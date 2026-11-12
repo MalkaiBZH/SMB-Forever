@@ -339,15 +339,19 @@ local function Profession(code)
 end
 
 -- Niveaux : fenêtre des compétences (Classic) ou GetProfessions (API récente)
+local premiereLecture = true  -- pas d'annonce « nouveau métier » à la première lecture de la session
+local absences = {}           -- [code] = lectures consécutives où ce métier manquait
+
 local function LireNiveaux()
-	local vus, replie, lu = {}, false, false
+	local vus, replie, lu, lignes = {}, false, false, 0
 	if GetNumSkillLines and GetSkillLineInfo then
 		lu = true
-		for i = 1, GetNumSkillLines() do
+		for i = 1, (GetNumSkillLines() or 0) do
 			local nom, entete, ouvert, rang, _, _, max = GetSkillLineInfo(i)
 			if entete then
 				if not ouvert then replie = true end
-			else
+			elseif nom then
+				lignes = lignes + 1
 				local m = MetierParNom(nom)
 				if m and rang then vus[m.code] = { rang, max } end
 			end
@@ -359,15 +363,21 @@ local function LireNiveaux()
 			local idx = liste[i]
 			if idx then
 				local nom, _, rang, max = GetProfessionInfo(idx)
+				if nom then lignes = lignes + 1 end
 				local m = MetierParNom(nom)
 				if m and rang then vus[m.code] = { rang, max } end
 			end
 		end
 	end
-	if not lu then return end
+	-- compétences pas encore chargées (juste après la connexion) : on ne conclut rien
+	if not lu or (lignes == 0 and next(MesDonnees().profs) ~= nil) then return end
 
 	local moi = MesDonnees()
 	local change = false
+	-- pas d'annonce à la première lecture de la session, ni quand aucun métier n'était connu
+	-- (première installation, nouveau personnage) : tout paraîtrait « nouveau »
+	local annoncer = pret and not premiereLecture and next(moi.profs) ~= nil
+	if pret then premiereLecture = false end
 	for code, v in pairs(vus) do
 		local avant = moi.profs[code] and moi.profs[code].n
 		local p = Profession(code)
@@ -376,7 +386,7 @@ local function LireNiveaux()
 			change = true
 		end
 		-- annonce à la guilde (bulle chez les autres) : nouveau métier, ou palier de 75 franchi
-		if pret and ns.AnnonceMetier and v[1] then
+		if annoncer and ns.AnnonceMetier and v[1] then
 			if not avant then
 				ns.AnnonceMetier("nouveau", NomMetier(PAR_CODE[code]), v[1])
 			elseif math.floor(v[1] / 75) > math.floor(avant / 75) then
@@ -384,12 +394,18 @@ local function LireNiveaux()
 			end
 		end
 	end
-	-- métier oublié (seulement si aucune catégorie n'est repliée : sinon on ne voit pas tout)
+	-- métier oublié : seulement si aucune catégorie n'est repliée (sinon on ne voit pas tout), et
+	-- après deux lectures consécutives où il manque (une lecture incomplète n'efface rien)
+	for code in pairs(vus) do absences[code] = nil end
 	if not replie then
 		for code in pairs(moi.profs) do
 			if not vus[code] then
-				moi.profs[code] = nil
-				change = true
+				absences[code] = (absences[code] or 0) + 1
+				if absences[code] >= 2 then
+					moi.profs[code] = nil
+					absences[code] = nil
+					change = true
+				end
 			end
 		end
 	end
@@ -451,6 +467,11 @@ local function Fusionner(m, rang, max, nouvelles, source, remplacer)
 end
 
 local function LireMetierClassique()
+	-- fenêtre de métier d'un autre joueur (lien de métier) : ce ne sont pas mes recettes
+	if IsTradeSkillLinked then
+		local okLie, lie = pcall(IsTradeSkillLinked)
+		if okLie and lie then return end
+	end
 	local okL, nom, rang, max = pcall(GetTradeSkillLine)
 	if not okL then return end
 	local m = MetierParNom(nom)
