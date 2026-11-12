@@ -176,6 +176,7 @@ local function Relayer(pour)
 		if not g then return end
 		for cle, e in pairs(g) do
 			if type(e) == "table" and cle ~= pour and not cle:find("#test", 1, true)
+				and (e.vu or 0) >= Maintenant() - OUBLI and not (ns.MembreGuilde and ns.MembreGuilde(cle) == false)
 				and not (relayees[cle] and GetTime() - relayees[cle] < 30) then
 				local mots = {}
 				for objet, qte in pairs(e.liste or {}) do mots[#mots + 1] = B36(objet) .. ":" .. qte end
@@ -289,7 +290,7 @@ end
 ns.ChercherObjets = ChercherObjets
 
 local function Depuis(t)
-	local s = time() - (t or time())
+	local s = Maintenant() - (t or Maintenant())
 	if s < 3600 then return math.max(1, math.floor(s / 60)) .. " min" end
 	if s < 86400 then return math.floor(s / 3600) .. " h" end
 	return math.floor(s / 86400) .. " j"
@@ -433,7 +434,7 @@ Maj = function()
 	-- besoins de la guilde : ce que je sais fabriquer d'abord, puis les membres en ligne
 	local g = Guilde() or {}
 	local tous = {}
-	local limite = time() - OUBLI
+	local limite = Maintenant() - OUBLI
 	for cle, e in pairs(g) do
 		if type(e) ~= "table" or (e.vu or 0) < limite then
 			g[cle] = nil
@@ -823,6 +824,18 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 	elseif event == "PLAYER_ENTERING_WORLD" and premiere then
 		premiere = false
 		debut = GetTime()
+		-- purge : listes de besoins sans nouvelles depuis 30 jours (toutes guildes)
+		pcall(function()
+			local guildes = Racine().guildes
+			local limite = Maintenant() - OUBLI
+			for _, g in pairs(guildes) do
+				if type(g) == "table" then
+					for cle, e in pairs(g) do
+						if type(e) ~= "table" or (e.vu or 0) < limite then g[cle] = nil end
+					end
+				end
+			end
+		end)
 		C_Timer.After(20, function()
 			pret = true
 			if next(MesBesoins()) then EnvoyerMaListe() end
