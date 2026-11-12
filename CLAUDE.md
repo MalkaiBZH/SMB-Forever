@@ -34,7 +34,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
 - `GuildUp_Options.lua` : fenêtre d'options, `/smb diag`, réinitialisation, commandes `/smb`.
 - Les fichiers découpés accèdent à `GuildUpDB` par un mandataire `db` (même nom qu'avant) et reprennent les fonctions partagées en tête de fichier (`local Message = ns.Coeur.Message`).
 - Groupes : `GuildUp_Catalogue.lua` (contenus de la recherche de groupe), `GuildUp_Groupes.lua` (protocole, état partagé `ns.Groupes.etat`, actions), `GuildUp_GroupesFenetre.lua` (interface).
-- `GuildUp_Reperes.lua` : repères des membres de la même carte en haut de l'écran (HUD), calculés à partir des
+- `GuildUp_Reperes.lua` : repères des membres de la même carte à l'écran (HUD : au-dessus de la tête, en haut, ou au bord), calculés à partir des
   positions de `GuildUp_Carte.lua` (`ns.PositionsMembres`, `ns.MaPosition`, portrait dans le message `P`) ; pas de préfixe propre.
 - `GuildUp_Config.lua` : **réglages propres à la guilde** (`ns.Config` : nom public, cri de guilde, emote animée,
   membre vedette). Chargé en premier, sans dépendance ; les autres modules le lisent via `ns.Config`.
