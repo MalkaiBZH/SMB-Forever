@@ -7,7 +7,7 @@ local NOM_ADDON, ns = ...
 
 ns.Config = {
 	-- Nom affiché dans la fenêtre « Nouveautés » (ex. "GuildUpSMB — Les Gardiens")
-	nomPublic = "GuildUpSMB",
+	nomPublic = "SMB Forever",
 
 	-- Cri de guilde : quand un membre l'écrit (seul, ou suivi de « ! »), une emote monte à l'écran
 	-- de toute la guilde. Lettres sans accent ou chiffres, sans espace. false pour désactiver.

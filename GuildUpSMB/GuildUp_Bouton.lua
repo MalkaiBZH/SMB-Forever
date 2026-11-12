@@ -328,16 +328,19 @@ local function CreerBulle()
 	f:SetFrameStrata("FULLSCREEN_DIALOG")
 	f:SetToplevel(true)
 	f:SetClampedToScreen(true)
-	f:SetBackdrop({
-		bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-		tile = true, tileSize = 16, edgeSize = 14,
-		insets = { left = 3, right = 3, top = 3, bottom = 3 },
-	})
-	f:SetBackdropColor(0, 0, 0, 0.85)
-	f:SetBackdropBorderColor(1, 0.82, 0, 1)
+	-- style de la fenêtre SMB Forever : fond sombre, bordure dorée (le cri de guilde la recolore)
+	ns.UI.Habiller(f, { 0.067, 0.055, 0.043, 0.96 }, ns.UI.C.orFonce)
+	f:SetBackdropBorderColor(ns.UI.C.orFonce[1], ns.UI.C.orFonce[2], ns.UI.C.orFonce[3], 1)
 	f:SetScale(1.15) -- un peu plus grande que les infobulles du jeu
+	-- filet doré sous le bord du haut
+	local filet = f:CreateTexture(nil, "ARTWORK")
+	filet:SetColorTexture(ns.UI.C.ors[1], ns.UI.C.ors[2], ns.UI.C.ors[3], 0.5)
+	filet:SetHeight(2)
+	filet:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -1)
+	filet:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -1)
+	f.filet = filet
 	f.titre = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	f.titre:SetTextColor(ns.UI.C.ors[1], ns.UI.C.ors[2], ns.UI.C.ors[3])
 	f.titre:SetPoint("TOPLEFT", f, "TOPLEFT", 12, -10)
 	f.texte = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	f.texte:SetPoint("TOPLEFT", f.titre, "BOTTOMLEFT", 0, -4)

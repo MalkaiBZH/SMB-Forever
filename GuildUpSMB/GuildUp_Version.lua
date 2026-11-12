@@ -2,6 +2,8 @@
 -- Chaque GuildUpSMB annonce sa version à la guilde à la connexion ("V~1.3.0", préfixe "GuildUpVer").
 -- Si un membre a une version plus récente, une bulle propose de mettre l'addon à jour (CurseForge).
 -- Si un membre a une version plus ancienne, on lui renvoie la nôtre pour qu'il soit prévenu.
+-- Fenêtre « Nouveautés » (ns.MontrerNouveautes, /smb nouveautes) : notes de chaque version, au style
+-- sombre et doré du kit ns.UI ; elle s'ouvre seule une fois après une mise à jour.
 
 local NOM_ADDON, ns = ...
 
@@ -84,10 +86,15 @@ end
 -- (/smb nouveautes pour la rouvrir)
 --------------------------------------------------------------------------------
 
-local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "GuildUpSMB" -- GuildUp_Config.lua
+local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.5.0"] = {
+		"|cffffd100Accueil|r au même style que les autres pages : portrait du chef et places par rôle dans les groupes ouverts, portrait de qui appelle à l'aide, noms à la couleur de leur classe.",
+		"|cffffd100Bulles de notification|r et |cffffd100menus|r (menu rapide du médaillon, personnages…) aux couleurs de la fenêtre SMB Forever.",
+		"Cette fenêtre |cffffd100Nouveautés|r a elle aussi fait peau neuve.",
+	},
 	["2.4.1"] = {
 		"Les noms des membres (dons, besoins) sont à la couleur de leur classe, et les portraits montrent l'icône de leur classe, d'après la liste de guilde.",
 	},
@@ -168,78 +175,167 @@ local NOTES = {
 	},
 }
 
+-- Apparence : kit ns.UI (GuildUp_Style.lua), comme la fenêtre SMB Forever. Cadre plat sombre à bordure
+-- dorée ; bandeau (emblème, titre, sous-titre, fermeture) par lequel on la déplace ; liste défilante
+-- (molette) d'un bloc par version, la version montrée mise en avant dans une carte ; bouton « Super ! ».
+local MEDIA = "Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\"
+local LARGEUR, HAUTEUR, HAUTEUR_TETE = 500, 470, 58
+local LARGEUR_BLOC = LARGEUR - 38             -- liste (marges 16 et 10), place de la barre de défilement
+local LARGEUR_NOTE = LARGEUR_BLOC - 26 - 12   -- après la puce, marge droite du bloc
+
 local fenNotes
+
+-- Bloc d'une version (réutilisé d'un affichage à l'autre) : titre, marque « ta version », puces
+local function Bloc(f, n)
+	if f.blocs[n] then return f.blocs[n] end
+	local UI, C = ns.UI, ns.UI.C
+	local b = UI.Cadre(f.liste.contenu, { 0, 0, 0, 0 })
+	b:SetWidth(LARGEUR_BLOC)
+	b.titre = UI.Texte(b, "GameFontNormalLarge", C.ors)
+	b.titre:SetPoint("TOPLEFT", b, "TOPLEFT", 12, -10)
+	b.marque = UI.Texte(b, "GameFontHighlightSmall", C.vert)
+	b.marque:SetPoint("LEFT", b.titre, "RIGHT", 10, 0)
+	b.puces = {}
+	f.blocs[n] = b
+	return b
+end
+
+-- Une note : puce dorée et texte à la ligne, aligné après la puce
+local function Puce(b, i)
+	if b.puces[i] then return b.puces[i] end
+	local UI, C = ns.UI, ns.UI.C
+	local p = {}
+	p.point = UI.Texte(b, "GameFontHighlight", C.orFonce)
+	p.point:SetText("•")
+	p.texte = UI.Texte(b, "GameFontHighlight", C.texte)
+	p.texte:SetWordWrap(true)
+	p.texte:SetWidth(LARGEUR_NOTE)
+	p.texte:SetSpacing(2)
+	b.puces[i] = p
+	return p
+end
+
+local function CreerFenetre()
+	local UI = ns.UI
+	local C = UI.C
+	local f = CreateFrame("Frame", "GuildUpNouveautes", UIParent, "BackdropTemplate")
+	UI.Habiller(f, C.fond, C.bordFort)
+	f:SetSize(LARGEUR, HAUTEUR)
+	f:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
+	f:SetFrameStrata("DIALOG") -- au-dessus de la fenêtre SMB Forever (HIGH)
+	f:SetToplevel(true)
+	f:SetClampedToScreen(true)
+	f:SetMovable(true)
+	f:EnableMouse(true)
+	f:RegisterForDrag("LeftButton")
+	f:SetScript("OnDragStart", f.StartMoving)
+	f:SetScript("OnDragStop", f.StopMovingOrSizing)
+	f:Hide()
+	tinsert(UISpecialFrames, "GuildUpNouveautes") -- Échap ferme
+
+	-- bandeau : emblème, titre, sous-titre, fermeture ; on le glisse pour déplacer
+	local tete = UI.Cadre(f, C.bandeau)
+	tete:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -1)
+	tete:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -1)
+	tete:SetHeight(HAUTEUR_TETE)
+	tete:EnableMouse(true)
+	tete:RegisterForDrag("LeftButton")
+	tete:SetScript("OnDragStart", function() f:StartMoving() end)
+	tete:SetScript("OnDragStop", function() f:StopMovingOrSizing() end)
+	local filet = UI.Filet(tete)
+	filet:SetPoint("BOTTOMLEFT", tete, "BOTTOMLEFT", 0, 0)
+	filet:SetPoint("BOTTOMRIGHT", tete, "BOTTOMRIGHT", 0, 0)
+	local embleme = tete:CreateTexture(nil, "ARTWORK")
+	embleme:SetTexture(MEDIA .. "gu_emote")
+	embleme:SetSize(36, 36)
+	embleme:SetPoint("LEFT", tete, "LEFT", 12, 0)
+	f.titre = UI.Texte(tete, "GameFontNormalLarge", C.ors)
+	f.titre:SetPoint("TOPLEFT", embleme, "TOPRIGHT", 10, -2)
+	f.sousTitre = UI.Texte(tete, "GameFontHighlightSmall", C.gris)
+	f.sousTitre:SetPoint("TOPLEFT", f.titre, "BOTTOMLEFT", 0, -3)
+	f.sousTitre:SetText("Ce qui a changé, de la plus récente à la plus ancienne")
+	-- croix du jeu comme la fenêtre SMB Forever (bouton plat si le modèle manque)
+	local ok, fermer = pcall(CreateFrame, "Button", nil, tete, "UIPanelCloseButton")
+	if not ok or not fermer then fermer = UI.Bouton(tete, "X", "fantome", 24, 24) end
+	fermer:SetPoint("RIGHT", tete, "RIGHT", -6, 0)
+	fermer:SetScript("OnClick", function() f:Hide() end)
+	f.CloseButton = fermer -- (pas de son de clic : la fenêtre joue le sien en se fermant)
+
+	-- notes de toutes les versions, la plus récente en haut (molette)
+	f.liste = UI.Liste(f)
+	f.liste:SetPoint("TOPLEFT", tete, "BOTTOMLEFT", 15, -12)
+	f.liste:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -10, 54)
+	f.blocs = {}
+
+	-- pied : filet et bouton or
+	local filetBas = UI.Filet(f)
+	filetBas:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 1, 46)
+	filetBas:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1, 46)
+	f.ok = UI.Bouton(f, "Super !", "or", 120, 26)
+	f.ok:SetPoint("BOTTOM", f, "BOTTOM", 0, 10)
+	f.ok:SetScript("OnClick", function() f:Hide() end)
+	f.ok.sonGuildUpSMB = true -- le kit joue déjà le son de clic (pas de second son par AvecSons)
+	if ns.AvecSons then ns.AvecSons(f, "fenetre") end
+	return f
+end
+
 local function MontrerNouveautes(version)
 	version = version or MA_VERSION
 	if not NOTES[version] then version = ORDRE[1] end
-	if not fenNotes then
-		local f = ns.FenetreDeplacable("GuildUpNouveautes", 470, 440)
-		f:ClearAllPoints()
-		f:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
-		f:SetToplevel(true)
-		local barre = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-		if not f.TitleText then barre:SetPoint("TOP", f, "TOP", 0, -6) end
-		barre:SetText("Nouveautés")
-		f.entete = f:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
-		f.entete:SetPoint("TOP", f, "TOP", 0, -36)
-		f.entete:SetTextColor(1, 0.82, 0)
-		f.sous = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-		f.sous:SetPoint("TOP", f.entete, "BOTTOM", 0, -4)
-		f.sous:SetText("Mettez à jour votre addon")
-		f.sous:SetTextColor(0.8, 0.8, 0.8)
-		-- notes de toutes les versions, la plus récente en haut (défilement)
-		local defile = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
-		defile:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -86)
-		defile:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -34, 46)
-		local contenu = CreateFrame("Frame", nil, defile)
-		contenu:SetSize(410, 10)
-		defile:SetScrollChild(contenu)
-		f.defile, f.contenu = defile, contenu
-		f.blocs = {}
-		f.ok = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-		f.ok:SetSize(110, 24)
-		f.ok:SetPoint("BOTTOM", f, "BOTTOM", 0, 12)
-		f.ok:SetText("Super !")
-		f.ok:SetScript("OnClick", function() f:Hide() end)
-		if ns.AvecSons then ns.AvecSons(f, "fenetre") end
-		fenNotes = f
-	end
+	if not ns.UI then return end -- (GuildUp_Style.lua absent)
+	if not fenNotes then fenNotes = CreerFenetre() end
 	local f = fenNotes
-	f.entete:SetText(("%s %s est sortie !"):format(NOM_PUBLIC, version))
-	local y = 0
-	local n = 0
+	local C = ns.UI.C
+	f.titre:SetText(("Nouveautés · %s %s"):format(NOM_PUBLIC, version))
+	local y, n = 0, 0
 	for _, v in ipairs(ORDRE) do
 		if Comparer(v, version) <= 0 and NOTES[v] then
 			n = n + 1
-			local b = f.blocs[n]
-			if not b then
-				b = {}
-				b.titre = f.contenu:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-				b.texte = f.contenu:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-				b.texte:SetWidth(400)
-				b.texte:SetJustifyH("LEFT")
-				b.texte:SetSpacing(3)
-				f.blocs[n] = b
+			local b = Bloc(f, n)
+			-- la version montrée dans une carte bordée d'or, les anciennes plus discrètes
+			local enAvant = (v == version)
+			b:ClearAllPoints()
+			b:SetPoint("TOPLEFT", f.liste.contenu, "TOPLEFT", 0, -y)
+			if b.SetBackdropColor then
+				if enAvant then
+					b:SetBackdropColor(unpack(C.carte))
+					b:SetBackdropBorderColor(unpack(C.bordMoyen))
+				else
+					b:SetBackdropColor(0, 0, 0, 0)
+					b:SetBackdropBorderColor(0, 0, 0, 0)
+				end
 			end
-			b.titre:ClearAllPoints()
-			b.titre:SetPoint("TOPLEFT", f.contenu, "TOPLEFT", 4, -y)
-			b.titre:SetText(v == version and ("Version " .. v) or ("|cffaaaaaaVersion " .. v .. "|r"))
-			b.texte:ClearAllPoints()
-			b.texte:SetPoint("TOPLEFT", b.titre, "BOTTOMLEFT", 0, -6)
-			local lignes = {}
-			for _, l in ipairs(NOTES[v]) do lignes[#lignes + 1] = "• " .. l end
-			b.texte:SetText(table.concat(lignes, "\n"))
-			-- les anciennes versions un peu plus discrètes
-			if v == version then b.texte:SetAlpha(1) else b.texte:SetAlpha(0.75) end
-			b.titre:Show()
-			b.texte:Show()
-			y = y + b.titre:GetStringHeight() + 6 + b.texte:GetStringHeight() + 18
+			b.titre:SetFontObject(enAvant and "GameFontNormalLarge" or "GameFontNormal")
+			b.titre:SetTextColor(unpack(enAvant and C.ors or C.orFonce))
+			b.titre:SetText("Version " .. v)
+			b.marque:SetText(v == MA_VERSION and "ta version" or "")
+			local h = 10 + b.titre:GetStringHeight() + 8
+			for i, note in ipairs(NOTES[v]) do
+				local p = Puce(b, i)
+				p.point:ClearAllPoints()
+				p.point:SetPoint("TOPLEFT", b, "TOPLEFT", 12, -h)
+				p.texte:ClearAllPoints()
+				p.texte:SetPoint("TOPLEFT", b, "TOPLEFT", 26, -h)
+				p.texte:SetText(note) -- (les codes couleur |cff…|r des notes sont gardés)
+				p.texte:SetAlpha(enAvant and 1 or 0.8)
+				p.point:Show()
+				p.texte:Show()
+				h = h + p.texte:GetStringHeight() + 6
+			end
+			for i = #NOTES[v] + 1, #b.puces do b.puces[i].point:Hide(); b.puces[i].texte:Hide() end
+			h = h + 6
+			b:SetHeight(h)
+			b:Show()
+			y = y + h + 8
 		end
 	end
-	for i = n + 1, #f.blocs do f.blocs[i].titre:Hide(); f.blocs[i].texte:Hide() end
-	f.contenu:SetHeight(math.max(10, y))
-	f.defile:SetVerticalScroll(0)
+	for i = n + 1, #f.blocs do f.blocs[i]:Hide() end
+	f.liste:Hauteur(y)
+	f.liste:Haut()
+	-- même taille que la fenêtre SMB Forever (/smb taille)
+	if ns.EchelleInterface then f:SetScale(ns.EchelleInterface() or 1) end
 	f:Show()
+	f:Raise()
 end
 ns.MontrerNouveautes = MontrerNouveautes
 

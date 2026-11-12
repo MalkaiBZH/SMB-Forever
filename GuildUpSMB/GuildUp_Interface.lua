@@ -80,24 +80,64 @@ for _, s in ipairs(SECTIONS) do PAR_ID[s.id] = s end
 
 local CarteAccueil = UI.Carte
 
--- ligne d'une carte : icône, titre, sous-titre, bouton à droite
+-- ligne d'une carte : portrait (un joueur) ou icône (un objet), titre, sous-titre, places par rôle
+-- éventuelles, bouton à droite
 local function LigneCarte(c, i)
 	local l = CreateFrame("Frame", nil, c)
-	l:SetHeight(36)
-	l:SetPoint("TOPLEFT", c, "TOPLEFT", 12, -36 - (i - 1) * 42)
+	l:SetHeight(38)
+	l:SetPoint("TOPLEFT", c, "TOPLEFT", 12, -36 - (i - 1) * 44)
 	l:SetPoint("RIGHT", c, "RIGHT", -12, 0)
 	l.icone = l:CreateTexture(nil, "ARTWORK")
-	l.icone:SetSize(30, 30)
+	l.icone:SetSize(32, 32)
 	l.icone:SetPoint("LEFT", l, "LEFT", 0, 0)
-	l.bouton = Bouton(l, "", "or", 78, 22)
+	l.portrait = UI.Portrait(l, 34)
+	l.portrait:SetPoint("LEFT", l, "LEFT", -1, 0)
+	l.portrait:Hide()
+	l.bouton = Bouton(l, "", "or", 88, 24)
 	l.bouton:SetPoint("RIGHT", l, "RIGHT", 0, 0)
+	l.places = UI.Places(l, 5)
+	l.places:SetPoint("BOTTOMRIGHT", l.bouton, "BOTTOMLEFT", -10, -2)
+	l.places:SetScale(0.8)
+	l.places:Hide()
 	l.titre = Texte(l, "GameFontHighlight", C.texte)
-	l.titre:SetPoint("TOPLEFT", l.icone, "TOPRIGHT", 8, -1)
+	l.titre:SetPoint("TOPLEFT", l.icone, "TOPRIGHT", 8, 0)
 	l.titre:SetPoint("RIGHT", l.bouton, "LEFT", -8, 0)
 	l.sous = Texte(l, "GameFontHighlightSmall", C.gris)
-	l.sous:SetPoint("TOPLEFT", l.titre, "BOTTOMLEFT", 0, -3)
+	l.sous:SetPoint("TOPLEFT", l.titre, "BOTTOMLEFT", 0, -4)
 	l.sous:SetPoint("RIGHT", l.bouton, "LEFT", -8, 0)
+	-- un joueur (portrait) ou un objet / contenu (icône carrée)
+	l.Joueur = function(self, cle, classe)
+		self.icone:Hide()
+		self.portrait:Poser(cle, classe)
+		self.portrait:Show()
+	end
+	l.Icone = function(self, texture)
+		self.portrait:Hide()
+		self.icone:SetTexture(texture or "Interface\\Icons\\INV_Misc_QuestionMark")
+		self.icone:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		self.icone:Show()
+	end
+	-- places = liste { role, pris } ou nil ; le sous-titre s'arrête avant elles
+	l.Places = function(self, places)
+		self.sous:ClearAllPoints()
+		self.sous:SetPoint("TOPLEFT", self.titre, "BOTTOMLEFT", 0, -4)
+		if places and #places > 0 and #places <= 5 then
+			self.places:Poser(places)
+			self.places:Show()
+			self.sous:SetPoint("RIGHT", self.places, "LEFT", -6, 0)
+		else
+			self.places:Hide()
+			self.sous:SetPoint("RIGHT", self.bouton, "LEFT", -8, 0)
+		end
+	end
 	return l
+end
+
+-- nom d'un membre à la couleur de sa classe (liste de guilde, position partagée)
+local function NomColore(nom)
+	local cle = ns.Normaliser and ns.Normaliser(nom or "")
+	if ns.NomMembreColore then return ns.NomMembreColore(cle, nom or "?") end
+	return NomCourt(nom or "?")
 end
 
 -- Position sur le monde d'un point de carte (nord, ouest), pour les distances
@@ -165,8 +205,7 @@ local function CreerAccueil(parent)
 		local m = CreateFrame("Button", nil, zone)
 		m:SetSize((largeur - 28) / 5, 44)
 		m:SetPoint("TOPLEFT", zone, "TOPLEFT", 14 + (i - 1) * (largeur - 28) / 5, -38)
-		m.portrait = m:CreateTexture(nil, "ARTWORK")
-		m.portrait:SetSize(42, 42)
+		m.portrait = UI.Portrait(m, 42)
 		m.portrait:SetPoint("LEFT", m, "LEFT", 0, 0)
 		m.nom = Texte(m, "GameFontHighlight")
 		m.nom:SetPoint("TOPLEFT", m.portrait, "TOPRIGHT", 8, -6)
@@ -245,7 +284,7 @@ local function CreerAccueil(parent)
 			local v = membres[i]
 			if v then
 				m.cle, m.nomComplet = v.cle, v.p.nom
-				m.portrait:SetTexture(v.p.portrait)
+				m.portrait:Poser(v.cle, v.p.classe)
 				m.nom:SetText(NomCourt(v.p.nom):match("^(%S+)") or NomCourt(v.p.nom))
 				m.nom:SetTextColor(CouleurClasse(v.p.classe))
 				local classe = v.p.classe and LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[v.p.classe] or ""
@@ -269,9 +308,15 @@ local function CreerAccueil(parent)
 			local a = liste[i]
 			if a then
 				local info = ns.Groupes.InfoContenu and ns.Groupes.InfoContenu(a.code) or {}
-				if info.icone and ns.Groupes.PoserIcone then ns.Groupes.PoserIcone(l.icone, info.icone)
-				else l.icone:SetTexture("Interface\\Icons\\INV_Misc_GroupNeedMore") end
+				l:Joueur(ns.Normaliser and ns.Normaliser(a.chef or ""), a.classe)
 				l.titre:SetText(info.nom or "?")
+				local places = {}
+				for _, r in ipairs({ "tank", "heal", "dps" }) do
+					for n = 1, (a.besoin and a.besoin[r] or 0) do
+						places[#places + 1] = { role = r, pris = n <= (a.pris and a.pris[r] or 0) }
+					end
+				end
+				l:Places(places)
 				local cherche = {}
 				for _, r in ipairs({ "tank", "heal", "dps" }) do
 					if ns.Groupes.PlacesLibres and (ns.Groupes.PlacesLibres(a, r) or 0) > 0 then
@@ -319,8 +364,9 @@ local function CreerAccueil(parent)
 		for i, l in ipairs(aide.lignes) do
 			local a = appels[i]
 			if a then
-				l.icone:SetTexture("Interface\\Icons\\Ability_Warrior_BattleShout")
-				l.titre:SetText(NomCourt(a.nom) .. " a besoin d'aide")
+				l:Joueur(ns.Normaliser and ns.Normaliser(a.nom or ""))
+				l:Places(nil)
+				l.titre:SetText(NomColore(a.nom) .. " a besoin d'aide")
 				l.sous:SetText(((a.zone ~= "" and a.zone) or "?") .. " · niv. " .. (a.niveau or "?")
 					.. ((a.texte and a.texte ~= "") and (" · « " .. a.texte .. " »") or ""))
 				l.bouton:Ecrire("Sur la carte")
@@ -343,8 +389,9 @@ local function CreerAccueil(parent)
 			if d then
 				local nom, lien, _, icone = ns.InfoObjet(d.objet)
 				if not nom and ns.Precharger then ns.Precharger(d.objet) end
-				l.icone:SetTexture(icone or "Interface\\Icons\\INV_Misc_QuestionMark")
-				l.titre:SetText(NomCourt(d.nom) .. " te demande " .. (lien or nom or "un objet"))
+				l:Icone(icone)
+				l:Places(nil)
+				l.titre:SetText(NomColore(d.nom) .. " te demande " .. (lien or nom or "un objet"))
 				l.sous:SetText((d.vu and "" or "|cff6fd08cnouvelle|r · ") .. IlYa(d.quand))
 				l.bouton:Ecrire("Voir")
 				l.bouton:Activer(true)
@@ -365,8 +412,9 @@ local function CreerAccueil(parent)
 			if b then
 				local nom, lien, _, icone = ns.InfoObjet(b.objet)
 				if not nom and ns.Precharger then ns.Precharger(b.objet) end
-				l.icone:SetTexture(icone or "Interface\\Icons\\INV_Misc_QuestionMark")
-				l.titre:SetText(NomCourt(b.nom) .. " cherche " .. ((b.qte or 0) > 0 and (b.qte .. " ") or "") .. (lien or nom or "un objet"))
+				l:Icone(icone)
+				l:Places(nil)
+				l.titre:SetText(NomColore(b.nom) .. " cherche " .. ((b.qte or 0) > 0 and (b.qte .. " ") or "") .. (lien or nom or "un objet"))
 				l.sous:SetText("tu sais le fabriquer" .. (b.enLigne and " · |cff6fd08cen ligne|r" or " · hors ligne"))
 				l.bouton:Ecrire("Chuchoter")
 				l.bouton:Activer(b.enLigne)

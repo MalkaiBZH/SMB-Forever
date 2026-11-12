@@ -150,7 +150,10 @@ ns.CadreMenu = function(nom)
 	local m = CreateFrame("Frame", nom, UIParent, "BackdropTemplate")
 	m:SetFrameStrata("FULLSCREEN_DIALOG")
 	m:SetClampedToScreen(true)
-	if m.SetBackdrop then
+	-- style de la fenêtre SMB Forever (kit ns.UI, chargé après ce fichier mais présent à l'appel)
+	if ns.UI then
+		ns.UI.Habiller(m, { 0.05, 0.043, 0.035, 0.98 }, ns.UI.C.bordFort)
+	elseif m.SetBackdrop then
 		m:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
 			edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14,
 			insets = { left = 3, right = 3, top = 3, bottom = 3 } })
@@ -169,9 +172,12 @@ ns.BoutonMenu = function(m, i)
 	if not b then
 		b = CreateFrame("Button", nil, m)
 		b:SetHeight(20)
-		b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
-		b.texte = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		local survol = b:CreateTexture(nil, "HIGHLIGHT")
+		survol:SetAllPoints()
+		survol:SetColorTexture(1, 1, 1, 0.08)
+		b.texte = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 		b.texte:SetPoint("LEFT", b, "LEFT", 8, 0)
+		if ns.UI and ns.UI.SonClic then ns.UI.SonClic(b) end
 		m.boutons[i] = b
 	end
 	return b
