@@ -8,14 +8,22 @@ l'addon voient et partagent ces informations**.
 
 ## Installation
 
+Le plus simple, sous Windows : **[télécharger GuildUpSMB-MiseAJour.exe](https://github.com/MalkaiBZH/SMB-Forever/releases/latest/download/GuildUpSMB-MiseAJour.exe)**
+et le lancer : il installe l'addon et le tient à jour tout seul (voir ci-dessous).
+
+À la main :
+
 1. Copier le dossier `GuildUpSMB/` dans `World of Warcraft/<version du client>/Interface/AddOns/`.
 2. Lancer le jeu (ou `/reload`) et vérifier que « GuildUpSMB » est coché dans la liste des addons.
 3. Taper `/smb` pour ouvrir les options, ou cliquer sur le bouton de la mini-carte.
 
 ### Mise à jour automatique (Windows)
 
-`GuildUpSMB-MiseAJour.exe` installe l'addon et le garde à jour depuis la branche `main` de ce dépôt.
-Il vit dans la zone de notification (icône de la chope, à côté de l'horloge) :
+[`GuildUpSMB-MiseAJour.exe`](https://github.com/MalkaiBZH/SMB-Forever/releases/latest) installe l'addon
+et le garde à jour depuis la branche `main` de ce dépôt. Au premier lancement, Windows peut afficher
+« Windows a protégé votre ordinateur » (programme non signé) : **Informations complémentaires**, puis
+**Exécuter quand même**. Le programme vit ensuite dans la zone de notification (icône de la chope, à
+côté de l'horloge) :
 
 - il trouve le dossier `_forever_` du jeu (sinon il le demande) et vérifie au lancement puis toutes
   les 15 minutes (5 min à 1 h, réglable) ; il ne télécharge que si un nouveau commit est arrivé ;
@@ -25,7 +33,12 @@ Il vit dans la zone de notification (icône de la chope, à côté de l'horloge)
   dans la zone de notification ; fermer la fenêtre l'y range, « Quitter » (clic droit sur l'icône)
   l'arrête ; le relancer rouvre sa fenêtre.
 
-Construction : `outils\MiseAJour\construire.bat` (compilateur C# fourni avec Windows, rien à installer).
+Inutile de le retélécharger pour avoir les nouvelles versions de l'addon ; seule une nouvelle version
+du programme lui-même passe par une nouvelle release.
+
+Construction : `outils\MiseAJour\construire.bat` (compilateur C# fourni avec Windows, rien à installer),
+puis publication du `.exe` dans une release `miseajour-<version>` marquée « latest » (le lien de
+téléchargement ci-dessus suit toujours la dernière).
 Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
 
 ## Fonctionnalités
