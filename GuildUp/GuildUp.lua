@@ -1289,6 +1289,20 @@ local function SurActivation()
 	if db.actif and db.nomsAllies then ImposerCVars() else RendreCVarsAllies() end
 end
 
+-- Réglages hors DEFAUT, remis à zéro avec les autres (les données des modules : carnets, dons,
+-- besoins, projets, identité, cvarsAvant… sont gardées)
+local REGLAGES_HORS_DEFAUT = {
+	"notifs", "barre", "annoncesGuilde", "emoteGU", "voletNotifs", "coursesCompact",
+	"afficherDebug", "tousNiveaux", "styleJeu", "rappelGroupe", "portee",
+}
+
+-- Bouton « Réinitialiser » et /smb reset : seulement les réglages
+local function ReinitialiserReglages()
+	for _, k in ipairs(REGLAGES_HORS_DEFAUT) do db[k] = nil end
+	for k, v in pairs(DEFAUT) do db[k] = v end
+	SurActivation()
+end
+
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("ADDON_LOADED")
 ev:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4)
@@ -1848,8 +1862,7 @@ local function CreerFenetre()
 	reset:SetPoint("BOTTOM", f, "BOTTOM", 0, 14)
 	reset:SetText("Réinitialiser")
 	reset:SetScript("OnClick", function()
-		for k in pairs(db) do db[k] = nil end
-		for k, v in pairs(DEFAUT) do db[k] = v end
+		ReinitialiserReglages()
 		Appliquer()
 	end)
 
@@ -2649,9 +2662,8 @@ SlashCmdList.GUILDUP = function(msg)
 		if not a then Message("ex. /smb opacite 0.8"); return end
 		db.a = math.max(0, math.min(a, 1)); Message(("opacité : %.2f"):format(db.a))
 	elseif cmd == "reset" then
-		for k in pairs(db) do db[k] = nil end
-		for k, v in pairs(DEFAUT) do db[k] = v end
-		Message("réglages par défaut")
+		ReinitialiserReglages()
+		Message("réglages par défaut (tes carnets, dons, besoins et projets sont gardés)")
 	else
 		if cmd == "" then BasculerFenetre() else Aide() end
 		return
