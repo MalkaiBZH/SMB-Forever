@@ -9,7 +9,8 @@ l'addon voient et partagent ces informations**.
 ## Installation
 
 Le plus simple, sous Windows : **[télécharger SMB Forever Updater](https://github.com/MalkaiBZH/SMB-Forever/releases/latest/download/GuildUpSMB-MiseAJour.exe)**
-et le lancer : il installe l'addon et le tient à jour tout seul (voir ci-dessous).
+et le lancer : il installe l'addon et le tient à jour tout seul (voir ci-dessous). Sous Linux (jeu sous
+Wine ou Proton), voir [la version Linux](#mise-à-jour-automatique-linux).
 
 À la main :
 
@@ -40,6 +41,31 @@ Construction : `outils\MiseAJour\construire.bat` (compilateur C# fourni avec Win
 puis publication du `.exe` dans une release `miseajour-<version>` marquée « latest » (le lien de
 téléchargement ci-dessus suit toujours la dernière).
 Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
+
+### Mise à jour automatique (Linux)
+
+Même travail, à la façon Linux : un script Python 3 (rien d'autre à installer) lancé par un minuteur
+systemd de la session, à l'ouverture de session puis toutes les 15 minutes. Dans un terminal :
+
+```sh
+curl -fsSL -o /tmp/smb-forever-maj https://raw.githubusercontent.com/MalkaiBZH/SMB-Forever/main/outils/MiseAJour/GuildUpSMB-MiseAJour.py
+python3 /tmp/smb-forever-maj --installer
+```
+
+- il installe le programme dans `~/.local/bin/smb-forever-maj`, active le minuteur et fait un premier passage ;
+- il cherche le dossier `_forever_` dans les préfixes Wine et Proton (Lutris, Bottles, Steam, Heroic,
+  Faugus, `~/.wine`…), dans leur registre et sur leurs lecteurs ; sinon il le demande, ou
+  `smb-forever-maj --jeu "<dossier _forever_>"` ;
+- après une mise à jour, notification du bureau (`notify-send`) : `/reload`, relancer le jeu, ou rien
+  si le jeu est fermé ;
+- `smb-forever-maj` seul fait un passage en montrant le détail ; `--etat` montre le dossier du jeu, la
+  version installée et le minuteur ; `--intervalle 5|15|30|60` ; `--desinstaller` retire le minuteur et
+  le programme (l'addon reste) ;
+- il se met à jour lui-même quand `outils/MiseAJour/GuildUpSMB-MiseAJour.py` change sur `main` : pas de
+  release pour Linux.
+
+Sans systemd, `--installer` donne la ligne à ajouter avec `crontab -e`. Réglages et journal du dernier
+passage : `~/.config/GuildUpSMB-MiseAJour/`.
 
 ## Fonctionnalités
 

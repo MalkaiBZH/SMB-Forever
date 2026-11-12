@@ -140,3 +140,12 @@ Pas de build ni de tests automatisés : on teste **en jeu**, après `/reload`.
    en français, du point de vue du joueur.
 3. Si le changement touche les commandes ou les fonctionnalités, mettre à jour le `README.md` dans le même
    commit.
+
+## Programme de mise à jour (`outils/MiseAJour/`)
+
+- Windows : `MiseAJour.cs` → `GuildUpSMB-MiseAJour.exe` (`construire.bat`), publié dans une release `miseajour-<version>`.
+- Linux : `GuildUpSMB-MiseAJour.py` (Python 3.6+, bibliothèque standard seulement, minuteur systemd de l'utilisateur).
+  Les joueurs l'ont tiré de `main` et il se remplace lui-même quand ce fichier change : **tout commit sur `main`
+  qui le touche part chez eux**, le garder exécutable (`compile` vérifié avant remplacement) et en fins de ligne LF.
+- Les deux suivent la même logique (empreinte du commit de `main` dans `GuildUpSMB/.miseajour`, synchronisation,
+  conseil `/reload` ou relancer le jeu) : un changement de l'une se reporte dans l'autre.
