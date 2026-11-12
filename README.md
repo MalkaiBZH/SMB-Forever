@@ -124,7 +124,9 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
   S'inscrire / Peut-être / Se désinscrire (ou Accepter / Refuser pour une invitation), sans ouvrir le calendrier
   du jeu. Boutons « Créer un événement de guilde » et « Ouvrir le calendrier ». Une bulle prévient d'un nouvel
   événement de guilde ; un clic ouvre la page. Le prochain événement est aussi rappelé sur l'accueil.
-- **Identité** : un pseudo commun à tous ses personnages et son personnage principal, visibles au survol.
+- **Identité** : un pseudo commun à tous ses personnages et son personnage principal. Partout où l'addon
+  affiche un membre (listes, bulles, infobulles, HUD), il apparaît sous la forme **Pseudo (Prénom)** s'il a choisi
+  un pseudo (le prénom est la première partie de son nom en jeu) ; sinon sous son nom en jeu.
 - **Vérification de version** : prévient quand un membre a une version plus récente.
 - **Spécial guilde** (réglé dans `GuildUpSMB/GuildUp_Config.lua`) : le cri de guilde « 33 », qui fait apparaître à
   l'écran de toute la guilde deux chopes qui trinquent, et, en option, une fête quand un membre « vedette »

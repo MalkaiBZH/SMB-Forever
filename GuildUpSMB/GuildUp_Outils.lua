@@ -22,6 +22,24 @@ ns.NomCourt = function(nom)
 	return ((nom or "?"):gsub("#test$", ""):gsub(" %(test%)$", ""):gsub("%-", " "))
 end
 
+-- Nom à AFFICHER pour un joueur : « Pseudo (Prénom) » quand il a choisi un pseudo commun à ses personnages
+-- (GuildUp_Identite.lua, différent de son prénom), sinon comme ns.NomCourt (« Prénom Famille ») ; prenomSeul :
+-- sans pseudo, le prénom seul (place comptée : HUD, carte « Dans ta zone »). Le prénom reste toujours visible,
+-- pour ne pas confondre deux membres au même pseudo. Seulement pour l'affichage : pour chuchoter, inviter,
+-- comparer ou chercher, garder le vrai nom (ns.NomCourt, ns.NomListeGuilde).
+ns.NomJoueur = function(nom, prenomSeul)
+	local court = ns.NomCourt(nom)
+	local prenom = court:match("^(%S+)") or court
+	-- (protégé : un nom à afficher ne doit jamais faire échouer une page)
+	local ok, id = pcall(function() return nom and ns.Identite and ns.Identite(nom) end)
+	local pseudo = ok and type(id) == "table" and id.pseudo
+	if type(pseudo) == "string" and pseudo ~= "" then
+		local s = ns.Simplifier or string.lower
+		if s(pseudo) ~= s(prenom) then return pseudo .. " (" .. prenom .. ")" end
+	end
+	return prenomSeul and prenom or court
+end
+
 -- Durée écoulée depuis une date (heure du serveur) : « 5 min », « 3 h », « 2 j »
 ns.Depuis = function(t)
 	local s = math.max(0, ns.Maintenant() - (t or ns.Maintenant()))

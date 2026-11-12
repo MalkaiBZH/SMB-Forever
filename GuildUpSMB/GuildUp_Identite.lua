@@ -1,7 +1,8 @@
 -- GuildUpSMB : pseudo commun à tous ses personnages, et personnage principal / secondaires.
 --
--- Le pseudo n'apparaît QU'AU SURVOL (infobulles) : partout ailleurs (listes, bulles, chat, courrier)
--- on garde le vrai nom en jeu, pour ne jamais écrire au mauvais joueur si deux membres ont le même pseudo.
+-- Affichage : « Pseudo (Prénom) » partout où l'addon montre un membre (ns.NomJoueur, GuildUp_Outils.lua) ;
+-- le prénom en jeu reste visible pour ne pas confondre deux membres au même pseudo. Pour chuchoter, inviter,
+-- envoyer un courrier ou comparer, on garde toujours le vrai nom en jeu.
 --
 -- GuildUpDB est commun au compte : chaque personnage connecté s'y note (db.mesPersos), le joueur
 -- choisit son pseudo (db.pseudo) et son principal (db.persoPrincipal). Synchro (préfixe GuildUpId) :

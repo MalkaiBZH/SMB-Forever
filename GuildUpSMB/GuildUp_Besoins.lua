@@ -31,6 +31,7 @@ local Normaliser = ns.Normaliser
 local MaCle = ns.MaCle
 local TestSolo = ns.TestSolo
 local NomCourt = ns.NomCourt
+local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
 local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end end
 local Erreur = ns.Erreur
 
@@ -136,7 +137,7 @@ end
 local function AlerteBesoin(nom, objet, qte)
 	if not ns.Notifier then return end
 	local nomO, lien = InfoObjet(objet)
-	ns.Notifier("plans", "Besoin dans la guilde", ("%s cherche %s%s — tu sais le fabriquer"):format(NomCourt(nom),
+	ns.Notifier("plans", "Besoin dans la guilde", ("%s cherche %s%s — tu sais le fabriquer"):format(NomJoueur(nom),
 		lien or nomO or ("l'objet " .. objet), TexteQte(qte) and (" " .. TexteQte(qte)) or ""), nil,
 		function() if ns.OuvrirBesoins then ns.OuvrirBesoins() end end)
 end
@@ -377,8 +378,8 @@ local function NomMembreColore(cle, nom)
 		local p = positions and cle and positions[(cle:gsub("#test$", ""))]
 		classe = p and p.classe
 	end
-	if classe and ns.CouleurClasseTexte then return ns.CouleurClasseTexte(classe) .. NomCourt(nom) .. "|r" end
-	return NomCourt(nom)
+	if classe and ns.CouleurClasseTexte then return ns.CouleurClasseTexte(classe) .. NomJoueur(nom) .. "|r" end
+	return NomJoueur(nom)
 end
 ns.NomMembreColore = NomMembreColore
 
@@ -414,7 +415,7 @@ local function InfobulleDemander(self)
 	local d = self:GetParent().d
 	local premier = d and d.donneurs and d.donneurs[1]
 	if not premier then return end
-	local nom = NomCourt(premier.e.nom)
+	local nom = NomJoueur(premier.e.nom)
 	GameTooltip:SetOwner(self, "ANCHOR_TOP")
 	if premier.demande then
 		GameTooltip:SetText("Déjà demandé")
@@ -428,7 +429,7 @@ local function InfobulleDemander(self)
 	if #d.donneurs > 1 then
 		local noms = {}
 		for i, x in ipairs(d.donneurs) do
-			noms[#noms + 1] = NomCourt(x.e.nom) .. (x.enLigne and (" " .. VERT .. "(en ligne)|r") or "")
+			noms[#noms + 1] = NomJoueur(x.e.nom) .. (x.enLigne and (" " .. VERT .. "(en ligne)|r") or "")
 			if i >= 6 then break end
 		end
 		GameTooltip:AddLine("Donné par : " .. table.concat(noms, ", "), C.gris[1], C.gris[2], C.gris[3], true)
@@ -440,7 +441,7 @@ local function CreerLigneMienne(parent)
 	local r = CreerLigne(parent, "Retirer", "fantome", function(self, bulle)
 		local premier = self.d and self.d.donneurs and self.d.donneurs[1]
 		if premier then
-			bulle:AddLine("Donné par " .. NomCourt(premier.e.nom) .. (#self.d.donneurs > 1 and (" et " .. (#self.d.donneurs - 1) .. " autre(s)") or ""),
+			bulle:AddLine("Donné par " .. NomJoueur(premier.e.nom) .. (#self.d.donneurs > 1 and (" et " .. (#self.d.donneurs - 1) .. " autre(s)") or ""),
 				C.vert[1], C.vert[2], C.vert[3])
 		end
 	end)
@@ -523,7 +524,7 @@ local function MajPage()
 		local premier = d.donneurs[1]
 		if premier then
 			local autres = #d.donneurs - 1
-			r.sous:SetText(TexteQte(d.qte, true) .. " · " .. VERT .. "donné par " .. NomCourt(premier.e.nom)
+			r.sous:SetText(TexteQte(d.qte, true) .. " · " .. VERT .. "donné par " .. NomJoueur(premier.e.nom)
 				.. (autres > 0 and (" +" .. autres) or "") .. "|r")
 			r.demander:Ecrire(premier.demande and "Demandé" or "Demander")
 			r.demander:Activer(not premier.demande)
@@ -810,7 +811,7 @@ local function LignesBesoin(tooltip, objet)
 	for cle, e in pairs(g) do
 		local q = type(e) == "table" and e.liste and e.liste[objet]
 		if q and DansLaGuilde(cle) and (TestSolo() or not cle:find("#test", 1, true)) then
-			qui[#qui + 1] = NomCourt(e.nom) .. (TexteQte(q) and (" (" .. TexteQte(q) .. ")") or "")
+			qui[#qui + 1] = NomJoueur(e.nom) .. (TexteQte(q) and (" (" .. TexteQte(q) .. ")") or "")
 		end
 	end
 	if #qui == 0 then return end

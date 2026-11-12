@@ -23,6 +23,7 @@ local Normaliser = ns.Normaliser
 local MaCle = ns.MaCle
 local TestSolo = ns.TestSolo
 local NomCourt = ns.NomCourt
+local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
 local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end end
 local AtlasExiste = ns.AtlasExiste
 
@@ -140,7 +141,7 @@ local function MajMesQuetes()
 		if not avant[id] then
 			local noms = {}
 			for cle, a in pairs(autres) do
-				if a.quetes[id] and EstEnLigne(cle) then noms[#noms + 1] = NomCourt(a.nom) end
+				if a.quetes[id] and EstEnLigne(cle) then noms[#noms + 1] = NomJoueur(a.nom) end
 			end
 			if #noms > 0 and ns.Notifier then
 				ns.Notifier("quetes", "Quête en commun", ("%s fait aussi : |cffffd100%s|r"):format(table.concat(noms, ", "), q.titre),
@@ -254,9 +255,9 @@ local function InfobulleQuete(self)
 	for _, m in ipairs(q.membres) do
 		if m.enLigne then
 			local zone = enLigne[m.cle] and enLigne[m.cle].zone
-			GameTooltip:AddLine("|cff33dd55●|r " .. NomCourt(m.nom) .. (zone and ("  |cff999999" .. zone .. "|r") or ""), 1, 1, 1)
+			GameTooltip:AddLine("|cff33dd55●|r " .. NomJoueur(m.nom) .. (zone and ("  |cff999999" .. zone .. "|r") or ""), 1, 1, 1)
 		else
-			GameTooltip:AddLine("|cff888888○ " .. NomCourt(m.nom) .. " (hors ligne)|r", 1, 1, 1)
+			GameTooltip:AddLine("|cff888888○ " .. NomJoueur(m.nom) .. " (hors ligne)|r", 1, 1, 1)
 		end
 	end
 	GameTooltip:AddLine(" ")
@@ -296,7 +297,7 @@ local function CreerLigne(parent)
 			GameTooltip:SetText("Inviter dans ton groupe")
 			local q = self:GetParent().q
 			local noms = {}
-			for _, m in ipairs(q and q.aInviter or {}) do noms[#noms + 1] = NomCourt(m.nom) end
+			for _, m in ipairs(q and q.aInviter or {}) do noms[#noms + 1] = NomJoueur(m.nom) end
 			GameTooltip:AddLine("Invite " .. table.concat(noms, ", ") .. " : ils ont cette quête et sont en ligne.", 1, 1, 1, true)
 		else
 			GameTooltip:SetText("Créer un groupe pour cette quête")
@@ -364,7 +365,7 @@ local function CreerPage(parent)
 			r.zone:SetText(q.zone or "")
 			local noms = {}
 			for _, m in ipairs(q.membres) do
-				noms[#noms + 1] = (m.enLigne and "|cff6fd08c" or "|cff8a826f") .. NomCourt(m.nom) .. "|r"
+				noms[#noms + 1] = (m.enLigne and "|cff6fd08c" or "|cff8a826f") .. NomJoueur(m.nom) .. "|r"
 					.. (m.groupe and " |cfff1cf6b(groupe)|r" or "")
 			end
 			r.membres:SetText(table.concat(noms, ", "))

@@ -25,6 +25,7 @@ local Normaliser = ns.Normaliser
 local MaCle = ns.MaCle
 local TestSolo = ns.TestSolo
 local NomCourt = ns.NomCourt
+local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
 local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end end
 local Maintenant = ns.Maintenant
 local function Outils() return ns.OutilsCarnet or {} end
@@ -351,7 +352,7 @@ local function AppliquerTache(cle, id, objet, qui, etat, maj, estRelais)
 	-- quelqu'un prend une tâche de mon projet : je le sais
 	if EstAuteur(p) and etat == PRISE and avant ~= PRISE and qui ~= MaCle() and p.nom and not estRelais then
 		local O = Outils()
-		Alerte(("%s s'occupe de %s (%s)."):format(NomCourt(qui), (O.InfoObjet and O.InfoObjet(objet)) or "un objet", p.nom), id)
+		Alerte(("%s s'occupe de %s (%s)."):format(NomJoueur(qui), (O.InfoObjet and O.InfoObjet(objet)) or "un objet", p.nom), id)
 	end
 	return true
 end
@@ -444,7 +445,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			if not encore[objet] then p.taches[objet] = nil end
 		end
 		if a.nouveau and p.auteur ~= MaCle() then
-			Alerte(("%s lance le projet « %s »."):format(NomCourt(p.auteur), p.nom), id)
+			Alerte(("%s lance le projet « %s »."):format(NomJoueur(p.auteur), p.nom), id)
 		end
 		Maj()
 	elseif genre == "T" then
@@ -497,7 +498,7 @@ local boutonsProjets, lignes = {}, {}
 -- « toi » (en vert) ou le nom du membre (doré)
 local function CouleurNom(cle)
 	if cle == MaCle() then return VERT .. "toi|r" end
-	return OR .. NomCourt(cle or "?") .. "|r"
+	return OR .. NomJoueur(cle or "?") .. "|r"
 end
 
 -- bouton d'action d'une tâche : style « or » (action principale) ou « fantome », texte, état, infobulle
@@ -590,7 +591,7 @@ local function Ligne(i)
 				GameTooltip:AddLine("Peuvent s'en occuper :", 1, 0.82, 0)
 				for k = 1, math.min(8, #self.qualifies) do
 					local a = self.qualifies[k]
-					GameTooltip:AddLine("  - " .. NomCourt(a.nom) .. (a.enLigne and " |cff6fd08c(en ligne)|r" or ""), 1, 1, 1)
+					GameTooltip:AddLine("  - " .. NomJoueur(a.nom) .. (a.enLigne and " |cff6fd08c(en ligne)|r" or ""), 1, 1, 1)
 				end
 				if #self.qualifies > 8 then GameTooltip:AddLine(("  … et %d autres"):format(#self.qualifies - 8), 0.7, 0.7, 0.7) end
 			end

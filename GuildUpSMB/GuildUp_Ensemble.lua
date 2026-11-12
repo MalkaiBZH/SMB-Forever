@@ -35,6 +35,7 @@ local MARGE_DONJON = 2        -- un donjon est « à mon niveau » de (min - 2) 
 local UI = ns.UI
 local C = UI and UI.C
 local NomCourt = ns.NomCourt
+local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
 local Normaliser = ns.Normaliser
 
 local monDispo = false
@@ -447,12 +448,12 @@ local function Calculer()
 							score = 12 + mien.etape * 2 - meilleur.ecart * 3, bouton = "Chuchoter", actif = true,
 							action = function() if UI.Chuchoter then UI.Chuchoter(m.cle, m.nom) end end }
 						if meilleur.ecart == 0 then
-							s.titre = ("%s en est au même point que toi"):format(NomCourt(m.nom))
+							s.titre = ("%s en est au même point que toi"):format(NomJoueur(m.nom))
 							s.sous = ("%s, étape %d sur %d"):format(mien.titre, mien.etape, mien.longueur)
 						else
-							s.titre = ("%s fait la même suite de quêtes que toi"):format(NomCourt(m.nom))
+							s.titre = ("%s fait la même suite de quêtes que toi"):format(NomJoueur(m.nom))
 							s.sous = ("%s : tu en es à l'étape %d, %s à l'étape %d (sur %d)"):format(mien.titre, mien.etape,
-								NomCourt(m.nom), meilleur.etape, mien.longueur)
+								NomJoueur(m.nom), meilleur.etape, mien.longueur)
 						end
 						res[#res + 1] = s
 					end
@@ -470,7 +471,7 @@ local function Calculer()
 				local memeZone = m.zone and m.zone == maZone
 				res[#res + 1] = { cle = "d:" .. cle, genre = "dispo", score = 20 + (memeZone and 15 or 0) - ecart * 2,
 					membres = { m },
-					titre = ("%s est dispo pour grouper"):format(NomCourt(m.nom)),
+					titre = ("%s est dispo pour grouper"):format(NomJoueur(m.nom)),
 					sous = ("%s%s%s"):format(m.niveau and ("niveau " .. m.niveau) or "",
 						m.role and (" · " .. TexteRole(m.role)) or "",
 						memeZone and " · dans ta zone" or (m.zone and (" · " .. m.zone) or "")),
@@ -496,7 +497,7 @@ local function Calculer()
 				res[#res + 1] = { cle = "g:" .. tostring(id), genre = "groupe", icone = info.icone,
 					score = 25 + (maQuete and 20 or 0) + (monRole and 5 or 0),
 					membres = chef and { Membre(roster, chef, a.chef) } or {},
-					titre = ("%s cherche %s pour %s"):format(NomCourt(a.chef or "?"),
+					titre = ("%s cherche %s pour %s"):format(NomJoueur(a.chef or "?"),
 						monRole and ("un " .. TexteRole(monRole)) or "du monde", info.nom or "un groupe"),
 					sous = ("%d/%d%s"):format(a.membres or 1, a.taille or 5, maQuete and " · tu as cette quête" or ""),
 					bouton = cand == "envoyee" and "Envoyée" or "Postuler", actif = cand ~= "envoyee",
@@ -598,7 +599,7 @@ local function CreerSuggestion(parent)
 		GameTooltip:SetText(self.s.titre, 1, 0.82, 0, 1, true)
 		for _, m in ipairs(self.s.membres or {}) do
 			GameTooltip:AddLine(("%s%s|r%s%s%s"):format(ns.CouleurClasseTexte and ns.CouleurClasseTexte(m.classe) or "",
-				NomCourt(m.nom), m.niveau and ("  " .. m.niveau) or "", (m.roleGroupe or m.role) and ("  " .. TexteRole(m.roleGroupe or m.role)) or "",
+				NomJoueur(m.nom), m.niveau and ("  " .. m.niveau) or "", (m.roleGroupe or m.role) and ("  " .. TexteRole(m.roleGroupe or m.role)) or "",
 				m.dispo and "  |cff6fd08cdispo|r" or ""), 1, 1, 1)
 		end
 		GameTooltip:AddLine(" ")
@@ -627,7 +628,7 @@ local function TexteMembres(membres, max)
 	local noms = {}
 	for i = 1, math.min(#membres, max or 4) do
 		local m = membres[i]
-		noms[#noms + 1] = ("%s%s|r%s"):format(ns.CouleurClasseTexte and ns.CouleurClasseTexte(m.classe) or "", NomCourt(m.nom),
+		noms[#noms + 1] = ("%s%s|r%s"):format(ns.CouleurClasseTexte and ns.CouleurClasseTexte(m.classe) or "", NomJoueur(m.nom),
 			m.niveau and (" |cff9c9380" .. m.niveau .. "|r") or "")
 	end
 	return table.concat(noms, ", ") .. (#membres > (max or 4) and (" |cff9c9380+" .. (#membres - (max or 4)) .. "|r") or "")
@@ -679,7 +680,7 @@ local function CreerDispo(parent)
 	end)
 	b:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-		GameTooltip:SetText(self.m and NomCourt(self.m.nom) or "")
+		GameTooltip:SetText(self.m and NomJoueur(self.m.nom) or "")
 		GameTooltip:AddLine("Clic : chuchoter · clic droit : inviter", 0.8, 0.8, 0.8)
 		GameTooltip:Show()
 	end)
@@ -773,7 +774,7 @@ local function RemplirDonjon(r, i)
 	parRole[monRole][#parRole[monRole] + 1] = "|cfff1cf6btoi|r"
 	for _, m in ipairs(i.choisis) do
 		local l = parRole[m.roleGroupe or "dps"]
-		l[#l + 1] = ("%s%s|r"):format(ns.CouleurClasseTexte and ns.CouleurClasseTexte(m.classe) or "", NomCourt(m.nom))
+		l[#l + 1] = ("%s%s|r"):format(ns.CouleurClasseTexte and ns.CouleurClasseTexte(m.classe) or "", NomJoueur(m.nom))
 	end
 	for role, t in pairs(r.roles) do
 		local l = parRole[role]
@@ -886,7 +887,7 @@ local function CreerPage(parent)
 			if m then
 				b.m = m
 				b.portrait:Poser(m.cle, m.classe)
-				b.nom:SetText(("%s%s|r"):format(ns.CouleurClasseTexte and ns.CouleurClasseTexte(m.classe) or "", NomCourt(m.nom)))
+				b.nom:SetText(("%s%s|r"):format(ns.CouleurClasseTexte and ns.CouleurClasseTexte(m.classe) or "", NomJoueur(m.nom)))
 				b.sous:SetText((m.niveau and (m.niveau .. " · ") or "") .. (m.zone or ""))
 				b.role:SetText(TexteRole(m.role))
 				b:Show()

@@ -19,6 +19,7 @@
 local NOM_ADDON, ns = ...
 local MEDIA = "Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\"
 local NomCourt = ns.NomCourt
+local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
 local CouleurClasse = ns.CouleurClasse
 local CouleurClasseTexte = ns.CouleurClasseTexte
 
@@ -144,7 +145,7 @@ end
 local function NomColore(nom)
 	local cle = ns.Normaliser and ns.Normaliser(nom or "")
 	if ns.NomMembreColore then return ns.NomMembreColore(cle, nom or "?") end
-	return NomCourt(nom or "?")
+	return NomJoueur(nom or "?")
 end
 
 -- Position sur le monde d'un point de carte (nord, ouest), pour les distances
@@ -325,7 +326,7 @@ local function CreerAccueil(parent)
 			if v then
 				m.cle, m.nomComplet = v.cle, v.p.nom
 				m.portrait:Poser(v.cle, v.p.classe)
-				m.nom:SetText(NomCourt(v.p.nom):match("^(%S+)") or NomCourt(v.p.nom))
+				m.nom:SetText(NomJoueur(v.p.nom, true))
 				m.nom:SetTextColor(CouleurClasse(v.p.classe))
 				local classe = v.p.classe and LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[v.p.classe] or ""
 				m.sous:SetText(classe .. (v.distance and ((classe ~= "" and " · " or "") .. math.floor(v.distance + 0.5) .. " " .. UNITE) or ""))
@@ -366,7 +367,7 @@ local function CreerAccueil(parent)
 				-- groupe programmé : l'heure de départ avant le reste
 				local programme = ns.Groupes.Programmee and ns.Groupes.Programmee(a)
 				local depart = (programme and ns.Groupes.TexteDepart) and ("|cfff1cf6bdépart " .. ns.Groupes.TexteDepart(a.depart) .. "|r · ") or ""
-				l.sous:SetText(depart .. ("%s%s|r · %d/%d%s"):format(CouleurClasseTexte(a.classe), NomCourt(a.chef or "?"),
+				l.sous:SetText(depart .. ("%s%s|r · %d/%d%s"):format(CouleurClasseTexte(a.classe), NomJoueur(a.chef or "?"),
 					a.membres or 1, a.taille or 5, #cherche > 0 and (" · cherche " .. table.concat(cherche, " ")) or ""))
 				local cand = etat and etat.candidatures and etat.candidatures[a.id]
 				local libres = ns.Groupes.PlacesLibres and ns.Groupes.PlacesLibres(a, monRole)

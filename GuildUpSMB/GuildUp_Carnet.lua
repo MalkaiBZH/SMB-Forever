@@ -20,6 +20,7 @@ local PROFONDEUR_MAX = 6
 
 local Erreur = ns.Erreur
 local NomCourt = ns.NomCourt
+local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
 -- « niv. 12-18 » (ou « niv. 12 ») d'un PNJ, rien si inconnu
 local function TexteNiveaux(p)
 	if not (p.min and p.min > 0) then return "" end
@@ -1562,11 +1563,11 @@ MajFiche = function()
 			Ajouter("Dans la guilde (en ligne)", 1, { sous = true })
 			for _, a in ipairs(artisans) do
 				local etat = a.moi and "|cff33dd55toi|r" or a.enLigne and "|cff33dd55en ligne|r" or "|cff999999hors ligne|r"
-				Ajouter(("- %s (%s %s) · %s"):format(NomCourt(a.nom), NomMetier(a.metier), a.niveau or "?", etat), 2, {
+				Ajouter(("- %s (%s %s) · %s"):format(NomJoueur(a.nom), NomMetier(a.metier), a.niveau or "?", etat), 2, {
 					action = (a.enLigne and not a.moi) and function()
 						if ns.CommanderObjet then ns.CommanderObjet(a.cle, a.nom, objet, fiche.qte) end
 					end or nil,
-					bulle = (a.enLigne and not a.moi) and ("Clic : commander à " .. NomCourt(a.nom)) or nil })
+					bulle = (a.enLigne and not a.moi) and ("Clic : commander à " .. NomJoueur(a.nom)) or nil })
 			end
 		end
 		Espace()
@@ -2626,7 +2627,7 @@ local function CreerPageItems(parent)
 			local a = self.a
 			if not a then return end
 			GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-			GameTooltip:SetText(NomCourt(a.nom or "?"))
+			GameTooltip:SetText(NomJoueur(a.nom or "?"))
 			GameTooltip:AddLine(NomMetier(a.metier) .. " " .. (a.niveau or "?"), 1, 1, 1)
 			if a.moi then GameTooltip:AddLine("C'est toi.", 0.6, 0.6, 0.6)
 			elseif a.enLigne then GameTooltip:AddLine("Clic : chuchoter", 0.6, 0.6, 0.6)
@@ -2667,7 +2668,7 @@ local function CreerPageItems(parent)
 			if not l then l = CreerArtisan(); d.lignes[i] = l end
 			l.a = a
 			l.portrait:Poser(a.cle)
-			l.nom:SetText(ns.NomMembreColore and ns.NomMembreColore(a.cle, a.nom) or NomCourt(a.nom or "?"))
+			l.nom:SetText(ns.NomMembreColore and ns.NomMembreColore(a.cle, a.nom) or NomJoueur(a.nom or "?"))
 			l.sous:SetText(NomMetier(a.metier) .. " " .. (a.niveau or "?") .. " · "
 				.. (a.moi and "toi" or a.enLigne and "|cff6fd08cen ligne|r" or "hors ligne"))
 			l.commander:SetShown(not a.moi)

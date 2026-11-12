@@ -28,6 +28,7 @@
 
 local NOM_ADDON, ns = ...
 local NomCourt = ns.NomCourt
+local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
 local Simplifier = ns.Simplifier
 local CouleurClasseTexte = ns.CouleurClasseTexte
 
@@ -320,7 +321,7 @@ local function NomJeu(m) return (ns.NomListeGuilde and ns.NomListeGuilde(m.cle))
 local function Chuchoter(m)
 	if m.moi then return end
 	if not m.enLigne then
-		if ns.Erreur then ns.Erreur(NomCourt(m.nom) .. " est hors ligne") end
+		if ns.Erreur then ns.Erreur(NomJoueur(m.nom) .. " est hors ligne") end
 		return
 	end
 	UI.Chuchoter(m.cle, m.nom)
@@ -329,7 +330,7 @@ end
 local function Inviter(m)
 	if m.moi then return end
 	if not m.enLigne then
-		if ns.Erreur then ns.Erreur(NomCourt(m.nom) .. " est hors ligne") end
+		if ns.Erreur then ns.Erreur(NomJoueur(m.nom) .. " est hors ligne") end
 		return
 	end
 	local inviter = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
@@ -342,12 +343,12 @@ local Dessiner -- (plus bas : redessine les rangées visibles)
 local function Rappeler(m)
 	if m.moi or not m.rappel then return end
 	if not m.enLigne then
-		if ns.Erreur then ns.Erreur(NomCourt(m.nom) .. " est hors ligne") end
+		if ns.Erreur then ns.Erreur(NomJoueur(m.nom) .. " est hors ligne") end
 		return
 	end
 	local attente = AttenteRappel(m.cle)
 	if attente > 0 then
-		if ns.Erreur then ns.Erreur(("%s a déjà été rappelé : attends encore %d min"):format(NomCourt(m.nom), math.ceil(attente / 60))) end
+		if ns.Erreur then ns.Erreur(("%s a déjà été rappelé : attends encore %d min"):format(NomJoueur(m.nom), math.ceil(attente / 60))) end
 		return
 	end
 	local cible = NomJeu(m)
@@ -356,7 +357,7 @@ local function Rappeler(m)
 	if not (envoi and cible) then return end
 	local ok = pcall(envoi, TexteRappel(m), "WHISPER", nil, cible)
 	if not ok then
-		if ns.Erreur then ns.Erreur("Message impossible à envoyer à " .. NomCourt(m.nom)) end
+		if ns.Erreur then ns.Erreur("Message impossible à envoyer à " .. NomJoueur(m.nom)) end
 		return
 	end
 	Rappels()[m.cle] = time()
@@ -415,7 +416,7 @@ local function Infobulle(self)
 	local e = m.e
 	local tt = GameTooltip
 	tt:SetOwner(self, "ANCHOR_RIGHT")
-	tt:SetText(CouleurClasseTexte(e.classe) .. NomCourt(m.nom) .. "|r" .. (m.moi and (GRIS .. " (toi)|r") or ""))
+	tt:SetText(CouleurClasseTexte(e.classe) .. NomJoueur(m.nom) .. "|r" .. (m.moi and (GRIS .. " (toi)|r") or ""))
 	tt:AddLine(("Niveau %s %s"):format(tostring(e.niveau or "?"), e.classeNom or ""), 1, 1, 1)
 	if e.rang and e.rang ~= "" then tt:AddLine("Rang : " .. e.rang, 0.85, 0.66, 0.25) end
 	if m.enLigne then
@@ -537,7 +538,7 @@ local function CreerRangee(parent)
 		local m = self.rangee.m
 		if not m then return end
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText("Rappeler " .. NomCourt(m.nom))
+		GameTooltip:SetText("Rappeler " .. NomJoueur(m.nom))
 		GameTooltip:AddLine("Message privé envoyé :", 0.6, 0.6, 0.6)
 		GameTooltip:AddLine("« " .. TexteRappel(m) .. " »", 1, 1, 1, true)
 		local attente = AttenteRappel(m.cle)
@@ -580,9 +581,8 @@ local function Remplir(r, m)
 	r.portrait:SetAlpha(m.enLigne and 1 or 0.45)
 	r.point:SetShown(m.enLigne)
 	-- ligne 1 : nom, niveau, pseudo, rôle, statut
-	local l1 = CouleurClasseTexte(e.classe) .. NomCourt(m.nom) .. "|r"
+	local l1 = CouleurClasseTexte(e.classe) .. NomJoueur(m.nom) .. "|r"
 		.. "  " .. GRIS .. "niv. " .. tostring(e.niveau or "?") .. "|r"
-	if m.pseudo then l1 = l1 .. "  " .. OR .. "« " .. m.pseudo .. " »|r" end
 	if m.role then l1 = l1 .. "  " .. UI.TexteRole(m.role) end
 	if m.moi then l1 = l1 .. "  " .. GRIS .. "(toi)|r" end
 	local statut = m.enLigne and TexteStatut(e.statut)

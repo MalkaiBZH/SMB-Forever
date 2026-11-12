@@ -161,6 +161,7 @@ local CouleurClasse = ns.CouleurClasse
 
 -- Nom affiché : complet, « Prénom Famille » (« Miko-Banko » devient « Miko Banko »)
 local NomCourt = ns.NomCourt
+local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
 
 -- Nom complet « Prénom Famille » (sur Forever, le nom de famille est à la place du royaume)
 local function NomCompletUnite(u)
@@ -929,7 +930,7 @@ RecevoirCommande = function(genre, reste, cle, nom)
 			date = maintenant, maj = maintenant, etat = "attente", suivi = (suivi == "2") or nil }
 		MajCommandes()
 		-- (silencieuse : le message privé du client a déjà sonné)
-		BulleCommande("Nouvelle commande", ("%s te demande : %s"):format(NomCourt(nom), TexteCommande(m.recues[id])), "aucun")
+		BulleCommande("Nouvelle commande", ("%s te demande : %s"):format(NomJoueur(nom), TexteCommande(m.recues[id])), "aucun")
 
 	elseif genre == "E" then
 		local cible, id, lettre, qui = strsplit("~", reste)
@@ -944,7 +945,7 @@ RecevoirCommande = function(genre, reste, cle, nom)
 		if qui == "a" then c.suivi, c.artisanNom = true, nom else c.clientNom = nom end
 		MajCommandes()
 		local t = (qui == "a" and TITRES_ARTISAN or TITRES_CLIENT)[etat]
-		if t then BulleCommande(t[1], t[2]:format(NomCourt(nom), TexteCommande(c)), t[3]) end
+		if t then BulleCommande(t[1], t[2]:format(NomJoueur(nom), TexteCommande(c)), t[3]) end
 
 	elseif genre == "K" then
 		-- réponse d'un artisan d'avant la 1.5 (bouton Accepter / Refuser)
@@ -956,7 +957,7 @@ RecevoirCommande = function(genre, reste, cle, nom)
 			MajCommandes()
 		end
 		local t = TITRES_ARTISAN[ok == "1" and "acceptee" or "refusee"]
-		BulleCommande(t[1], t[2]:format(NomCourt(nom), c and TexteCommande(c) or NomRecette(code or "")), t[3])
+		BulleCommande(t[1], t[2]:format(NomJoueur(nom), c and TexteCommande(c) or NomRecette(code or "")), t[3])
 	end
 end
 
@@ -998,7 +999,7 @@ end
 local function DemanderConfirmation(cle, nom, code, qte)
 	ns.UI.DemanderTexte({
 		titre = "Commander",
-		texte = ("À |cffffd100%s|r : %s\nQuantité :"):format(NomCourt(nom), NomRecette(code)),
+		texte = ("À |cffffd100%s|r : %s\nQuantité :"):format(NomJoueur(nom), NomRecette(code)),
 		defaut = tostring(qte or 1), numerique = true, maxLettres = 4, bouton = "Commander",
 		valider = function(t) Commander(cle, nom, code, tonumber(t) or qte) end,
 	})
@@ -1265,7 +1266,7 @@ local function CreerLigneMembre(parent)
 		local e = self.e
 		if not e then return end
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(NomCourt(e.nom or self.cle), CouleurClasse(e.classe))
+		GameTooltip:SetText(NomJoueur(e.nom or self.cle), CouleurClasse(e.classe))
 		if ns.LignesIdentite then ns.LignesIdentite(GameTooltip, self.cle) end
 		local rien = true
 		for _, m in ipairs(METIERS) do
@@ -1290,7 +1291,7 @@ local function RemplirLigneMembre(b, f, choisi)
 	local e = f.e
 	b.cle, b.e = f.cle, e
 	b.point:SetVertexColor(unpack(f.enLigne and C.vert or GRIS_HORS_LIGNE))
-	b.nom:SetText(NomCourt(e.nom or f.cle) .. (f.moi and " |cff9c937f(toi)|r" or ""))
+	b.nom:SetText(NomJoueur(e.nom or f.cle) .. (f.moi and " |cff9c937f(toi)|r" or ""))
 	b.nom:SetTextColor(CouleurClasse(e.classe))
 	if recherche ~= "" and f.trouvees > 0 then
 		local s = f.trouvees > 1 and "s" or ""
@@ -1404,7 +1405,7 @@ local function Prendre(genre)
 				GameTooltip:SetText(self.texte:GetText() or "?")
 			end
 			if self.commande then
-				GameTooltip:AddLine(self.commande.enLigne and ("Clic : commander à " .. NomCourt(self.commande.nom))
+				GameTooltip:AddLine(self.commande.enLigne and ("Clic : commander à " .. NomJoueur(self.commande.nom))
 					or "Hors ligne : commande impossible", 0.3, 1, 0.3)
 			end
 			GameTooltip:AddLine("Maj-clic : lien dans la discussion", 0.6, 0.6, 0.6)
@@ -1454,7 +1455,7 @@ local function MajDetail(f)
 	end
 	fen.videD:Hide()
 	local e = f.e
-	fen.dNom:SetText(NomCourt(e.nom or f.cle))
+	fen.dNom:SetText(NomJoueur(e.nom or f.cle))
 	fen.dNom:SetTextColor(CouleurClasse(e.classe))
 	local etat
 	if f.enLigne then
@@ -1876,7 +1877,7 @@ do
 		local autre = recue and c.client or c.artisan
 		local nomAutre = (recue and c.clientNom or c.artisanNom) or autre or "?"
 		l.autre, l.nomAutre = autre, nomAutre
-		local qui = (ns.NomMembreColore and autre and ns.NomMembreColore(autre, nomAutre)) or NomCourt(nomAutre)
+		local qui = (ns.NomMembreColore and autre and ns.NomMembreColore(autre, nomAutre)) or NomJoueur(nomAutre)
 		local e = ETATS_COMMANDE[c.etat] or ETATS_COMMANDE.attente
 		l.sous:SetText(e.couleur .. e.nom .. (c.etat ~= "attente" and (" " .. UI.IlYa(c.maj)) or "") .. "|r · "
 			.. (recue and "de " or "pour ") .. qui .. " · commandée " .. UI.IlYa(c.date)
@@ -1905,7 +1906,7 @@ do
 			if c.aEnvoyer then
 				-- (gardée tant que l'autre n'est pas prévenu)
 				l.action2:Activer(false)
-				l.action2.bulle = "Pas encore : " .. NomCourt(nomAutre) .. " sera prévenu à son retour."
+				l.action2.bulle = "Pas encore : " .. NomJoueur(nomAutre) .. " sera prévenu à son retour."
 			end
 		end
 		local enLigne = autre ~= nil and EnLigne(autre, { vu = 0 })

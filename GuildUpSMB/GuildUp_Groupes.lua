@@ -77,6 +77,7 @@ end
 
 -- Nom affiché : complet, « Prénom Famille » (« Miko-Banko » devient « Miko Banko »)
 local NomCourt = ns.NomCourt
+local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
 
 -- Nom complet « Prénom Famille » (sur Forever, le nom de famille est à la place du royaume)
 local function NomCompletUnite(u)
@@ -641,14 +642,14 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 				if ns.AQuete and ns.AQuete(idQuete) and ns.Notifier then
 					local titre = ns.InfoQuete and ns.InfoQuete(idQuete) or "?"
 					local zone = etat.annonces[id].commentaire ~= "" and (" (" .. etat.annonces[id].commentaire .. ")") or ""
-					ns.Notifier("quetes", "Groupe pour ta quête", ("%s : |cffffd100%s|r%s"):format(NomCourt(expediteur), titre, zone),
+					ns.Notifier("quetes", "Groupe pour ta quête", ("%s : |cffffd100%s|r%s"):format(NomJoueur(expediteur), titre, zone),
 						nil, function() if ns.OuvrirGroupes then ns.OuvrirGroupes() end end)
 				end
 			elseif Programmee(etat.annonces[id]) and ns.Notifier then
-				ns.Notifier("groupes", "Groupe programmé", ("%s : |cffffd100%s|r %s"):format(NomCourt(expediteur), nomContenu,
+				ns.Notifier("groupes", "Groupe programmé", ("%s : |cffffd100%s|r %s"):format(NomJoueur(expediteur), nomContenu,
 					TexteDepart(depart)), nil, function() if ns.OuvrirGroupes then ns.OuvrirGroupes() end end)
 			elseif ns.AlerteNouveauGroupe then
-				ns.AlerteNouveauGroupe(NomCourt(expediteur), nomContenu)
+				ns.AlerteNouveauGroupe(NomJoueur(expediteur), nomContenu)
 			end
 		end
 		if Rafraichir then Rafraichir() end
@@ -684,10 +685,10 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		c.role, c.classe, c.niveau, c.statut = p[3], p[4] ~= "" and p[4] or nil, tonumber(p[5]) or 0, "attente"
 		if ns.Notifier then
 			if Programmee(etat.monAnnonce) then
-				ns.Notifier("candidatures", "Nouvelle inscription", ("%s s'inscrit : %s (départ %s)"):format(NomCourt(expediteur),
+				ns.Notifier("candidatures", "Nouvelle inscription", ("%s s'inscrit : %s (départ %s)"):format(NomJoueur(expediteur),
 					TexteRole(c.role), TexteDepart(etat.monAnnonce.depart)), "TELL_MESSAGE")
 			else
-				ns.Notifier("candidatures", "Nouvelle candidature", ("%s postule : %s"):format(NomCourt(expediteur), TexteRole(c.role)), "TELL_MESSAGE")
+				ns.Notifier("candidatures", "Nouvelle candidature", ("%s postule : %s"):format(NomJoueur(expediteur), TexteRole(c.role)), "TELL_MESSAGE")
 			end
 		end
 		if Rafraichir then Rafraichir() end
@@ -705,7 +706,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		if id and etat.candidatures[id] and DuChef(id) then
 			etat.candidatures[id] = "refusee"
 			NoterInscription(id, nil)
-			if ns.Notifier then ns.Notifier("candidatures", "Candidature refusée", "par " .. NomCourt(expediteur)) end
+			if ns.Notifier then ns.Notifier("candidatures", "Candidature refusée", "par " .. NomJoueur(expediteur)) end
 			if Rafraichir then Rafraichir() end
 		end
 	end
@@ -731,7 +732,7 @@ local function Rappels(maintenant)
 				if not idQuete or (ns.AQuete and ns.AQuete(idQuete)) then
 					local libres = (a.taille or 5) - (a.membres or 1)
 					ns.Notifier("groupes", "Groupe toujours en recherche", ("%s : |cffffd100%s|r (%d place%s)"):format(
-						NomCourt(a.chef), InfoContenu(a.code).nom, libres, libres > 1 and "s" or ""), "aucun",
+						NomJoueur(a.chef), InfoContenu(a.code).nom, libres, libres > 1 and "s" or ""), "aucun",
 						function() if ns.OuvrirGroupes then ns.OuvrirGroupes() end end)
 				end
 			end
@@ -778,7 +779,7 @@ local function RappelsDepart()
 			fait = true
 			if ns.Notifier then
 				ns.Notifier("groupes", "Groupe programmé", ("|cffffd100%s|r %s : %s va inviter"):format(InfoContenu(a.code).nom or "?",
-					TexteDans(a.depart), NomCourt(a.chef or "?")), nil, function() if ns.OuvrirGroupes then ns.OuvrirGroupes() end end)
+					TexteDans(a.depart), NomJoueur(a.chef or "?")), nil, function() if ns.OuvrirGroupes then ns.OuvrirGroupes() end end)
 			end
 		end
 	end

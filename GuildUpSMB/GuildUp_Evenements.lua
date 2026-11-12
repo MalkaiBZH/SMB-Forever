@@ -36,6 +36,7 @@ local premiereLecture = true
 
 local Erreur = ns.Erreur
 local NomCourt = ns.NomCourt
+local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
 local CouleurClasseTexte = ns.CouleurClasseTexte
 local UI = ns.UI
 local C = UI.C
@@ -567,7 +568,7 @@ local function MajLigne(r, e, maintenant)
 	local typeTexte = TexteType(e, d)
 	if typeTexte ~= "" then morceaux[#morceaux + 1] = typeTexte end
 	local par = (d and d.createur) or e.invitePar
-	if par then morceaux[#morceaux + 1] = "par " .. NomCourt(par) end
+	if par then morceaux[#morceaux + 1] = "par " .. NomJoueur(par) end
 	if e.quand < maintenant then morceaux[#morceaux + 1] = Hex(VERT) .. "en cours|r" end
 	r.sous:SetText(table.concat(morceaux, " · "))
 	local etat = (d and d.etat) or e.etat
@@ -679,7 +680,7 @@ local function CreerDetail(p)
 		local typeTexte = TexteType(e, d)
 		c.genre:SetText(typeTexte ~= "" and typeTexte or "Événement")
 		local par = (d and d.createur) or e.invitePar
-		c.createur:SetText(par and (((d and d.createur) and "Créé par " or "Invitation de ") .. NomCourt(par)) or "")
+		c.createur:SetText(par and (((d and d.createur) and "Créé par " or "Invitation de ") .. NomJoueur(par)) or "")
 		local etat = (d and d.etat) or e.etat
 		local inscription = EstInscription(e, d)
 		if EstOrganisateur(e, d) then
@@ -706,7 +707,7 @@ local function CreerDetail(p)
 			for i, v in ipairs(d.invites) do
 				local l = c.lignes[i]
 				if not l then l = CreerInvite(c.liste.contenu); c.lignes[i] = l end
-				l.nom:SetText(CouleurClasseTexte(v.classe) .. NomCourt(v.nom) .. "|r"
+				l.nom:SetText(CouleurClasseTexte(v.classe) .. NomJoueur(v.nom) .. "|r"
 					.. (v.niveau and v.niveau > 0 and ("  |cff9b9380" .. v.niveau .. "|r") or "")
 					.. (v.mod == "CREATOR" and "  |cff9b9380(organisateur)|r" or "")
 					.. (v.moi and "  |cff9b9380(toi)|r" or ""))

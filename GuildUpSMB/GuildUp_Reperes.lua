@@ -17,6 +17,7 @@
 local NOM_ADDON, ns = ...
 
 local NomCourt = ns.NomCourt
+local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
 local CouleurClasse = ns.CouleurClasse
 
 local CHAMP = math.rad((ns.Config and tonumber(ns.Config.champVisionReperes)) or 90) -- largeur de l'écran (angle)
@@ -102,7 +103,7 @@ local function NouveauRepere()
 	b:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
 		local r, g, bl = CouleurClasse(self.classe)
-		GameTooltip:AddLine(NomCourt(self.joueur), r, g, bl)
+		GameTooltip:AddLine(NomJoueur(self.joueur), r, g, bl)
 		GameTooltip:AddLine(("à %d %s"):format(self.metres or 0, UNITE), 1, 1, 1)
 		GameTooltip:AddLine("Clic : chuchoter", 0.6, 0.6, 0.6)
 		GameTooltip:Show()
@@ -202,7 +203,7 @@ local function Maj()
 		r:SetFrameLevel(cadre:GetFrameLevel() + i) -- le plus proche par-dessus
 		r.cle, r.joueur, r.classe, r.metres = v.cle, v.p.nom, v.p.classe, math.floor(v.metres + 0.5)
 		r.portrait:SetTexture(v.p.portrait)
-		r.nom:SetText(NomCourt(v.p.nom):match("^(%S+)") or NomCourt(v.p.nom)) -- prénom seul
+		r.nom:SetText(NomJoueur(v.p.nom, true)) -- « Pseudo (Prénom) », ou le prénom seul
 		r.nom:SetTextColor(CouleurClasse(v.p.classe))
 		r.distance:SetText(r.metres .. " " .. UNITE)
 		r:Show()

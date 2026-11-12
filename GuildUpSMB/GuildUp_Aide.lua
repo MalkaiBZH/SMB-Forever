@@ -15,6 +15,7 @@ local dernierAppel = 0
 local Normaliser = ns.Normaliser
 local TestSolo = ns.TestSolo
 local NomCourt = ns.NomCourt
+local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
 local Erreur = ns.Erreur
 
 local function MaPosition()
@@ -97,7 +98,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	if ns.MajBouton then ns.MajBouton() end
 	if ns.MajInterface then ns.MajInterface() end
 	if ns.Notifier then
-		ns.Notifier("aide", "Demande d'aide", ("%s (niv %d) a besoin d'aide · %s%s"):format(NomCourt(expediteur), niveau,
+		ns.Notifier("aide", "Demande d'aide", ("%s (niv %d) a besoin d'aide · %s%s"):format(NomJoueur(expediteur), niveau,
 			zone ~= "" and zone or "?", texte ~= "" and (" : « " .. texte .. " »") or ""),
 			memeZone and "RAID_WARNING" or nil, function() MontrerSurCarte(carte, x, y) end)
 	end

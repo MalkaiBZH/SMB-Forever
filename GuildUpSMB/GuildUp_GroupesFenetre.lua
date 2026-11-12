@@ -40,6 +40,7 @@ local InfoContenu = G.InfoContenu
 local Inviter = G.Inviter
 local MonNom = G.MonNom
 local NomCourt = G.NomCourt
+local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
 local NombreMembres = G.NombreMembres
 local PeutAnnoncer = G.PeutAnnoncer
 local PlacesLibres = G.PlacesLibres
@@ -184,12 +185,12 @@ local function InfobulleAnnonce(self)
 	tt:SetOwner(self, "ANCHOR_RIGHT")
 	tt:SetText(e.nom or "?", C.ors[1], C.ors[2], C.ors[3])
 	tt:AddLine(TexteNiveaux(e) .. " · " .. (a.membres or 1) .. "/" .. (a.taille or 5) .. " joueurs", 1, 1, 1)
-	tt:AddLine("Chef : " .. CouleurClasse(a.classe) .. NomCourt(a.chef or "?") .. "|r" .. ((a.niveau or 0) > 0 and (" (" .. a.niveau .. ")") or ""), 1, 1, 1)
+	tt:AddLine("Chef : " .. CouleurClasse(a.classe) .. NomJoueur(a.chef or "?") .. "|r" .. ((a.niveau or 0) > 0 and (" (" .. a.niveau .. ")") or ""), 1, 1, 1)
 	if ns.LignesIdentite and not a.estMoi then ns.LignesIdentite(tt, a.chef) end
 	if a.liste and #a.liste > 0 then
 		for _, m in ipairs(a.liste) do
 			if Prenom(m.nom) ~= Prenom(a.chef) then
-				tt:AddLine("  " .. NomCourt(m.nom) .. " — " .. TexteRole(m.role), 0.9, 0.9, 0.9)
+				tt:AddLine("  " .. NomJoueur(m.nom) .. " — " .. TexteRole(m.role), 0.9, 0.9, 0.9)
 			end
 		end
 	end
@@ -206,7 +207,7 @@ local function InfobulleAnnonce(self)
 		tt:AddLine(" ")
 		tt:AddLine(LigneDepart(a.depart) .. " |cff999999(heure de ton ordinateur)|r", 1, 1, 1)
 		if not a.estMoi then
-			tt:AddLine("Inscris-toi à l'avance : " .. NomCourt(a.chef or "?") .. " invitera les inscrits à l'heure. Rappel 10 min avant.",
+			tt:AddLine("Inscris-toi à l'avance : " .. NomJoueur(a.chef or "?") .. " invitera les inscrits à l'heure. Rappel 10 min avant.",
 				0.8, 0.8, 0.8, true)
 		end
 	end
@@ -251,7 +252,7 @@ local function MajAnnonce(r, a)
 	r.entree:SetPoint("LEFT", r.titre, "RIGHT", 6, 0)
 	r.entree:Poser(e)
 	local age = a.premiere and math.floor((GetTime() - a.premiere) / 60) or 0
-	r.sous:SetText(("%s|r · %s%s|r%s · %s"):format(CouleurNiveau(e) .. TexteNiveaux(e), CouleurClasse(a.classe), NomCourt(a.chef or "?"),
+	r.sous:SetText(("%s|r · %s%s|r%s · %s"):format(CouleurNiveau(e) .. TexteNiveaux(e), CouleurClasse(a.classe), NomJoueur(a.chef or "?"),
 		(a.niveau or 0) > 0 and (" (" .. a.niveau .. ")") or "", a.estMoi and "ton annonce" or (age < 1 and "à l'instant" or ("il y a " .. age .. " min"))))
 	-- troisième ligne : l'heure de départ d'un groupe programmé, puis le commentaire
 	local programme = Programmee(a)
@@ -828,7 +829,7 @@ local function CreerGestion(page)
 				if d then
 					l.role:Poser(d.role)
 					if d.membre then
-						l.nom:SetText(NomCourt(d.membre.nom) .. (d.membre.role and "" or "  |cff999999(rôle inconnu)|r"))
+						l.nom:SetText(NomJoueur(d.membre.nom) .. (d.membre.role and "" or "  |cff999999(rôle inconnu)|r"))
 						l.nom:SetTextColor(unpack(C.texte))
 					else
 						l.nom:SetText("— place libre —")
@@ -862,7 +863,7 @@ local function CreerGestion(page)
 			local r = cand.lignes[i]
 			if not r then r = CreerCandidat(); cand.lignes[i] = r end
 			r.portrait:Poser(Normaliser(cd.nom or ""), cd.classe)
-			r.nom:SetText(CouleurClasse(cd.classe) .. NomCourt(cd.nom or "?") .. "|r" .. ((cd.niveau or 0) > 0 and ("  |cff999999(" .. cd.niveau .. ")|r") or ""))
+			r.nom:SetText(CouleurClasse(cd.classe) .. NomJoueur(cd.nom or "?") .. "|r" .. ((cd.niveau or 0) > 0 and ("  |cff999999(" .. cd.niveau .. ")|r") or ""))
 			local plein = cd.role and m.besoin[cd.role] and (pris[cd.role] or 0) >= (m.besoin[cd.role] or 0)
 			r.sous:SetText(TexteRole(cd.role) .. (cd.statut == "invite" and "  · |cff6fd08cinvité|r" or "")
 				.. (plein and "  · |cffff6655rôle déjà pris|r" or ""))

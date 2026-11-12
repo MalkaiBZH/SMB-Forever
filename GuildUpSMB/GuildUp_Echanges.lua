@@ -69,6 +69,7 @@ local Normaliser = ns.Normaliser
 local MaCle = ns.MaCle
 local TestSolo = ns.TestSolo
 local NomCourt = ns.NomCourt
+local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
 local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end end
 local Erreur = ns.Erreur
 local PoserAtlas = ns.PoserAtlas
@@ -314,7 +315,7 @@ local function AlerteDon(cle, nom, objet, d)
 	if not (g and g[cle] and g[cle].liste[objet]) or not ns.Notifier then return end -- retiré entre-temps
 	if DejaConnu(objet) then return end
 	local nomO, lien = InfoObjet(objet)
-	ns.Notifier("plans", "Plan à donner", ("%s donne %s (%s)"):format(NomCourt(nom), lien or nomO or ("plan " .. objet),
+	ns.Notifier("plans", "Plan à donner", ("%s donne %s (%s)"):format(NomJoueur(nom), lien or nomO or ("plan " .. objet),
 		TexteMetier(d.c, d.n)), nil, function() if ns.OuvrirEchanges then ns.OuvrirEchanges(2, DONS) end end)
 end
 
@@ -324,7 +325,7 @@ local function AlerteBesoin(qui, nom, objet)
 	if not (g and g[qui] and g[qui].liste and g[qui].liste[objet]) or not ns.Notifier then return end -- retiré entre-temps
 	if MonBesoin(objet) == nil then return end
 	local nomO, lien = InfoObjet(objet)
-	ns.Notifier("plans", "Dans tes besoins", ("%s donne %s : il est dans tes besoins"):format(NomCourt(nom),
+	ns.Notifier("plans", "Dans tes besoins", ("%s donne %s : il est dans tes besoins"):format(NomJoueur(nom),
 		lien or nomO or ("l'objet " .. objet)), nil, function() if ns.OuvrirEchanges then ns.OuvrirEchanges(1, DONS, objet) end end)
 end
 
@@ -664,7 +665,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		NoterMerci(donneur, cle, objet, Maintenant())
 		if (donneur == moi or (TestSolo() and donneur == moi .. "#test")) and ns.Notifier then
 			local nomO, lien = InfoObjet(objet)
-			ns.Notifier("plans", "Merci !", ("%s te remercie pour %s"):format(NomCourt(nom), lien or nomO or ("l'objet " .. objet)),
+			ns.Notifier("plans", "Merci !", ("%s te remercie pour %s"):format(NomJoueur(nom), lien or nomO or ("l'objet " .. objet)),
 				nil, function() end)
 		end
 		if MajTout then MajTout() end
@@ -712,7 +713,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		local nomO, lien = InfoObjet(objet)
 		if ns.Notifier then
 			-- sans son : le message privé du demandeur sonne déjà
-			ns.Notifier("plans", "Demande de don", ("%s voudrait %s"):format(NomCourt(nom), lien or nomO or ("l'objet " .. objet)),
+			ns.Notifier("plans", "Demande de don", ("%s voudrait %s"):format(NomJoueur(nom), lien or nomO or ("l'objet " .. objet)),
 				"aucun", function()
 					local nomMP = cle:find("#test", 1, true) and UnitName("player")
 						or (ns.NomListeGuilde and ns.NomListeGuilde(cle)) or NomCourt(nom)
@@ -738,7 +739,7 @@ local function Demander(d)
 		local nomO, lien = InfoObjet(d.objet)
 		if ns.Notifier then
 			ns.Notifier("plans", "Demande de don", ("%s est hors ligne : ta demande pour %s lui sera transmise dès que possible"):format(
-				NomCourt(d.e.nom), lien or nomO or ("objet " .. d.objet)), "aucun", function() end)
+				NomJoueur(d.e.nom), lien or nomO or ("objet " .. d.objet)), "aucun", function() end)
 		end
 		if MajTout then MajTout() end
 		return
@@ -1018,13 +1019,13 @@ local function InfobulleDemande(self)
 	GameTooltip:SetOwner(self, "ANCHOR_TOP")
 	if demande then
 		GameTooltip:SetText(demande.merci and "Merci envoyé" or "Merci !")
-		GameTooltip:AddLine("Tu as reçu ce don ? Remercie " .. NomCourt(d.e.nom) .. " : ça compte pour les donateurs du mois.", 1, 1, 1, true)
+		GameTooltip:AddLine("Tu as reçu ce don ? Remercie " .. NomJoueur(d.e.nom) .. " : ça compte pour les donateurs du mois.", 1, 1, 1, true)
 	elseif not d.enLigne then
 		GameTooltip:SetText("Demander ce don")
-		GameTooltip:AddLine(NomCourt(d.e.nom) .. " est hors ligne : ta demande lui sera transmise dès que possible, par un membre de la guilde connecté avec SMB Forever, ou quand vous serez connectés en même temps.", 1, 1, 1, true)
+		GameTooltip:AddLine(NomJoueur(d.e.nom) .. " est hors ligne : ta demande lui sera transmise dès que possible, par un membre de la guilde connecté avec SMB Forever, ou quand vous serez connectés en même temps.", 1, 1, 1, true)
 	else
 		GameTooltip:SetText("Demander ce don")
-		GameTooltip:AddLine("Un message privé part vers " .. NomCourt(d.e.nom) .. ".", 1, 1, 1, true)
+		GameTooltip:AddLine("Un message privé part vers " .. NomJoueur(d.e.nom) .. ".", 1, 1, 1, true)
 	end
 	GameTooltip:Show()
 end
@@ -1509,7 +1510,7 @@ local function CreerPage(parent)
 		local top = p.onglet == DONS and DonateursDuMois() or {}
 		if #top > 0 then
 			local noms = {}
-			for i = 1, math.min(3, #top) do noms[#noms + 1] = NomCourt(top[i].qui) .. " (" .. top[i].n .. ")" end
+			for i = 1, math.min(3, #top) do noms[#noms + 1] = NomJoueur(top[i].qui) .. " (" .. top[i].n .. ")" end
 			p.donateurs:SetText("Donateurs du mois : " .. OR .. table.concat(noms, " · ") .. "|r")
 		else
 			p.donateurs:SetText("")

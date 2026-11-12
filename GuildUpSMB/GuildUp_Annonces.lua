@@ -14,6 +14,7 @@ local dejaEntre = false
 
 local Normaliser = ns.Normaliser
 local NomCourt = ns.NomCourt
+local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
 local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end end
 local function Nettoyer(t) return ((t or ""):gsub("[~|]", " ")) end
 
@@ -33,7 +34,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	if Normaliser(expediteur) == Normaliser(UnitName("player")) and not (ns.TestSolo and ns.TestSolo()) then return end
 	if GetTime() - debut < CALME then return end
 	local genre, a, b = strsplit("~", msg)
-	local qui = NomCourt(expediteur)
+	local qui = NomJoueur(expediteur)
 	if genre == "N" and tonumber(a) and ns.NiveauSpecial and ns.NiveauSpecial(expediteur, a) then
 		-- montée de niveau spéciale (membre vedette : bulle en fête, GuildUp_GU.lua)
 	elseif genre == "N" and tonumber(a) then
