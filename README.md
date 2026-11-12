@@ -60,6 +60,8 @@ l'addon voient et partagent ces informations**.
 | `/smb annonces` | Annonces de la guilde en bulle |
 | `/smb gu` | Emote « GU! » |
 | `/smb diag` | Informations techniques à copier en cas de problème |
+| `/smb debug` | Afficher / cacher la partie Debug de la fenêtre d'options |
+| `/smb entree <mot>` | Noter ma position comme entrée d'un donjon (ex. `/smb entree mortemines`) |
 | `/smb reset` | Réglages par défaut |
 
 `/guildup` fonctionne comme `/smb`.

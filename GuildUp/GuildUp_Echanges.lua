@@ -1,10 +1,11 @@
--- GuildUp : fenêtre « Artisanat & Échanges » (1.5) — tout l'artisanat de la guilde en un.
--- Onglets : Registre (métiers et recettes, GuildUp_Metiers.lua) · Dons (hôtel des ventes de dons,
--- par catégorie) · Mes dons (mes objets échangeables, sacs et banque : je coche ce que je donne) ·
--- Besoins (GuildUp_Besoins.lua).
+-- GuildUp : fenêtre « Dons de la guilde ».
+-- Onglets : Dons (hôtel des ventes de dons, par catégorie) · Mes dons (mes objets échangeables, sacs et
+-- banque : je coche ce que je donne) · Demandes (qui m'a demandé un don) · Besoins (GuildUp_Besoins.lua).
 --
 -- Préfixe "GuildUpEch" (canal de guilde) :
 --   "L~part~total~objet:qte:métier:niveau,…"  ma liste de dons complète (vide = plus aucun don)
+--   "W~qui~date~part~total~objet:qte:…,…"      liste de dons d'un absent, renvoyée par le relais élu
+--   "M~donneur~objet"                           merci (classement des donateurs du mois)
 --   "Q"                                         « renvoyez vos listes » (à la connexion)
 --   "D~objet~cible~quand"                       je voudrais ce don (+ message privé si en ligne)
 --   "R~cible~demandeur~objet~quand"             demande faite pendant que « cible » était hors ligne,
@@ -276,7 +277,6 @@ end
 -- Envoi / réception des listes
 --------------------------------------------------------------------------------
 
-local dernierEnvoi = 0
 EnvoyerMaListe = function()
 	local mots = {}
 	for objet in pairs(Dons()) do
@@ -290,7 +290,6 @@ EnvoyerMaListe = function()
 	table.sort(mots)
 	local morceaux = ns.Morceaux(mots, TAILLE_MORCEAU)
 	for i, txt in ipairs(morceaux) do Envoyer(("L~%d~%d~%s"):format(i, #morceaux, txt)) end
-	dernierEnvoi = GetTime()
 end
 
 local function AlerteDon(cle, nom, objet, d)
@@ -1401,7 +1400,7 @@ MajTout = function()
 end
 
 -- Fenêtre à onglets (cadre à portrait, bande de pierre, encart illustré), partagée avec la fenêtre
--- Artisanat (GuildUp_Artisanat.lua). pages : fonctions (f) -> page ; noms : textes des onglets.
+-- Artisanat (GuildUp_Carnet.lua). pages : fonctions (f) -> page ; noms : textes des onglets.
 local function FenetreOnglets(nom, titre, icone, fonds, pages, noms)
 	local ok, f = pcall(CreateFrame, "Frame", nom, UIParent, "PortraitFrameTemplate")
 	if not ok then

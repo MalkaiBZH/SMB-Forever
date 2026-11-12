@@ -7,7 +7,8 @@
 --   canal GUILD  : "A~..." annonce (ou mise à jour), "F~id" fin d'annonce, "Q" demande des annonces
 --   chuchotement : "P~id~role~classe~niveau" candidature, "X~id" candidature annulée,
 --                  "R~id~non" candidature refusée
--- Annonce : A~id~code~besoinT~besoinH~besoinD~prisT~prisH~prisD~taille~membres~niveau~classe~commentaire~liste
+-- Annonce : A~id~code~besoinT~besoinH~besoinD~prisT~prisH~prisD~taille~membres~niveau~classe~commentaire~liste~rappel
+--   (id = « clé du chef:date » ; rappel = « 1 » si le chef veut une bulle de rappel toutes les 5 min)
 --   liste (groupes de 5 max) : "Nom.t,Nom.h,Nom.?" (rôle de chaque membre)
 --
 -- Catalogue des contenus : lu dans la recherche de groupe Blizzard du client (C_LFGList),
@@ -391,7 +392,6 @@ local function TailleMaxContenu(e)
 	if EstPerso(e) then return TAILLE_MAX_PERSO end
 	return e and e.taille or 5
 end
-ns.TailleMaxContenu = TailleMaxContenu
 
 
 local function TexteNiveaux(e)
@@ -836,7 +836,6 @@ local function Infobulle(cadre, Remplir)
 	cadre:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end
 
--- Emplacements de rôles façon FF14 : une icône par place (≤ 10 joueurs), sinon icône + compteur
 -- Places par rôle façon FF14 : une icône par place, chacune dans un petit cadre
 -- (fond sombre + liseré doré) ; au-delà de 10 places, 3 icônes + « pris/besoin »
 local ECART_PLACES = 6
@@ -911,7 +910,6 @@ local function MajEmplacements(w, besoin, pris, taille)
 	end
 end
 
--- remet les icônes en ligne (après un affichage « grand groupe »)
 -- Petit bouton « entrée sur la carte » (repère sur la carte du monde, voir GuildUp_Carte.lua)
 local function CreerBoutonEntree(parent)
 	local bt = CreateFrame("Button", nil, parent)
@@ -942,6 +940,7 @@ local function MajBoutonEntree(bt, e)
 	bt:SetShown(connue and true or false)
 end
 
+-- remet les icônes en ligne (après un affichage « grand groupe »)
 local function RangerEmplacements(w)
 	for i, t in ipairs(w.icones) do
 		t:ClearAllPoints()
