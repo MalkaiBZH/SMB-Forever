@@ -64,6 +64,7 @@ end
 
 -- le jeu n'accepte le texte libre des annonces que sur un compte avec authentificateur
 local function CommentaireAutorise()
+	if not C_LFGList then return false end
 	if not C_LFGList.IsPlayerAuthenticatedForLFG then return true end
 	local ok, oui = pcall(C_LFGList.IsPlayerAuthenticatedForLFG)
 	return not ok or oui ~= false
@@ -95,6 +96,9 @@ local function RendrePublic(annonce, nomContenu)
 		newPlayerFriendly = style == 1,
 		voiceMode = 0,
 	})
+	-- la zone de texte de la fenêtre « Annonce » du jeu ne garde pas notre commentaire pour une
+	-- annonce faite ensuite à la main (le jeu l'a lu au moment de l'inscription)
+	if pose then PoserCommentaire("") end
 	if not ok then
 		Erreur("Le jeu a refusé l'inscription : " .. tostring(err))
 		return

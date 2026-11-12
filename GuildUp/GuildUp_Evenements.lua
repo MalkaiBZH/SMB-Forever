@@ -86,7 +86,8 @@ local function LireEvenementsGuilde()
 	for i = 1, n do
 		local okE, e = pcall(C_Calendar.GetGuildEventInfo, i)
 		if okE and type(e) == "table" and e.title then
-			local cle = tostring(e.eventID or (e.title .. e.month .. e.monthDay .. e.hour .. e.minute))
+			local cle = tostring(e.eventID or (tostring(e.title) .. tostring(e.month) .. tostring(e.monthDay)
+				.. tostring(e.hour) .. tostring(e.minute)))
 			if not vus[cle] then
 				vus[cle] = time()
 				if not calme and ns.Notifier then

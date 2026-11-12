@@ -366,8 +366,14 @@ local function ConstruireCatalogue()
 	for _, e in ipairs(catalogue) do parCode[e.code] = e end
 end
 
+local essaiCatalogue = 0
 local function Catalogue()
-	if not catalogue or #catalogue == 0 then ConstruireCatalogue() end
+	-- liste de secours (le jeu ne donnait encore rien, par exemple juste après la connexion) :
+	-- on redemande au jeu, au plus toutes les 10 s
+	if not catalogue or #catalogue == 0 or (catalogue.secours and GetTime() - essaiCatalogue > 10) then
+		essaiCatalogue = GetTime()
+		ConstruireCatalogue()
+	end
 	return catalogue
 end
 
