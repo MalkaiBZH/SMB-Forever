@@ -18,6 +18,9 @@ local BATTEMENT = 20     -- envoi même sans bouger, pour dire « je suis toujou
 local DUREE_VIE = 45     -- secondes sans nouvelles avant d'effacer un membre (plus de deux battements)
 local TAILLE_POINT = (ns.Config and tonumber(ns.Config.taillePointCarte)) or 16 -- diamètre du point (pixels)
 -- disque blanc de l'addon, teinté ici : ne dépend d'aucune image ni d'aucun masque du client
+-- Niveau d'affichage au-dessus du canevas de la carte : les couches du jeu (zones explorées, brouillard,
+-- repères) montent bien plus haut que le canevas ; en dessous, un point reste survolable mais invisible
+local function NiveauCarte(canevas, rang) return math.min(9000, canevas:GetFrameLevel() + 2600 + rang) end
 local ROND = (ns.MEDIA or ("Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\")) .. "point"
 
 local positions = {}     -- [nom normalisé] = { nom, carte, x, y, classe, vu, instance }
@@ -370,11 +373,11 @@ local function MajRepere(canevas, carte, largeur, hauteur, echelle)
 	end
 	local a = epingleEntree.ancre
 	a:SetParent(canevas)
-	a:SetFrameLevel(canevas:GetFrameLevel() + 52)
+	a:SetFrameLevel(NiveauCarte(canevas, 2))
 	a:ClearAllPoints()
 	a:SetPoint("CENTER", canevas, "TOPLEFT", x * largeur, -y * hauteur)
 	epingleEntree:SetScale(1 / echelle)
-	epingleEntree:SetFrameLevel(canevas:GetFrameLevel() + 53)
+	epingleEntree:SetFrameLevel(NiveauCarte(canevas, 3))
 	a:Show()
 	epingleEntree:Show()
 end
@@ -647,11 +650,11 @@ MajCarte = function()
 					epingles[n] = e
 				end
 				e.ancre:SetParent(canevas)
-				e.ancre:SetFrameLevel(canevas:GetFrameLevel() + 50)
+				e.ancre:SetFrameLevel(NiveauCarte(canevas, 0))
 				e.ancre:ClearAllPoints()
 				e.ancre:SetPoint("CENTER", canevas, "TOPLEFT", x * largeur, -y * hauteur)
 				e:SetScale(1 / echelle)
-				e:SetFrameLevel(canevas:GetFrameLevel() + 51)
+				e:SetFrameLevel(NiveauCarte(canevas, 1))
 				e.point:SetVertexColor(CouleurClasse(p.classe))
 				e.p, e.cle = p, cle
 				e.ancre:Show()
