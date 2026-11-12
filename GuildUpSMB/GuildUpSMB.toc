@@ -18,6 +18,7 @@ GuildUp_Catalogue.lua
 GuildUp_Groupes.lua
 GuildUp_GroupesFenetre.lua
 GuildUp_Carte.lua
+GuildUp_Reperes.lua
 GuildUp_Recettes.lua
 GuildUp_Metiers.lua
 GuildUp_Version.lua

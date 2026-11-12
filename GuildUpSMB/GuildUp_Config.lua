@@ -28,4 +28,10 @@ ns.Config = {
 
 	-- Carte du monde : diamètre en pixels du point qui marque chaque membre de la guilde
 	taillePointCarte = 16,
+
+	-- Repères des membres en haut de l'écran (GuildUp_Reperes.lua) : angle de vue (degrés) qui
+	-- correspond à toute la largeur de l'écran (à ajuster si les repères ne tombent pas au-dessus des
+	-- joueurs), et position verticale (pixels sous le haut de l'écran, négatif = plus bas).
+	champVisionReperes = 90,
+	hauteurReperes = -30,
 }

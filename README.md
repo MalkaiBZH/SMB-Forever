@@ -18,6 +18,10 @@ l'addon voient et partagent ces informations**.
   56 portraits Alliance dans `GuildUpSMB/media/portraits/`) s'affiche à gauche de leur nom, sur les barres
   de nom et le cadre de cible. Les anciennes bannières horizontales derrière le nom ne sont plus dessinées :
   sans portrait, rien derrière le nom. Lueur dorée sur la cible. `/smb medaillons` pour couper.
+- **Repères dans le HUD** : les membres de la guilde présents sur la même carte apparaissent en haut de
+  l'écran, comme dans un jeu de tir : portrait, prénom à la couleur de la classe et distance, placés dans
+  leur direction (une flèche au bord quand ils sont hors du champ de vision). Clic : chuchoter. Seulement
+  les membres qui partagent leur position et ont un portrait. `/smb reperes` pour couper.
 - **Bouton de mini-carte** : choix de son rôle, accès à toutes les fenêtres, notifications.
   Halo doré quand des groupes sont ouverts, anneau vert quand on est en attente.
 - **Recherche de groupe de la guilde** : places Tank / Heal / DPS, groupes jusqu'à 40, et bouton
@@ -61,6 +65,7 @@ l'addon voient et partagent ces informations**.
 | `/smb noms` | Nom et guilde des autres joueurs |
 | `/smb lueur` | Lueur derrière la bannière de la cible |
 | `/smb medaillons` | Portraits des joueurs sur les bannières |
+| `/smb reperes` | Membres de ta zone en haut de l'écran |
 | `/smb annonces` | Annonces de la guilde en bulle |
 | `/smb gu` | Emote du cri de guilde |
 | `/smb diag` | Informations techniques à copier en cas de problème |

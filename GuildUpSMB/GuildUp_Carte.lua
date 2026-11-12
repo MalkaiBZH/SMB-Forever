@@ -1,7 +1,10 @@
 -- GuildUpSMB : positions des membres de la guilde sur la carte du monde.
 -- Chacun choisit de partager sa position (bouton « Position » du volet de la mini-carte,
 -- activé par défaut, réglage partagePosition). Messages d'addon invisibles sur le canal de guilde :
---   "P~carte~x~y~CLASSE"  position (carte = uiMapID de C_Map.GetBestMapForUnit, x/y entre 0 et 1)
+--   "P~carte~x~y~CLASSE~PORTRAIT"  position (carte = uiMapID de C_Map.GetBestMapForUnit, x/y entre 0
+--                          et 1 ; PORTRAIT = « nain-chaman-femme », vide sans portrait ; les anciennes
+--                          versions ignorent ce dernier champ). Sert aussi aux repères du HUD
+--                          (GuildUp_Reperes.lua).
 --   "I"                    en instance (pas de position utilisable)
 --   "O"                    partage coupé
 -- Envoi toutes les INTERVALLE secondes si le joueur a bougé, sinon un signal toutes les BATTEMENT s
@@ -77,10 +80,13 @@ local function Emettre(force)
 	local bouge = carte ~= dernier.carte or math.abs(x - dernier.x) > 0.0005 or math.abs(y - dernier.y) > 0.0005
 	if force or bouge or maintenant - dernier.t > BATTEMENT then
 		local _, classe = UnitClass("player")
-		Envoyer(("P~%d~%.4f~%.4f~%s"):format(carte, x, y, classe or ""))
+		local portrait = ns.PortraitUnite and ns.PortraitUnite("player")
+		Envoyer(("P~%d~%.4f~%.4f~%s~%s"):format(carte, x, y, classe or "", portrait or ""))
 		dernier.carte, dernier.x, dernier.y, dernier.t, dernier.etat = carte, x, y, maintenant, "P"
 	end
 end
+
+ns.MaPosition = MaPosition -- carte, x, y (pour GuildUp_Reperes.lua)
 
 -- appelé par GuildUp.lua quand on clique sur le bouton « Position »
 ns.SurChangementPartage = function()
@@ -95,13 +101,14 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	if prefixe ~= PREFIXE or canal ~= "GUILD" or not msg or not expediteur then return end
 	local cle = Normaliser(expediteur)
 	if cle == Normaliser(UnitName("player")) and not (ns.TestSolo and ns.TestSolo()) then return end
-	local type_, a, b, c, d = strsplit("~", msg)
+	local type_, a, b, c, d, e = strsplit("~", msg)
 	if type_ == "P" then
 		local carte, x, y = tonumber(a), tonumber(b), tonumber(c)
 		if not (carte and x and y) or x < 0 or x > 1 or y < 0 or y > 1 then return end
 		positions[cle] = {
 			nom = expediteur, carte = carte, x = x, y = y,
 			classe = (d and d ~= "") and d or nil, vu = GetTime(),
+			portrait = ns.CheminPortrait and ns.CheminPortrait(e) or nil, -- chemin de l'image, ou nil
 		}
 	elseif type_ == "I" then
 		positions[cle] = { nom = expediteur, instance = true, vu = GetTime() }
@@ -709,6 +716,10 @@ end
 --------------------------------------------------------------------------------
 
 ns.Ecouter(PREFIXE, Recevoir)
+
+-- positions reçues : [nom normalisé] = { nom, carte, x, y, classe, portrait, vu, instance } (lecture seule,
+-- pour GuildUp_Reperes.lua ; les trop vieilles sont effacées au dessin de la carte)
+ns.PositionsMembres = function() return positions end
 
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("PLAYER_ENTERING_WORLD")
