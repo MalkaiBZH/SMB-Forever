@@ -1,9 +1,15 @@
--- GuildUp : noms de tous les objets échangeables du jeu (ni liés quand ramassés, ni de quête,
+-- GuildUp : noms français de tous les objets échangeables du jeu (ni liés quand ramassés, ni de quête,
 -- ni gris), pour chercher un objet par son nom dans les Besoins même sans l'avoir sur soi.
--- Généré depuis les données du client WoW Forever 1.60.1.70862, français (wago.tools : ItemSparse).
+-- Généré depuis les données du client WoW Forever 1.60.1.70862, français (wago.tools : ItemSparse, Item)
+-- par outils/generer_objets.py. Ne pas modifier à la main.
 -- Une ligne par objet : id:qualité:classe:niveau d'objet:nom (classe 7 = artisanat, 5 = composant)
+-- Client anglais (enUS, enGB) : ce fichier ne fait rien, GuildUp_Objets_enUS.lua donne les noms anglais.
+-- Le texte n'est alors gardé nulle part : il disparaît avec le fichier après son chargement.
 
 local NOM_ADDON, ns = ...
+
+local langue = GetLocale and GetLocale()
+if langue == "enUS" or langue == "enGB" then return end
 
 ns.DONNEES_OBJETS = [==[
 20351:2:4:63:63 Green Frost Belt
@@ -6401,7 +6407,7 @@ ns.DONNEES_OBJETS = [==[
 ]==]
 
 -- objets liés quand ramassés et fabriqués par une recette : seulement pour la fenêtre Items (pas pour
--- les Besoins : on ne peut pas les donner). Même format. Filtrés par outils/filtrer_objets_lies.py.
+-- les Besoins : on ne peut pas les donner). Même format. Seulement ceux de GuildUp_Craft.lua.
 ns.DONNEES_OBJETS_LIES = [==[
 252490:3:4:20:Armure de bagarreur en cuir
 252492:3:4:20:Armure de chevaucheur de tempête en cuir
