@@ -104,6 +104,19 @@ local function Survol(cadre, alpha)
 end
 UI.Survol = Survol
 
+-- Son de clic des éléments du kit, sur PostClick : les pages posent leur propre OnClick avec
+-- SetScript, ce qui effacerait une accroche sur OnClick. case = vrai : son de case cochée / décochée.
+function UI.SonClic(b, case)
+	b:SetScript("PostClick", function(self)
+		if not ns.Son then return end
+		if case then
+			ns.Son(self.oui and "IG_MAINMENU_OPTION_CHECKBOX_ON" or "IG_MAINMENU_OPTION_CHECKBOX_OFF")
+		else
+			ns.Son("U_CHAT_SCROLL_BUTTON")
+		end
+	end)
+end
+
 -- Bouton plat : "or" (action principale), "fantome" (secondaire), "aide" (appel à l'aide)
 function UI.Bouton(parent, texte, style, largeur, hauteur)
 	local b = CreateFrame("Button", nil, parent, "BackdropTemplate")
@@ -123,7 +136,7 @@ function UI.Bouton(parent, texte, style, largeur, hauteur)
 		b.texte:SetTextColor(unpack(C.ors))
 	end
 	Survol(b)
-	if ns.SonsSurBoutons then ns.SonsSurBoutons(b) end
+	UI.SonClic(b)
 	b.Ecrire = function(self, t) self.texte:SetText(t) end
 	b.Activer = function(self, oui)
 		self:SetEnabled(oui and true or false)
@@ -276,7 +289,7 @@ function UI.Onglets(parent, noms, choisir)
 		b.trait:SetPoint("BOTTOMRIGHT")
 		Survol(b, 0.05)
 		b:SetScript("OnClick", function() choisir(i) end)
-		if ns.SonsSurBoutons then ns.SonsSurBoutons(b) end
+		UI.SonClic(b)
 		o.boutons[i] = b
 	end
 	local filet = UI.Filet(o)
@@ -313,7 +326,7 @@ function UI.Puces(parent, noms, choisir)
 		x = x + l + 6
 		Survol(b)
 		b:SetScript("OnClick", function() choisir(i) end)
-		if ns.SonsSurBoutons then ns.SonsSurBoutons(b) end
+		UI.SonClic(b)
 		p.boutons[i] = b
 	end
 	p:SetWidth(math.max(1, x - 6))
@@ -436,7 +449,7 @@ function UI.Case(parent, texte, changer)
 		if changer then changer(self.oui) end
 	end)
 	b:Poser(false)
-	if ns.SonsSurBoutons then ns.SonsSurBoutons(b) end
+	UI.SonClic(b, true)
 	return b
 end
 

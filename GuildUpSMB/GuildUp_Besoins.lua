@@ -1,10 +1,18 @@
--- GuildUpSMB : besoins (onglet « Besoins » de la fenêtre Artisanat & Échanges).
+-- GuildUpSMB : besoins (onglet « Besoins » de la page « Dons » de la fenêtre GuildUpSMB).
 -- Chaque joueur liste les objets dont il a besoin (avec une quantité). La liste part à la guilde
 -- (préfixe "GuildUpBes") et chacun la garde (GuildUpDB) : elle reste visible même quand son
 -- auteur est hors ligne.
 --   "B~objet:qte,objet:qte,…"   ma liste complète (vide = plus aucun besoin ; qte 0 = sans limite)
+--   "V~cle~date~objet36:qte,…"  liste d'un autre membre, renvoyée par le relais élu
 --   "Q"                          « renvoyez vos listes » (à la connexion)
--- Bulle « Besoin dans la guilde » pour ceux qui savent fabriquer l'objet demandé.
+-- Bulle « Besoin dans la guilde » pour ceux qui savent fabriquer l'objet demandé ; ligne « Miko a
+-- besoin de cette ressource » ajoutée aux infobulles d'objets du jeu.
+-- Interface (kit ns.UI) : ns.CreerPageBesoins(parent) fabrique le contenu de l'onglet (appelé par
+-- GuildUp_Echanges.lua, qui le rafraîchit) : carte « Mes besoins » (case où glisser un objet ou
+-- recherche dans tous les objets du jeu, quantité ou « sans limite », Ajouter ; liste avec Retirer) et
+-- carte « Besoins de la guilde » (ce que je sais fabriquer d'abord, Chuchoter). Fournit aussi aux
+-- autres onglets ns.IconeObjet (icône bordée à la couleur de qualité), ns.InfobulleObjet,
+-- ns.EcrireNomObjet et ns.NomMembreColore.
 
 local NOM_ADDON, ns = ...
 
@@ -15,7 +23,6 @@ local OUBLI = 30 * 86400      -- une liste sans nouvelles depuis 30 jours est ou
 
 local debut = GetTime()
 local pret = false
-local Maj
 
 local Normaliser = ns.Normaliser
 local MaCle = ns.MaCle
@@ -23,7 +30,9 @@ local TestSolo = ns.TestSolo
 local NomCourt = ns.NomCourt
 local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end end
 local Erreur = ns.Erreur
-local AtlasExiste = ns.AtlasExiste
+
+-- La page « Dons » (GuildUp_Echanges.lua) se rafraîchit si elle est affichée, avec ses compteurs
+local function Rafraichir() if ns.MajOngletsEchanges then ns.MajOngletsEchanges() end end
 
 --------------------------------------------------------------------------------
 -- Données
@@ -100,7 +109,7 @@ local function Ajouter(objet, qte)
 	mes[objet] = (qte == 0) and 0 or math.max(1, math.min(999, math.floor(qte or 1)))
 	Precharger(objet)
 	EnvoyerMaListe()
-	if Maj then Maj() end
+	Rafraichir()
 	return true
 end
 
@@ -110,7 +119,7 @@ ns.AjouterBesoin = function(objet, qte) return Ajouter(objet, qte) end
 local function Retirer(objet)
 	MesBesoins()[objet] = nil
 	EnvoyerMaListe()
-	if Maj then Maj() end
+	Rafraichir()
 end
 
 --------------------------------------------------------------------------------
@@ -192,7 +201,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 				C_Timer.After(1, function() AlerteBesoin(nom, objet, qte) end)
 			end
 		end
-		if Maj then Maj() end
+		Rafraichir()
 	elseif genre == "V" then
 		local qui, date, mots = reste:match("^([^~]+)~(%d+)~?(.*)$")
 		date = tonumber(date)
@@ -206,17 +215,9 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			if o and q and q >= 0 then liste[o] = q; Precharger(o) end
 		end
 		local nomQui = (g[qui] and g[qui].nom) or qui
-		if Enregistrer(g, qui, nomQui, liste, date) and Maj then Maj() end
+		if Enregistrer(g, qui, nomQui, liste, date) then Rafraichir() end
 	end
 end
-
---------------------------------------------------------------------------------
--- Page « Besoins »
---------------------------------------------------------------------------------
-
-local page
-local lignesMes, lignesGuilde = {}, {}
-local choix                    -- objet choisi dans la zone d'ajout
 
 --------------------------------------------------------------------------------
 -- Recherche d'un objet par son nom dans tout le jeu (GuildUp_Objets.lua, ou GuildUp_Objets_enUS.lua
@@ -264,49 +265,6 @@ ns.ChercherObjets = ChercherObjets
 
 local Depuis = ns.Depuis
 
-local function LigneBase(parent, largeur)
-	local b = CreateFrame("Frame", nil, parent)
-	b:SetSize(largeur, 38)
-	b:EnableMouse(true)
-	local fond = b:CreateTexture(nil, "BACKGROUND")
-	fond:SetAllPoints(b)
-	fond:SetColorTexture(0, 0, 0, 0.25)
-	b.icone = b:CreateTexture(nil, "ARTWORK")
-	b.icone:SetSize(30, 30)
-	b.icone:SetPoint("LEFT", b, "LEFT", 4, 0)
-	b.nom = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	b.nom:SetPoint("TOPLEFT", b.icone, "TOPRIGHT", 6, -1)
-	b.nom:SetJustifyH("LEFT")
-	b.nom:SetWordWrap(false)
-	b.sous = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	b.sous:SetPoint("BOTTOMLEFT", b.icone, "BOTTOMRIGHT", 6, 1)
-	b.sous:SetJustifyH("LEFT")
-	b.sous:SetWordWrap(false)
-	b.bouton = CreateFrame("Button", nil, b, "UIPanelButtonTemplate")
-	b.bouton:SetSize(82, 22)
-	b.bouton:SetPoint("RIGHT", b, "RIGHT", -4, 0)
-	b.nom:SetPoint("RIGHT", b.bouton, "LEFT", -6, 0)
-	b.sous:SetPoint("RIGHT", b.bouton, "LEFT", -6, 0)
-	b:SetScript("OnEnter", function(self)
-		if not self.objet then return end
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		pcall(GameTooltip.SetItemByID, GameTooltip, self.objet)
-		GameTooltip:Show()
-	end)
-	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-	if ns.SonsSurBoutons then ns.SonsSurBoutons(b) end
-	return b
-end
-
-local function Remplir(b, objet)
-	local nom, _, qualite, icone = InfoObjet(objet)
-	b.objet = objet
-	b.icone:SetTexture(icone or "Interface\\Icons\\INV_Misc_QuestionMark")
-	b.nom:SetText(nom or "|cff999999chargement…|r")
-	local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
-	if qc and nom then b.nom:SetTextColor(qc.r, qc.g, qc.b) else b.nom:SetTextColor(1, 0.82, 0) end
-end
-
 -- Membre encore dans la guilde ? (liste de guilde chargée : sinon on garde)
 local function DansLaGuilde(cle)
 	if cle:find("#test", 1, true) then return true end
@@ -328,43 +286,6 @@ end
 ns.IndexObjets = Index
 ns.NomObjetListe = function(objet) return (NomListe(objet)) end
 
-local function MajChoix()
-	if not page then return end
-	local z = page.ajout
-	if choix then
-		local nom, _, qualite, icone = InfoObjet(choix)
-		if not icone then
-			local fi = (C_Item and C_Item.GetItemIconByID) or GetItemIcon
-			if fi then local ok, i = pcall(fi, choix); if ok then icone = i end end
-		end
-		if not nom then nom, qualite = NomListe(choix) end
-		z.icone:SetTexture(icone or "Interface\\Icons\\INV_Misc_QuestionMark")
-		z.icone:SetDesaturated(false)
-		-- le nom choisi s'écrit dans la recherche (sans relancer la recherche)
-		z.ecriture = true
-		z.cherche:SetText(nom or ("Objet " .. choix))
-		z.ecriture = false
-		local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
-		if qc then z.cherche:SetTextColor(qc.r, qc.g, qc.b) else z.cherche:SetTextColor(1, 1, 1) end
-	else
-		z.icone:SetTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
-		z.icone:SetDesaturated(true)
-		z.cherche:SetTextColor(1, 1, 1)
-	end
-	z.ajouter:SetEnabled(choix ~= nil)
-end
-
-local function Choisir(objet)
-	choix = objet
-	if objet then Precharger(objet) end
-	if not objet and page and page.ajout and page.ajout.cherche then
-		page.ajout.ecriture = true
-		page.ajout.cherche:SetText("")
-		page.ajout.ecriture = false
-	end
-	MajChoix()
-end
-
 -- Nombre de besoins listés par la guilde (compteur de l'onglet)
 ns.NombreBesoins = function()
 	local n = 0
@@ -376,9 +297,144 @@ ns.NombreBesoins = function()
 	return n
 end
 
-Maj = function()
-	if ns.MajOngletsEchanges then ns.MajOngletsEchanges() end
-	if not page or not page:IsShown() then return end
+--------------------------------------------------------------------------------
+-- Éléments communs aux onglets de la page « Dons » (repris par GuildUp_Echanges.lua)
+--------------------------------------------------------------------------------
+
+local UI = ns.UI
+local C = UI.C
+local BLANC = "Interface\\Buttons\\WHITE8X8"
+local ICONE_INCONNUE = "Interface\\Icons\\INV_Misc_QuestionMark"
+local CASE_VIDE = "Interface\\PaperDoll\\UI-Backpack-EmptySlot"
+local VERT = "|cff6fd08c"
+local MARGE = 16
+
+-- Icône d'objet dans un cadre bordé (2 pixels) à la couleur de sa qualité ; genre "Button" pour une
+-- case cliquable. f:Poser(icône, qualité, vide) : vide = icône grisée (case sans objet)
+local function IconeObjet(parent, taille, genre)
+	local f = CreateFrame(genre or "Frame", nil, parent, "BackdropTemplate")
+	f:SetSize(taille, taille)
+	if f.SetBackdrop then
+		f:SetBackdrop({ bgFile = BLANC, edgeFile = BLANC, edgeSize = 2 })
+		f:SetBackdropColor(unpack(C.champ))
+		f:SetBackdropBorderColor(unpack(C.bord))
+	end
+	f.image = f:CreateTexture(nil, "ARTWORK")
+	f.image:SetPoint("TOPLEFT", f, "TOPLEFT", 2, -2)
+	f.image:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -2, 2)
+	f.image:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	if genre == "Button" then UI.Survol(f, 0.12) end
+	f.Poser = function(self, icone, qualite, vide)
+		self.image:SetTexture(icone or ICONE_INCONNUE)
+		self.image:SetDesaturated(vide and true or false)
+		if not self.SetBackdropBorderColor then return end
+		local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
+		if qc then self:SetBackdropBorderColor(qc.r, qc.g, qc.b, 1) else self:SetBackdropBorderColor(unpack(C.bord)) end
+	end
+	return f
+end
+ns.IconeObjet = IconeObjet
+
+-- Infobulle de l'objet du cadre (self.objet) au survol ; plus(self, bulle) ajoute des lignes
+local function InfobulleObjet(cadre, plus)
+	cadre:SetScript("OnEnter", function(self)
+		if not self.objet then return end
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		pcall(GameTooltip.SetItemByID, GameTooltip, self.objet)
+		if plus then plus(self, GameTooltip) end
+		GameTooltip:Show()
+	end)
+	cadre:SetScript("OnLeave", function() GameTooltip:Hide() end)
+end
+ns.InfobulleObjet = InfobulleObjet
+
+-- Nom d'un objet à la couleur de sa qualité (« chargement… » tant que le jeu ne l'a pas)
+local function EcrireNomObjet(fs, nom, qualite)
+	if not nom then
+		fs:SetText("chargement…")
+		fs:SetTextColor(unpack(C.gris))
+		return
+	end
+	fs:SetText(nom)
+	local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
+	if qc then fs:SetTextColor(qc.r, qc.g, qc.b) else fs:SetTextColor(unpack(C.texte)) end
+end
+ns.EcrireNomObjet = EcrireNomObjet
+
+-- Nom d'un membre à la couleur de sa classe, si elle est connue (positions partagées de la carte)
+local function NomMembreColore(cle, nom)
+	local positions = ns.PositionsMembres and ns.PositionsMembres()
+	local p = positions and cle and positions[(cle:gsub("#test$", ""))]
+	if p and p.classe and ns.CouleurClasseTexte then return ns.CouleurClasseTexte(p.classe) .. NomCourt(nom) .. "|r" end
+	return NomCourt(nom)
+end
+ns.NomMembreColore = NomMembreColore
+
+--------------------------------------------------------------------------------
+-- Onglet « Besoins »
+--------------------------------------------------------------------------------
+
+local page
+local choix                    -- objet choisi dans la zone d'ajout
+local HAUTEUR_LIGNE, ECART_LIGNE = 44, 4
+local MAX_RES = 10
+
+-- Ligne d'une liste : icône, nom, sous-titre, bouton à droite
+local function CreerLigne(parent, texteBouton, style, plus)
+	local r = UI.Rangee(parent, HAUTEUR_LIGNE)
+	r.icone = IconeObjet(r, 32)
+	r.icone:SetPoint("LEFT", r, "LEFT", 8, 0)
+	r.bouton = UI.Bouton(r, texteBouton, style, 86, 24)
+	r.bouton:SetPoint("RIGHT", r, "RIGHT", -8, 0)
+	r.nom = UI.Texte(r, "GameFontNormal")
+	r.nom:SetPoint("TOPLEFT", r.icone, "TOPRIGHT", 10, -1)
+	r.nom:SetPoint("RIGHT", r.bouton, "LEFT", -8, 0)
+	r.sous = UI.Texte(r, "GameFontHighlightSmall", C.gris)
+	r.sous:SetPoint("BOTTOMLEFT", r.icone, "BOTTOMRIGHT", 10, 1)
+	r.sous:SetPoint("RIGHT", r.bouton, "LEFT", -8, 0)
+	r.objet, r.d = false, false
+	InfobulleObjet(r, plus)
+	return r
+end
+
+local function Remplir(r, objet)
+	local nom, _, qualite, icone = InfoObjet(objet)
+	if not nom then
+		nom, qualite = NomListe(objet)
+		Precharger(objet)
+	end
+	r.objet = objet
+	r.icone:Poser(icone, qualite)
+	EcrireNomObjet(r.nom, nom, qualite)
+end
+
+local function MajChoix()
+	if not page then return end
+	local z = page.ajout
+	if choix then
+		local nom, _, qualite, icone = InfoObjet(choix)
+		if not nom then nom, qualite = NomListe(choix) end
+		z.case:Poser(icone, qualite)
+		-- le nom choisi s'écrit dans la recherche (sans relancer la recherche)
+		z.cherche:Ecrire(nom or ("Objet " .. choix))
+		local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
+		if qc then z.cherche.saisie:SetTextColor(qc.r, qc.g, qc.b) else z.cherche.saisie:SetTextColor(unpack(C.texte)) end
+	else
+		z.case:Poser(CASE_VIDE, nil, true)
+		z.cherche.saisie:SetTextColor(unpack(C.texte))
+	end
+	z.ajouter:Activer(choix ~= nil)
+end
+
+local function Choisir(objet)
+	choix = objet
+	if objet then Precharger(objet) end
+	if not objet and page then page.ajout.cherche:Ecrire("") end
+	MajChoix()
+end
+
+local function MajPage()
+	if not page then return end
 	MajChoix()
 
 	-- mes besoins
@@ -387,23 +443,28 @@ Maj = function()
 		liste[#liste + 1] = { objet = objet, qte = qte, nom = (InfoObjet(objet)) or "" }
 	end
 	table.sort(liste, function(x, y) return x.nom < y.nom end)
+	local mes = page.mes
 	local y = 0
 	for i, d in ipairs(liste) do
-		local b = lignesMes[i] or LigneBase(page.contenuG, page.largeurG)
-		lignesMes[i] = b
-		b:ClearAllPoints()
-		b:SetPoint("TOPLEFT", page.contenuG, "TOPLEFT", 0, -y)
-		Remplir(b, d.objet)
-		b.sous:SetText(d.qte == 0 and "Quantité : sans limite" or ("Quantité : " .. d.qte))
-		b.bouton:SetText("Retirer")
-		b.bouton:SetEnabled(true)
-		b.bouton:SetScript("OnClick", function() Retirer(d.objet) end)
-		b:Show()
-		y = y + 42
+		local r = mes.lignes[i]
+		if not r then
+			r = CreerLigne(mes.liste.contenu, "Retirer", "fantome")
+			r.bouton:SetScript("OnClick", function() if r.d then Retirer(r.d.objet) end end)
+			mes.lignes[i] = r
+		end
+		r.d = d
+		r:ClearAllPoints()
+		r:SetPoint("TOPLEFT", mes.liste.contenu, "TOPLEFT", 0, -y)
+		r:SetPoint("RIGHT", mes.liste.contenu, "RIGHT", 0, 0)
+		Remplir(r, d.objet)
+		r.sous:SetText(d.qte == 0 and "Quantité : sans limite" or ("Quantité : " .. d.qte))
+		r:Show()
+		y = y + HAUTEUR_LIGNE + ECART_LIGNE
 	end
-	for i = #liste + 1, #lignesMes do lignesMes[i]:Hide() end
-	page.contenuG:SetHeight(math.max(10, y))
-	page.videG:SetShown(#liste == 0)
+	for i = #liste + 1, #mes.lignes do mes.lignes[i]:Hide() end
+	mes.liste:Hauteur(y)
+	mes.vide:SetShown(#liste == 0)
+	mes.compte:SetText(#liste .. " / " .. MAX_BESOINS)
 
 	-- besoins de la guilde : ce que je sais fabriquer d'abord, puis les membres en ligne
 	local g = Guilde() or {}
@@ -427,145 +488,91 @@ Maj = function()
 		if a.nomO ~= b.nomO then return a.nomO < b.nomO end
 		return (a.e.nom or "") < (b.e.nom or "")
 	end)
+	local gu = page.guilde
 	y = 0
 	for i, d in ipairs(tous) do
-		local b = lignesGuilde[i] or LigneBase(page.contenuD, page.largeurD)
-		lignesGuilde[i] = b
-		b:ClearAllPoints()
-		b:SetPoint("TOPLEFT", page.contenuD, "TOPLEFT", 0, -y)
-		Remplir(b, d.objet)
-		local etat = d.enLigne and "|cff33dd55en ligne|r" or ("|cff999999hors ligne · il y a " .. Depuis(d.e.vu) .. "|r")
-		b.sous:SetText(("%s%s · %s%s"):format(NomCourt(d.e.nom), TexteQte(d.qte) and (" (" .. TexteQte(d.qte) .. ")") or "", etat,
-			d.fabrique and "  |cff33dd55· tu sais le fabriquer|r" or ""))
-		b.bouton:SetText("Chuchoter")
-		b.bouton:SetEnabled(d.enLigne and true or false)
-		b.bouton:SetScript("OnClick", function()
-			local nomMP = (ns.NomListeGuilde and ns.NomListeGuilde(d.cle)) or NomCourt(d.e.nom)
-			if d.cle:find("#test", 1, true) then nomMP = UnitName("player") end
-			if ChatFrame_SendTell then ChatFrame_SendTell(nomMP)
-			elseif ChatFrame_OpenChat then ChatFrame_OpenChat("/w " .. nomMP .. " ") end
-		end)
-		b:Show()
-		y = y + 42
+		local r = gu.lignes[i]
+		if not r then
+			r = CreerLigne(gu.liste.contenu, "Chuchoter", "or", function(self, bulle)
+				if self.d and self.d.fabrique then bulle:AddLine("Tu sais le fabriquer", C.vert[1], C.vert[2], C.vert[3]) end
+			end)
+			r.bouton:SetScript("OnClick", function() if r.d then UI.Chuchoter(r.d.cle, r.d.e.nom) end end)
+			gu.lignes[i] = r
+		end
+		r.d = d
+		r:ClearAllPoints()
+		r:SetPoint("TOPLEFT", gu.liste.contenu, "TOPLEFT", 0, -y)
+		r:SetPoint("RIGHT", gu.liste.contenu, "RIGHT", 0, 0)
+		Remplir(r, d.objet)
+		local etat = d.enLigne and (VERT .. "en ligne|r") or ("hors ligne · il y a " .. Depuis(d.e.vu))
+		r.sous:SetText(("%s%s · %s%s"):format(NomMembreColore(d.cle, d.e.nom), TexteQte(d.qte) and (" (" .. TexteQte(d.qte) .. ")") or "",
+			etat, d.fabrique and (" · " .. VERT .. "tu sais le fabriquer|r") or ""))
+		r.bouton:Activer(d.enLigne)
+		r:Fort(d.fabrique)
+		r:Show()
+		y = y + HAUTEUR_LIGNE + ECART_LIGNE
 	end
-	for i = #tous + 1, #lignesGuilde do lignesGuilde[i]:Hide() end
-	page.contenuD:SetHeight(math.max(10, y))
-	page.videD:SetShown(#tous == 0)
+	for i = #tous + 1, #gu.lignes do gu.lignes[i]:Hide() end
+	gu.liste:Hauteur(y)
+	gu.vide:SetShown(#tous == 0)
+	gu.compte:SetText(#tous > 0 and tostring(#tous) or "")
 end
 
--- Appelé par GuildUp_Echanges.lua à la création de la fenêtre
-ns.CreerPageBesoins = function(f, hautEncart)
-	local p = CreateFrame("Frame", nil, f)
-	p:SetAllPoints(f)
-	local largeur = f:GetWidth()
-	local milieu = math.floor(largeur / 2)
-	p.largeurG = milieu - 46
-	p.largeurD = largeur - milieu - 46
+-- Zone d'ajout : [case objet] [recherche dans tous les objets du jeu      x]
+--                            Quantité [ 1 ]  [ ] Sans limite        [Ajouter]
+local function CreerAjout(carte)
+	local z = CreateFrame("Button", nil, carte)
+	z:SetPoint("TOPLEFT", carte, "TOPLEFT", 14, -38)
+	z:SetPoint("RIGHT", carte, "RIGHT", -14, 0)
+	z:SetHeight(60)
+	z.case = IconeObjet(z, 44, "Button")
+	z.case:SetPoint("LEFT", z, "LEFT", 0, 0)
 
-	local titre = p:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	titre:SetPoint("TOPLEFT", f, "TOPLEFT", 70, -34)
-	titre:SetText("Besoins")
-	local aide = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	aide:SetPoint("TOPLEFT", titre, "BOTTOMLEFT", 0, -6)
-	aide:SetWidth(largeur - 90)
-	aide:SetJustifyH("LEFT")
-	aide:SetText("Liste les objets dont tu as besoin : la guilde les voit, même quand tu es hors ligne. Ceux qui savent les fabriquer sont prévenus.")
-
-	local function Colonne(x, l, texte, decalage)
-		local fond = p:CreateTexture(nil, "BACKGROUND")
-		fond:SetPoint("TOPLEFT", f, "TOPLEFT", x - 4, hautEncart - 4)
-		fond:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", x - 4, 12)
-		fond:SetWidth(l + 36)
-		if AtlasExiste("Professions-background-summarylist") then
-			fond:SetAtlas("Professions-background-summarylist")
-		else
-			fond:SetColorTexture(0, 0, 0, 0.25)
-		end
-		local t = p:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-		t:SetPoint("TOPLEFT", f, "TOPLEFT", x + 2, hautEncart - 10)
-		t:SetText(texte)
-		local defile = CreateFrame("ScrollFrame", nil, p, "UIPanelScrollFrameTemplate")
-		defile:SetPoint("TOPLEFT", f, "TOPLEFT", x, hautEncart - 30 - (decalage or 0))
-		defile:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", x, 16)
-		defile:SetWidth(l)
-		local contenu = CreateFrame("Frame", nil, defile)
-		contenu:SetSize(l, 10)
-		defile:SetScrollChild(contenu)
-		local vide = p:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-		vide:SetPoint("TOP", defile, "TOP", 0, -30)
-		vide:SetWidth(l - 20)
-		return contenu, vide
-	end
-	p.contenuG, p.videG = Colonne(14, p.largeurG, "Mes besoins", 70)
-	p.videG:SetText("Aucun besoin pour l'instant.")
-	p.contenuD, p.videD = Colonne(milieu + 14, p.largeurD, "Besoins de la guilde")
-	p.videD:SetText("Personne n'a listé de besoin pour l'instant.")
-
-	-- zone d'ajout : [case objet] nom de l'objet / Quantité [ 1 ] [Ajouter]
-	local z = CreateFrame("Button", nil, p)
-	z:SetSize(p.largeurG, 64)
-	z:SetPoint("TOPLEFT", f, "TOPLEFT", 14, hautEncart - 30)
-	p.ajout = z
-	local cadre = z:CreateTexture(nil, "BACKGROUND")
-	cadre:SetAllPoints(z)
-	cadre:SetColorTexture(0, 0, 0, 0.35)
-	z.case = CreateFrame("Button", nil, z)
-	z.case:SetSize(36, 36)
-	z.case:SetPoint("LEFT", z, "LEFT", 6, 0)
-	z.icone = z.case:CreateTexture(nil, "ARTWORK")
-	z.icone:SetAllPoints(z.case)
-	z.case:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
 	-- recherche par nom (tout le jeu) : liste de résultats sous la zone de saisie
-	local okC, cherche = pcall(CreateFrame, "EditBox", "GuildUpBesoinsCherche", z, "SearchBoxTemplate")
-	if not okC then cherche = CreateFrame("EditBox", "GuildUpBesoinsCherche", z, "InputBoxTemplate") end
-	cherche:SetHeight(20)
-	cherche:SetPoint("TOPLEFT", z.case, "TOPRIGHT", 12, 0)
-	cherche:SetPoint("RIGHT", z, "RIGHT", -8, 0)
-	cherche:SetAutoFocus(false)
-	if cherche.Instructions then cherche.Instructions:SetText("Nom de l'objet, ou glisse-le ici") end
+	local cherche = UI.Champ(z, 200, "Nom de l'objet, ou glisse-le ici", 26)
+	cherche:SetPoint("TOPLEFT", z.case, "TOPRIGHT", 10, 8)
+	cherche:SetPoint("RIGHT", z, "RIGHT", 0, 0)
+	cherche.saisie:SetPoint("BOTTOMRIGHT", cherche, "BOTTOMRIGHT", -26, 0)
 	z.cherche = cherche
-	local res = CreateFrame("Frame", nil, z, "BackdropTemplate")
+	local croix = CreateFrame("Button", nil, cherche)
+	croix:SetSize(20, 20)
+	croix:SetPoint("RIGHT", cherche, "RIGHT", -4, 0)
+	croix.texte = UI.Texte(croix, "GameFontNormal", C.gris)
+	croix.texte:SetPoint("CENTER", 0, 1)
+	croix.texte:SetText("x")
+	UI.Survol(croix, 0.1)
+	croix:Hide()
+
+	local res = UI.Cadre(z, { 0.05, 0.043, 0.035, 0.98 }, C.bordFort)
 	res:SetFrameStrata("DIALOG")
-	res:SetPoint("TOPLEFT", cherche, "BOTTOMLEFT", -4, -2)
+	res:SetPoint("TOPLEFT", cherche, "BOTTOMLEFT", 0, -2)
 	res:SetPoint("TOPRIGHT", cherche, "BOTTOMRIGHT", 0, -2)
-	if res.SetBackdrop then
-		res:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-			edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14,
-			insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-		res:SetBackdropColor(0.05, 0.05, 0.05, 0.97)
-	end
 	res:Hide()
 	res.lignes = {}
-	local MAX_RES = 10
 	for i = 1, MAX_RES do
 		local l = CreateFrame("Button", nil, res)
-		l:SetHeight(20)
-		l:SetPoint("TOPLEFT", res, "TOPLEFT", 6, -5 - (i - 1) * 20)
-		l:SetPoint("RIGHT", res, "RIGHT", -6, 0)
-		l:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+		l:SetHeight(22)
+		l:SetPoint("TOPLEFT", res, "TOPLEFT", 2, -2 - (i - 1) * 22)
+		l:SetPoint("RIGHT", res, "RIGHT", -2, 0)
+		UI.Survol(l, 0.08)
 		l.icone = l:CreateTexture(nil, "ARTWORK")
 		l.icone:SetSize(16, 16)
-		l.icone:SetPoint("LEFT", l, "LEFT", 2, 0)
-		l.texte = l:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		l.icone:SetPoint("LEFT", l, "LEFT", 6, 0)
+		l.icone:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		l.texte = UI.Texte(l, "GameFontHighlightSmall")
 		l.texte:SetPoint("LEFT", l.icone, "RIGHT", 6, 0)
-		l.texte:SetPoint("RIGHT", l, "RIGHT", -2, 0)
-		l.texte:SetJustifyH("LEFT")
-		l.texte:SetWordWrap(false)
+		l.texte:SetPoint("RIGHT", l, "RIGHT", -4, 0)
+		l.objet = false
 		l:SetScript("OnClick", function(self)
 			res:Hide()
-			cherche:ClearFocus()
+			cherche.saisie:ClearFocus()
 			Choisir(self.objet)
 		end)
-		l:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			pcall(GameTooltip.SetItemByID, GameTooltip, self.objet)
-			GameTooltip:Show()
-		end)
-		l:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		InfobulleObjet(l)
 		res.lignes[i] = l
 	end
 	local function Resultats()
-		local liste = ChercherObjets(cherche:GetText(), MAX_RES)
+		local liste = ChercherObjets(cherche:Lire(), MAX_RES)
 		local fi = (C_Item and C_Item.GetItemIconByID) or GetItemIcon
 		for i, l in ipairs(res.lignes) do
 			local o = liste[i]
@@ -573,98 +580,71 @@ ns.CreerPageBesoins = function(f, hautEncart)
 				l.objet = o[1]
 				local okI, icone = false, nil
 				if fi then okI, icone = pcall(fi, o[1]) end
-				l.icone:SetTexture(okI and icone or "Interface\\Icons\\INV_Misc_QuestionMark")
+				l.icone:SetTexture(okI and icone or ICONE_INCONNUE)
 				local qc = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[o[2]]
 				l.texte:SetText(o[3])
-				if qc then l.texte:SetTextColor(qc.r, qc.g, qc.b) else l.texte:SetTextColor(1, 1, 1) end
+				if qc then l.texte:SetTextColor(qc.r, qc.g, qc.b) else l.texte:SetTextColor(unpack(C.texte)) end
 				l:Show()
 			else
 				l:Hide()
 			end
 		end
-		res:SetHeight(10 + math.max(1, #liste) * 20)
+		res:SetHeight(4 + math.max(1, #liste) * 22)
 		res:SetShown(#liste > 0)
 	end
-	cherche:HookScript("OnTextChanged", function(self, saisie)
-		if z.ecriture then return end
-		if not saisie and self:GetText() == "" then
-			-- croix de la recherche : on vide aussi l'objet choisi
-			res:Hide()
-			if choix then Choisir(nil) end
-			return
-		end
-		if saisie and choix then
-			-- on retape un nom : l'objet choisi est oublié
+	-- on tape un nom : l'objet choisi est oublié, les résultats suivent
+	cherche.SurTexte = function()
+		if choix then
 			choix = nil
-			z.icone:SetTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
-			z.icone:SetDesaturated(true)
-			self:SetTextColor(1, 1, 1)
-			z.ajouter:SetEnabled(false)
+			MajChoix()
 		end
-		if saisie then Resultats() end
+		Resultats()
+	end
+	croix:SetScript("OnClick", function()
+		res:Hide()
+		cherche.saisie:ClearFocus()
+		Choisir(nil)
 	end)
-	cherche:HookScript("OnEnterPressed", function(self)
-		-- Entrée : le premier résultat
+	cherche.saisie:HookScript("OnTextChanged", function(self) croix:SetShown((self:GetText() or "") ~= "") end)
+	-- Entrée : le premier résultat ; Échap ferme la liste
+	cherche.saisie:SetScript("OnEnterPressed", function(self)
 		local l = res.lignes[1]
 		if res:IsShown() and l:IsShown() then l:Click() else self:ClearFocus() end
 	end)
-	cherche:HookScript("OnEscapePressed", function(self) res:Hide(); self:ClearFocus() end)
-	cherche:HookScript("OnEditFocusLost", function()
-		C_Timer.After(0.2, function() if not cherche:HasFocus() then res:Hide() end end)
+	cherche.saisie:HookScript("OnEscapePressed", function() res:Hide() end)
+	cherche.saisie:HookScript("OnEditFocusLost", function()
+		C_Timer.After(0.2, function() if not cherche.saisie:HasFocus() then res:Hide() end end)
 	end)
-	z.nom = z:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall") -- (plus affiché)
-	z.nom:Hide()
-	local tq = z:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	tq:SetPoint("BOTTOMLEFT", z.case, "BOTTOMRIGHT", 8, 0)
+
+	-- quantité, sans limite, ajouter
+	local tq = UI.Texte(z, "GameFontNormalSmall", C.ors)
+	tq:SetPoint("BOTTOMLEFT", z.case, "BOTTOMRIGHT", 10, -4)
 	tq:SetText("Quantité")
-	z.qte = CreateFrame("EditBox", nil, z, "InputBoxTemplate")
-	z.qte:SetSize(40, 18)
-	z.qte:SetPoint("LEFT", tq, "RIGHT", 10, 0)
-	z.qte:SetAutoFocus(false)
-	z.qte:SetNumeric(true)
-	z.qte:SetMaxLetters(3)
-	z.qte:SetText("1")
-	z.qte:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-	z.ajouter = CreateFrame("Button", nil, z, "UIPanelButtonTemplate")
-	z.ajouter:SetSize(80, 22)
-	z.ajouter:SetPoint("BOTTOMRIGHT", z, "BOTTOMRIGHT", -6, 6)
-	z.ajouter:SetText("Ajouter")
-	z.ajouter:SetScript("OnClick", function()
-		z.qte:ClearFocus()
-		local qte = z.infini:GetChecked() and 0 or (tonumber(z.qte:GetText()) or 1)
-		if Ajouter(choix, qte) then
-			Choisir(nil)
-			z.ecriture = true
-			z.cherche:SetText("")
-			z.ecriture = false
-			z.qte:SetText("1")
-		end
-	end)
+	z.qte = UI.Champ(z, 46, nil, 24)
+	z.qte:SetPoint("LEFT", tq, "RIGHT", 8, 0)
+	z.qte.saisie:SetNumeric(true)
+	z.qte.saisie:SetMaxLetters(3)
+	z.qte:Ecrire("1")
 	-- « Sans limite » : besoin permanent (quantité 0)
-	z.infini = CreateFrame("CheckButton", nil, z, "UICheckButtonTemplate")
-	z.infini:SetSize(20, 20)
-	z.infini:SetPoint("LEFT", z.qte, "RIGHT", 8, 0)
-	local ti = z.infini.Text or z.infini.text
-	if not ti then
-		ti = z.infini:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-		ti:SetPoint("LEFT", z.infini, "RIGHT", 1, 0)
-	end
-	ti:SetFontObject("GameFontHighlightSmall")
-	ti:SetText("Sans limite")
-	z.infini:SetScript("OnClick", function(self)
-		local oui = self:GetChecked() and true or false
-		z.qte:SetEnabled(not oui)
+	z.infini = UI.Case(z, "Sans limite", function(oui)
+		z.qte.saisie:SetEnabled(not oui)
 		z.qte:SetAlpha(oui and 0.4 or 1)
 	end)
-	z.infini:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:SetText("Sans limite")
-		GameTooltip:AddLine("Besoin permanent : la guilde voit « sans limite » au lieu d'une quantité.", 1, 1, 1, true)
-		GameTooltip:Show()
+	z.infini:SetPoint("LEFT", z.qte, "RIGHT", 10, 0)
+	UI.Infobulle(z.infini, "Sans limite", "Besoin permanent : la guilde voit « sans limite » au lieu d'une quantité.")
+	z.ajouter = UI.Bouton(z, "Ajouter", "or", 84, 26)
+	z.ajouter:SetPoint("BOTTOMRIGHT", z, "BOTTOMRIGHT", 0, -2)
+	z.ajouter:SetScript("OnClick", function()
+		z.qte.saisie:ClearFocus()
+		local qte = z.infini.oui and 0 or (tonumber(z.qte:Lire()) or 1)
+		if Ajouter(choix, qte) then
+			Choisir(nil)
+			z.qte:Ecrire("1")
+		end
 	end)
-	z.infini:SetScript("OnLeave", function() GameTooltip:Hide() end)
-	-- glisser un objet sur la case (ou cliquer avec un objet sur le curseur)
-	ns.BrancherDepot({ z, z.case }, function(o) Choisir(o) end, function() return choix end)
+
+	-- glisser un objet sur la case (ou cliquer avec un objet sur le curseur) ; clic droit : vider
+	ns.BrancherDepot({ z, z.case }, function(o) res:Hide(); Choisir(o) end, function() return choix end)
 	z.case:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		if choix then
@@ -678,8 +658,54 @@ ns.CreerPageBesoins = function(f, hautEncart)
 	end)
 	z.case:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	if ns.SonsSurBoutons then ns.SonsSurBoutons(z) end
+	return z
+end
 
-	p:SetScript("OnShow", function() Maj() end)
+-- Appelé par GuildUp_Echanges.lua à la création de la page « Dons » : contenu de l'onglet, qui
+-- remplit parent (les onglets sont au-dessus) ; p.Maj() le rafraîchit
+ns.CreerPageBesoins = function(parent)
+	local p = CreateFrame("Frame", nil, parent)
+	p:SetAllPoints()
+	local largeur = (ns.TAILLE_PAGE and ns.TAILLE_PAGE[1] or 794) - 2 * MARGE
+	local demi = math.floor((largeur - 12) / 2)
+
+	local aide = UI.Texte(p, "GameFontHighlightSmall", C.gris)
+	aide:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -56)
+	aide:SetPoint("RIGHT", p, "RIGHT", -MARGE, 0)
+	aide:SetWordWrap(true)
+	aide:SetText("Liste les objets dont tu as besoin : la guilde les voit, même quand tu es hors ligne. Ceux qui savent les fabriquer sont prévenus.")
+
+	-- gauche : mes besoins (zone d'ajout puis liste)
+	local mes = UI.Carte(p, "Mes besoins")
+	mes:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -84)
+	mes:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", MARGE, 12)
+	mes:SetWidth(demi)
+	mes.lignes = {}
+	p.mes = mes
+	p.ajout = CreerAjout(mes)
+	local filet = UI.Filet(mes)
+	filet:SetPoint("TOPLEFT", mes, "TOPLEFT", 14, -108)
+	filet:SetPoint("TOPRIGHT", mes, "TOPRIGHT", -14, -108)
+	mes.liste = UI.Liste(mes)
+	mes.liste:SetPoint("TOPLEFT", mes, "TOPLEFT", 12, -118)
+	mes.liste:SetPoint("BOTTOMRIGHT", mes, "BOTTOMRIGHT", -6, 10)
+	mes.vide:ClearAllPoints()
+	mes.vide:SetPoint("TOPLEFT", mes.liste, "TOPLEFT", 2, -6)
+	mes.vide:SetPoint("RIGHT", mes, "RIGHT", -14, 0)
+	mes.vide:SetText("Aucun besoin pour l'instant.")
+
+	-- droite : besoins de la guilde
+	local gu = UI.Carte(p, "Besoins de la guilde")
+	gu:SetPoint("TOPLEFT", mes, "TOPRIGHT", 12, 0)
+	gu:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE, 12)
+	gu.lignes = {}
+	p.guilde = gu
+	gu.liste = UI.Liste(gu)
+	gu.liste:SetPoint("TOPLEFT", gu, "TOPLEFT", 12, -38)
+	gu.liste:SetPoint("BOTTOMRIGHT", gu, "BOTTOMRIGHT", -6, 10)
+	gu.vide:SetText("Personne n'a listé de besoin pour l'instant.")
+
+	p.Maj = MajPage
 	page = p
 	return p
 end
@@ -739,7 +765,7 @@ else
 	end
 end
 
--- Ouvre la fenêtre Échanges sur l'onglet « Besoins »
+-- Ouvre la page « Dons » sur l'onglet « Besoins »
 ns.OuvrirBesoins = function()
 	if ns.OuvrirEchanges then ns.OuvrirEchanges(nil, 4) end
 end
@@ -754,23 +780,17 @@ ns.DiagBesoins = function(L)
 end
 
 --------------------------------------------------------------------------------
--- Évènements
+-- Évènements (le rafraîchissement de la page sur GET_ITEM_INFO_RECEIVED et GUILD_ROSTER_UPDATE est
+-- fait par GuildUp_Echanges.lua, pour toute la page « Dons »)
 --------------------------------------------------------------------------------
 
 ns.Ecouter(PREFIXE, Recevoir)
 
 local ev = CreateFrame("Frame")
-for _, nom in ipairs({ "PLAYER_ENTERING_WORLD", "GET_ITEM_INFO_RECEIVED", "GUILD_ROSTER_UPDATE" }) do
-	pcall(ev.RegisterEvent, ev, nom)
-end
-local premiere, prevu = true, false
-ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
-	if event == "GET_ITEM_INFO_RECEIVED" or event == "GUILD_ROSTER_UPDATE" then
-		if page and page:IsShown() and not prevu then
-			prevu = true
-			C_Timer.After(0.3, function() prevu = false; if Maj then Maj() end end)
-		end
-	elseif event == "PLAYER_ENTERING_WORLD" and premiere then
+pcall(ev.RegisterEvent, ev, "PLAYER_ENTERING_WORLD")
+local premiere = true
+ev:SetScript("OnEvent", function(_, event)
+	if event == "PLAYER_ENTERING_WORLD" and premiere then
 		premiere = false
 		debut = GetTime()
 		-- purge : listes de besoins sans nouvelles depuis 30 jours (toutes guildes)

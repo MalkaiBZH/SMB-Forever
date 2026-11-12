@@ -1,6 +1,11 @@
--- GuildUpSMB : fenêtre « Dons de la guilde ».
--- Onglets : Dons (hôtel des ventes de dons, par catégorie) · Mes dons (mes objets échangeables, sacs et
--- banque : je coche ce que je donne) · Demandes (qui m'a demandé un don) · Besoins (GuildUp_Besoins.lua).
+-- GuildUpSMB : dons de la guilde (page « Dons » de la fenêtre GuildUpSMB, kit ns.UI).
+-- Onglets : Dons (les dons de la guilde, par catégorie, recherche, donateurs du mois) · Mes dons (mes
+-- objets échangeables, sacs et banque : je glisse dans la case ce que je donne) · Demandes (qui m'a
+-- demandé un don) · Besoins (GuildUp_Besoins.lua, ns.CreerPageBesoins).
+-- La page est lourde : elle ne suit pas le rafraîchissement automatique de la fenêtre
+-- (rafraichirAuto = false) ; MajTout (= ns.MajOngletsEchanges) la rafraîchit si elle est affichée,
+-- ainsi que le médaillon, à chaque changement (listes reçues, sacs, demandes, liste de guilde…).
+-- ns.FenetreOnglets / ns.HAUT_ENCART : ancienne fenêtre à onglets, encore utilisée par l'Artisanat.
 --
 -- Préfixe "GuildUpEch" (canal de guilde) :
 --   "L~part~total~objet:qte:métier:niveau,…"  ma liste de dons complète (vide = plus aucun don)
@@ -25,12 +30,9 @@ local DELAI_SANS_NIVEAU = 10
 local CALME = 25
 local OUBLI = 30 * 86400
 local TAILLE_MORCEAU = 200
-local LARGEUR, HAUTEUR = 720, 520
+local LARGEUR, HAUTEUR = 720, 520   -- ancienne fenêtre à onglets (ns.FenetreOnglets, Artisanat)
 local HAUT_ENCART = -88
-local LARGEUR_CATS = 132
-local ICONE_FENETRE = "Interface\\Icons\\INV_Holiday_Christmas_Present_01"
-local TITRE = "Dons de la guilde"
--- onglets
+-- onglets de la page
 local DONS, MES_DONS, DEMANDES, BESOINS = 1, 2, 3, 4
 local GARDE_DEMANDES = 30 * 86400   -- historique des demandes reçues
 local GARDE_RELAIS = 14 * 86400     -- demandes gardées pour un donneur hors ligne
@@ -57,8 +59,7 @@ for _, c in ipairs(CATEGORIES) do for k in pairs(c.classes or {}) do CLASSES_RAN
 local debut = GetTime()
 local pret = false
 local PhotoConnexion, RecapConnexion
-local fen
-local MajTout
+local MajTout              -- rafraîchit le médaillon et la page (défini avec la page)
 
 local Normaliser = ns.Normaliser
 local MaCle = ns.MaCle
@@ -66,7 +67,6 @@ local TestSolo = ns.TestSolo
 local NomCourt = ns.NomCourt
 local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end end
 local Erreur = ns.Erreur
-local AtlasExiste = ns.AtlasExiste
 local PoserAtlas = ns.PoserAtlas
 local Simplifier = ns.Simplifier
 
@@ -114,11 +114,12 @@ local function InfoObjet(objet)
 	local nom, lien, qualite, icone, niveau = ns.InfoObjet(objet)
 	return nom, lien, qualite, niveau, icone
 end
+-- classe, sous-classe, icône, nom du type dans le jeu (« Bâtons »)
 local function ClasseObjet(objet)
 	local f = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
 	if not f then return nil end
-	local ok, _, _, _, _, icone, classe, sousClasse = pcall(f, objet)
-	if ok then return classe, sousClasse, icone end
+	local ok, _, _, sousType, _, icone, classe, sousClasse = pcall(f, objet)
+	if ok then return classe, sousClasse, icone, sousType end
 end
 local Precharger = ns.Precharger
 
@@ -204,8 +205,8 @@ local function Case(sac, c)
 	end
 end
 local function NbCases(sac)
-	return (C_Container and C_Container.GetContainerNumSlots and C_Container.GetContainerNumSlots(sac))
-		or (GetContainerNumSlots and GetContainerNumSlots(sac)) or 0
+	return tonumber((C_Container and C_Container.GetContainerNumSlots and C_Container.GetContainerNumSlots(sac))
+		or (GetContainerNumSlots and GetContainerNumSlots(sac))) or 0
 end
 
 -- compte les objets d'un sac dans t (avecLies : aussi les objets liés, sinon seulement les échangeables)
@@ -236,7 +237,7 @@ local EnvoyerMaListe
 local envoiPrevu = false
 local function LireMesObjets()
 	local sacs = {}
-	for sac = 0, (NUM_BAG_SLOTS or 4) do LireSac(sac, sacs) end
+	for sac = 0, tonumber(NUM_BAG_SLOTS) or 4 do LireSac(sac, sacs) end
 	local t = {}
 	local function Noter(objet, n, lieu)
 		local o = t[objet]
@@ -365,7 +366,6 @@ local function DonateursDuMois()
 	table.sort(liste, function(a, b) if a.n ~= b.n then return a.n > b.n end return a.qui < b.qui end)
 	return liste
 end
-local MajDemandes          -- rafraîchit l'onglet « Demandes »
 
 local Maintenant = ns.Maintenant
 
@@ -702,7 +702,7 @@ local function Demander(d)
 end
 
 --------------------------------------------------------------------------------
--- Fenêtre
+-- Dons de la guilde (tri, filtres)
 --------------------------------------------------------------------------------
 
 local Depuis = ns.Depuis
@@ -722,21 +722,35 @@ local function Classee(cat, classe)
 	return true
 end
 
+-- « Armes · Bâtons » : catégorie de l'objet et son type dans le jeu
+local function TexteGenre(classe, sousType)
+	local nom
+	for i = 2, #CATEGORIES do
+		local c = CATEGORIES[i]
+		if not c.autres and Classee(c, classe) then nom = c.nom; break end
+	end
+	if type(sousType) == "string" and sousType ~= "" then
+		if nom and Simplifier(nom) ~= Simplifier(sousType) then return nom .. " · " .. sousType end
+		return sousType
+	end
+	return nom or ""
+end
+
 local comptes = {}       -- [catégorie] = nombre de dons de la guilde
 local function DonsGuilde()
 	local g = Guilde() or {}
 	local res = {}
 	wipe(comptes)
 	local limite = Maintenant() - OUBLI
-	local cat = CATEGORIES[categorie]
+	local cat = CATEGORIES[categorie] or CATEGORIES[1]
 	for cle, e in pairs(g) do
 		if type(e) ~= "table" or (e.vu or 0) < limite then
 			g[cle] = nil
 		elseif DansLaGuilde(cle) then
 			local enLigne = ns.EnLigneMembre and ns.EnLigneMembre(cle) or false
 			for objet, d in pairs(e.liste or {}) do
-				local classe = ClasseObjet(objet)
-				local nomO, _, qualite, niveau = InfoObjet(objet)
+				local classe, _, iconeI, sousType = ClasseObjet(objet)
+				local nomO, _, qualite, niveau, icone = InfoObjet(objet)
 				local trouve = recherche == "" or Simplifier(nomO):find(recherche, 1, true) ~= nil
 				-- compteurs des catégories (avec la recherche en cours)
 				if trouve then
@@ -746,7 +760,8 @@ local function DonsGuilde()
 				end
 				if trouve and Classee(cat, classe) then
 					res[#res + 1] = { cle = cle, e = e, objet = objet, d = d, enLigne = enLigne, nomO = nomO or "",
-						qualite = qualite, niveau = niveau, place = d.c and MaPlace(d.c, d.n) or nil }
+						qualite = qualite, niveau = niveau, icone = icone or iconeI, classe = classe, sousType = sousType,
+						place = d.c and MaPlace(d.c, d.n) or nil }
 				end
 			end
 		end
@@ -770,261 +785,9 @@ local function NombreDons()
 	return n
 end
 
-local function CouleurQualite(fs, qualite, ok)
-	local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
-	if qc and ok then fs:SetTextColor(qc.r, qc.g, qc.b) else fs:SetTextColor(1, 0.82, 0) end
-end
-
-local function InfobulleObjet(cadre)
-	cadre:SetScript("OnEnter", function(self)
-		if not self.objet then return end
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		pcall(GameTooltip.SetItemByID, GameTooltip, self.objet)
-		GameTooltip:Show()
-	end)
-	cadre:SetScript("OnLeave", function() GameTooltip:Hide() end)
-end
-
-local function Colonne(parent, texte, x, largeur, alignement)
-	local t = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	t:SetPoint("LEFT", parent, "LEFT", x, 0)
-	t:SetWidth(largeur)
-	t:SetJustifyH(alignement or "LEFT")
-	t:SetText(texte)
-	return t
-end
-
-local function Defilement(p, x1, y1, x2)
-	local defile = CreateFrame("ScrollFrame", nil, p, "UIPanelScrollFrameTemplate")
-	defile:SetPoint("TOPLEFT", fen, "TOPLEFT", x1, y1)
-	defile:SetPoint("BOTTOMRIGHT", fen, "BOTTOMRIGHT", x2, 16)
-	local contenu = CreateFrame("Frame", nil, defile)
-	contenu:SetSize(defile:GetWidth() > 0 and defile:GetWidth() or 400, 10)
-	defile:SetScrollChild(contenu)
-	local vide = p:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-	vide:SetPoint("TOP", defile, "TOP", 0, -40)
-	vide:SetWidth(300)
-	return defile, contenu, vide
-end
-
-local function BoiteRecherche(p, nom, x, y, largeur, aide, Changer)
-	local ok, boite = pcall(CreateFrame, "EditBox", nom, p, "SearchBoxTemplate")
-	if not ok then boite = CreateFrame("EditBox", nom, p, "InputBoxTemplate") end
-	boite:SetSize(largeur, 20)
-	boite:SetPoint("TOPLEFT", fen, "TOPLEFT", x, y)
-	boite:SetAutoFocus(false)
-	if boite.Instructions then boite.Instructions:SetText(aide) end
-	boite:HookScript("OnTextChanged", function(self) Changer(Simplifier(strtrim(self:GetText() or ""))) end)
-	boite:HookScript("OnEscapePressed", function(self) self:ClearFocus() end)
-	return boite
-end
-
----------------------------------------------------------------- Parcourir
-local pageParcourir, lignesP, boutonsCats = nil, {}, {}
-local LARGEUR_LISTE = LARGEUR - LARGEUR_CATS - 52
-
-local function CreerLigneDon(parent)
-	local b = CreateFrame("Frame", nil, parent)
-	b:SetSize(LARGEUR_LISTE, 34)
-	b:EnableMouse(true)
-	b.fond = b:CreateTexture(nil, "BACKGROUND")
-	b.fond:SetAllPoints(b)
-	b.fond:SetColorTexture(1, 1, 1, 0.04)
-	b.icone = b:CreateTexture(nil, "ARTWORK")
-	b.icone:SetSize(28, 28)
-	b.icone:SetPoint("LEFT", b, "LEFT", 3, 0)
-	b.nom = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	b.nom:SetPoint("TOPLEFT", b.icone, "TOPRIGHT", 6, -1)
-	b.nom:SetWidth(200)
-	b.nom:SetJustifyH("LEFT")
-	b.nom:SetWordWrap(false)
-	b.info = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	b.info:SetPoint("BOTTOMLEFT", b.icone, "BOTTOMRIGHT", 6, 1)
-	b.info:SetWidth(200)
-	b.info:SetJustifyH("LEFT")
-	b.info:SetWordWrap(false)
-	b.qte = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	b.qte:SetPoint("LEFT", b, "LEFT", 240, 0)
-	b.qte:SetWidth(36)
-	b.qte:SetJustifyH("CENTER")
-	b.niveau = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	b.niveau:SetPoint("LEFT", b, "LEFT", 280, 0)
-	b.niveau:SetWidth(36)
-	b.niveau:SetJustifyH("CENTER")
-	b.donneur = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	b.donneur:SetPoint("TOPLEFT", b, "TOPLEFT", 324, -4)
-	b.donneur:SetWidth(120)
-	b.donneur:SetJustifyH("LEFT")
-	b.donneur:SetWordWrap(false)
-	b.etat = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	b.etat:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", 324, 4)
-	b.etat:SetWidth(120)
-	b.etat:SetJustifyH("LEFT")
-	b.bouton = CreateFrame("Button", nil, b, "UIPanelButtonTemplate")
-	b.bouton:SetSize(84, 22)
-	b.bouton:SetPoint("RIGHT", b, "RIGHT", -2, 0)
-	b.bouton:SetMotionScriptsWhileDisabled(true)
-	InfobulleObjet(b)
-	if ns.SonsSurBoutons then ns.SonsSurBoutons(b) end
-	return b
-end
-
-local function MajParcourir()
-	local p = pageParcourir
-	if not p or not p:IsShown() then return end
-	-- donateurs du mois (les plus remerciés)
-	local top = DonateursDuMois()
-	if #top > 0 then
-		local noms = {}
-		for i = 1, math.min(3, #top) do noms[#noms + 1] = ("%s (%d)"):format(NomCourt(top[i].qui), top[i].n) end
-		p.donateurs:SetText("|cffffd100Donateurs du mois :|r " .. table.concat(noms, " · "))
-	else
-		p.donateurs:SetText("Les plans que tu peux apprendre passent en premier.")
-	end
-	for i, bt in ipairs(boutonsCats) do
-		if i == categorie then bt:LockHighlight() else bt:UnlockHighlight() end
-		bt.choisi:SetShown(i == categorie)
-	end
-	local liste = DonsGuilde()
-	for i, bt in ipairs(boutonsCats) do
-		local n = comptes[i] or 0
-		bt.texte:SetText(n > 0 and (CATEGORIES[i].nom .. " |cff999999(" .. n .. ")|r") or ("|cff808080" .. CATEGORIES[i].nom .. "|r"))
-	end
-	local y = 0
-	for i, d in ipairs(liste) do
-		local b = lignesP[i] or CreerLigneDon(p.contenu)
-		lignesP[i] = b
-		b:ClearAllPoints()
-		b:SetPoint("TOPLEFT", p.contenu, "TOPLEFT", 0, -y)
-		b.fond:SetShown(i % 2 == 0)
-		b.objet = d.objet
-		local _, _, _, _, icone = InfoObjet(d.objet)
-		local _, _, iconeI = ClasseObjet(d.objet)
-		b.icone:SetTexture(icone or iconeI or "Interface\\Icons\\INV_Misc_QuestionMark")
-		b.nom:SetText(d.nomO ~= "" and d.nomO or "|cff999999chargement…|r")
-		CouleurQualite(b.nom, d.qualite, d.nomO ~= "")
-		if d.d.c then
-			local couleur = d.place == "ok" and "|cff33dd55" or d.place == "bas" and "|cffff9933" or "|cff999999"
-			b.info:SetText(couleur .. TexteMetier(d.d.c, d.d.n) .. "|r")
-		else
-			b.info:SetText("")
-		end
-		b.qte:SetText(d.d.q or 1)
-		b.niveau:SetText((d.niveau and d.niveau > 1) and d.niveau or "—")
-		b.donneur:SetText(NomCourt(d.e.nom))
-		b.etat:SetText(d.enLigne and "|cff33dd55en ligne|r" or ("hors ligne · " .. Depuis(d.e.vu)))
-		local demande = mesDemandes[d.cle .. d.objet]
-		-- après la demande : « Merci ! » (une fois le don reçu), puis « Remercié »
-		local merci = demande and demande.merci
-		b.bouton:SetText(merci and "Remercié" or demande and "Merci !" or "Demander")
-		b.bouton:SetEnabled(not merci)
-		b.bouton:SetScript("OnClick", function()
-			if not demande then
-				Demander(d)
-			elseif not demande.merci then
-				demande.merci = true
-				Envoyer(("M~%s~%d"):format(d.cle, d.objet))
-				if MajTout then MajTout() end
-			end
-		end)
-		b.bouton:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self, "ANCHOR_TOP")
-			if demande then
-				GameTooltip:SetText(merci and "Merci envoyé" or "Merci !")
-				GameTooltip:AddLine("Tu as reçu ce don ? Remercie " .. NomCourt(d.e.nom) .. " : ça compte pour les donateurs du mois.", 1, 1, 1, true)
-			elseif not d.enLigne then
-				GameTooltip:SetText("Demander ce don")
-				GameTooltip:AddLine(NomCourt(d.e.nom) .. " est hors ligne : ta demande lui sera transmise dès que possible, par un membre de la guilde connecté avec GuildUpSMB, ou quand vous serez connectés en même temps.", 1, 1, 1, true)
-			else
-				GameTooltip:SetText("Demander ce don")
-				GameTooltip:AddLine("Un message privé part vers " .. NomCourt(d.e.nom) .. ".", 1, 1, 1, true)
-			end
-			GameTooltip:Show()
-		end)
-		b.bouton:SetScript("OnLeave", function() GameTooltip:Hide() end)
-		b:Show()
-		y = y + 36
-	end
-	for i = #liste + 1, #lignesP do lignesP[i]:Hide() end
-	p.contenu:SetHeight(math.max(10, y))
-	p.vide:SetShown(#liste == 0)
-	p.vide:SetText(recherche ~= "" and "Aucun don ne correspond à ta recherche."
-		or categorie > 1 and "Aucun don dans cette catégorie." or "Personne ne donne rien pour l'instant.")
-end
-
--- Colonne des catégories (dons de la guilde et mes dons)
-local function CreerCategories(p, f, boutons, Choisir)
-	local fondC = p:CreateTexture(nil, "BACKGROUND")
-	fondC:SetPoint("TOPLEFT", f, "TOPLEFT", 8, HAUT_ENCART - 4)
-	fondC:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 8, 10)
-	fondC:SetWidth(LARGEUR_CATS)
-	PoserAtlas(fondC, "Professions-background-summarylist", { 0, 0, 0, 0.25 })
-	for i, c in ipairs(CATEGORIES) do
-		local bt = CreateFrame("Button", nil, p)
-		bt:SetSize(LARGEUR_CATS - 12, 22)
-		bt:SetPoint("TOPLEFT", f, "TOPLEFT", 14, HAUT_ENCART - 10 - (i - 1) * 24)
-		bt:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
-		bt.choisi = bt:CreateTexture(nil, "BACKGROUND")
-		bt.choisi:SetAllPoints(bt)
-		bt.choisi:SetColorTexture(1, 0.82, 0, 0.18)
-		bt.texte = bt:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-		bt.texte:SetPoint("LEFT", bt, "LEFT", 8, 0)
-		bt.texte:SetText(c.nom)
-		bt:SetScript("OnClick", function() Choisir(i) end)
-		boutons[i] = bt
-	end
-end
-
-local function CreerParcourir(f)
-	local p = CreateFrame("Frame", nil, f)
-	p:SetAllPoints(f)
-	local titre = p:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	titre:SetPoint("TOPLEFT", f, "TOPLEFT", 70, -32)
-	titre:SetText("Dons de la guilde")
-	BoiteRecherche(p, "GuildUpEchangesRecherche", 76, -58, 220, "Chercher un objet", function(t)
-		recherche = t
-		MajParcourir()
-	end)
-	local aide = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	aide:SetPoint("TOPLEFT", f, "TOPLEFT", 310, -62)
-	aide:SetText("Les plans que tu peux apprendre passent en premier.")
-	p.donateurs = aide
-
-	-- catégories (colonne de gauche)
-	CreerCategories(p, f, boutonsCats, function(i)
-		categorie = i
-		p.defile:SetVerticalScroll(0)
-		MajParcourir()
-	end)
-
-	-- en-têtes de colonnes
-	local x0 = LARGEUR_CATS + 20
-	local entete = CreateFrame("Frame", nil, p)
-	entete:SetSize(LARGEUR_LISTE, 18)
-	entete:SetPoint("TOPLEFT", f, "TOPLEFT", x0, HAUT_ENCART - 8)
-	Colonne(entete, "Objet", 36, 180)
-	Colonne(entete, "Qté", 240, 36, "CENTER")
-	Colonne(entete, "Niv.", 280, 36, "CENTER")
-	Colonne(entete, "Donneur", 324, 120)
-	local fondL = p:CreateTexture(nil, "BACKGROUND")
-	fondL:SetPoint("TOPLEFT", f, "TOPLEFT", x0 - 4, HAUT_ENCART - 4)
-	fondL:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 10)
-	PoserAtlas(fondL, "Professions-Recipe-Background", { 0, 0, 0, 0.2 })
-
-	p.defile, p.contenu, p.vide = Defilement(p, x0, HAUT_ENCART - 30, -30)
-	p.contenu:SetWidth(LARGEUR_LISTE)
-	p:SetScript("OnShow", MajParcourir)
-	pageParcourir = p
-	return p
-end
-
----------------------------------------------------------------- Mes dons
--- Comme les besoins : on glisse un objet dans la case d'ajout, avec la quantité à
--- donner. Seuls les objets que j'ai (sacs ou banque) et qui ne sont pas liés peuvent être donnés.
-local pageMes, lignesM, boutonsCatsMes = nil, {}, {}
-local rechercheMes, categorieMes = "", 1
-local choixDon
-
+--------------------------------------------------------------------------------
+-- Mes dons : ajout, retrait
+--------------------------------------------------------------------------------
 
 -- Quantité donnée : celle choisie, jamais plus que ce que j'ai
 local function QteDonnee(objet)
@@ -1052,190 +815,306 @@ local function RetirerDon(objet)
 	if MajTout then MajTout() end
 end
 
-local function CreerLigneMien(parent, largeur)
-	local b = CreateFrame("Frame", nil, parent)
-	b:SetSize(largeur, 34)
-	b:EnableMouse(true)
-	b.fond = b:CreateTexture(nil, "BACKGROUND")
-	b.fond:SetAllPoints(b)
-	b.fond:SetColorTexture(1, 1, 1, 0.04)
-	b.icone = b:CreateTexture(nil, "ARTWORK")
-	b.icone:SetSize(28, 28)
-	b.icone:SetPoint("LEFT", b, "LEFT", 3, 0)
-	b.nom = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	b.nom:SetPoint("TOPLEFT", b.icone, "TOPRIGHT", 6, -1)
-	b.nom:SetWidth(largeur - 140)
-	b.nom:SetJustifyH("LEFT")
-	b.nom:SetWordWrap(false)
-	b.info = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	b.info:SetPoint("BOTTOMLEFT", b.icone, "BOTTOMRIGHT", 6, 1)
-	b.info:SetWidth(largeur - 140)
-	b.info:SetJustifyH("LEFT")
-	b.info:SetWordWrap(false)
-	b.retirer = CreateFrame("Button", nil, b, "UIPanelButtonTemplate")
-	b.retirer:SetSize(84, 22)
-	b.retirer:SetPoint("RIGHT", b, "RIGHT", -2, 0)
-	b.retirer:SetText("Retirer")
-	b.retirer:SetScript("OnClick", function() if b.objet then RetirerDon(b.objet) end end)
-	InfobulleObjet(b)
-	if ns.SonsSurBoutons then ns.SonsSurBoutons(b) end
-	return b
+--------------------------------------------------------------------------------
+-- Page « Dons » de la fenêtre GuildUpSMB
+--------------------------------------------------------------------------------
+
+local UI = ns.UI
+local C = UI.C
+local IconeObjet = ns.IconeObjet
+local InfobulleObjet = ns.InfobulleObjet
+local EcrireNomObjet = ns.EcrireNomObjet
+local NomMembreColore = ns.NomMembreColore
+
+local MARGE = 16
+local LARGEUR_CATS = 140
+local X_DROITE = MARGE + LARGEUR_CATS + 12         -- début de la colonne de droite
+local TRANSPARENT = { 0, 0, 0, 0 }
+local CASE_VIDE = "Interface\\PaperDoll\\UI-Backpack-EmptySlot"
+local VERT, ORANGE, GRIS, OR = "|cff6fd08c", "|cffff9933", "|cff9c937f", "|cfff1cf6b"
+local NOMS_ONGLETS = { "Dons", "Mes dons", "Demandes", "Besoins" }
+
+local page                 -- la page (onglets et contenus)
+local rechercheMes, categorieMes = "", 1
+local choixDon             -- objet posé dans la case « Mes dons »
+
+-- Colonne des catégories : nom, compteur à droite ; grisée quand elle est vide.
+-- col:Poser(choisie, comptes)
+local function ColonneCategories(parent, choisir)
+	local col = CreateFrame("Frame", nil, parent)
+	col:SetSize(LARGEUR_CATS, #CATEGORIES * 32)
+	col.boutons = {}
+	for i, c in ipairs(CATEGORIES) do
+		local b = CreateFrame("Button", nil, col, "BackdropTemplate")
+		UI.Habiller(b, TRANSPARENT, TRANSPARENT)
+		b:SetSize(LARGEUR_CATS, 30)
+		b:SetPoint("TOPLEFT", col, "TOPLEFT", 0, -(i - 1) * 32)
+		b.nom = UI.Texte(b, "GameFontHighlight", C.texte)
+		b.nom:SetPoint("LEFT", b, "LEFT", 10, 0)
+		b.nom:SetText(c.nom)
+		b.n = UI.Texte(b, "GameFontHighlightSmall", C.gris)
+		b.n:SetPoint("RIGHT", b, "RIGHT", -10, 0)
+		b.n:SetJustifyH("RIGHT")
+		UI.Survol(b, 0.05)
+		b:SetScript("OnClick", function() choisir(i) end)
+		if ns.SonsSurBoutons then ns.SonsSurBoutons(b) end
+		col.boutons[i] = b
+	end
+	col.Poser = function(self, choisie, nombres)
+		for i, b in ipairs(self.boutons) do
+			local oui = (i == choisie)
+			local n = nombres[i] or 0
+			b:SetBackdropColor(unpack(oui and C.actif or TRANSPARENT))
+			b:SetBackdropBorderColor(unpack(oui and C.bordMoyen or TRANSPARENT))
+			b.nom:SetTextColor(unpack(oui and C.ors or C.texte))
+			b.n:SetText(tostring(n))
+			b:SetAlpha((n > 0 or oui) and 1 or 0.45)
+		end
+	end
+	return col
+end
+
+-- Texte vide (centré en haut d'une liste)
+local function TexteVide(parent, liste)
+	local t = UI.Texte(parent, "GameFontHighlight", C.gris)
+	t:SetPoint("TOPLEFT", liste, "TOPLEFT", 4, -8)
+	t:SetPoint("RIGHT", liste, "RIGHT", -10, 0)
+	t:SetWordWrap(true)
+	return t
+end
+
+-- Place les rangées d'une liste les unes sous les autres ; renvoie la hauteur occupée
+local function Empiler(liste, lignes, n, hauteur)
+	local y = 0
+	for i = 1, n do
+		local r = lignes[i]
+		r:ClearAllPoints()
+		r:SetPoint("TOPLEFT", liste.contenu, "TOPLEFT", 0, -y)
+		r:SetPoint("RIGHT", liste.contenu, "RIGHT", 0, 0)
+		r:Show()
+		y = y + hauteur
+	end
+	for i = n + 1, #lignes do lignes[i]:Hide() end
+	liste:Hauteur(y)
+end
+
+---------------------------------------------------------------- Onglet « Dons »
+local HAUTEUR_DON, ECART = 54, 6
+
+-- infobulle du bouton Demander / Merci ! / Remercié
+local function InfobulleDemande(self)
+	local d = self:GetParent().d
+	if not d then return end
+	local demande = mesDemandes[d.cle .. d.objet]
+	GameTooltip:SetOwner(self, "ANCHOR_TOP")
+	if demande then
+		GameTooltip:SetText(demande.merci and "Merci envoyé" or "Merci !")
+		GameTooltip:AddLine("Tu as reçu ce don ? Remercie " .. NomCourt(d.e.nom) .. " : ça compte pour les donateurs du mois.", 1, 1, 1, true)
+	elseif not d.enLigne then
+		GameTooltip:SetText("Demander ce don")
+		GameTooltip:AddLine(NomCourt(d.e.nom) .. " est hors ligne : ta demande lui sera transmise dès que possible, par un membre de la guilde connecté avec GuildUpSMB, ou quand vous serez connectés en même temps.", 1, 1, 1, true)
+	else
+		GameTooltip:SetText("Demander ce don")
+		GameTooltip:AddLine("Un message privé part vers " .. NomCourt(d.e.nom) .. ".", 1, 1, 1, true)
+	end
+	GameTooltip:Show()
+end
+
+local function CreerRangeeDon(parent)
+	local r = UI.Rangee(parent, HAUTEUR_DON)
+	r.d, r.objet = false, false
+	r.icone = IconeObjet(r, 36)
+	r.icone:SetPoint("LEFT", r, "LEFT", 10, 0)
+	-- bouton : « Demander » (or), puis « Merci ! » (fantôme), puis « Remercié » (désactivé)
+	r.demander = UI.Bouton(r, "Demander", "or", 96, 28)
+	r.demander:SetPoint("RIGHT", r, "RIGHT", -12, 0)
+	r.demander:SetScript("OnClick", function() if r.d then Demander(r.d) end end)
+	r.demander:SetScript("OnEnter", InfobulleDemande)
+	r.demander:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	r.merci = UI.Bouton(r, "Merci !", "fantome", 96, 28)
+	r.merci:SetPoint("RIGHT", r, "RIGHT", -12, 0)
+	if r.merci.SetMotionScriptsWhileDisabled then r.merci:SetMotionScriptsWhileDisabled(true) end
+	r.merci:SetScript("OnClick", function()
+		local d = r.d
+		local demande = d and mesDemandes[d.cle .. d.objet]
+		if demande and not demande.merci then
+			demande.merci = true
+			Envoyer(("M~%s~%d"):format(d.cle, d.objet))
+			if MajTout then MajTout() end
+		end
+	end)
+	r.merci:SetScript("OnEnter", InfobulleDemande)
+	r.merci:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	-- donneur (nom, en ligne), niveau, quantité
+	local donneur = CreateFrame("Frame", nil, r)
+	donneur:SetSize(116, 34)
+	donneur:SetPoint("RIGHT", r.demander, "LEFT", -12, 0)
+	r.donneur = UI.Texte(donneur, "GameFontHighlight", C.texte)
+	r.donneur:SetPoint("TOPLEFT", donneur, "TOPLEFT", 0, -2)
+	r.donneur:SetPoint("RIGHT", donneur, "RIGHT", 0, 0)
+	r.etat = UI.Texte(donneur, "GameFontHighlightSmall", C.gris)
+	r.etat:SetPoint("BOTTOMLEFT", donneur, "BOTTOMLEFT", 0, 2)
+	r.etat:SetPoint("RIGHT", donneur, "RIGHT", 0, 0)
+	r.niveau = UI.Texte(r, "GameFontHighlightSmall", C.gris)
+	r.niveau:SetPoint("RIGHT", donneur, "LEFT", -8, 0)
+	r.niveau:SetWidth(50)
+	r.qte = UI.Texte(r, "GameFontHighlightSmall", C.gris)
+	r.qte:SetPoint("RIGHT", r.niveau, "LEFT", -4, 0)
+	r.qte:SetWidth(38)
+	r.nom = UI.Texte(r, "GameFontNormal")
+	r.nom:SetPoint("TOPLEFT", r.icone, "TOPRIGHT", 12, -2)
+	r.nom:SetPoint("RIGHT", r.qte, "LEFT", -10, 0)
+	r.sous = UI.Texte(r, "GameFontHighlightSmall", C.gris)
+	r.sous:SetPoint("BOTTOMLEFT", r.icone, "BOTTOMRIGHT", 12, 2)
+	r.sous:SetPoint("RIGHT", r.qte, "LEFT", -10, 0)
+	InfobulleObjet(r)
+	return r
+end
+
+local function MajRangeeDon(r, d)
+	r.d, r.objet = d, d.objet
+	r.icone:Poser(d.icone, d.qualite)
+	EcrireNomObjet(r.nom, d.nomO ~= "" and d.nomO or nil, d.qualite)
+	if d.d.c then
+		-- plan : métier et niveau requis, en vert si je peux l'apprendre, en orange s'il me manque le niveau
+		local suite = d.place == "ok" and " · tu peux l'apprendre" or d.place == "bas" and " · niveau trop bas" or ""
+		r.sous:SetText((d.place == "ok" and VERT or d.place == "bas" and ORANGE or GRIS) .. TexteMetier(d.d.c, d.d.n) .. suite .. "|r")
+	else
+		r.sous:SetText(TexteGenre(d.classe, d.sousType))
+	end
+	r.qte:SetText("x" .. (d.d.q or 1))
+	r.niveau:SetText("niv. " .. ((d.niveau and d.niveau > 1) and d.niveau or "—"))
+	r.donneur:SetText(NomMembreColore(d.cle, d.e.nom))
+	r.etat:SetText(d.enLigne and (VERT .. "en ligne|r") or ("hors ligne · " .. Depuis(d.e.vu)))
+	local demande = mesDemandes[d.cle .. d.objet]
+	r.demander:SetShown(not demande)
+	r.merci:SetShown(demande and true or false)
+	if demande then
+		r.merci:Ecrire(demande.merci and "Remercié" or "Merci !")
+		r.merci:Activer(not demande.merci)
+	end
+	r:Fort(d.place == "ok")
+end
+
+local function CreerOngletDons(parent)
+	local p = CreateFrame("Frame", nil, parent)
+	p:SetAllPoints()
+	p.lignes = {}
+	p.cats = ColonneCategories(p, function(i)
+		categorie = i
+		p.liste:Haut()
+		p.Maj()
+	end)
+	p.cats:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -56)
+	p.champ = UI.Champ(p, 300, "Chercher un objet", 30)
+	p.champ:SetPoint("TOPLEFT", p, "TOPLEFT", X_DROITE, -56)
+	p.champ:SetPoint("RIGHT", p, "RIGHT", -MARGE, 0)
+	p.champ.SurTexte = function(t)
+		recherche = Simplifier(strtrim(t))
+		p.liste:Haut()
+		p.Maj()
+	end
+	local aide = UI.Texte(p, "GameFontHighlightSmall", C.gris)
+	aide:SetPoint("TOPLEFT", p, "TOPLEFT", X_DROITE + 2, -94)
+	aide:SetText("Les plans que tu peux apprendre passent en premier.")
+	p.liste = UI.Liste(p)
+	p.liste:SetPoint("TOPLEFT", p, "TOPLEFT", X_DROITE, -112)
+	p.liste:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE + 6, 12)
+	p.vide = TexteVide(p, p.liste)
+
+	p.Maj = function()
+		local liste = DonsGuilde()
+		p.cats:Poser(categorie, comptes)
+		for i, d in ipairs(liste) do
+			local r = p.lignes[i]
+			if not r then r = CreerRangeeDon(p.liste.contenu); p.lignes[i] = r end
+			MajRangeeDon(r, d)
+		end
+		Empiler(p.liste, p.lignes, #liste, HAUTEUR_DON + ECART)
+		p.vide:SetShown(#liste == 0)
+		p.vide:SetText(recherche ~= "" and "Aucun don ne correspond à ta recherche."
+			or categorie > 1 and "Aucun don dans cette catégorie." or "Personne ne donne rien pour l'instant.")
+	end
+	return p
+end
+
+---------------------------------------------------------------- Onglet « Mes dons »
+-- On glisse un objet dans la case d'ajout, avec la quantité à donner. Seuls les objets que j'ai
+-- (sacs ou banque) et qui ne sont pas liés peuvent être donnés.
+local HAUTEUR_MIEN = 46
+
+local function CreerRangeeMien(parent)
+	local r = UI.Rangee(parent, HAUTEUR_MIEN)
+	r.objet = false
+	r.icone = IconeObjet(r, 32)
+	r.icone:SetPoint("LEFT", r, "LEFT", 8, 0)
+	r.retirer = UI.Bouton(r, "Retirer", "fantome", 86, 26)
+	r.retirer:SetPoint("RIGHT", r, "RIGHT", -10, 0)
+	r.retirer:SetScript("OnClick", function() if r.objet then RetirerDon(r.objet) end end)
+	r.nom = UI.Texte(r, "GameFontNormal")
+	r.nom:SetPoint("TOPLEFT", r.icone, "TOPRIGHT", 10, -1)
+	r.nom:SetPoint("RIGHT", r.retirer, "LEFT", -10, 0)
+	r.sous = UI.Texte(r, "GameFontHighlightSmall", C.gris)
+	r.sous:SetPoint("BOTTOMLEFT", r.icone, "BOTTOMRIGHT", 10, 1)
+	r.sous:SetPoint("RIGHT", r.retirer, "LEFT", -10, 0)
+	InfobulleObjet(r)
+	return r
 end
 
 local function MajChoixDon()
-	local p = pageMes
+	local p = page and page.pages[MES_DONS]
 	if not p then return end
 	local z = p.ajout
 	local o = choixDon and mesObjets[choixDon]
 	if choixDon then
-		local nom, lien, _, _, icone = InfoObjet(choixDon)
+		local nom, lien, qualite, _, icone = InfoObjet(choixDon)
 		local _, _, iconeI = ClasseObjet(choixDon)
-		z.icone:SetTexture(icone or iconeI or "Interface\\Icons\\INV_Misc_QuestionMark")
-		z.icone:SetDesaturated(false)
+		z.case:Poser(icone or iconeI, qualite)
 		z.nom:SetText((lien or nom or ("Objet " .. choixDon))
-			.. (o and ("  |cff999999(tu en as " .. o.nombre .. ")|r") or "  |cffff6666(pas dans tes affaires, ou lié)|r"))
+			.. (o and ("  " .. GRIS .. "(tu en as " .. o.nombre .. ")|r") or "  |cffff6655(pas dans tes affaires, ou lié)|r"))
 	else
-		z.icone:SetTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
-		z.icone:SetDesaturated(true)
-		z.nom:SetText("|cff999999Glisse ici un objet de tes sacs (ou de ta banque ouverte)|r")
+		z.case:Poser(CASE_VIDE, nil, true)
+		z.nom:SetText(GRIS .. "Glisse ici un objet de tes sacs (ou de ta banque ouverte)|r")
 	end
-	z.ajouter:SetEnabled(o ~= nil)
+	z.donner:Activer(o ~= nil)
 end
 
 local function ChoisirDon(objet)
 	choixDon = objet
 	local o = objet and mesObjets[objet]
-	if pageMes then
-		pageMes.ajout.qte:SetText(o and tostring(Dons()[objet] and QteDonnee(objet) or o.nombre) or "1")
-	end
+	local p = page and page.pages[MES_DONS]
+	if p then p.ajout.qte:Ecrire(o and tostring(Dons()[objet] and QteDonnee(objet) or o.nombre) or "1") end
 	MajChoixDon()
 end
 
-local function MajMes()
-	local p = pageMes
-	if not p or not p:IsShown() then return end
-	for i, bt in ipairs(boutonsCatsMes) do
-		if i == categorieMes then bt:LockHighlight() else bt:UnlockHighlight() end
-		bt.choisi:SetShown(i == categorieMes)
-	end
-	MajChoixDon()
-	local cat = CATEGORIES[categorieMes]
-	local liste, comptesMes = {}, {}
-	for objet in pairs(Dons()) do
-		local o = mesObjets[objet]
-		if o then
-			local nomO, _, qualite = InfoObjet(objet)
-			if rechercheMes == "" or Simplifier(nomO):find(rechercheMes, 1, true) then
-				for i, c in ipairs(CATEGORIES) do
-					if Classee(c, o.classe) then comptesMes[i] = (comptesMes[i] or 0) + 1 end
-				end
-				if Classee(cat, o.classe) then liste[#liste + 1] = { o = o, nomO = nomO or "", qualite = qualite } end
-			end
-		end
-	end
-	for i, bt in ipairs(boutonsCatsMes) do
-		local n = comptesMes[i] or 0
-		bt.texte:SetText(n > 0 and (CATEGORIES[i].nom .. " |cff999999(" .. n .. ")|r") or ("|cff808080" .. CATEGORIES[i].nom .. "|r"))
-	end
-	table.sort(liste, function(a, b) return a.nomO < b.nomO end)
-	local y = 0
-	for i, d in ipairs(liste) do
-		local b = lignesM[i] or CreerLigneMien(p.contenu, LARGEUR_LISTE)
-		lignesM[i] = b
-		b:ClearAllPoints()
-		b:SetPoint("TOPLEFT", p.contenu, "TOPLEFT", 0, -y)
-		b.fond:SetShown(i % 2 == 0)
-		b.objet = d.o.objet
-		local _, _, _, _, icone = InfoObjet(d.o.objet)
-		local _, _, iconeI = ClasseObjet(d.o.objet)
-		b.icone:SetTexture(icone or iconeI or "Interface\\Icons\\INV_Misc_QuestionMark")
-		b.nom:SetText(d.nomO ~= "" and d.nomO or "|cff999999chargement…|r")
-		CouleurQualite(b.nom, d.qualite, d.nomO ~= "")
-		local qte = QteDonnee(d.o.objet)
-		local infos = ("Donne x%d"):format(qte)
-		if qte < d.o.nombre then infos = infos .. (" (sur %d)"):format(d.o.nombre) end
-		infos = infos .. " · " .. d.o.lieu
-		if d.o.code then infos = infos .. " · " .. TexteMetier(d.o.code, d.o.niveau) end
-		local n = 0
-		n = NombreDemandes(d.o.objet)
-		if n > 0 then infos = infos .. ("  |cff33dd55%d demande%s|r"):format(n, n > 1 and "s" or "") end
-		b.info:SetText(infos)
-		b:Show()
-		y = y + 36
-	end
-	for i = #liste + 1, #lignesM do lignesM[i]:Hide() end
-	p.contenu:SetHeight(math.max(10, y))
-	p.vide:SetShown(#liste == 0)
-	p.vide:SetText(rechercheMes ~= "" and "Aucun de tes dons ne correspond à ta recherche."
-		or categorieMes > 1 and "Aucun don dans cette catégorie."
-		or "Tu ne donnes rien pour l'instant : glisse un objet dans la case ci-dessus.")
-end
-
-local function CreerMes(f)
-	local p = CreateFrame("Frame", nil, f)
-	p:SetAllPoints(f)
-	pageMes = p
-	local titre = p:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	titre:SetPoint("TOPLEFT", f, "TOPLEFT", 70, -32)
-	titre:SetText("Mes dons")
-	BoiteRecherche(p, "GuildUpEchangesRechercheMes", 76, -58, 220, "Chercher dans mes dons", function(t)
-		rechercheMes = t
-		MajMes()
-	end)
-	local aide = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	aide:SetPoint("TOPLEFT", f, "TOPLEFT", 310, -62)
-	aide:SetText("Objets de tes sacs ou de ta banque, non liés.")
-
-	CreerCategories(p, f, boutonsCatsMes, function(i)
-		categorieMes = i
-		p.defile:SetVerticalScroll(0)
-		MajMes()
-	end)
-
-	local x0 = LARGEUR_CATS + 20
-	local fondL = p:CreateTexture(nil, "BACKGROUND")
-	fondL:SetPoint("TOPLEFT", f, "TOPLEFT", x0 - 4, HAUT_ENCART - 4)
-	fondL:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 10)
-	PoserAtlas(fondL, "Professions-Recipe-Background", { 0, 0, 0, 0.2 })
-
-	-- zone d'ajout : [case objet] nom (tu en as N) / Quantité [ N ] [Donner]
-	local z = CreateFrame("Button", nil, p)
-	z:SetSize(LARGEUR_LISTE, 56)
-	z:SetPoint("TOPLEFT", f, "TOPLEFT", x0, HAUT_ENCART - 8)
-	p.ajout = z
-	local cadre = z:CreateTexture(nil, "BACKGROUND")
-	cadre:SetAllPoints(z)
-	cadre:SetColorTexture(0, 0, 0, 0.35)
-	z.case = CreateFrame("Button", nil, z)
-	z.case:SetSize(36, 36)
-	z.case:SetPoint("LEFT", z, "LEFT", 8, 0)
-	z.icone = z.case:CreateTexture(nil, "ARTWORK")
-	z.icone:SetAllPoints(z.case)
-	z.case:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-	z.nom = z:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	z.nom:SetPoint("TOPLEFT", z.case, "TOPRIGHT", 8, -2)
-	z.nom:SetPoint("RIGHT", z, "RIGHT", -100, 0)
-	z.nom:SetJustifyH("LEFT")
-	z.nom:SetWordWrap(false)
-	local tq = z:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	tq:SetPoint("BOTTOMLEFT", z.case, "BOTTOMRIGHT", 8, 0)
+-- zone d'ajout : [case objet] nom (tu en as N)              [Donner]
+--                            Quantité [ N ]
+local function CreerAjoutDon(p)
+	local z = CreateFrame("Button", nil, p, "BackdropTemplate")
+	UI.Habiller(z, C.carte, C.bordMoyen)
+	z:SetPoint("TOPLEFT", p, "TOPLEFT", X_DROITE, -112)
+	z:SetPoint("RIGHT", p, "RIGHT", -MARGE, 0)
+	z:SetHeight(64)
+	z.case = IconeObjet(z, 44, "Button")
+	z.case:SetPoint("LEFT", z, "LEFT", 10, 0)
+	z.donner = UI.Bouton(z, "Donner", "or", 96, 28)
+	z.donner:SetPoint("RIGHT", z, "RIGHT", -12, 0)
+	z.nom = UI.Texte(z, "GameFontHighlight", C.texte)
+	z.nom:SetPoint("TOPLEFT", z.case, "TOPRIGHT", 10, -2)
+	z.nom:SetPoint("RIGHT", z.donner, "LEFT", -10, 0)
+	local tq = UI.Texte(z, "GameFontNormalSmall", C.ors)
+	tq:SetPoint("BOTTOMLEFT", z.case, "BOTTOMRIGHT", 10, 5)
 	tq:SetText("Quantité")
-	z.qte = CreateFrame("EditBox", nil, z, "InputBoxTemplate")
-	z.qte:SetSize(44, 18)
-	z.qte:SetPoint("LEFT", tq, "RIGHT", 10, 0)
-	z.qte:SetAutoFocus(false)
-	z.qte:SetNumeric(true)
-	z.qte:SetMaxLetters(4)
-	z.qte:SetText("1")
-	z.qte:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-	z.ajouter = CreateFrame("Button", nil, z, "UIPanelButtonTemplate")
-	z.ajouter:SetSize(84, 22)
-	z.ajouter:SetPoint("RIGHT", z, "RIGHT", -8, 0)
-	z.ajouter:SetText("Donner")
-	z.ajouter:SetScript("OnClick", function()
-		z.qte:ClearFocus()
-		if AjouterDon(choixDon, tonumber(z.qte:GetText())) then ChoisirDon(nil) end
+	z.qte = UI.Champ(z, 56, nil, 22)
+	z.qte:SetPoint("LEFT", tq, "RIGHT", 8, 0)
+	z.qte.saisie:SetNumeric(true)
+	z.qte.saisie:SetMaxLetters(4)
+	z.qte:Ecrire("1")
+	z.donner:SetScript("OnClick", function()
+		z.qte.saisie:ClearFocus()
+		if AjouterDon(choixDon, tonumber(z.qte:Lire())) then ChoisirDon(nil) end
 	end)
+	-- glisser un objet sur la case (ou cliquer avec un objet sur le curseur) ; clic droit : vider
 	ns.BrancherDepot({ z, z.case }, function(o) ChoisirDon(o) end, function() return choixDon end)
 	z.case:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -1250,161 +1129,260 @@ local function CreerMes(f)
 	end)
 	z.case:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	if ns.SonsSurBoutons then ns.SonsSurBoutons(z) end
+	return z
+end
 
-	p.defile, p.contenu, p.vide = Defilement(p, x0, HAUT_ENCART - 70, -30)
-	p.contenu:SetWidth(LARGEUR_LISTE)
-	p:SetScript("OnShow", function() LireMesObjets() end)
+local function CreerOngletMes(parent)
+	local p = CreateFrame("Frame", nil, parent)
+	p:SetAllPoints()
+	p.lignes = {}
+	p.cats = ColonneCategories(p, function(i)
+		categorieMes = i
+		p.liste:Haut()
+		p.Maj()
+	end)
+	p.cats:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -56)
+	p.champ = UI.Champ(p, 300, "Chercher dans mes dons", 30)
+	p.champ:SetPoint("TOPLEFT", p, "TOPLEFT", X_DROITE, -56)
+	p.champ:SetPoint("RIGHT", p, "RIGHT", -MARGE, 0)
+	p.champ.SurTexte = function(t)
+		rechercheMes = Simplifier(strtrim(t))
+		p.liste:Haut()
+		p.Maj()
+	end
+	local aide = UI.Texte(p, "GameFontHighlightSmall", C.gris)
+	aide:SetPoint("TOPLEFT", p, "TOPLEFT", X_DROITE + 2, -94)
+	aide:SetText("Objets de tes sacs ou de ta banque, non liés.")
+	p.ajout = CreerAjoutDon(p)
+	p.liste = UI.Liste(p)
+	p.liste:SetPoint("TOPLEFT", p, "TOPLEFT", X_DROITE, -188)
+	p.liste:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE + 6, 12)
+	p.vide = TexteVide(p, p.liste)
+
+	p.Maj = function()
+		MajChoixDon()
+		local cat = CATEGORIES[categorieMes] or CATEGORIES[1]
+		local liste, nombres = {}, {}
+		for objet in pairs(Dons()) do
+			local o = mesObjets[objet]
+			if o then
+				local nomO, _, qualite, _, icone = InfoObjet(objet)
+				if rechercheMes == "" or Simplifier(nomO):find(rechercheMes, 1, true) then
+					for i, c in ipairs(CATEGORIES) do
+						if Classee(c, o.classe) then nombres[i] = (nombres[i] or 0) + 1 end
+					end
+					if Classee(cat, o.classe) then
+						liste[#liste + 1] = { o = o, nomO = nomO or "", qualite = qualite, icone = icone }
+					end
+				end
+			end
+		end
+		p.cats:Poser(categorieMes, nombres)
+		table.sort(liste, function(a, b) return a.nomO < b.nomO end)
+		for i, d in ipairs(liste) do
+			local r = p.lignes[i]
+			if not r then r = CreerRangeeMien(p.liste.contenu); p.lignes[i] = r end
+			local objet = d.o.objet
+			r.objet = objet
+			local _, _, iconeI = ClasseObjet(objet)
+			r.icone:Poser(d.icone or iconeI, d.qualite)
+			EcrireNomObjet(r.nom, d.nomO ~= "" and d.nomO or nil, d.qualite)
+			local qte = QteDonnee(objet)
+			local infos = "Donne x" .. qte
+			if qte < d.o.nombre then infos = infos .. " (sur " .. d.o.nombre .. ")" end
+			infos = infos .. " · " .. d.o.lieu
+			if d.o.code then infos = infos .. " · " .. TexteMetier(d.o.code, d.o.niveau) end
+			local n = NombreDemandes(objet)
+			if n > 0 then infos = infos .. " · " .. VERT .. n .. " demande" .. (n > 1 and "s" or "") .. "|r" end
+			r.sous:SetText(infos)
+			r:Fort(n > 0)
+		end
+		Empiler(p.liste, p.lignes, #liste, HAUTEUR_MIEN + ECART)
+		p.vide:SetShown(#liste == 0)
+		p.vide:SetText(rechercheMes ~= "" and "Aucun de tes dons ne correspond à ta recherche."
+			or categorieMes > 1 and "Aucun don dans cette catégorie."
+			or "Tu ne donnes rien pour l'instant : glisse un objet dans la case ci-dessus.")
+	end
 	return p
 end
 
+---------------------------------------------------------------- Onglet « Demandes »
+local HAUTEUR_DEMANDE = 50
 
----------------------------------------------------------------- Demandes
-local pageDemandes, lignesD = nil, {}
-
-local function CreerLigneDemande(parent, largeur)
-	local b = CreateFrame("Frame", nil, parent)
-	b:SetSize(largeur, 36)
-	b:EnableMouse(true)
-	b.fond = b:CreateTexture(nil, "BACKGROUND")
-	b.fond:SetAllPoints(b)
-	b.fond:SetColorTexture(1, 1, 1, 0.04)
-	b.nouveau = b:CreateTexture(nil, "BORDER")
-	b.nouveau:SetPoint("TOPLEFT", b, "TOPLEFT", 0, 0)
-	b.nouveau:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", 0, 0)
-	b.nouveau:SetWidth(3)
-	b.nouveau:SetColorTexture(0.25, 1, 0.4, 0.9)
-	b.icone = b:CreateTexture(nil, "ARTWORK")
-	b.icone:SetSize(28, 28)
-	b.icone:SetPoint("LEFT", b, "LEFT", 6, 0)
-	b.nom = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	b.nom:SetPoint("TOPLEFT", b.icone, "TOPRIGHT", 6, -1)
-	b.nom:SetPoint("RIGHT", b, "RIGHT", -190, 0)
-	b.nom:SetJustifyH("LEFT")
-	b.nom:SetWordWrap(false)
-	b.info = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	b.info:SetPoint("BOTTOMLEFT", b.icone, "BOTTOMRIGHT", 6, 1)
-	b.info:SetPoint("RIGHT", b, "RIGHT", -190, 0)
-	b.info:SetJustifyH("LEFT")
-	b.info:SetWordWrap(false)
-	b.effacer = CreateFrame("Button", nil, b, "UIPanelButtonTemplate")
-	b.effacer:SetSize(80, 22)
-	b.effacer:SetPoint("RIGHT", b, "RIGHT", -2, 0)
-	b.effacer:SetText("Effacer")
-	b.mp = CreateFrame("Button", nil, b, "UIPanelButtonTemplate")
-	b.mp:SetSize(90, 22)
-	b.mp:SetPoint("RIGHT", b.effacer, "LEFT", -4, 0)
-	b.mp:SetText("Chuchoter")
-	InfobulleObjet(b)
-	if ns.SonsSurBoutons then ns.SonsSurBoutons(b) end
-	return b
+local function CreerRangeeDemande(parent)
+	local r = UI.Rangee(parent, HAUTEUR_DEMANDE)
+	r.d, r.objet, r.cle = false, false, false
+	-- marque verte à gauche : demande pas encore vue
+	r.marque = r:CreateTexture(nil, "OVERLAY")
+	r.marque:SetColorTexture(C.vert[1], C.vert[2], C.vert[3], 0.9)
+	r.marque:SetPoint("TOPLEFT", r, "TOPLEFT", 1, -1)
+	r.marque:SetPoint("BOTTOMLEFT", r, "BOTTOMLEFT", 1, 1)
+	r.marque:SetWidth(3)
+	r.icone = IconeObjet(r, 34)
+	r.icone:SetPoint("LEFT", r, "LEFT", 12, 0)
+	r.effacer = UI.Bouton(r, "Effacer", "fantome", 80, 26)
+	r.effacer:SetPoint("RIGHT", r, "RIGHT", -10, 0)
+	r.effacer:SetScript("OnClick", function()
+		local h = Historique()
+		for k, x in ipairs(h) do
+			if x == r.d then table.remove(h, k); break end
+		end
+		if MajTout then MajTout() end
+	end)
+	r.mp = UI.Bouton(r, "Chuchoter", "or", 96, 26)
+	r.mp:SetPoint("RIGHT", r.effacer, "LEFT", -6, 0)
+	r.mp:SetScript("OnClick", function() if r.d then UI.Chuchoter(r.cle, r.d.nom) end end)
+	r.nom = UI.Texte(r, "GameFontNormal")
+	r.nom:SetPoint("TOPLEFT", r.icone, "TOPRIGHT", 10, -1)
+	r.nom:SetPoint("RIGHT", r.mp, "LEFT", -10, 0)
+	r.sous = UI.Texte(r, "GameFontHighlightSmall", C.gris)
+	r.sous:SetPoint("BOTTOMLEFT", r.icone, "BOTTOMRIGHT", 10, 1)
+	r.sous:SetPoint("RIGHT", r.mp, "LEFT", -10, 0)
+	InfobulleObjet(r)
+	return r
 end
 
-MajDemandes = function()
-	local p = pageDemandes
-	if not p or not p:IsVisible() then return end
-	local h = Historique()
-	local y = 0
-	for i, d in ipairs(h) do
-		local b = lignesD[i] or CreerLigneDemande(p.contenu, p.largeur)
-		lignesD[i] = b
-		b:ClearAllPoints()
-		b:SetPoint("TOPLEFT", p.contenu, "TOPLEFT", 0, -y)
-		b.fond:SetShown(i % 2 == 0)
-		b.nouveau:SetShown(not d.vu)
-		b.objet = d.objet
-		local nomO, _, qualite, _, icone = InfoObjet(d.objet)
-		local _, _, iconeI = ClasseObjet(d.objet)
-		b.icone:SetTexture(icone or iconeI or "Interface\\Icons\\INV_Misc_QuestionMark")
-		b.nom:SetText(nomO or "|cff999999chargement…|r")
-		CouleurQualite(b.nom, qualite, nomO ~= nil)
-		local cle = Normaliser(d.nom)
-		local enLigne = ns.EnLigneMembre and ns.EnLigneMembre(cle) or false
-		local encore = Dons()[d.objet] and "" or "  |cff999999(plus dans tes dons)|r"
-		b.info:SetText(("par %s · il y a %s · %s%s"):format(NomCourt(d.nom), Depuis(d.quand),
-			enLigne and "|cff33dd55en ligne|r" or "|cff999999hors ligne|r", encore))
-		b.mp:SetEnabled(enLigne)
-		b.mp:SetScript("OnClick", function()
-			local nomMP = (ns.NomListeGuilde and ns.NomListeGuilde(cle)) or NomCourt(d.nom)
-			if ChatFrame_SendTell then ChatFrame_SendTell(nomMP) end
-		end)
-		b.effacer:SetScript("OnClick", function()
-			for k, x in ipairs(Historique()) do
-				if x == d then table.remove(Historique(), k); break end
-			end
-			MajTout()
-		end)
-		b:Show()
-		y = y + 38
-	end
-	for i = #h + 1, #lignesD do lignesD[i]:Hide() end
-	p.contenu:SetHeight(math.max(10, y))
-	p.vide:SetShown(#h == 0)
-	p.toutEffacer:SetEnabled(#h > 0)
-end
-
-local function CreerDemandes(f)
-	local p = CreateFrame("Frame", nil, f)
-	p:SetAllPoints(f)
-	p.largeur = LARGEUR - 60
-	pageDemandes = p
-	local titre = p:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	titre:SetPoint("TOPLEFT", f, "TOPLEFT", 70, -32)
-	titre:SetText("Demandes reçues")
-	local aide = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	aide:SetPoint("TOPLEFT", titre, "BOTTOMLEFT", 0, -6)
-	aide:SetWidth(LARGEUR - 260)
-	aide:SetJustifyH("LEFT")
+local function CreerOngletDemandes(parent)
+	local p = CreateFrame("Frame", nil, parent)
+	p:SetAllPoints()
+	p.lignes = {}
+	local aide = UI.Texte(p, "GameFontHighlightSmall", C.gris)
+	aide:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -56)
+	aide:SetPoint("RIGHT", p, "RIGHT", -MARGE - 140, 0)
+	aide:SetWordWrap(true)
 	aide:SetText("Qui t'a demandé un de tes dons (gardé 30 jours). Les demandes faites pendant ton absence arrivent quand un membre avec GuildUpSMB est connecté en même temps que toi.")
-	p.toutEffacer = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
-	p.toutEffacer:SetSize(110, 22)
-	p.toutEffacer:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -58)
-	p.toutEffacer:SetText("Tout effacer")
+	p.toutEffacer = UI.Bouton(p, "Tout effacer", "fantome", 120, 28)
+	p.toutEffacer:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -54)
 	p.toutEffacer:SetScript("OnClick", function()
 		wipe(Historique())
-		MajTout()
+		if MajTout then MajTout() end
 	end)
-	local fond = p:CreateTexture(nil, "BACKGROUND")
-	fond:SetPoint("TOPLEFT", f, "TOPLEFT", 8, HAUT_ENCART - 4)
-	fond:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 10)
-	PoserAtlas(fond, "Professions-background-summarylist", { 0, 0, 0, 0.25 })
-	p.defile, p.contenu, p.vide = Defilement(p, 14, HAUT_ENCART - 10, -30)
-	p.contenu:SetWidth(p.largeur)
+	p.liste = UI.Liste(p)
+	p.liste:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -96)
+	p.liste:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE + 6, 12)
+	p.vide = TexteVide(p, p.liste)
 	p.vide:SetText("Personne ne t'a encore demandé de don.")
-	-- en ouvrant l'onglet, les demandes sont « vues » (le compteur de l'onglet retombe)
-	p:SetScript("OnShow", function()
-		MajDemandes()
-		C_Timer.After(1.5, function()
-			if not p:IsVisible() then return end
-			for _, d in ipairs(Historique()) do d.vu = true end
-			MajTout()
-		end)
-	end)
+
+	p.Maj = function()
+		local h = Historique()
+		for i, d in ipairs(h) do
+			local r = p.lignes[i]
+			if not r then r = CreerRangeeDemande(p.liste.contenu); p.lignes[i] = r end
+			local cle = Normaliser(d.nom)
+			r.d, r.objet, r.cle = d, d.objet, cle
+			r.marque:SetShown(not d.vu)
+			r:Fort(not d.vu)
+			local nomO, _, qualite, _, icone = InfoObjet(d.objet)
+			local _, _, iconeI = ClasseObjet(d.objet)
+			r.icone:Poser(icone or iconeI, qualite)
+			EcrireNomObjet(r.nom, nomO, qualite)
+			local enLigne = ns.EnLigneMembre and ns.EnLigneMembre(cle) or false
+			r.sous:SetText(("par %s · il y a %s · %s%s"):format(NomMembreColore(cle, d.nom), Depuis(d.quand),
+				enLigne and (VERT .. "en ligne|r") or "hors ligne",
+				Dons()[d.objet] and "" or ("  " .. GRIS .. "(plus dans tes dons)|r")))
+			r.mp:Activer(enLigne)
+		end
+		Empiler(p.liste, p.lignes, #h, HAUTEUR_DEMANDE + ECART)
+		p.vide:SetShown(#h == 0)
+		p.toutEffacer:Activer(#h > 0)
+	end
 	return p
 end
 
----------------------------------------------------------------- Fenêtre et onglets
-local NOMS_ONGLETS = { "Dons", "Mes dons", "Demandes", "Besoins" }
-local function MajOnglets()
-	if not fen or not fen.onglets then return end
-	local compteurs = { NombreDons(), 0, NombreDemandes(nil, true), ns.NombreBesoins and ns.NombreBesoins() or 0 }
-	for i, o in ipairs(fen.onglets) do
-		local n = compteurs[i] or 0
-		if i == MES_DONS then for _ in pairs(Dons()) do n = n + 1 end end
-		o:SetText(n > 0 and (NOMS_ONGLETS[i] .. " |cff33dd55(" .. n .. ")|r") or NOMS_ONGLETS[i])
-		if PanelTemplates_TabResize then pcall(PanelTemplates_TabResize, o, 0) end
+---------------------------------------------------------------- La page
+
+-- Rafraîchit le médaillon et la page si elle est affichée (après tout changement des dons, des
+-- demandes ou des besoins ; appelé aussi par GuildUp_Besoins.lua)
+MajTout = function()
+	if ns.MajBouton then ns.MajBouton() end
+	if ns.PageInterface and ns.PageInterface() == "dons" and ns.MajInterface then ns.MajInterface() end
+end
+ns.MajOngletsEchanges = MajTout
+
+-- En ouvrant l'onglet « Demandes », les demandes sont « vues » (le compteur retombe) après 1,5 s
+local function PrevoirVues()
+	C_Timer.After(1.5, function()
+		if not (page and page.onglet == DEMANDES and page:IsVisible()) then return end
+		for _, d in ipairs(Historique()) do d.vu = true end
+		MajTout()
+	end)
+end
+
+-- Les onglets du kit prennent la largeur de leur nom : on leur laisse la place du compteur « (12) »
+local function ElargirOnglets(o, plus)
+	local x = 0
+	for _, b in ipairs(o.boutons) do
+		b:SetWidth(b:GetWidth() + plus)
+		b:ClearAllPoints()
+		b:SetPoint("BOTTOMLEFT", o, "BOTTOMLEFT", x, 0)
+		x = x + b:GetWidth() + 2
 	end
 end
-ns.MajOngletsEchanges = MajOnglets
 
-MajTout = function()
-	MajOnglets()
-	if MajDemandes then MajDemandes() end
-	MajParcourir()
-	MajMes()
+local function CreerPage(parent)
+	local p = CreateFrame("Frame", nil, parent)
+	p:SetAllPoints()
+	-- page lourde : rafraîchie sur ses évènements (MajTout), pas toutes les 2 s
+	p.rafraichirAuto = false
+	p.onglet = DONS
+	local function Choisir(i)
+		p.onglet = i
+		p.onglets:Choisir(i)
+		if i == DEMANDES then PrevoirVues() end
+		p.Maj()
+		-- mes sacs relus (la liste suit ce que j'ai vraiment)
+		if i == MES_DONS then LireMesObjets() end
+	end
+	p.onglets = UI.Onglets(p, NOMS_ONGLETS, Choisir)
+	p.onglets:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -10)
+	p.onglets:SetPoint("RIGHT", p, "RIGHT", -MARGE, 0)
+	ElargirOnglets(p.onglets, 36)
+	-- donateurs du mois (les plus remerciés), à droite des onglets
+	p.donateurs = UI.Texte(p, "GameFontHighlightSmall", C.gris)
+	p.donateurs:SetPoint("BOTTOMRIGHT", p.onglets, "BOTTOMRIGHT", 0, 11)
+	p.donateurs:SetJustifyH("RIGHT")
+
+	local besoins = ns.CreerPageBesoins and ns.CreerPageBesoins(p)
+	if not besoins then
+		besoins = CreateFrame("Frame", nil, p)
+		besoins.Maj = function() end
+	end
+	p.pages = { CreerOngletDons(p), CreerOngletMes(p), CreerOngletDemandes(p), besoins }
+	p.onglets:Choisir(DONS)
+
+	p.Maj = function()
+		local nMes = 0
+		for _ in pairs(Dons()) do nMes = nMes + 1 end
+		p.onglets:Compte(DONS, NombreDons())
+		p.onglets:Compte(MES_DONS, nMes)
+		p.onglets:Compte(DEMANDES, NombreDemandes(nil, true))
+		p.onglets:Compte(BESOINS, ns.NombreBesoins and ns.NombreBesoins() or 0)
+		local top = p.onglet == DONS and DonateursDuMois() or {}
+		if #top > 0 then
+			local noms = {}
+			for i = 1, math.min(3, #top) do noms[#noms + 1] = NomCourt(top[i].qui) .. " (" .. top[i].n .. ")" end
+			p.donateurs:SetText("Donateurs du mois : " .. OR .. table.concat(noms, " · ") .. "|r")
+		else
+			p.donateurs:SetText("")
+		end
+		for i, sp in ipairs(p.pages) do sp:SetShown(i == p.onglet) end
+		local sp = p.pages[p.onglet]
+		if sp and sp.Maj then sp.Maj() end
+	end
+	-- ns.OuvrirInterface("dons", onglet, catégorie)
+	p.Ouvrir = function(onglet, cat)
+		if cat and CATEGORIES[cat] then categorie = cat end
+		Choisir(onglet or DONS)
+	end
+	p:SetScript("OnShow", function() if p.onglet == DEMANDES then PrevoirVues() end end)
+	page = p
+	return p
 end
+if ns.AjouterPage then ns.AjouterPage("dons", CreerPage) end
 
--- Fenêtre à onglets (cadre à portrait, bande de pierre, encart illustré), partagée avec la fenêtre
--- Artisanat (GuildUp_Carnet.lua). pages : fonctions (f) -> page ; noms : textes des onglets.
+-- Fenêtre à onglets (cadre à portrait, bande de pierre, encart illustré) : ancienne fenêtre des dons,
+-- encore utilisée par la fenêtre Artisanat (GuildUp_Carnet.lua) en attendant sa page.
+-- pages : fonctions (f) -> page ; noms : textes des onglets.
 local function FenetreOnglets(nom, titre, icone, fonds, pages, noms)
 	local ok, f = pcall(CreateFrame, "Frame", nom, UIParent, "PortraitFrameTemplate")
 	if not ok then
@@ -1483,45 +1461,25 @@ end
 ns.FenetreOnglets = FenetreOnglets
 ns.HAUT_ENCART = HAUT_ENCART
 
-local function CreerFenetre()
-	fen = FenetreOnglets("GuildUpDons", TITRE, ICONE_FENETRE,
-		{ "auctionhouse-background-index", "Profession-Background-Template2" },
-		-- fen doit être connue avant de créer les pages : leurs listes s'ancrent dessus
-		{ function(f) fen = f; return CreerParcourir(f) end, CreerMes, CreerDemandes,
-			function(f) return ns.CreerPageBesoins and ns.CreerPageBesoins(f, HAUT_ENCART) end },
-		NOMS_ONGLETS)
-	MajOnglets()
-	return fen
-end
+--------------------------------------------------------------------------------
+-- Ouverture (volet, bulles, accueil, /smb)
+--------------------------------------------------------------------------------
 
--- Ouvre la fenêtre des dons sur un onglet (1 Dons, 2 Mes dons, 3 Demandes, 4 Besoins) ; déjà ouverte
--- sur cet onglet : la ferme (bouton « Dons » du volet)
-local function Creer()
+-- ns.OuvrirEchanges(catégorie, onglet) : ouvre la page « Dons » sur un onglet (1 Dons, 2 Mes dons,
+-- 3 Demandes, 4 Besoins ; défaut : Dons) et une catégorie des dons (indice dans CATEGORIES, 2 = Recettes)
+ns.OuvrirEchanges = function(cat, onglet)
 	-- qui est en ligne : la liste de guilde n'est sinon relue qu'à la connexion
 	if ns.DemanderRoster then ns.DemanderRoster() end
-	if fen then return end
-	CreerFenetre()
-	if ns.AvecSons then ns.AvecSons(fen, "fenetre") end
+	if ns.OuvrirInterface then ns.OuvrirInterface("dons", onglet or DONS, cat) end
+	LireMesObjets()
 end
-local function BasculerOnglet(onglet)
-	Creer()
-	if fen:IsShown() and fen.ongletChoisi == onglet then
-		fen:Hide()
-		return
+-- Bouton « Dons » du volet : ferme la fenêtre si elle montre déjà la page « Dons », sinon l'ouvre
+ns.BasculerEchanges = function()
+	if ns.PageInterface and ns.PageInterface() == "dons" then
+		if ns.BasculerInterface then ns.BasculerInterface() end
+	else
+		ns.OuvrirEchanges(nil, DONS)
 	end
-	fen:Show()
-	fen.Choisir(onglet)
-	LireMesObjets()
-end
-ns.BasculerEchanges = function() BasculerOnglet(DONS) end
-
--- ns.OuvrirEchanges(catégorie, onglet) : catégorie des dons (2 = Recettes), onglet (défaut : Dons)
-ns.OuvrirEchanges = function(cat, onglet)
-	Creer()
-	if cat then categorie = cat end
-	fen:Show()
-	fen.Choisir(onglet or DONS)
-	LireMesObjets()
 end
 ns.OuvrirPlans = function() ns.OuvrirEchanges(2, DONS) end
 
@@ -1646,7 +1604,8 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 		banqueOuverte = false
 	elseif event == "GET_ITEM_INFO_RECEIVED" or event == "GUILD_ROSTER_UPDATE" then
 		if event == "GUILD_ROSTER_UPDATE" and pret then TransmettreAuxConnectes() end
-		if fen and fen:IsShown() and not prevuMaj then
+		-- page « Dons » affichée (tous ses onglets, Besoins compris) : noms d'objets arrivés, qui est en ligne
+		if ns.PageInterface and ns.PageInterface() == "dons" and not prevuMaj then
 			prevuMaj = true
 			C_Timer.After(0.3, function() prevuMaj = false; MajTout() end)
 		end
