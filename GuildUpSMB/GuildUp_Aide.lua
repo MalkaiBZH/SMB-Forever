@@ -1,4 +1,4 @@
--- GuildUp : « Besoin d'aide ». Un appel à la guilde (préfixe "GuildUpAid") pour une quête difficile,
+-- GuildUpSMB : « Besoin d'aide ». Un appel à la guilde (préfixe "GuildUpAid") pour une quête difficile,
 -- une escorte, un élite… avec la zone et la position :
 --   "H~carte~x~y~niveau~zone~texte"   (x, y en dix-millièmes)
 -- Les membres qui ont le niveau pour aider (au moins le niveau de l'appelant moins 3) reçoivent une

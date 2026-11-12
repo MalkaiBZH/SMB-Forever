@@ -1,5 +1,5 @@
--- GuildUp : registre des métiers de la guilde.
--- Chaque GuildUp lit les niveaux de métier du joueur (fenêtre des compétences) et les recettes connues
+-- GuildUpSMB : registre des métiers de la guilde.
+-- Chaque GuildUpSMB lit les niveaux de métier du joueur (fenêtre des compétences) et les recettes connues
 -- (relevées quand le joueur ouvre sa fenêtre de métier : le jeu ne les donne qu'à ce moment-là),
 -- puis les partage avec les autres membres qui ont l'addon. Les fiches reçues sont gardées
 -- (GuildUpMetiersDB) : on voit aussi les membres hors ligne.
@@ -1380,7 +1380,7 @@ MajFenetre = function()
 	fen.speciales:SetChecked(Speciales())
 	fen.videG:SetText(Speciales() and "Personne n'a de recette spéciale (ou ne l'a pas encore partagée)."
 		or recherche ~= "" and "Personne ne correspond à ta recherche."
-		or filtre and "Personne n'a ce métier (parmi les membres qui ont GuildUp)."
+		or filtre and "Personne n'a ce métier (parmi les membres qui ont GuildUpSMB)."
 		or "Personne pour l'instant.")
 	if not choisie then
 		choisie = liste[1]

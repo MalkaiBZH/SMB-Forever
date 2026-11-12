@@ -1,6 +1,6 @@
--- GuildUp : événements de guilde, avec le calendrier du jeu.
+-- GuildUpSMB : événements de guilde, avec le calendrier du jeu.
 -- Le bouton « Événements » du volet ouvre la fenêtre « Créer un événement de guilde » du jeu
--- (comme le menu du clic droit sur un jour du calendrier). GuildUp surveille ensuite les
+-- (comme le menu du clic droit sur un jour du calendrier). GuildUpSMB surveille ensuite les
 -- événements de guilde du jeu (C_Calendar.GetGuildEventInfo) : une bulle prévient quand un
 -- nouveau apparaît.
 

@@ -1,11 +1,11 @@
--- GuildUp : bannière derrière le nom et la barre de vie des membres de ta guilde.
+-- GuildUpSMB : bannière derrière le nom et la barre de vie des membres de ta guilde.
 -- L'image dépend du rôle (tank / heal / dps), qu'on soit en combat ou non ; rôle inconnu =
--- bannière neutre (fichier "horscombat"). Chaque GuildUp annonce le rôle de son joueur à la guilde.
+-- bannière neutre (fichier "horscombat"). Chaque GuildUpSMB annonce le rôle de son joueur à la guilde.
 -- Affichage local uniquement : seuls les joueurs qui ont l'addon le voient.
 
 -- ns : table partagée entre les fichiers de l'addon (GuildUp_Groupes.lua s'en sert)
 local NOM_ADDON, ns = ...
-local MEDIA = "Interface\\AddOns\\GuildUp\\media\\"
+local MEDIA = "Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\" -- le dossier de l'addon, quel que soit son nom
 
 local DEFAUT = {
 	actif     = true,
@@ -38,7 +38,7 @@ local function LireCVar(nom)
 end
 
 local function Message(texte)
-	print("|cff3399ffGuildUp|r : " .. texte)
+	print("|cff3399ffGuildUpSMB|r : " .. texte)
 end
 
 --------------------------------------------------------------------------------
@@ -119,7 +119,7 @@ end
 local ROLES = { TANK = "tank", HEALER = "heal", DAMAGER = "dps" }
 local ROLE_VALIDE = { tank = true, heal = true, dps = true }
 
-local rolesConnus = {} -- ["Nom-Royaume"] = rôle annoncé par son GuildUp
+local rolesConnus = {} -- ["Nom-Royaume"] = rôle annoncé par son GuildUpSMB
 
 -- Sur Forever, le royaume d'un joueur (UnitFullName : « Miko », « Banko ») n'est pas le nom
 -- interne du serveur (GetNormalizedRealmName : « CAMWOWEU5Realm5PvE »), et les noms complets
@@ -188,11 +188,11 @@ end
 
 -- Partagé avec les autres fichiers de l'addon
 ns.MonRole = function() return db and MonRole() end
--- Rôle annoncé par le GuildUp d'un joueur, à partir de son nom normalisé
+-- Rôle annoncé par le GuildUpSMB d'un joueur, à partir de son nom normalisé
 ns.RoleDeNom = function(nomNormalise) return nomNormalise and rolesConnus[nomNormalise] end
 -- Mode test seul (Debug) : se voir comme un autre membre
 ns.TestSolo = function() return db and db.test and db.testSolo end
--- Rôle connu d'une unité (tank / heal / dps) ou nil : moi, rôle de groupe, ou rôle annoncé par son GuildUp
+-- Rôle connu d'une unité (tank / heal / dps) ou nil : moi, rôle de groupe, ou rôle annoncé par son GuildUpSMB
 ns.RoleConnu = function(unit)
 	if not db or not unit or not UnitExists(unit) then return nil end
 	if UnitIsUnit(unit, "player") then return MonRole() end
@@ -713,7 +713,7 @@ local function ColorerBarreVie(uf, unit)
 	modifiees[uf] = true
 end
 
--- Mise en page GuildUp (auras sous la barre, niveau, nom à gauche, incantation en haut) :
+-- Mise en page GuildUpSMB (auras sous la barre, niveau, nom à gauche, incantation en haut) :
 -- seulement sur les barres de nom des membres de la guilde. Quand une barre de nom passe à
 -- un autre joueur, on demande à Blizzard de refaire sa propre mise en page (UpdateAnchors,
 -- ApplyStyleAndAnchoring) : on ne peut pas lire les positions d'origine nous-mêmes.
@@ -898,7 +898,7 @@ end
 -- options « Noms » du jeu : noms des joueurs alliés, et leur guilde (réglage absent = affiché)
 local function GuildesVoulues() return LireCVar("UnitNamePlayerGuild") ~= "0" end
 
-local textesNoms = {} -- [UnitFrame] = nom écrit par GuildUp (remplace celui de Blizzard)
+local textesNoms = {} -- [UnitFrame] = nom écrit par GuildUpSMB (remplace celui de Blizzard)
 
 -- Sur Forever, chaque personnage a un nom de famille, rangé là où les autres versions mettent
 -- le royaume (UnitFullName : « Miko », « Banko ») ; le jeu l'affiche après le prénom
@@ -1161,7 +1161,7 @@ end
 
 -- Auras et incantations : Blizzard replace ses éléments à chaque mise à jour, on repasse après lui.
 -- Une seule passe par image pour toutes les barres concernées, et seulement pour celles des
--- membres de la guilde (mise en page GuildUp).
+-- membres de la guilde (mise en page GuildUpSMB).
 local aReplacer = { auras = {}, incantation = {} }
 local replacementPrevu = false
 local function PlanifierReplacement(genre, unite)
@@ -1236,13 +1236,13 @@ end
 
 local premiereEntree = true
 
--- Réglages Blizzard des barres de nom imposés par GuildUp à chaque connexion
+-- Réglages Blizzard des barres de nom imposés par GuildUpSMB à chaque connexion
 -- (nameplateDebuffPadding = option « Espacement des affaiblissements »)
 local CVARS_IMPOSEES = {
 	nameplateDebuffPadding = "25",
 }
 
--- Réglages imposés tant que GuildUp est actif (remis comme avant à la désactivation) :
+-- Réglages imposés tant que GuildUpSMB est actif (remis comme avant à la désactivation) :
 -- barres de nom alliées affichées (Maj+V) ; les noms flottants du jeu restent actifs : au-delà
 -- de la portée des barres (limite interne du jeu), chacun retrouve son nom d'origine
 local CVARS_ALLIES = {
@@ -1271,7 +1271,7 @@ local function ImposerCVars()
 	local voulues = {}
 	for nom, valeur in pairs(CVARS_IMPOSEES) do voulues[nom] = valeur end
 	if db.actif and db.nomsAllies then
-		-- GuildUp activé = barres de nom alliées affichées (comme Maj+V) ; le nom du réglage
+		-- GuildUpSMB activé = barres de nom alliées affichées (comme Maj+V) ; le nom du réglage
 		-- change selon les versions du client, ceux qui n'existent pas sont ignorés
 		for _, c in ipairs(CVARS_ALLIES) do voulues[c[1]] = c[2] end
 	end
@@ -1287,7 +1287,7 @@ local function ImposerCVars()
 	for nom, valeur in pairs(voulues) do
 		local ok, actuelle = pcall(lire, nom)
 		if ok and actuelle ~= nil and tostring(actuelle) ~= valeur then
-			-- valeur d'avant GuildUp, remise si on désactive
+			-- valeur d'avant GuildUpSMB, remise si on désactive
 			if db.cvarsAvant[nom] == nil then db.cvarsAvant[nom] = tostring(actuelle) end
 			local okE, res = pcall(ecrire, nom, valeur)
 			local okR, apres = pcall(lire, nom)
@@ -1298,7 +1298,7 @@ local function ImposerCVars()
 	end
 end
 
--- GuildUp désactivé (ou /smb noms coupé) : barres de nom alliées remises comme avant
+-- GuildUpSMB désactivé (ou /smb noms coupé) : barres de nom alliées remises comme avant
 local function RendreCVarsAllies()
 	if InCombatLockdown() then
 		local attente = CreateFrame("Frame")
@@ -1618,7 +1618,7 @@ local function DiagCollecte(L)
 			local ok, e = pcall(fn, uf)
 			return ok and "ok" or ("ERREUR " .. tostring(e))
 		end
-		L("  mise en page GuildUp appliquée : " .. tostring(misesEnPage[uf] == true))
+		L("  mise en page GuildUpSMB appliquée : " .. tostring(misesEnPage[uf] == true))
 		L("  placement de l'incantation : " .. Tenter(PlacerIncantation))
 		Decrire("LevelFrame", uf.LevelFrame)
 		Decrire("PlayerLevelDiffFrame", uf.PlayerLevelDiffFrame)
@@ -1646,7 +1646,7 @@ local fenetreCopie
 local function AfficherCopie(texte)
 	if not fenetreCopie then
 		local f = ns.FenetreDeplacable("GuildUpCopie", 520, 380)
-		if f.TitleText then f.TitleText:SetText("GuildUp — diag (Ctrl+C pour copier)") end
+		if f.TitleText then f.TitleText:SetText("GuildUpSMB — diag (Ctrl+C pour copier)") end
 
 		local defile = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
 		defile:SetPoint("TOPLEFT", f, "TOPLEFT", 12, -30)
@@ -1769,7 +1769,7 @@ local function CreerFenetre()
 
 	local titre = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	if not f.TitleText then titre:SetPoint("TOP", f, "TOP", 0, -16) end
-	titre:SetText("GuildUp")
+	titre:SetText("GuildUpSMB")
 
 	local x, y = 16, -34
 	local function Ligne(h) local v = y; y = y - (h or 24); return v end
@@ -1960,7 +1960,7 @@ local function PlacerVolet()
 end
 
 -- Volet du bouton de mini-carte : pseudo et personnages, mon rôle (Tank / Heal / DPS), boutons des
--- fenêtres (groupes, artisanat, dons…), partage de position, activation de GuildUp et
+-- fenêtres (groupes, artisanat, dons…), partage de position, activation de GuildUpSMB et
 -- notifications (repliables)
 local LARGEUR_VOLET = 206
 
@@ -2152,7 +2152,7 @@ local function CreerVolet()
 			function() if ns.BasculerEchanges then ns.BasculerEchanges() end end })
 	Filet(-188)
 
-	-- Ligne 5 : activer GuildUp (bannières, noms, barres de nom alliées)
+	-- Ligne 5 : activer GuildUpSMB (bannières, noms, barres de nom alliées)
 	local actif = CreateFrame("CheckButton", nil, v, "UICheckButtonTemplate")
 	actif:SetSize(24, 24)
 	actif:SetPoint("LEFT", v, "TOPLEFT", 6, -206)
@@ -2193,7 +2193,7 @@ local function CreerVolet()
 		{ "evenements", "Événements" }, { "quetes", "Quêtes" },
 		{ "commandes", "Commandes" }, { "plans", "Échanges" },
 		{ "version", "Version" }, { "aide", "Aide" },
-		{ "gu", "GU!" },
+		{ "gu", (ns.Config and ns.Config.cri) and (tostring(ns.Config.cri):upper() .. "!") or "Cri" },
 	}
 	v.notifs = {}
 	for i, n in ipairs(NOTIFS) do
@@ -2290,7 +2290,7 @@ local function CreerBoutonCarte()
 	-- est à false, c'est le halo qui pulse en vert à la place.
 	if ANNEAU_CUSTOM then
 		b.anneau = b:CreateTexture(nil, "OVERLAY", nil, 1)
-		b.anneau:SetTexture("Interface\\AddOns\\GuildUp\\media\\anneau")
+		b.anneau:SetTexture(MEDIA .. "anneau")
 		b.anneau:SetSize(87, 87)
 		b.anneau:SetPoint("CENTER", b, "TOPLEFT", 17, -16.5)
 		b.anneau:SetBlendMode("ADD")
@@ -2346,7 +2346,7 @@ local function CreerBoutonCarte()
 	end)
 	b:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-		GameTooltip:SetText("GuildUp")
+		GameTooltip:SetText("GuildUpSMB")
 		local role = MonRole()
 		GameTooltip:AddLine("Ton rôle : " .. (role and ICONES_ROLE[role].nom or "inconnu"), 1, 1, 1)
 		local n = ns.NombreGroupes and ns.NombreGroupes() or 0
@@ -2518,14 +2518,14 @@ local function AncrerBulle(b)
 	end
 end
 
--- Renvoie true si la bulle est affichée (false : GuildUp pas prêt ou catégorie coupée)
+-- Renvoie true si la bulle est affichée (false : GuildUpSMB pas prêt ou catégorie coupée)
 ns.Notifier = function(categorie, titre, texte, son, action)
 	if not db then return false end
 	if not NotifActive(categorie) then return false end
 	bulle = bulle or CreerBulle()
 	if bulle.Reinit then bulle.Reinit(bulle) end -- une bulle spéciale (GuildUp_GU) l'avait décorée
 	bulle.action = action
-	bulle.titre:SetText(titre or "GuildUp")
+	bulle.titre:SetText(titre or "GuildUpSMB")
 	bulle.texte:SetText(texte or "")
 	local largeur = math.max(bulle.titre:GetStringWidth(), bulle.texte:GetStringWidth()) + 26
 	bulle:SetSize(largeur, bulle.titre:GetStringHeight() + bulle.texte:GetStringHeight() + 24)
@@ -2586,11 +2586,11 @@ SlashCmdList.GUILDUP = function(msg)
 		if fi and fi:IsShown() then fi:Hide() elseif ns.OuvrirFiche then ns.OuvrirFiche(nil) end
 		return
 	elseif cmd == "gu" then
-		-- même réglage que la case « GU! » des notifications du volet
+		-- même réglage que la case du cri de guilde dans les notifications du volet
 		if type(db.notifs) ~= "table" then db.notifs = {} end
 		db.notifs.gu = (db.notifs.gu == false) and nil or false
 		db.emoteGU = nil
-		Message(db.notifs.gu == false and "emote « GU! » coupée." or "emote « GU! » activée.")
+		Message(db.notifs.gu == false and "emote du cri de guilde coupée." or "emote du cri de guilde activée.")
 		return
 	elseif cmd == "projets" or cmd == "projet" then
 		if ns.OuvrirProjet then ns.OuvrirProjet() end

@@ -1,4 +1,4 @@
--- GuildUp : annonces de la guilde en bulle (jamais dans le chat).
+-- GuildUpSMB : annonces de la guilde en bulle (jamais dans le chat).
 -- Préfixe "GuildUpAnn" :
 --   "N~niveau"          j'ai atteint un niveau
 --   "M~nom du métier"   j'ai appris un métier
@@ -35,11 +35,11 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	local genre, a, b = strsplit("~", msg)
 	local qui = NomCourt(expediteur)
 	if genre == "N" and tonumber(a) and ns.NiveauSpecial and ns.NiveauSpecial(expediteur, a) then
-		-- montée de niveau spéciale (Zaardoz Gu : bulle + GIF, GuildUp_GU.lua)
+		-- montée de niveau spéciale (membre vedette : bulle en fête, GuildUp_GU.lua)
 	elseif genre == "N" and tonumber(a) then
 		-- petite sonnette (media/ding.mp3)
 		ns.Notifier("niveaux", "La guilde progresse", ("%s a atteint le niveau |cffffd100%s|r !"):format(qui, a),
-			(ns.MEDIA or "Interface\\AddOns\\GuildUp\\media\\") .. "ding.mp3", function() end)
+			(ns.MEDIA or ("Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\")) .. "ding.mp3", function() end)
 	elseif genre == "M" and a then
 		ns.Notifier("metiers", "Nouveau métier", ("%s a appris |cffffd100%s|r"):format(qui, a), nil, function()
 			if ns.BasculerMetiers then ns.BasculerMetiers() end

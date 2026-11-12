@@ -1,4 +1,4 @@
--- GuildUp : besoins (onglet « Besoins » de la fenêtre Artisanat & Échanges).
+-- GuildUpSMB : besoins (onglet « Besoins » de la fenêtre Artisanat & Échanges).
 -- Chaque joueur liste les objets dont il a besoin (avec une quantité). La liste part à la guilde
 -- (préfixe "GuildUpBes") et chacun la garde (GuildUpDB) : elle reste visible même quand son
 -- auteur est hors ligne.

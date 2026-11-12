@@ -1,4 +1,4 @@
--- GuildUp : fenêtre « Dons de la guilde ».
+-- GuildUpSMB : fenêtre « Dons de la guilde ».
 -- Onglets : Dons (hôtel des ventes de dons, par catégorie) · Mes dons (mes objets échangeables, sacs et
 -- banque : je coche ce que je donne) · Demandes (qui m'a demandé un don) · Besoins (GuildUp_Besoins.lua).
 --
@@ -930,7 +930,7 @@ local function MajParcourir()
 				GameTooltip:AddLine("Tu as reçu ce don ? Remercie " .. NomCourt(d.e.nom) .. " : ça compte pour les donateurs du mois.", 1, 1, 1, true)
 			elseif not d.enLigne then
 				GameTooltip:SetText("Demander ce don")
-				GameTooltip:AddLine(NomCourt(d.e.nom) .. " est hors ligne : ta demande lui sera transmise dès que possible, par un membre de la guilde connecté avec GuildUp, ou quand vous serez connectés en même temps.", 1, 1, 1, true)
+				GameTooltip:AddLine(NomCourt(d.e.nom) .. " est hors ligne : ta demande lui sera transmise dès que possible, par un membre de la guilde connecté avec GuildUpSMB, ou quand vous serez connectés en même temps.", 1, 1, 1, true)
 			else
 				GameTooltip:SetText("Demander ce don")
 				GameTooltip:AddLine("Un message privé part vers " .. NomCourt(d.e.nom) .. ".", 1, 1, 1, true)
@@ -1350,7 +1350,7 @@ local function CreerDemandes(f)
 	aide:SetPoint("TOPLEFT", titre, "BOTTOMLEFT", 0, -6)
 	aide:SetWidth(LARGEUR - 260)
 	aide:SetJustifyH("LEFT")
-	aide:SetText("Qui t'a demandé un de tes dons (gardé 30 jours). Les demandes faites pendant ton absence arrivent quand un membre avec GuildUp est connecté en même temps que toi.")
+	aide:SetText("Qui t'a demandé un de tes dons (gardé 30 jours). Les demandes faites pendant ton absence arrivent quand un membre avec GuildUpSMB est connecté en même temps que toi.")
 	p.toutEffacer = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
 	p.toutEffacer:SetSize(110, 22)
 	p.toutEffacer:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -58)

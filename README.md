@@ -1,4 +1,4 @@
-# GuildUp
+# GuildUpSMB
 
 Addon World of Warcraft pour le client **WoW Forever** (interface `16001`, client 1.60.1) : des outils pour
 faire vivre une guilde. Version adaptée à notre guilde, à partir de GuildUp de Miko.
@@ -8,8 +8,8 @@ l'addon voient et partagent ces informations**.
 
 ## Installation
 
-1. Copier le dossier `GuildUp/` dans `World of Warcraft/<version du client>/Interface/AddOns/`.
-2. Lancer le jeu (ou `/reload`) et vérifier que « GuildUp » est coché dans la liste des addons.
+1. Copier le dossier `GuildUpSMB/` dans `World of Warcraft/<version du client>/Interface/AddOns/`.
+2. Lancer le jeu (ou `/reload`) et vérifier que « GuildUpSMB » est coché dans la liste des addons.
 3. Taper `/smb` pour ouvrir les options, ou cliquer sur le bouton de la mini-carte.
 
 ## Fonctionnalités
@@ -35,7 +35,9 @@ l'addon voient et partagent ces informations**.
 - **Événements** : création via le calendrier du jeu et notification des nouveaux événements.
 - **Identité** : un pseudo commun à tous ses personnages et son personnage principal, visibles au survol.
 - **Vérification de version** : prévient quand un membre a une version plus récente.
-- **Spécial guilde** : l'emote « GU! » qui monte à l'écran, et la fête quand Zaardoz Gu monte de niveau.
+- **Spécial guilde** (réglé dans `GuildUpSMB/GuildUp_Config.lua`) : le cri de guilde « 33 », qui fait apparaître à
+  l'écran de toute la guilde deux chopes qui trinquent, et, en option, une fête quand un membre « vedette »
+  monte de niveau.
 
 ## Commandes
 
@@ -58,7 +60,7 @@ l'addon voient et partagent ces informations**.
 | `/smb noms` | Nom et guilde des autres joueurs |
 | `/smb lueur` | Lueur derrière la bannière de la cible |
 | `/smb annonces` | Annonces de la guilde en bulle |
-| `/smb gu` | Emote « GU! » |
+| `/smb gu` | Emote du cri de guilde |
 | `/smb diag` | Informations techniques à copier en cas de problème |
 | `/smb debug` | Afficher / cacher la partie Debug de la fenêtre d'options |
 | `/smb entree <mot>` | Noter ma position comme entrée d'un donjon (ex. `/smb entree mortemines`) |
@@ -79,6 +81,7 @@ nouvelles depuis 30 jours sont oubliées.
 - Addon d'origine : **Miko**.
 - Données d'objets et de recettes générées depuis les tables du client WoW Forever (via wago.tools).
 - Provenance des composants (`GuildUp_Sources.lua`) tirée une fois de **QuestieDB** (version Forever,
-  GPL-3.0) : merci à ses auteurs. GuildUp n'a pas besoin de Questie pour fonctionner.
-- Images (`GuildUp/media/`) : bannières et anneau de Miko ; l'emote « GU! » et l'animation de Zaardoz Gu
-  appartiennent à la guilde et ne sont pas couvertes par la licence du code sans l'accord des personnes concernées.
+  GPL-3.0) : merci à ses auteurs. GuildUpSMB n'a pas besoin de Questie pour fonctionner.
+- Images (`GuildUpSMB/media/`) : bannières et anneau de Miko ; chopes du cri de guilde (`gu_emote.tga`,
+  `emote_animee.tga`) dessinées pour cette version ; l'animation de Zaardoz Gu (`zaardoz.tga`, inutilisée ici)
+  appartient à la guilde d'origine et n'est pas couverte par la licence du code sans l'accord des personnes concernées.

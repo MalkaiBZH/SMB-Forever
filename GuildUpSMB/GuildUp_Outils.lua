@@ -1,4 +1,4 @@
--- GuildUp : outils communs à tous les modules (chargé juste après GuildUp.lua, voir le .toc).
+-- GuildUpSMB : outils communs à tous les modules (chargé juste après GuildUp.lua, voir le .toc).
 -- Une seule version de chaque petite fonction : noms, recherche sans accents, atlas, objets, dates,
 -- couleurs de classe, menus déroulants, case où déposer un objet, fenêtre déplaçable.
 -- Les modules les reprennent en local en tête de fichier (local NomCourt = ns.NomCourt).
