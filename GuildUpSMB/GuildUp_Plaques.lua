@@ -111,12 +111,8 @@ local function PortraitUnite(unit)
 end
 
 -- chemin du médaillon à afficher pour une unité, ou nil (réglage coupé, pas de portrait)
--- Pas de portrait quand je suis en groupe / en raid ou en combat : la bannière habituelle revient
--- (rafraîchi par GROUP_ROSTER_UPDATE et PLAYER_REGEN_DISABLED / PLAYER_REGEN_ENABLED)
 local function MedaillonUnite(unit)
 	if db.medaillons == false then return nil end
-	if (IsInGroup and IsInGroup()) or (IsInRaid and IsInRaid()) then return nil end
-	if UnitAffectingCombat("player") then return nil end
 	local nom = PortraitUnite(unit)
 	return nom and (MEDIA .. "portraits\\" .. nom .. ".tga") or nil
 end
@@ -177,51 +173,22 @@ local function Degrade(tex, a1, a2) DegradeCouleur(tex, db.r, db.g, db.b, a1, a2
 -- barres de nom restreintes. hauteurInt = hauteur de cette zone (fixe l'échelle de l'image).
 -- medaillon (facultatif) : portrait du joueur à la place de la mascotte (morceau gauche)
 local function PoserBanniere(f, image, region, dxG, dxD, dyH, dyB, hauteurInt, m, medaillon)
-	local k = hauteurInt / (m.INT_BAS - m.INT_HAUT)
-	local yHaut = dyH + (m.INT_HAUT - m.V_HAUT) * k
-	local yBas = dyB - (m.V_BAS - m.INT_BAS) * k
-	for _, cle in ipairs(ORDRE) do
-		local t, c = f[cle], m.MORCEAUX[cle]
-		t:ClearAllPoints()
-		t:SetTexture(image)
-		t:SetVertexColor(1, 1, 1, 1)
-		t:SetTexCoord(c[1] / TEX_L, c[2] / TEX_L, m.V_HAUT / TEX_H, m.V_BAS / TEX_H)
-	end
-	local g, a, o, b, d = f.g, f.a, f.o, f.b, f.d
-	local function Largeur(cle) return (m.MORCEAUX[cle][2] - m.MORCEAUX[cle][1]) * k end
-
-	-- morceau gauche : son bord droit est 16 px (image) après le début de l'intérieur
-	local xG = dxG + (m.MORCEAUX.g[2] - m.INT_GAUCHE) * k
-	g:SetPoint("TOPRIGHT", region, "TOPLEFT", xG, yHaut)
-	g:SetPoint("BOTTOMRIGHT", region, "BOTTOMLEFT", xG, yBas)
-	g:SetWidth(Largeur("g"))
-	-- embout droit : son bord gauche est 56 px (image) avant la fin de l'intérieur
-	local xD = dxD - (m.INT_DROITE - m.MORCEAUX.d[1]) * k
-	d:SetPoint("TOPLEFT", region, "TOPRIGHT", xD, yHaut)
-	d:SetPoint("BOTTOMLEFT", region, "BOTTOMRIGHT", xD, yBas)
-	d:SetWidth(Largeur("d"))
-	-- ornement central : centré sur l'intérieur, jamais étiré
-	local xO = (dxG + dxD) / 2
-	o:SetPoint("TOP", region, "TOP", xO, yHaut)
-	o:SetPoint("BOTTOM", region, "BOTTOM", xO, yBas)
-	o:SetWidth(Largeur("o"))
-	-- parties unies : elles comblent l'espace restant de chaque côté de l'ornement
-	b:SetPoint("TOPLEFT", o, "TOPRIGHT", 0, 0)
-	b:SetPoint("BOTTOMRIGHT", d, "BOTTOMLEFT", 0, 0)
-	for _, cle in ipairs(ORDRE) do f[cle]:Show() end
-
+	-- La barre horizontale de la bannière n'est plus dessinée : seulement le portrait à côté du nom,
+	-- et rien pour un joueur sans portrait (ou portraits coupés). Les mesures du modèle de bannière
+	-- (m) servent encore à placer le portrait et la lueur de la cible. (image : plus utilisée)
+	for _, cle in ipairs(ORDRE) do f[cle]:Hide() end
 	if not medaillon then
-		a:SetPoint("TOPLEFT", g, "TOPRIGHT", 0, 0)
-		a:SetPoint("BOTTOMRIGHT", o, "BOTTOMLEFT", 0, 0)
 		if f.medaillon then f.medaillon:Hide() end
 		return
 	end
+	local k = hauteurInt / (m.INT_BAS - m.INT_HAUT)
+	local yHaut = dyH + (m.INT_HAUT - m.V_HAUT) * k
+	local yBas = dyB - (m.V_BAS - m.INT_BAS) * k
+
 	-- Médaillon : rond, de la hauteur de la bannière, collé à gauche de l'intérieur (il ne passe pas
-	-- sous le nom ni la barre de vie). La bannière elle-même disparaît : il ne reste que le médaillon
-	-- à côté du nom et de la barre de vie (plus léger à l'écran).
+	-- sous le nom ni la barre de vie)
 	local taille = (m.V_BAS - m.V_HAUT) * k
 	local yCentre = (yHaut + yBas) / 2
-	for _, cle in ipairs(ORDRE) do f[cle]:Hide() end
 	if not f.medaillon then
 		-- juste au-dessus de la bannière, dans le même cadre
 		local couche, sous = f.couche or "BACKGROUND", (f.sousCouche or 0) + 1
@@ -740,8 +707,8 @@ local policesNoms = {} -- [UnitFrame] = police d'origine du nom { police, taille
 local OMBRE_ALLIE = { 0, 0, 0, 0.45 } -- ombre douce qui adoucit le bord des lettres (alpha 0 = aucune)
 local RENDU_ALLIE = 3            -- texte dessiné 3 fois plus grand puis réduit (épaisseur des noms du jeu)
 local DECALAGE_Y_ALLIE = -25    -- nom + guilde descendus de 25 px (négatif = plus bas)
-local AGRANDISSEMENT_ALLIE = 1.5 -- taille fixe des noms hors guilde (x1.5 la police des barres)
--- Taille des noms hors guilde : relevée une seule fois (police des barres de nom du jeu x 1,5), puis
+local AGRANDISSEMENT_ALLIE = 1 -- noms hors guilde : taille de la police des barres de nom du jeu
+-- Taille des noms hors guilde : relevée une seule fois (police des barres de nom du jeu), puis
 -- gardée pour tout le monde. La relire à chaque fois la faisait suivre les changements du jeu.
 local tailleNomsAllies
 -- Cadre porteur du nom et de la guilde, par barre de nom : il suit l'échelle de la barre (réglée par
@@ -1224,7 +1191,6 @@ ns.ActiverPlaques = function()
 		"PLAYER_SPECIALIZATION_CHANGED", "ACTIVE_TALENT_GROUP_CHANGED", "CVAR_UPDATE",
 		"PLAYER_FLAGS_CHANGED", "UNIT_FLAGS", "UNIT_HEALTH", "UNIT_MAXHEALTH",
 		"UNIT_SPELLCAST_START", "UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_EMPOWER_START",
-		"PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", -- entrée / sortie de combat : portraits
 	}) do
 		pcall(evPlaques.RegisterEvent, evPlaques, e) -- certains évènements peuvent ne pas exister sur ce client
 	end
@@ -1280,7 +1246,7 @@ evPlaques:SetScript("OnEvent", function(self, event, arg1)
 			MajCible()
 		end
 	else
-		-- GUILD_ROSTER_UPDATE, CVAR_UPDATE, PLAYER_FLAGS_CHANGED, PLAYER_GUILD_UPDATE, PLAYER_REGEN_… : regroupés
+		-- GUILD_ROSTER_UPDATE, CVAR_UPDATE, PLAYER_FLAGS_CHANGED, PLAYER_GUILD_UPDATE… : regroupés
 		PlanifierRafraichissement()
 	end
 end)
