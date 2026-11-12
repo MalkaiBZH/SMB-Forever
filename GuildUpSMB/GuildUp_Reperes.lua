@@ -6,10 +6,12 @@
 -- clic gauche) :
 --   - barre de nom du membre affichée (il est à l'écran et assez proche) : chevron doré et distance
 --     au-dessus de sa tête, accrochés à sa barre de nom (placement exact, suit ses mouvements) ;
---   - devant moi mais trop loin pour avoir une barre de nom : portrait, prénom et distance en haut de
---     l'écran, à l'horizontale dans sa direction ;
+--   - devant moi mais trop loin pour avoir une barre de nom : portrait, prénom et distance au milieu
+--     de l'écran, sur la ligne d'horizon (là où se trouve un personnage lointain), à l'horizontale
+--     dans sa direction ;
 --   - hors du champ de vision : même repère au bord de l'écran, avec une flèche. Le tour de l'écran
---     suit la direction : à droite ou à gauche sur les côtés, derrière moi en bas, au centre.
+--     suit la direction : à droite ou à gauche sur les côtés (à partir de l'horizon), plus bas à
+--     mesure qu'il passe derrière moi, puis en bas, au centre quand il est juste derrière.
 -- Seuls les membres dont le portrait est connu sont affichés (addon à jour, race avec portrait).
 -- Pas de hauteur : les positions de la carte n'ont pas d'altitude.
 -- Clic : chuchoter. Réglage db.reperes (/smb reperes, case dans les options).
@@ -24,7 +26,7 @@ local CouleurClasse = ns.CouleurClasse
 local NomComplet = ns.Coeur and ns.Coeur.NomComplet
 
 local CHAMP = math.rad((ns.Config and tonumber(ns.Config.champVisionReperes)) or 90) -- largeur de l'écran (angle)
-local HAUTEUR = (ns.Config and tonumber(ns.Config.hauteurReperes)) or -30 -- position sous le haut de l'écran
+local HORIZON = (ns.Config and tonumber(ns.Config.horizonReperes)) or 40 -- ligne d'horizon, au-dessus du centre de l'écran
 local BAS = (ns.Config and tonumber(ns.Config.basReperes)) or 150 -- centre des repères du bas (au-dessus des barres d'action)
 local TAILLE = 40        -- diamètre du portrait (pixels)
 local MARGE = 50         -- distance minimale au bord de l'écran (côtés)
@@ -150,7 +152,7 @@ local function NouveauRepere()
 end
 
 -- Mise en page d'un repère, refaite seulement quand elle change :
--- "tete" (au-dessus de la barre de nom), "haut" (sans flèche), "<", ">", "v" (bord de l'écran)
+-- "tete" (au-dessus de la barre de nom), "horizon" (sans flèche), "<", ">", "v" (bord de l'écran)
 local function Disposer(r, mode)
 	if r.mode == mode then return end
 	r.mode = mode
@@ -171,7 +173,7 @@ local function Disposer(r, mode)
 	r.nom:SetPoint("TOP", r, "BOTTOM", 0, -2)
 	r.distance:SetPoint("TOP", r.nom, "BOTTOM", 0, -1)
 	r:EnableMouse(true)
-	if mode == "haut" then
+	if mode == "horizon" then
 		r.fleche:Hide()
 		r:SetAlpha(1)
 		return
@@ -185,8 +187,8 @@ local function Disposer(r, mode)
 end
 
 -- Membre hors du champ de vision : place sur le tour de l'écran (centre du repère, depuis le centre
--- de l'écran) et flèche. On part du coin haut (bord du champ de vision), on descend le côté, puis on
--- suit le bas jusqu'au centre (droit derrière moi).
+-- de l'écran) et flèche. On part du côté à hauteur de l'horizon (bord du champ de vision), on
+-- descend le côté, puis on suit le bas jusqu'au centre (droit derrière moi).
 local function PlaceAuBord(angle, demiL, yHaut, yBas)
 	local cote = (angle > 0) and -1 or 1 -- angle positif = à ma gauche
 	local f = (math.abs(angle) - CHAMP / 2) / (PI - CHAMP / 2)
@@ -236,7 +238,7 @@ local function Maj()
 
 	local demi = cadre:GetWidth() / 2
 	local demiL = math.max(0, demi - MARGE)
-	local yHaut = cadre:GetHeight() / 2 + HAUTEUR - TAILLE / 2
+	local yHaut = HORIZON -- centre du portrait, depuis le centre de l'écran
 	local yBas = -cadre:GetHeight() / 2 + BAS
 	local tanDemi = math.tan(CHAMP / 2)
 	for i, v in ipairs(visibles) do
@@ -249,8 +251,8 @@ local function Maj()
 			Disposer(r, "tete")
 			r:SetPoint("BOTTOM", ancre, "TOP", 0, 2)
 		elseif math.abs(v.angle) < CHAMP / 2 then
-			-- devant moi, loin : en haut de l'écran ; projection comme sur l'écran (tangente)
-			Disposer(r, "haut")
+			-- devant moi, loin : sur l'horizon ; projection comme sur l'écran (tangente)
+			Disposer(r, "horizon")
 			local px = -math.tan(v.angle) / tanDemi * demi
 			if px < -demiL then px = -demiL elseif px > demiL then px = demiL end
 			r:SetPoint("CENTER", cadre, "CENTER", px, yHaut)

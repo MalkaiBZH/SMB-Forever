@@ -31,10 +31,10 @@ ns.Config = {
 
 	-- Repères des membres à l'écran (GuildUp_Reperes.lua) : angle de vue (degrés) qui correspond à
 	-- toute la largeur de l'écran (à ajuster si les repères ne tombent pas dans la direction des
-	-- joueurs), position des repères du haut (pixels sous le haut de l'écran, négatif = plus bas) et
-	-- de ceux du bas, membres derrière soi (pixels au-dessus du bas de l'écran, au-dessus des barres
-	-- d'action).
+	-- joueurs), ligne d'horizon où se placent les membres lointains devant soi (pixels au-dessus du
+	-- centre de l'écran, négatif = plus bas) et position des repères du bas, membres derrière soi
+	-- (pixels au-dessus du bas de l'écran, au-dessus des barres d'action).
 	champVisionReperes = 90,
-	hauteurReperes = -30,
+	horizonReperes = 40,
 	basReperes = 150,
 }

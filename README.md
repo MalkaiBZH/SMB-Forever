@@ -33,7 +33,7 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
   sans portrait, rien derrière le nom. Lueur dorée sur la cible. `/smb medaillons` pour couper.
 - **Repères dans le HUD** : les membres de la guilde présents sur la même carte ont un repère à l'écran,
   comme dans un jeu de tir. Proche et visible : chevron doré et distance au-dessus de sa tête. Devant mais
-  loin : portrait, prénom à la couleur de la classe et distance en haut de l'écran, dans sa direction.
+  loin : portrait, prénom à la couleur de la classe et distance au milieu de l'écran, dans sa direction.
   Hors du champ de vision : au bord de l'écran avec une flèche (sur les côtés, ou en bas quand il est
   derrière). Clic : chuchoter. Seulement les membres qui partagent leur position et ont un portrait.
   `/smb reperes` pour couper.
