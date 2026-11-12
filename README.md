@@ -92,10 +92,16 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
   désactivable dans les options ou le menu rapide du médaillon). Chaque membre y apparaît avec son médaillon
   (son portrait), entouré d'un anneau à la couleur de sa classe ; un point de couleur s'il n'a pas de portrait.
   Quand plusieurs membres se chevauchent, la position la plus récente est au-dessus.
-- **Jouer ensemble** (3.0) : ce que tu peux faire maintenant avec la guilde. Suggestions classées par intérêt :
-  tes quêtes en commun regroupées par zone avec les membres en ligne qui les ont (« Former le groupe » les
-  invite), les membres dispo proches de ton niveau (« Inviter »), les groupes de la guilde qui cherchent ton rôle
-  ou montés pour une de tes quêtes (« Postuler »). Clic droit : ignorer une suggestion. À droite, « Dispo
+- **Jouer ensemble** (3.0) : ce que tu peux faire maintenant avec la guilde. Onglet **Maintenant**, suggestions
+  classées par intérêt : tes quêtes en commun regroupées par zone avec les membres en ligne qui les ont
+  (« Former le groupe » les invite), les donjons à ton niveau où des membres ont des quêtes (« Les Mortemines :
+  il ne manque qu'un soigneur », « Monter le groupe »), les membres qui font la même suite de quêtes que toi
+  (au même point ou à une ou deux étapes près), les membres dispo proches de ton niveau (« Inviter »), les
+  groupes de la guilde qui cherchent ton rôle ou montés pour une de tes quêtes (« Postuler »). Clic droit :
+  ignorer une suggestion. Onglet **Donjons** : chaque donjon avec ses quêtes (les tiennes et celles des membres),
+  qui les a, les rôles qu'on pourrait réunir, « Monter le groupe » (un tank, un soigneur, trois DPS, en
+  commençant par ceux qui ont des quêtes dedans) et « Créer l'annonce » ; filtres à ton niveau, où il y a des
+  quêtes, tous. À droite, « Dispo
   maintenant » : les membres qui ont coché **Dispo pour grouper** (case de la page, menu rapide du médaillon ou
   `/smb dispo` ; valable jusqu'à la déconnexion). Clic : chuchoter, clic droit : inviter.
 - **Quêtes en commun** : les quêtes que d'autres membres font aussi, avec « Créer un groupe ». Si tu es déjà
@@ -133,7 +139,7 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
 | `/smb taille 1.2` | Taille de la fenêtre GuildUpSMB (de 0.7 à 1.6, 1.1 par défaut) |
 | `/smb groupes` | Recherche de groupe de la guilde |
 | `/smb metiers` | Registre des métiers |
-| `/smb ensemble` | Jouer ensemble |
+| `/smb ensemble [donjons]` | Jouer ensemble (onglet Donjons) |
 | `/smb dispo` | Dispo pour grouper (oui / non) |
 | `/smb quetes` | Quêtes en commun |
 | `/smb evenements` | Créer un événement de guilde |

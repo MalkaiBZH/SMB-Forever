@@ -134,8 +134,12 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["3.1.0"] = {
+		"|cffffd100Jouer ensemble > Donjons|r : chaque donjon avec les quêtes à y faire (les tiennes et celles des membres), qui les a, les rôles qu'on pourrait réunir, « Monter le groupe » et « Créer l'annonce ». Filtres : à ton niveau, où il y a des quêtes, tous.",
+		"Nouvelles suggestions : « Les Mortemines : il ne manque qu'un soigneur » pour les donjons à ton niveau, et « Pikkle en est au même point que toi » quand un membre fait la même suite de quêtes (même étape ou presque).",
+	},
 	["3.0.0"] = {
 		"|cffffd100Jouer ensemble|r : nouvelle page, juste sous l'Accueil. Elle te propose ce que tu peux faire maintenant avec la guilde : tes quêtes en commun par zone avec les membres en ligne (« Former le groupe »), les membres dispo proches de ton niveau (« Inviter ») et les groupes de la guilde qui cherchent ton rôle (« Postuler »).",
 		"|cffffd100Dispo pour grouper|r : coche-le dans la page, dans le menu rapide du médaillon ou avec /smb dispo ; la guilde te voit dans « Dispo maintenant » jusqu'à ta déconnexion.",

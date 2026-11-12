@@ -102,7 +102,9 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
 - `GuildUp_ObjectifsQuetes.lua` (`ns.OBJECTIFS_QUETES` : pour chaque quête, monstres à tuer et monstres qui
   lâchent les objets demandés, dans l'ordre des objectifs du jeu) : généré par `python outils/generer_objectifs.py`
   depuis QuestieDB (`data/Forever` du dépôt Questie/QuestieDB, GPL-3.0 ; `--ref` pour une version précise,
-  cache dans `outils/cache/questiedb/`, même `--verifier`). Lu par `GuildUp_Objectifs.lua`.
+  cache dans `outils/cache/questiedb/`, même `--verifier`). Lu par `GuildUp_Objectifs.lua`. Le même fichier contient
+  `ns.DONJONS_QUETES` (quêtes de chaque donjon, par numéro de zone) et `ns.SUITES_QUETES` (suites de quêtes :
+  première quête, étape, nombre d'étapes), lus par `GuildUp_Ensemble.lua`.
 - Ces fichiers font plusieurs milliers de lignes : **ne pas les lire en entier**, utiliser Grep.
 
 ## Particularités de Forever

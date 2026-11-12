@@ -49,7 +49,7 @@ local function Aide()
 	print("  /smb taille 1.2 — taille de la fenêtre SMB Forever (de 0.7 à 1.6)")
 	print("  /smb groupes — recherche de groupe de la guilde")
 	print("  /smb metiers — registre des métiers de la guilde")
-	print("  /smb ensemble — Jouer ensemble : suggestions de groupe et membres dispo")
+	print("  /smb ensemble [donjons] — Jouer ensemble : suggestions de groupe, membres dispo, donjons")
 	print("  /smb dispo — dispo pour grouper (" .. OuiNon(ns.EstDispo and ns.EstDispo()) .. ")")
 	print("  /smb quetes — quêtes en commun avec la guilde")
 	print("  /smb evenements — ouvrir la page Événements (calendrier de la guilde)")
@@ -616,7 +616,7 @@ SlashCmdList.GUILDUP = function(msg)
 		if ns.BasculerEchanges then ns.BasculerEchanges() end
 		return
 	elseif cmd == "ensemble" or cmd == "jouer" then
-		if ns.OuvrirEnsemble then ns.OuvrirEnsemble() end
+		if ns.OuvrirEnsemble then ns.OuvrirEnsemble((reste and reste:find("^donj")) and "donjons" or nil) end
 		return
 	elseif cmd == "dispo" then
 		if ns.BasculerDispo then ns.BasculerDispo() end
