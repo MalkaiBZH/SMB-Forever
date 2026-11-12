@@ -139,30 +139,60 @@ ns.ListeFormules = function()
 end
 
 local sources         -- { objets = { [id] = {...} }, pnj = {}, recolte = {}, zones = {}, quetes = {} }
+-- Table lue à la demande : chaque entrée n'est analysée qu'au premier accès (sources[id]), en
+-- cherchant sa ligne « id|… » dans le texte brut. Analyser les ~30 000 lignes d'un coup gelait le jeu
+-- et créait ~85 000 tables. (Pas de pairs() sur ces tables : seules les entrées lues y sont.)
+local function TablePresseuse(brut, construire)
+	brut = "\n" .. (brut or "")
+	local cache = {}
+	return setmetatable({}, { __index = function(_, id)
+		if type(id) ~= "number" then return nil end
+		local v = cache[id]
+		if v == nil then
+			v = false
+			local debut = brut:find("\n" .. id .. "|", 1, true)
+			if debut then
+				local fin = brut:find("\n", debut + 1, true) or (#brut + 1)
+				v = construire(brut:sub(debut + 1, fin - 1)) or false
+			end
+			cache[id] = v
+		end
+		return v or nil
+	end, __brut = brut })
+end
+
 local function Sources()
 	if sources then return sources end
-	sources = { objets = {}, pnj = {}, recolte = {}, zones = {}, quetes = {} }
+	sources = { zones = {}, quetes = {} }
+	local VIDE = {} -- liste vide partagée (jamais modifiée)
 	local function ids(t)
+		if not t or t == "" then return VIDE end
 		local l = {}
-		for x in (t or ""):gmatch("%d+") do l[#l + 1] = tonumber(x) end
+		for x in t:gmatch("%d+") do l[#l + 1] = tonumber(x) end
 		return l
-	end
-	for id, m, b, nb, r, c, q in (ns.SOURCES_OBJETS or ""):gmatch("(%d+)|([^|]*)|([^|]*)|(%d*)|([^|]*)|([^|]*)|([^\n]*)") do
-		sources.objets[tonumber(id)] = { marchands = ids(m), butin = ids(b), nbButin = tonumber(nb) or 0,
-			recolte = ids(r), contenants = ids(c), quetes = ids(q) }
 	end
 	local function Points(t)
 		local l = {}
 		for x, y in (t or ""):gmatch("([%d%.]+),([%d%.]+)") do l[#l + 1] = { tonumber(x), tonumber(y) } end
 		return l
 	end
-	for id, nom, mi, ma, z, fa, pos, sous, rang in (ns.SOURCES_PNJ or ""):gmatch("(%d+)|([^|]*)|(%d*)|(%d*)|(%d*)|([^|]*)|([^|]*)|([^|\n]*)|?(%d*)") do
+	sources.objets = TablePresseuse(ns.SOURCES_OBJETS, function(ligne)
+		local _, m, b, nb, r, c, q = ligne:match("^(%d+)|([^|]*)|([^|]*)|(%d*)|([^|]*)|([^|]*)|(.*)$")
+		if not m then return nil end
+		return { marchands = ids(m), butin = ids(b), nbButin = tonumber(nb) or 0,
+			recolte = ids(r), contenants = ids(c), quetes = ids(q) }
+	end)
+	sources.pnj = TablePresseuse(ns.SOURCES_PNJ, function(ligne)
+		local id, nom, mi, ma, z, fa, pos, sous, rang = ligne:match("^(%d+)|([^|]*)|(%d*)|(%d*)|(%d*)|([^|]*)|([^|]*)|([^|]*)|?(%d*)$")
+		if not id then return nil end
 		local pts = Points(pos)
-		sources.pnj[tonumber(id)] = { id = tonumber(id), nom = nom, min = tonumber(mi), max = tonumber(ma), zone = tonumber(z),
+		return { id = tonumber(id), nom = nom, min = tonumber(mi), max = tonumber(ma), zone = tonumber(z),
 			faction = fa ~= "" and fa or nil, points = pts, x = pts[1] and pts[1][1], y = pts[1] and pts[1][2],
 			sous = sous ~= "" and sous or nil, rang = tonumber(rang) or 0 }
-	end
-	for id, nom, zs in (ns.SOURCES_RECOLTE or ""):gmatch("(%d+)|([^|]*)|([^\n]*)") do
+	end)
+	sources.recolte = TablePresseuse(ns.SOURCES_RECOLTE, function(ligne)
+		local _, nom, zs = ligne:match("^(%d+)|([^|]*)|(.*)$")
+		if not nom then return nil end
 		local l, pts = {}, {}
 		for bloc in zs:gmatch("[^#]+") do
 			local z, _, p = bloc:match("^(%d+):(%d*):?(.*)$")
@@ -171,8 +201,8 @@ local function Sources()
 				pts[tonumber(z)] = Points(p)
 			end
 		end
-		sources.recolte[tonumber(id)] = { nom = nom, zones = l, points = pts }
-	end
+		return { nom = nom, zones = l, points = pts }
+	end)
 	for id, nom, carte in (ns.SOURCES_ZONES or ""):gmatch("(%d+)|([^|]*)|(%d*)") do
 		sources.zones[tonumber(id)] = { nom = nom, carte = tonumber(carte) }
 	end
@@ -544,7 +574,16 @@ local function Developper(objet, besoin, ctx, profondeur, chemin)
 	return n
 end
 
+local CalculerSansMemoire
+local memoireCalcul, imageCalcul -- résultat du dernier calcul et moment (GetTime : un par image)
 local function Calculer()
+	-- plusieurs affichages (liste, mini-liste, carnets) le demandent dans la même image : un seul calcul
+	if memoireCalcul and imageCalcul == GetTime() then return memoireCalcul[1], memoireCalcul[2] end
+	local arbres, base = CalculerSansMemoire()
+	memoireCalcul, imageCalcul = { arbres, base }, GetTime()
+	return arbres, base
+end
+CalculerSansMemoire = function()
 	Recettes()
 	local k = Carnet()
 	local arbres, base = {}, {}
@@ -1422,9 +1461,9 @@ ns.MiniVisible = function() return mini and mini:IsShown() end
 
 ns.OuvrirCourses = function()
 	if not courses then CreerCourses() end
-	courses:Show()
+	-- son OnShow refait la liste ; déjà ouverte, on la refait nous-mêmes (une seule fois dans les deux cas)
+	if courses:IsShown() then MajCourses() else courses:Show() end
 	courses:Raise()
-	MajCourses()
 end
 ns.BasculerCourses = function()
 	-- réduit : la commande rouvre le carnet ; sinon elle l'ouvre ou le ferme
@@ -2663,7 +2702,8 @@ ns.OutilsCarnet = { RecettesDe = RecettesDe, InfoObjet = InfoObjet, NomMetier = 
 ns.DiagCarnet2 = function(L)
 	local n, m = 0, 0
 	for _ in pairs(Recettes()) do n = n + 1 end
-	for _ in pairs(Sources().objets) do m = m + 1 end
+	local brut = getmetatable(Sources().objets).__brut or ""
+	for _ in brut:gmatch("\n%d+|") do m = m + 1 end
 	L(("carnet : %d recettes, sources de %d composants"):format(n, m))
 end
 

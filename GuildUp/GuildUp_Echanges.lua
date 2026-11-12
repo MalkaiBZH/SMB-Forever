@@ -150,7 +150,17 @@ local function DejaConnu(objet)
 	return false
 end
 -- Plan : métier et niveau requis (ligne « Requiert Forge (125) »)
+local exigences = {} -- [objet] = { code, niveau } : lu une fois dans l'infobulle
+local ExigenceLue
 local function Exigence(objet, sousClasse)
+	local e = exigences[objet]
+	if e then return e[1], e[2] end
+	local code, niveau = ExigenceLue(objet, sousClasse)
+	-- infobulle pas encore chargée (texte vide) : on ne garde pas, on relira
+	if code ~= SOUS_CLASSES_PLANS[sousClasse or -1] or niveau ~= 0 then exigences[objet] = { code, niveau } end
+	return code, niveau
+end
+ExigenceLue = function(objet, sousClasse)
 	local code, niveau
 	for _, texte in ipairs(LignesInfobulle(objet)) do
 		local avant, n = texte:match("^(.-)%s*%((%d+)%)%s*$")

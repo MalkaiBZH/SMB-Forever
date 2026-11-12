@@ -314,8 +314,14 @@ local function DansLaGuilde(cle)
 end
 
 -- nom d'un objet d'après la liste du jeu (quand il n'est pas encore en cache)
+local parId -- [id] = entrée de l'index (construit au premier besoin)
 local function NomListe(objet)
-	for _, o in ipairs(Index()) do if o[1] == objet then return o[3], o[2] end end
+	if not parId then
+		parId = {}
+		for _, o in ipairs(Index()) do parId[o[1]] = o end
+	end
+	local o = parId[objet]
+	if o then return o[3], o[2] end
 end
 -- Pour la page Items du carnet : la liste de tous les objets échangeables, et un nom de secours
 ns.IndexObjets = Index

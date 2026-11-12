@@ -107,7 +107,16 @@ local function Taches(p)
 		end
 	end
 	for _, e in ipairs(p.entrees) do Parcourir(O.Developper(e.objet, e.qte, ctx, 0, {}), 0) end
-	local function Nom(o) return (O.InfoObjet and O.InfoObjet(o)) or "" end
+	-- noms lus une fois (et non à chaque comparaison du tri)
+	local noms = {}
+	local function Nom(o)
+		local n = noms[o]
+		if not n then
+			n = (O.InfoObjet and O.InfoObjet(o)) or ""
+			noms[o] = n
+		end
+		return n
+	end
 	table.sort(ordreF, function(a, b)
 		if a.prof ~= b.prof then return a.prof < b.prof end
 		return Nom(a.objet) < Nom(b.objet)
