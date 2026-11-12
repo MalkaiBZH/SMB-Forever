@@ -737,6 +737,28 @@ local OMBRE_ALLIE = { 0, 0, 0, 0.45 } -- ombre douce qui adoucit le bord des let
 local RENDU_ALLIE = 3            -- texte dessiné 3 fois plus grand puis réduit (épaisseur des noms du jeu)
 local DECALAGE_Y_ALLIE = -25    -- nom + guilde descendus de 25 px (négatif = plus bas)
 local AGRANDISSEMENT_ALLIE = 1.5 -- taille fixe des noms hors guilde (x1.5 la police des barres)
+-- Taille des noms hors guilde : relevée une seule fois (police des barres de nom du jeu x 1,5), puis
+-- gardée pour tout le monde. La relire à chaque fois la faisait suivre les changements du jeu.
+local tailleNomsAllies
+-- Cadre porteur du nom et de la guilde, par barre de nom : il ignore l'échelle de la barre (le jeu
+-- peut l'agrandir quand on s'approche), pour que le texte garde la même taille à l'écran
+local porteursNoms = {} -- [UnitFrame] = cadre
+local function PorteurNom(uf)
+	local p = porteursNoms[uf]
+	if not p then
+		p = CreateFrame("Frame", nil, uf)
+		p:SetSize(1, 1)
+		p:SetPoint("CENTER", uf, "CENTER")
+		if p.SetIgnoreParentScale then p:SetIgnoreParentScale(true) end
+		-- même transparence que l'écran, pas celle de la barre (le jeu rend les barres translucides)
+		if p.SetIgnoreParentAlpha then p:SetIgnoreParentAlpha(true) end
+		porteursNoms[uf] = p
+	end
+	-- taille de l'interface (le cadre ignore celle de la barre, qui la contient d'habitude)
+	if p.SetIgnoreParentScale then p:SetScale(UIParent:GetEffectiveScale()) end
+	p:SetFrameLevel(uf:GetFrameLevel() + 5)
+	return p
+end
 
 -- police des noms flottants du jeu (Friz Quadrata), taille fixe
 local function PoliceAllie() return UNIT_NAME_FONT or STANDARD_TEXT_FONT end
@@ -843,14 +865,16 @@ local function MajNomSeul(uf, unit)
 			local ok, police, taille, contour = pcall(uf.name.GetFont, uf.name)
 			if ok and police then policesNoms[uf] = { police, taille or 10, contour or "" } end
 		end
-		local taille = (policesNoms[uf] and policesNoms[uf][2] or 10) * AGRANDISSEMENT_ALLIE
+		if not tailleNomsAllies and policesNoms[uf] then tailleNomsAllies = (policesNoms[uf][2] or 10) * AGRANDISSEMENT_ALLIE end
+		local taille = tailleNomsAllies or 10 * AGRANDISSEMENT_ALLIE
+		local porteur = PorteurNom(uf)
 		-- le nom de Blizzard ne suit pas le rendu « grand puis réduit » (le jeu remet sa propre
 		-- échelle) : on le rend invisible et on écrit le nôtre, centré au-dessus de la barre
 		pcall(uf.name.SetAlpha, uf.name, 0)
 		nomSeul[uf] = true
 		local n = textesNoms[uf]
 		if not n then
-			n = uf:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+			n = porteur:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 			textesNoms[uf] = n
 		end
 		n:ClearAllPoints()
@@ -862,7 +886,7 @@ local function MajNomSeul(uf, unit)
 		local guilde = GuildesVoulues() and GetGuildInfo(unit)
 		if guilde and guilde ~= "" then
 			if not t then
-				t = uf:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+				t = porteur:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 				textesGuilde[uf] = t
 			end
 			t:ClearAllPoints()
