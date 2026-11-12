@@ -168,16 +168,22 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	local db = DB()
 	if not db then return end
 	if type(db.identites) ~= "table" then db.identites = {} end
+	-- textes bornés (affichés dans les infobulles)
+	pseudo = ns.CouperUTF8(pseudo, 48)
+	principal = ns.CouperUTF8(principal, 64)
 	local l = {}
-	for c in persos:gmatch("[^,]+") do l[#l + 1] = c end
+	for c in persos:gmatch("[^,]+") do
+		if #l < 20 then l[#l + 1] = ns.CouperUTF8(c, 64) end
+	end
 	if #l == 0 then l[1] = cle end
 	db.identites[cle] = { pseudo = pseudo ~= "" and pseudo or nil, principal = principal ~= "" and principal or nil,
 		persos = l, maj = time() }
-	-- un perso ne peut appartenir qu'à une identité : on retire les anciennes mentions
+	-- l'expéditeur ne peut appartenir qu'à une identité : on le retire des autres (il ne peut pas
+	-- retirer les personnages d'un autre membre)
 	for autre, id in pairs(db.identites) do
 		if autre ~= cle then
 			for i = #(id.persos or {}), 1, -1 do
-				for _, c in ipairs(l) do if id.persos[i] == c then table.remove(id.persos, i); break end end
+				if id.persos[i] == cle then table.remove(id.persos, i) end
 			end
 		end
 	end

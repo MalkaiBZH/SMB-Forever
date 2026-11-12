@@ -194,7 +194,7 @@ end
 
 local TAILLE_MORCEAU = 180
 local function EnvoyerProjet(p, relais)
-	if p.supprime then Envoyer(("X~%s~%d"):format(p.id, p.supprime)); return end
+	if p.supprime then Envoyer(("X~%s~%d%s"):format(p.id, p.supprime, relais and "~r" or "")); return end
 	if not p.nom then return end
 	Envoyer(("P~%s~%d~%s~%s~%s"):format(p.id, p.maj, p.auteur or "?", relais and "1" or "0", Propre(p.nom)))
 	local mots = {}
@@ -202,13 +202,16 @@ local function EnvoyerProjet(p, relais)
 	local morceaux = ns.Morceaux(mots, TAILLE_MORCEAU)
 	for i, m in ipairs(morceaux) do Envoyer(("E~%s~%d~%d~%d~%s"):format(p.id, p.maj, i, #morceaux, m)) end
 end
-local function EnvoyerTache(p, objet)
+-- relais : renvoi pour un absent (« ~r » à la fin) ; sans, le message doit venir de la bonne personne
+local function EnvoyerTache(p, objet, relais)
 	local t = p.taches[objet]
-	if t then Envoyer(("T~%s~%d~%s~%d~%d"):format(p.id, objet, t.qui or "", t.etat or LIBRE, t.maj or 0)) end
+	if t then
+		Envoyer(("T~%s~%d~%s~%d~%d%s"):format(p.id, objet, t.qui or "", t.etat or LIBRE, t.maj or 0, relais and "~r" or ""))
+	end
 end
 local function EnvoyerTout(p, relais)
 	EnvoyerProjet(p, relais)
-	if not p.supprime then for objet in pairs(p.taches) do EnvoyerTache(p, objet) end end
+	if not p.supprime then for objet in pairs(p.taches) do EnvoyerTache(p, objet, relais) end end
 end
 
 --------------------------------------------------------------------------------
@@ -307,6 +310,12 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		local id, maj, auteur, relais, nom = reste:match("^([^~]+)~(%d+)~([^~]*)~(%d)~(.*)$")
 		if not id then return end
 		maj = tonumber(maj)
+		-- date dans le futur refusée ; envoi direct : seulement par l'auteur ; relais : l'auteur d'un
+		-- projet connu ne change pas
+		if not maj or maj > Maintenant() + 3600 then return end
+		if relais == "0" and auteur ~= cle then return end
+		local connu = Projet(id)
+		if connu and connu.auteur and connu.auteur ~= auteur then return end
 		-- réceptions abandonnées (morceaux perdus)
 		for k, a in pairs(enAttente) do
 			if GetTime() - (a.recu or 0) > ATTENTE_MAX then enAttente[k], orphelines[k] = nil, nil end
@@ -353,9 +362,10 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		end
 		Maj()
 	elseif genre == "T" then
-		local id, objet, qui, etat, maj = reste:match("^([^~]+)~(%d+)~([^~]*)~(%d)~(%d+)$")
+		local id, objet, qui, etat, maj, relaisT = reste:match("^([^~]+)~(%d+)~([^~]*)~(%d)~(%d+)(~?r?)$")
 		if not id then return end
 		objet, etat, maj = tonumber(objet), tonumber(etat), tonumber(maj)
+		if not (objet and etat and maj) or etat > FAITE or maj > Maintenant() + 3600 then return end
 		local nouv = { qui = qui ~= "" and qui or nil, etat = etat, maj = maj }
 		local p = Projet(id)
 		if not (p and p.nom) then
@@ -366,6 +376,12 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			return
 		end
 		local t = p.taches[objet]
+		-- envoi direct : prendre ou finir une tâche pour soi, libérer la sienne ; l'auteur du projet
+		-- peut tout (les relais « ~r » renvoient l'état connu d'un absent)
+		if relaisT == "" and cle ~= p.auteur then
+			local permis = (etat ~= LIBRE and qui == cle) or (etat == LIBRE and t and t.qui == cle)
+			if not permis then return end
+		end
 		if not Gagne(nouv, t) then return end
 		local avant = t and t.etat
 		if etat ~= LIBRE then nouv.qte = QteTache(p, objet) end
@@ -377,9 +393,14 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		end
 		Maj()
 	elseif genre == "X" then
-		local id, maj = reste:match("^([^~]+)~(%d+)$")
+		local id, maj, relaisX = reste:match("^([^~]+)~(%d+)(~?r?)$")
 		if not id then return end
 		maj = tonumber(maj)
+		if not maj or maj > Maintenant() + 3600 then return end
+		-- suppression d'un projet connu et vivant : seulement par son auteur (un relais ne sert qu'à
+		-- ceux qui ne le connaissent pas, ou plus)
+		local connu = Projet(id)
+		if connu and connu.nom and not connu.supprime and connu.auteur and connu.auteur ~= cle then return end
 		local p = Projet(id, true)
 		annules[id] = true
 		if (p.supprime or 0) >= maj or maj < (p.maj or 0) then return end

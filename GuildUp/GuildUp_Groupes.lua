@@ -631,9 +631,21 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	end
 	if (type_ == "P" or type_ == "X") and p[2] then p[2] = p[2]:gsub("^test:", "") end
 
+	-- l'identifiant d'une annonce commence par la clé de son chef (« Nom-Royaume:date ») : seul le
+	-- chef peut la publier ou la fermer
+	local function DuChef(id)
+		return deMoi or (id and id:match("^(.+):%d+$") == Normaliser(expediteur))
+	end
+	-- nombre reçu, borné (un message forgé ne fige pas le jeu avec une boucle d'un milliard de tours)
+	local function Borne(v, mini, maxi, defaut)
+		v = tonumber(v)
+		if not v then return defaut end
+		return math.max(mini, math.min(maxi, math.floor(v)))
+	end
+
 	if type_ == "A" and canal == "GUILD" then
 		local id = p[2]
-		if not id then return end
+		if not id or not DuChef(id) then return end
 		local ancienne = annonces[id]
 		local membres = {}
 		for _, m in ipairs(p[15] and p[15] ~= "" and Decouper(p[15], ",") or {}) do
@@ -644,10 +656,10 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			id = id, chef = expediteur,
 			premiere = ancienne and ancienne.premiere or GetTime(),
 			code = p[3] or "",
-			besoin = { tank = tonumber(p[4]) or 0, heal = tonumber(p[5]) or 0, dps = tonumber(p[6]) or 0 },
-			pris = { tank = tonumber(p[7]) or 0, heal = tonumber(p[8]) or 0, dps = tonumber(p[9]) or 0 },
-			taille = tonumber(p[10]) or 5, membres = tonumber(p[11]) or 1,
-			niveau = tonumber(p[12]) or 0, classe = p[13] ~= "" and p[13] or nil,
+			besoin = { tank = Borne(p[4], 0, 40, 0), heal = Borne(p[5], 0, 40, 0), dps = Borne(p[6], 0, 40, 0) },
+			pris = { tank = Borne(p[7], 0, 40, 0), heal = Borne(p[8], 0, 40, 0), dps = Borne(p[9], 0, 40, 0) },
+			taille = Borne(p[10], 1, 40, 5), membres = Borne(p[11], 1, 40, 1),
+			niveau = Borne(p[12], 0, 100, 0), classe = p[13] ~= "" and p[13] or nil,
 			commentaire = p[14] or "", liste = membres,
 			rappel = p[16] == "1",
 			prochainRappel = ancienne and ancienne.prochainRappel,
@@ -676,7 +688,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 
 	elseif type_ == "F" then
 		local id = p[2]
-		if id and annonces[id] then
+		if id and annonces[id] and DuChef(id) then
 			annonces[id] = nil
 			candidatures[id] = nil
 			if Rafraichir then Rafraichir() end
@@ -687,6 +699,8 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 
 	elseif type_ == "P" then
 		if not monAnnonce or p[2] ~= monAnnonce.id then return end
+		-- candidature d'un joueur hors de la guilde (chuchotement) : ignorée
+		if not deMoi and ns.MembreGuilde and ns.MembreGuilde(Normaliser(expediteur)) == false then return end
 		local c = TrouverCandidat(expediteur)
 		if not c then
 			c = { nom = expediteur }
@@ -707,7 +721,8 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 
 	elseif type_ == "R" then
 		local id = p[2]
-		if id and candidatures[id] then
+		-- seul le chef de l'annonce peut refuser ma candidature
+		if id and candidatures[id] and DuChef(id) then
 			candidatures[id] = "refusee"
 			if ns.Notifier then ns.Notifier("candidatures", "Candidature refusée", "par " .. NomCourt(expediteur)) end
 			if Rafraichir then Rafraichir() end
