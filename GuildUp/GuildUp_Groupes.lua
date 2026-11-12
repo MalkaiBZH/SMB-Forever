@@ -447,6 +447,17 @@ local function UnitesDuGroupe()
 	return unites
 end
 
+-- Le joueur « nom » est-il dans mon groupe ? (compare les noms complets « Prénom Famille »)
+local function DansMonGroupe(nom)
+	local cible = nom and Normaliser(nom)
+	if not cible then return false end
+	for _, u in ipairs(UnitesDuGroupe()) do
+		local n = NomCompletUnite(u)
+		if n and Normaliser(n) == cible then return true end
+	end
+	return false
+end
+
 -- pris = places occupées par rôle ; membres = { nom, role } ; les rôles inconnus prennent les
 -- places libres (DPS d'abord)
 local function Composition(besoin)
@@ -512,6 +523,7 @@ end
 
 local function FermerMonAnnonce(raison)
 	if not monAnnonce then return end
+	if raison then (ns.Erreur or Message)("Annonce de groupe fermée : " .. raison) end
 	if ns.RetirerPublic then ns.RetirerPublic() end -- l'annonce publique (recherche du jeu) part avec
 	Envoyer("F" .. SEP .. monAnnonce.id, "GUILD")
 	for _, c in ipairs(candidats) do
@@ -537,7 +549,8 @@ local function CreerMonAnnonce(code, besoin, commentaire)
 		id = MonNom() .. ":" .. (GetServerTime and GetServerTime() or math.floor(GetTime())),
 		code = code,
 		besoin = { tank = besoin.tank, heal = besoin.heal, dps = besoin.dps },
-		taille = EstPerso(e) and math.max(1, besoin.tank + besoin.heal + besoin.dps) or (e.taille or 5),
+		taille = EstPerso(e) and math.max(1, besoin.tank + besoin.heal + besoin.dps)
+			or math.min(e.taille or 5, math.max(1, besoin.tank + besoin.heal + besoin.dps)),
 		commentaire = Nettoyer(commentaire, 50),
 		rappel = DB() and DB().rappelGroupe and true or false,
 	}
@@ -578,7 +591,7 @@ local function Inviter(nom)
 	elseif InviteUnit then
 		InviteUnit(nom)
 	end
-	c.statut = "invite"
+	c.statut, c.invite = "invite", GetTime()
 	if Rafraichir then Rafraichir() end
 end
 
@@ -753,10 +766,17 @@ local function Rappels(maintenant)
 	end
 end
 
+local DELAI_INVITATION = 60
 local function Entretien()
 	local maintenant = GetTime()
 	local change = false
 	pcall(Rappels, maintenant)
+	for _, c in ipairs(candidats) do
+		if c.statut == "invite" and maintenant - (c.invite or 0) > DELAI_INVITATION then
+			c.statut = "attente"
+			change = true
+		end
+	end
 	for id, a in pairs(annonces) do
 		if maintenant - a.vu > DUREE_VIE then
 			annonces[id] = nil
@@ -775,6 +795,11 @@ local function Entretien()
 end
 
 local function SurChangementDeGroupe()
+	-- mes candidatures : je suis entré dans le groupe du chef, elles ne sont plus « en attente »
+	for id in pairs(candidatures) do
+		local a = annonces[id]
+		if a and a.chef and IsInGroup() and DansMonGroupe(a.chef) then candidatures[id] = nil end
+	end
 	if monAnnonce then
 		if not PeutAnnoncer() then
 			FermerMonAnnonce("tu n'es plus chef du groupe")
@@ -785,14 +810,7 @@ local function SurChangementDeGroupe()
 			return
 		end
 		for i = #candidats, 1, -1 do
-			local cible = Normaliser(candidats[i].nom)
-			for _, u in ipairs(UnitesDuGroupe()) do
-				local n, r = UnitName(u)
-				if n and Normaliser(n .. (r and r ~= "" and ("-" .. r) or "")) == cible then
-					table.remove(candidats, i)
-					break
-				end
-			end
+			if DansMonGroupe(candidats[i].nom) then table.remove(candidats, i) end
 		end
 		if GetTime() - dernierEnvoi > 5 then DiffuserMonAnnonce() end
 	end
@@ -1621,10 +1639,25 @@ local function CreerPageMonGroupe(f)
 	gerer.aucun:SetPoint("TOP", gerer, "TOP", 0, -270)
 	gerer.aucun:SetText("Pas encore de candidat.")
 	gerer.candidats = {}
+	gerer.decalage = 0 -- premier candidat affiché (molette sur la liste)
+	local function Defiler(_, delta)
+		local maxi = math.max(0, #candidats - #gerer.candidats)
+		gerer.decalage = math.max(0, math.min(maxi, gerer.decalage - delta))
+		if Rafraichir then Rafraichir() end
+	end
+	local zone = CreateFrame("Frame", nil, gerer)
+	zone:SetPoint("TOPLEFT", gerer, "TOPLEFT", 10, -248)
+	zone:SetSize(LARGEUR_LISTE + 20, 6 * 30)
+	zone:EnableMouseWheel(true)
+	zone:SetScript("OnMouseWheel", Defiler)
+	gerer.plus = gerer:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+	gerer.plus:SetPoint("TOPRIGHT", zone, "BOTTOMRIGHT", -4, -2)
 	for i = 1, 6 do
 		local l = CreateFrame("Frame", nil, gerer)
 		l:SetSize(LARGEUR_LISTE + 20, 28)
 		l:SetPoint("TOPLEFT", gerer, "TOPLEFT", 10, -248 - (i - 1) * 30)
+		l:EnableMouseWheel(true)
+		l:SetScript("OnMouseWheel", Defiler)
 		l.fond = l:CreateTexture(nil, "BACKGROUND")
 		l.fond:SetAllPoints(l)
 		PoserAtlas(l.fond, "groupfinder-highlightbar", { 0.15, 0.13, 0.1, 0.8 })
@@ -1836,8 +1869,12 @@ local function RafraichirGestion(p)
 	end
 
 	g.aucun:SetShown(#candidats == 0)
+	g.decalage = math.max(0, math.min(g.decalage or 0, #candidats - #g.candidats))
+	local caches = #candidats - #g.candidats
+	g.plus:SetText(caches > 0 and ("%d-%d sur %d candidats (molette)"):format(g.decalage + 1,
+		g.decalage + #g.candidats, #candidats) or "")
 	for i, l in ipairs(g.candidats) do
-		local cd = candidats[i]
+		local cd = candidats[i + g.decalage]
 		if cd then
 			IconeRole(l.role, cd.role, true)
 			IconeClasse(l.classe, cd.classe)
@@ -1847,7 +1884,9 @@ local function RafraichirGestion(p)
 				plein and "  |cffff6666rôle déjà pris|r" or ""))
 			l.inviter:SetScript("OnClick", function() Inviter(cd.nom) end)
 			l.refuser:SetScript("OnClick", function() Refuser(cd.nom) end)
-			l.inviter:SetEnabled(cd.statut ~= "invite")
+			-- invitation sans réponse (déclinée, échouée) : on peut réinviter après quelques secondes
+			l.inviter:SetText(cd.statut == "invite" and "Réinviter" or "Inviter")
+			l.inviter:SetEnabled(cd.statut ~= "invite" or GetTime() - (cd.invite or 0) > 10)
 			l:Show()
 		else
 			l:Hide()
