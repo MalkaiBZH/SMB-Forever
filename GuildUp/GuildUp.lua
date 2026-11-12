@@ -25,7 +25,6 @@ local DEFAUT = {
 	incantationHaut = true,  -- barre d'incantation au-dessus du nom, sur le bord doré (barres de nom)
 	debugIncantation = false, -- affiche une fausse barre d'incantation pour régler sa position
 	role      = "auto",      -- aperçu : "auto", ou forcer "tank" / "heal" / "dps" / "horscombat" sur tout le monde
-	monRole   = "auto",      -- rôle annoncé à la guilde : "auto" (groupe / spécialisation) ou "tank" / "heal" / "dps"
 	test      = false,       -- mode test : tous les joueurs comptent comme membres de la guilde
 	r = 0.10, g = 0.55, b = 1.00, a = 0.80, -- couleur et opacité du style "degrade"
 }
@@ -165,6 +164,26 @@ local function Normaliser(texte)
 end
 ns.Normaliser = Normaliser
 
+-- Rôle choisi à la main, par personnage (db.rolesPerso[clé] = "tank" / "heal" / "dps" ; absent =
+-- automatique). GuildUpDB est commun au compte : l'ancien réglage db.monRole, commun à tous les
+-- personnages, est repris une fois par le premier personnage connecté.
+local function RoleManuel()
+	if not db then return "auto" end
+	if type(db.rolesPerso) ~= "table" then db.rolesPerso = {} end
+	local cle = Normaliser(UnitName("player"))
+	if db.monRole ~= nil then
+		if db.monRole ~= "auto" and cle and db.rolesPerso[cle] == nil then db.rolesPerso[cle] = db.monRole end
+		db.monRole = nil
+	end
+	return cle and db.rolesPerso[cle] or "auto"
+end
+
+local function PoserRoleManuel(role)
+	RoleManuel() -- reprise de l'ancien réglage
+	local cle = Normaliser(UnitName("player"))
+	if cle then db.rolesPerso[cle] = (role ~= "auto") and role or nil end
+end
+
 local function NomComplet(unit)
 	local nom, royaume = UnitName(unit)
 	if not nom then return nil end
@@ -181,7 +200,8 @@ end
 
 -- Mon rôle : choix manuel, sinon rôle de groupe, sinon rôle de ma spécialisation (si le client le permet)
 local function MonRole()
-	if ROLE_VALIDE[db.monRole] then return db.monRole end
+	local manuel = RoleManuel()
+	if ROLE_VALIDE[manuel] then return manuel end
 	local r = RoleDeGroupe("player")
 	if r then return r end
 	if GetSpecialization and GetSpecializationRole then
@@ -1293,7 +1313,7 @@ end
 -- besoins, projets, identité, cvarsAvant… sont gardées)
 local REGLAGES_HORS_DEFAUT = {
 	"notifs", "barre", "annoncesGuilde", "emoteGU", "voletNotifs", "coursesCompact",
-	"afficherDebug", "tousNiveaux", "styleJeu", "rappelGroupe", "portee",
+	"afficherDebug", "tousNiveaux", "styleJeu", "rappelGroupe", "portee", "rolesPerso",
 }
 
 -- Bouton « Réinitialiser » et /smb reset : seulement les réglages
@@ -1798,8 +1818,8 @@ local function CreerFenetre()
 	for _, r in ipairs(mesRoles) do
 		local cle = r[1]
 		NouvelleCase(f, r[3], r[4], r[2],
-			function() return db.monRole == cle end, function()
-				db.monRole = cle
+			function() return RoleManuel() == cle end, function()
+				PoserRoleManuel(cle)
 				Annoncer(true)
 			end, true)
 	end
@@ -1924,7 +1944,7 @@ end
 
 local function ChoisirRole(role)
 	-- re-cliquer sur le rôle choisi à la main revient en automatique
-	if db.monRole == role then db.monRole = "auto" else db.monRole = role end
+	if RoleManuel() == role then PoserRoleManuel("auto") else PoserRoleManuel(role) end
 	Annoncer(true)
 	ToutRafraichir()
 	if fenetre and fenetre:IsShown() then MajFenetre() end
@@ -1932,7 +1952,7 @@ local function ChoisirRole(role)
 end
 -- utilisé par la fenêtre des groupes (même choix que le bouton de mini-carte)
 ns.ChoisirRole = function(role) if db then ChoisirRole(role) end end
-ns.RoleChoisiALaMain = function() return db and db.monRole end
+ns.RoleChoisiALaMain = function() return db and RoleManuel() end
 
 -- Taille du bouton de mini-carte (1 = celle des boutons des autres addons)
 local ECHELLE_BOUTON = 1.3
@@ -2429,7 +2449,7 @@ MajBarreRole = function()
 		local choisi = (actuel == role)
 		bt.icone:SetDesaturated(not choisi)
 		bt.icone:SetAlpha(choisi and 1 or 0.4)
-		bt.halo:SetShown(db.monRole == role)
+		bt.halo:SetShown(RoleManuel() == role)
 	end
 	volet.position.icone:SetDesaturated(not db.partagePosition)
 	volet.position.icone:SetAlpha(db.partagePosition and 1 or 0.5)
