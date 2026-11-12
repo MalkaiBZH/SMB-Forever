@@ -82,3 +82,5 @@ nouvelles depuis 30 jours sont oubliées.
   GPL-3.0) : merci à ses auteurs. GuildUp n'a pas besoin de Questie pour fonctionner.
 - Images (`GuildUp/media/`) : bannières et anneau de Miko ; l'emote « GU! » et l'animation de Zaardoz Gu
   appartiennent à la guilde et ne sont pas couvertes par la licence du code sans l'accord des personnes concernées.
+- Portraits (`GuildUp/media/portraits/`) : 56 médaillons Alliance (race, classe, homme et femme), nommés
+  `race-classe-sexe.tga`, générés par IA (Nano Banana Pro) pour la guilde. TGA 32 bits 256×256, fond transparent.
