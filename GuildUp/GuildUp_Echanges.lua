@@ -75,16 +75,26 @@ local function Simplifier(s) return ((s or ""):gsub("[\195][\128-\191]", ACCENTS
 
 --------------------------------------------------------------------------------
 -- Données
---   db.dons[objet] = true                          ce que je donne (repris des « Dons de plans »)
+--   db.donsPerso[perso][objet] = quantité          ce que je donne, par personnage (voir Dons())
 --   db.donsBanque[perso] = { [objet] = nombre }    objets échangeables de ma banque (dernière visite)
 --   db.echanges[guilde][cle] = { nom, vu, liste = { [objet] = { q, c, n } } }
 --------------------------------------------------------------------------------
 
 local function DB() return ns.DB and ns.DB() or {} end
+-- Mes dons, par personnage (GuildUpDB est commun au compte : sans cela, un reroll effaçait les
+-- dons du principal). Ancienne table commune db.dons : reprise une fois, par le personnage
+-- principal s'il est choisi, sinon par le premier personnage connecté.
 local function Dons()
 	local db = DB()
-	if type(db.dons) ~= "table" then db.dons = {} end
-	return db.dons
+	if type(db.donsPerso) ~= "table" then db.donsPerso = {} end
+	if type(db.dons) == "table" then
+		local cle = (type(db.persoPrincipal) == "string" and db.persoPrincipal ~= "") and db.persoPrincipal or MaCle()
+		if db.donsPerso[cle] == nil then db.donsPerso[cle] = db.dons end
+		db.dons = nil
+	end
+	local moi = MaCle()
+	if type(db.donsPerso[moi]) ~= "table" then db.donsPerso[moi] = {} end
+	return db.donsPerso[moi]
 end
 local function Banque()
 	local db = DB()
