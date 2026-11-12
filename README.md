@@ -75,6 +75,11 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
   la session). Aussi par le bouton « Mon profil » de la page Guilde.
 - **Recherche de groupe de la guilde** : places Tank / Heal / DPS, groupes jusqu'à 40, et bouton
   « Rendre public » pour inscrire le groupe dans la recherche du jeu.
+  - **Groupes programmés** : dans « Mon groupe », choisis un départ aujourd'hui ou demain (par pas de 15 min)
+    au lieu de « Maintenant ». Les membres s'inscrivent à l'avance depuis Parcourir (puce « Programmés », heure
+    affichée dans l'heure de chacun). Bulle 10 min avant le départ pour le chef et les inscrits, bulle « C'est
+    l'heure » au chef, et bouton « Inviter tous les inscrits » (passage en raid compris). L'annonce survit à un
+    /reload du chef ; elle se ferme seule 1 h après le départ si personne n'est venu.
 - **Carte de la guilde** : position des membres sur la carte du monde (partage activé par défaut,
   désactivable dans les options ou le menu rapide du médaillon). Chaque membre y apparaît avec son médaillon
   (son portrait), entouré d'un anneau à la couleur de sa classe ; un point de couleur s'il n'a pas de portrait.
@@ -138,7 +143,9 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
 
 ## Données enregistrées
 
-- `GuildUpDB` (par compte) : réglages, dons, besoins, projets, identité, listes reçues des autres membres.
+- `GuildUpDB` (par compte) : réglages, dons, besoins, projets, identité, listes reçues des autres membres,
+  groupes programmés (`groupesProgrammes` : ton annonce programmée, ses inscrits et tes inscriptions, oubliés
+  1 h après le départ).
 - `GuildUpMetiersDB` (par compte) : métiers et recettes de ses personnages et des membres de la guilde.
 
 Les listes des membres hors ligne sont gardées et relayées par les membres connectés ; celles sans

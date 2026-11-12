@@ -204,7 +204,14 @@ local function GroupesOuverts()
 			res[#res + 1] = a
 		end
 	end
-	table.sort(res, function(a, b) return (a.premiere or 0) > (b.premiere or 0) end)
+	-- groupes immédiats d'abord (les plus récents), puis les programmés (départ le plus proche)
+	local Programmee = ns.Groupes.Programmee or function() return false end
+	table.sort(res, function(a, b)
+		local pa, pb = Programmee(a), Programmee(b)
+		if pa ~= pb then return not pa end
+		if pa then return (a.depart or 0) < (b.depart or 0) end
+		return (a.premiere or 0) > (b.premiere or 0)
+	end)
 	return res
 end
 
@@ -354,13 +361,16 @@ local function CreerAccueil(parent)
 						cherche[#cherche + 1] = COULEURS_ROLES[r] .. NOMS_ROLES[r] .. "|r"
 					end
 				end
-				l.sous:SetText(("%s%s|r · %d/%d%s"):format(CouleurClasseTexte(a.classe), NomCourt(a.chef or "?"),
+				-- groupe programmé : l'heure de départ avant le reste
+				local programme = ns.Groupes.Programmee and ns.Groupes.Programmee(a)
+				local depart = (programme and ns.Groupes.TexteDepart) and ("|cfff1cf6bdépart " .. ns.Groupes.TexteDepart(a.depart) .. "|r · ") or ""
+				l.sous:SetText(depart .. ("%s%s|r · %d/%d%s"):format(CouleurClasseTexte(a.classe), NomCourt(a.chef or "?"),
 					a.membres or 1, a.taille or 5, #cherche > 0 and (" · cherche " .. table.concat(cherche, " ")) or ""))
 				local cand = etat and etat.candidatures and etat.candidatures[a.id]
 				local libres = ns.Groupes.PlacesLibres and ns.Groupes.PlacesLibres(a, monRole)
 				l.bouton:SetScript("OnClick", nil)
 				if cand == "envoyee" then
-					l.bouton:Ecrire("Annuler")
+					l.bouton:Ecrire(programme and "Se désinscrire" or "Annuler")
 					l.bouton:Activer(true)
 					l.bouton:SetScript("OnClick", function()
 						if ns.Groupes.AnnulerCandidature then ns.Groupes.AnnulerCandidature(a.id) end
@@ -373,7 +383,7 @@ local function CreerAccueil(parent)
 					l.bouton:Ecrire("Rôle complet")
 					l.bouton:Activer(false)
 				else
-					l.bouton:Ecrire("Postuler")
+					l.bouton:Ecrire(programme and "S'inscrire" or "Postuler")
 					l.bouton:Activer(true)
 					l.bouton:SetScript("OnClick", function()
 						if ns.Groupes.Postuler then ns.Groupes.Postuler(a.id) end

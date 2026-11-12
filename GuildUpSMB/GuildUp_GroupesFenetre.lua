@@ -3,15 +3,20 @@
 -- le catalogue des contenus dans GuildUp_Catalogue.lua. Aucun message réseau ici, sauf « Q »
 -- (Actualiser : « renvoyez-moi vos annonces », une fois toutes les 10 s au plus).
 -- Onglets :
---   Parcourir : les annonces de la guilde (la plus récente d'abord, complètes comprises), filtres par
---     catégorie et recherche ; par annonce : portrait du chef, contenu (+ entrée sur la carte), niveaux,
---     chef, âge, commentaire, places par rôle, rôle recherché, bouton (Postuler / Annuler / Refusé /
+--   Parcourir : les annonces de la guilde (groupes immédiats, le plus récent d'abord, complets compris ;
+--     puis les groupes programmés, le plus proche d'abord), filtres par catégorie (dont « Programmés »)
+--     et recherche ; par annonce : portrait du chef, contenu (+ entrée sur la carte), niveaux, chef, âge,
+--     heure de départ d'un groupe programmé (« départ à 21:00 · dans 2 h 15 », heure locale), commentaire,
+--     places par rôle, rôle recherché, bouton (Postuler / S'inscrire / Annuler / Se désinscrire / Refusé /
 --     Complet / Rôle complet / Ton groupe) ; info-bulle avec les membres et les places libres.
 --   Mon groupe : sans annonce, le formulaire (catégorie, contenu, places recherchées par rôle,
---     commentaire, rappel, Publier) ; avec une annonce, sa gestion (composition, candidats à inviter ou
---     refuser, style de jeu et groupe public, Retirer l'annonce).
+--     commentaire, rappel, départ « Maintenant » ou aujourd'hui / demain à une heure par pas de 15 min,
+--     Publier / Programmer) ; avec une annonce, sa gestion (composition, candidats ou inscrits à inviter
+--     ou refuser, « Inviter tous », style de jeu et groupe public, Retirer l'annonce).
 -- Fonctions gardées pour les autres fichiers : ns.OuvrirGroupes, ns.BasculerGroupes, ns.NombreGroupes,
 -- ns.EnAttente, ns.SurChangementDeRole, ns.SurChangementTestSolo, ns.RafraichirGroupes, ns.DiagGroupes.
+-- Un groupe programmé ne compte dans ns.NombreGroupes et ns.EnAttente (pastille, halo et anneau du
+-- médaillon) que dans l'heure qui précède son départ.
 
 local NOM_ADDON, ns = ...
 
@@ -46,7 +51,23 @@ local Refuser = G.Refuser
 local TailleMaxContenu = G.TailleMaxContenu
 local TexteNiveaux = G.TexteNiveaux
 local TexteRole = G.TexteRole
+local Programmee = G.Programmee
+local TexteDepart = G.TexteDepart
+local TexteDans = G.TexteDans
+local InviterTous = G.InviterTous
 local Normaliser = ns.Normaliser
+local Maintenant = ns.Maintenant
+
+-- un groupe programmé compte (médaillon, attente) seulement dans l'heure qui précède son départ
+local AVANT_COMPTE = 3600
+local function Proche(depart)
+	return not depart or depart - Maintenant() <= AVANT_COMPTE
+end
+
+-- « Départ à 21:00 · dans 2 h 15 » (doré), pour un groupe programmé
+local function LigneDepart(depart)
+	return ("|cfff1cf6bDépart %s · %s|r"):format(TexteDepart(depart), TexteDans(depart))
+end
 
 local UI = ns.UI
 local C = UI.C
@@ -151,7 +172,8 @@ end
 -- Onglet « Parcourir »
 --------------------------------------------------------------------------------
 
-local NOMS_FILTRES = { "Tout", "Donjons", "Raids", "Quêtes", "Autres" }
+local NOMS_FILTRES = { "Tout", "Donjons", "Raids", "Quêtes", "Autres", "Programmés" }
+local FILTRE_PROGRAMMES = 6
 local HAUTEUR_ANNONCE, ECART_ANNONCE = 68, 6
 local derniereDemande = -100
 
@@ -180,6 +202,14 @@ local function InfobulleAnnonce(self)
 		end
 	end
 	if a.commentaire and a.commentaire ~= "" then tt:AddLine("« " .. a.commentaire .. " »", 0.8, 0.8, 0.8, true) end
+	if Programmee(a) then
+		tt:AddLine(" ")
+		tt:AddLine(LigneDepart(a.depart) .. " |cff999999(heure de ton ordinateur)|r", 1, 1, 1)
+		if not a.estMoi then
+			tt:AddLine("Inscris-toi à l'avance : " .. NomCourt(a.chef or "?") .. " invitera les inscrits à l'heure. Rappel 10 min avant.",
+				0.8, 0.8, 0.8, true)
+		end
+	end
 	tt:Show()
 end
 
@@ -223,7 +253,10 @@ local function MajAnnonce(r, a)
 	local age = a.premiere and math.floor((GetTime() - a.premiere) / 60) or 0
 	r.sous:SetText(("%s|r · %s%s|r%s · %s"):format(CouleurNiveau(e) .. TexteNiveaux(e), CouleurClasse(a.classe), NomCourt(a.chef or "?"),
 		(a.niveau or 0) > 0 and (" (" .. a.niveau .. ")") or "", a.estMoi and "ton annonce" or (age < 1 and "à l'instant" or ("il y a " .. age .. " min"))))
-	r.commentaire:SetText((a.commentaire and a.commentaire ~= "") and ("« " .. a.commentaire .. " »") or "")
+	-- troisième ligne : l'heure de départ d'un groupe programmé, puis le commentaire
+	local programme = Programmee(a)
+	local commentaire = (a.commentaire and a.commentaire ~= "") and ("« " .. a.commentaire .. " »") or ""
+	r.commentaire:SetText(programme and (LigneDepart(a.depart) .. (commentaire ~= "" and ("   " .. commentaire) or "")) or commentaire)
 	-- places : un rond par joueur (jusqu'à 10), sinon le compte par rôle
 	local places = ListePlaces(a.besoin, a.pris)
 	if #places <= 10 then
@@ -252,7 +285,7 @@ local function MajAnnonce(r, a)
 	if a.estMoi then
 		b:Ecrire("Ton groupe"); b:Activer(false)
 	elseif cand == "envoyee" then
-		b:Ecrire("Annuler"); b:Activer(true)
+		b:Ecrire(programme and "Se désinscrire" or "Annuler"); b:Activer(true)
 		b:SetScript("OnClick", function() AnnulerCandidature(a.id) end)
 	elseif cand == "refusee" then
 		b:Ecrire("Refusé"); b:Activer(false)
@@ -261,27 +294,35 @@ local function MajAnnonce(r, a)
 	elseif libres and libres <= 0 then
 		b:Ecrire("Rôle complet"); b:Activer(false)
 	else
-		b:Ecrire("Postuler"); b:Activer(true)
+		-- groupe programmé : on s'inscrit à l'avance (même candidature, le chef invite à l'heure)
+		b:Ecrire(programme and "S'inscrire" or "Postuler"); b:Activer(true)
 		b:SetScript("OnClick", function() Postuler(a.id) end)
 	end
 	r:Fort(a.estMoi or cand == "envoyee")
 end
 
--- annonces à montrer : toutes sauf la mienne (complètes comprises), la plus récente d'abord, et ma
--- propre annonce en tête (« Ton groupe »)
+-- annonces à montrer : toutes sauf la mienne (complètes comprises) ; les groupes immédiats d'abord (le
+-- plus récent en tête), puis les groupes programmés (le départ le plus proche en tête) ; ma propre
+-- annonce tout en haut (« Ton groupe »)
 local function AnnoncesParcourir()
 	local liste = {}
 	for id, a in pairs(etat.annonces) do
 		if not (etat.monAnnonce and id == etat.monAnnonce.id) then liste[#liste + 1] = a end
 	end
-	table.sort(liste, function(x, y) return (x.premiere or 0) > (y.premiere or 0) end)
+	table.sort(liste, function(x, y)
+		local px, py = Programmee(x), Programmee(y)
+		if px ~= py then return py end
+		if px and x.depart ~= y.depart then return x.depart < y.depart end
+		if (x.premiere or 0) ~= (y.premiere or 0) then return (x.premiere or 0) > (y.premiere or 0) end
+		return tostring(x.id) < tostring(y.id)
+	end)
 	local m = etat.monAnnonce
 	if m then
 		local pris, membres = Composition(m.besoin)
 		local _, classe = UnitClass("player")
 		table.insert(liste, 1, { id = m.id, code = m.code, besoin = m.besoin, pris = pris, taille = m.taille,
 			membres = #membres, chef = UnitName("player"), classe = classe, niveau = UnitLevel("player"),
-			commentaire = m.commentaire, liste = membres, estMoi = true })
+			commentaire = m.commentaire, liste = membres, depart = m.depart, estMoi = true })
 	end
 	return liste
 end
@@ -331,7 +372,8 @@ local function CreerParcourir(page)
 		local y, n = 0, 0
 		for _, a in ipairs(liste) do
 			local e = InfoContenu(a.code)
-			local ok = (p.filtre == 1 or FiltreDe(e) == p.filtre)
+			local ok = p.filtre == 1 or (p.filtre == FILTRE_PROGRAMMES and Programmee(a))
+				or (p.filtre ~= FILTRE_PROGRAMMES and FiltreDe(e) == p.filtre)
 			if ok and p.recherche ~= "" then
 				local texte = Simplifier((e.nom or "") .. " " .. NomCourt(a.chef or "") .. " " .. (a.commentaire or ""))
 				ok = texte:find(p.recherche, 1, true) ~= nil
@@ -352,6 +394,7 @@ local function CreerParcourir(page)
 		p.liste:Hauteur(y)
 		p.vide:SetShown(n == 0)
 		p.vide:SetText(#liste == 0 and "Aucun groupe ouvert pour l'instant. Si tu ne trouves pas ce que tu cherches, crée le tien."
+			or (p.filtre == FILTRE_PROGRAMMES and p.recherche == "" and "Aucun groupe programmé. Dans « Mon groupe », choisis une heure de départ pour en programmer un.")
 			or "Aucun groupe ne correspond à ce filtre.")
 		local nq = ns.QuetesEnCommun and #ns.QuetesEnCommun() or 0
 		p.quetes.texte:SetText(nq > 0 and (nq .. " de tes quêtes " .. (nq > 1 and "sont" or "est") .. " aussi faite" .. (nq > 1 and "s" or "") .. " par d'autres membres.")
@@ -447,13 +490,62 @@ local function CreerCreation(page)
 		if db then db.rappelGroupe = oui end
 	end)
 	a.rappel:SetPoint("TOPLEFT", a, "TOPLEFT", 14, -290)
-	UI.Infobulle(a.rappel, "Rappel", "Tant que ton groupe cherche du monde, la guilde reçoit une bulle de rappel (sans son) toutes les 5 minutes.")
+	UI.Infobulle(a.rappel, "Rappel", "Tant que ton groupe cherche du monde, la guilde reçoit une bulle de rappel (sans son) toutes les 5 minutes."
+		.. " Groupe programmé : à partir de l'heure de départ.")
+
+	-- départ : maintenant, ou aujourd'hui / demain à une heure (pas de 15 min ; Maj-clic : 1 h ; molette)
+	local tDepart = UI.Texte(a, "GameFontNormalSmall", C.ors)
+	tDepart:SetPoint("TOPLEFT", a, "TOPLEFT", 14, -324)
+	tDepart:SetText("Départ")
+	local function HeureParDefaut() return math.ceil((Maintenant() + 3600) / G.QUART) * G.QUART end
+	a.jour = UI.Choix(a, 118, { { "maintenant", "Maintenant" }, { "aujourdhui", "Aujourd'hui" }, { "demain", "Demain" } }, function(v)
+		if v == "maintenant" then
+			page.depart = false -- (faux = maintenant)
+		else
+			local base = page.depart or HeureParDefaut()
+			local jour = G.JourDe(base)
+			local voulu = (v == "demain") and 1 or 0
+			if jour ~= voulu then base = G.MemeHeure(base, voulu - jour) end
+			page.depart = G.BornerDepart(base)
+		end
+		Rafraichir()
+	end)
+	a.jour:SetPoint("TOPLEFT", a, "TOPLEFT", 14, -342)
+	local function Decaler(pas)
+		page.depart = G.BornerDepart((page.depart or G.PremierDepart()) + pas)
+		Rafraichir()
+	end
+	local function Pas() return IsShiftKeyDown and IsShiftKeyDown() and 3600 or G.QUART end
+	a.moins = UI.Bouton(a, "-", "fantome", 28, 24)
+	a.moins:SetPoint("LEFT", a.jour, "RIGHT", 10, 0)
+	a.moins:SetScript("OnClick", function() Decaler(-Pas()) end)
+	a.heure = CreateFrame("Button", nil, a)
+	a.heure:SetSize(52, 24)
+	a.heure:SetPoint("LEFT", a.moins, "RIGHT", 2, 0)
+	a.heure.texte = UI.Texte(a.heure, "GameFontHighlight", C.texte)
+	a.heure.texte:SetAllPoints()
+	a.heure.texte:SetJustifyH("CENTER")
+	a.heure:EnableMouseWheel(true)
+	a.heure:SetScript("OnMouseWheel", function(_, sens) Decaler(sens * Pas()) end)
+	a.plus = UI.Bouton(a, "+", "fantome", 28, 24)
+	a.plus:SetPoint("LEFT", a.heure, "RIGHT", 2, 0)
+	a.plus:SetScript("OnClick", function() Decaler(Pas()) end)
+	for _, b in ipairs({ a.moins, a.heure, a.plus }) do
+		UI.Infobulle(b, "Heure de départ", "Clic sur - / + ou molette : 15 min. Maj : 1 heure. Heure de ton ordinateur ;"
+			.. " chaque membre voit l'heure de départ dans la sienne.")
+	end
+	a.departInfo = UI.Texte(a, "GameFontHighlightSmall", C.gris)
+	a.departInfo:SetPoint("TOPLEFT", a, "TOPLEFT", 14, -378)
+	a.departInfo:SetPoint("RIGHT", a, "RIGHT", -14, 0)
+	a.departInfo:SetWordWrap(true)
+
 	a.publier = UI.Bouton(a, "Publier le groupe", "or", LARGEUR_ANNONCE - 28, 34)
 	a.publier:SetPoint("BOTTOMLEFT", a, "BOTTOMLEFT", 14, 14)
 	a.publier:SetScript("OnClick", function()
 		if not page.choix then return end
 		a.commentaire.saisie:ClearFocus()
-		CreerMonAnnonce(page.choix, page.besoin or BesoinParDefaut(5), a.commentaire:Lire())
+		CreerMonAnnonce(page.choix, page.besoin or BesoinParDefaut(5), a.commentaire:Lire(), page.depart)
+		if etat.monAnnonce then page.depart = false end -- la prochaine annonce repart sur « Maintenant »
 		Rafraichir()
 	end)
 	a.etat = UI.Texte(a, "GameFontHighlightSmall", C.aide)
@@ -511,7 +603,7 @@ local function CreerCreation(page)
 		if not IsInGuild() then
 			p.consigne:SetText("|cffff6655Tu n'es pas dans une guilde.|r")
 		elseif not PeutAnnoncer() then
-			p.consigne:SetText("|cffff6655Seul le chef du groupe peut publier.|r")
+			p.consigne:SetText("|cffff6655Pas chef du groupe :|r programme-le pour plus tard.")
 		else
 			p.consigne:SetText("Choisis une catégorie puis un contenu.")
 		end
@@ -560,10 +652,28 @@ local function CreerCreation(page)
 		a.taille:SetText(EstPerso(e) and (total .. " place" .. (total > 1 and "s" or "") .. " (jusqu'à " .. max .. ")")
 			or (total .. " place" .. (total > 1 and "s" or "") .. " sur " .. max))
 		a.rappel:Poser(db and db.rappelGroupe)
-		local peut = IsInGuild() and PeutAnnoncer()
+
+		-- départ (l'heure choisie est repoussée si elle est passée pendant que le formulaire était ouvert)
+		if page.depart then page.depart = G.BornerDepart(page.depart) end
+		local depart = page.depart or nil
+		a.jour:Poser(not depart and "maintenant" or (G.JourDe(depart) >= 1 and "demain" or "aujourdhui"))
+		a.moins:SetShown(depart ~= nil)
+		a.heure:SetShown(depart ~= nil)
+		a.plus:SetShown(depart ~= nil)
+		if depart then
+			a.heure.texte:SetText(date("%H:%M", depart))
+			a.moins:Activer(depart > G.PremierDepart())
+			a.plus:Activer(depart < G.DernierDepart())
+			a.departInfo:SetText(LigneDepart(depart) .. ". Les membres s'inscrivent à l'avance ; rappel à tous 10 min avant.")
+		else
+			a.departInfo:SetText("Le groupe part tout de suite. Choisis Aujourd'hui ou Demain pour le programmer.")
+		end
+
+		local peut = IsInGuild() and (PeutAnnoncer() or depart ~= nil)
+		a.publier:Ecrire(depart and "Programmer le groupe" or "Publier le groupe")
 		a.publier:Activer(peut and page.choix ~= nil and total > 0)
 		a.etat:SetText(not IsInGuild() and "Tu n'es pas dans une guilde."
-			or (not PeutAnnoncer() and "Seul le chef du groupe peut publier.") or "")
+			or (not peut and "Seul le chef du groupe peut publier (ou programme le groupe pour plus tard).") or "")
 	end
 	return p
 end
@@ -606,6 +716,19 @@ local function CreerGestion(page)
 	cand.liste:SetPoint("BOTTOMRIGHT", cand, "BOTTOMRIGHT", -6, 10)
 	cand.vide:SetText("Pas encore de candidat. Les membres qui postulent apparaissent ici : invite-les dans ton groupe.")
 	cand.lignes = {}
+	-- « Inviter tous » : les candidats (inscrits) en attente, autant que de places (passage en raid compris)
+	cand.tous = UI.Bouton(cand, "Inviter tous", "or", 170, 24)
+	cand.tous:SetPoint("TOPRIGHT", cand, "TOPRIGHT", -10, -7)
+	cand.tous:SetScript("OnClick", function()
+		local invites, reste = InviterTous()
+		if reste > 0 then
+			print(("|cff3399ffSMB Forever|r : %d invité%s, %d laissé%s en attente (pas de place pour l'instant)."):format(
+				invites, invites > 1 and "s" or "", reste, reste > 1 and "s" or ""))
+		end
+		Rafraichir()
+	end)
+	UI.Infobulle(cand.tous, "Inviter tous", "Invite les candidats en attente, dans l'ordre d'inscription, autant que de places."
+		.. " Plus de 5 joueurs : passage en raid (seul, les suivants sont invités dès que le premier a rejoint).")
 	local function CreerCandidat()
 		local r = UI.Rangee(cand.liste.contenu, HAUTEUR_CANDIDAT - 4)
 		r.portrait = UI.Portrait(r, 30)
@@ -670,7 +793,12 @@ local function CreerGestion(page)
 		tete.nom:SetText(e.nom or "?")
 		tete.infos:SetText(NombreMembres() .. "/" .. (m.taille or 5) .. " joueurs · " .. CouleurNiveau(e) .. TexteNiveaux(e) .. "|r"
 			.. (m.rappel and " · |cff999999rappel toutes les 5 min|r" or ""))
-		tete.commentaire:SetText((m.commentaire and m.commentaire ~= "") and ("« " .. m.commentaire .. " »") or "")
+		local commentaire = (m.commentaire and m.commentaire ~= "") and ("« " .. m.commentaire .. " »") or ""
+		if m.depart then
+			-- groupe programmé : l'heure (ou depuis quand il est parti), puis le commentaire
+			commentaire = LigneDepart(m.depart) .. (commentaire ~= "" and ("   " .. commentaire) or "")
+		end
+		tete.commentaire:SetText(commentaire)
 
 		-- composition
 		local pris, membres = Composition(m.besoin)
@@ -719,7 +847,16 @@ local function CreerGestion(page)
 
 		-- candidats
 		local liste = etat.candidats or {}
-		cand.titre:SetText("Candidats" .. (#liste > 0 and ("  |cff6fd08c(" .. #liste .. ")|r") or ""))
+		local programme = m.depart ~= nil
+		cand.titre:SetText((programme and "Inscrits" or "Candidats") .. (#liste > 0 and ("  |cff6fd08c(" .. #liste .. ")|r") or ""))
+		cand.vide:SetText(Programmee(m)
+			and "Pas encore d'inscrit. Les membres s'inscrivent à l'avance depuis Parcourir ; tu auras une bulle 10 min avant le départ, puis à l'heure pour les inviter."
+			or "Pas encore de candidat. Les membres qui postulent apparaissent ici : invite-les dans ton groupe.")
+		local enAttente = 0
+		for _, cd in ipairs(liste) do if cd.statut == "attente" then enAttente = enAttente + 1 end end
+		cand.tous:Ecrire(programme and "Inviter tous les inscrits" or "Inviter tous")
+		cand.tous:SetShown(enAttente > 0)
+		cand.tous:Activer(PeutAnnoncer())
 		local y = 0
 		for i, cd in ipairs(liste) do
 			local r = cand.lignes[i]
@@ -799,20 +936,25 @@ if ns.AjouterPage then ns.AjouterPage("groupes", CreerPage) end
 -- Fonctions partagées
 --------------------------------------------------------------------------------
 
--- Nombre de groupes de la guilde qui cherchent encore du monde (hors le mien)
+-- Nombre de groupes de la guilde qui cherchent encore du monde (hors le mien) ; un groupe programmé
+-- ne compte que dans l'heure qui précède son départ (pas de pastille des heures à l'avance)
 ns.NombreGroupes = function()
 	local n = 0
 	for id, a in pairs(etat.annonces) do
-		if not (etat.monAnnonce and id == etat.monAnnonce.id) and (a.membres or 1) < (a.taille or 5) then n = n + 1 end
+		if not (etat.monAnnonce and id == etat.monAnnonce.id) and (a.membres or 1) < (a.taille or 5) and Proche(a.depart) then
+			n = n + 1
+		end
 	end
 	return n
 end
 
--- Suis-je en attente ? (mon annonce ouverte, une candidature envoyée, ou mon groupe public)
+-- Suis-je en attente ? (mon annonce ouverte, une candidature envoyée, ou mon groupe public) ; pour un
+-- groupe programmé, seulement dans l'heure qui précède le départ
 ns.EnAttente = function()
-	if etat.monAnnonce then return true end
-	for _, e in pairs(etat.candidatures) do
-		if e == "envoyee" then return true end
+	if etat.monAnnonce and Proche(etat.monAnnonce.depart) then return true end
+	for id, e in pairs(etat.candidatures) do
+		local a = etat.annonces[id]
+		if e == "envoyee" and Proche(a and a.depart) then return true end
 	end
 	if C_LFGList and C_LFGList.HasActiveEntryInfo then
 		local ok, oui = pcall(C_LFGList.HasActiveEntryInfo)
