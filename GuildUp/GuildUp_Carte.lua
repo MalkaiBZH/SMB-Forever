@@ -4,22 +4,24 @@
 --   "P~carte~x~y~CLASSE"  position (carte = uiMapID de C_Map.GetBestMapForUnit, x/y entre 0 et 1)
 --   "I"                    en instance (pas de position utilisable)
 --   "O"                    partage coupé
--- Envoi toutes les INTERVALLE secondes si le joueur a bougé, sinon un signal toutes les BATTEMENT s.
+-- Envoi toutes les INTERVALLE secondes si le joueur a bougé, sinon un signal toutes les BATTEMENT s
+-- (message « jetable » : un seul en attente dans la file d'envoi).
 -- Sur la carte : un point par membre, à la couleur de sa classe ; nom, rôle et âge de la position
 -- au survol. Les positions sont converties pour s'afficher aussi sur la carte du continent.
 
 local NOM_ADDON, ns = ...
 
 local PREFIXE = "GuildUpPos"
-local INTERVALLE = 3     -- secondes entre deux vérifications de ma position
-local BATTEMENT = 15     -- envoi même sans bouger, pour dire « je suis toujours là »
-local DUREE_VIE = 30     -- secondes sans nouvelles avant d'effacer un membre
+local INTERVALLE = 6     -- secondes entre deux vérifications de ma position
+local BATTEMENT = 20     -- envoi même sans bouger, pour dire « je suis toujours là »
+local DUREE_VIE = 45     -- secondes sans nouvelles avant d'effacer un membre (plus de deux battements)
 local TAILLE_POINT = 10   -- petit point de couleur (couleur de classe)
 
 local positions = {}     -- [nom normalisé] = { nom, carte, x, y, classe, vu, instance }
 local dernier = { carte = nil, x = -1, y = -1, t = 0, etat = nil }
 local epingles = {}      -- points affichés sur la carte (réutilisés)
 local MajCarte
+local aRedessiner = true -- une position a changé depuis le dernier dessin de la carte
 
 local function DB() return ns.DB and ns.DB() end
 
@@ -100,7 +102,8 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	elseif type_ == "O" then
 		positions[cle] = nil
 	end
-	if MajCarte then MajCarte() end
+	-- la carte sera redessinée par son suivi (au plus 5 fois par seconde, seulement si ouverte)
+	aRedessiner = true
 end
 
 --------------------------------------------------------------------------------
@@ -108,7 +111,8 @@ end
 --------------------------------------------------------------------------------
 
 -- Position d'un membre sur la carte affichée (même zone, ou conversion par les coordonnées du monde)
-local function PositionSurCarte(p, carteAffichee)
+-- (conversion gardée sur la position elle-même : une nouvelle position = une nouvelle table)
+local function Convertir(p, carteAffichee)
 	if not p.carte or not p.x then return nil end
 	if p.carte == carteAffichee then return p.x, p.y end
 	if not (C_Map.GetWorldPosFromMapPos and C_Map.GetMapPosFromWorldPos and CreateVector2D) then return nil end
@@ -119,6 +123,13 @@ local function PositionSurCarte(p, carteAffichee)
 	local x, y = pos:GetXY()
 	if not x or x < 0 or x > 1 or y < 0 or y > 1 then return nil end
 	return x, y
+end
+local function PositionSurCarte(p, carteAffichee)
+	if p.cacheCarte ~= carteAffichee then
+		p.cacheCarte = carteAffichee
+		p.cacheX, p.cacheY = Convertir(p, carteAffichee)
+	end
+	return p.cacheX, p.cacheY
 end
 
 local CouleurClasse = ns.CouleurClasse
@@ -657,11 +668,22 @@ local suivi
 local function InstallerSuivi()
 	if suivi or not WorldMapFrame then return end
 	suivi = CreateFrame("Frame", nil, WorldMapFrame)
-	local attente = 0
+	local attente, etat, dernierDessin = 0, "", 0
 	suivi:SetScript("OnUpdate", function(_, ecoule)
 		attente = attente + ecoule
-		if attente >= 0.2 then
-			attente = 0
+		if attente < 0.2 then return end
+		attente = 0
+		-- redessin seulement si une position a changé, si la carte, sa taille ou le zoom ont changé, ou
+		-- toutes les 2 s (positions trop anciennes à effacer)
+		local carte = WorldMapFrame.GetMapID and WorldMapFrame:GetMapID()
+		local canevas = WorldMapFrame.GetCanvas and WorldMapFrame:GetCanvas()
+		local defile = WorldMapFrame.ScrollContainer
+		local echelle = defile and defile.GetCanvasScale and select(2, pcall(defile.GetCanvasScale, defile)) or 1
+		local l, h = 0, 0
+		if canevas then l, h = canevas:GetSize() end
+		local nouvelEtat = ("%s:%s:%s:%s"):format(tostring(carte), tostring(echelle), tostring(l), tostring(h))
+		if aRedessiner or nouvelEtat ~= etat or GetTime() - dernierDessin > 2 then
+			aRedessiner, etat, dernierDessin = false, nouvelEtat, GetTime()
 			MajCarte()
 		end
 	end)
