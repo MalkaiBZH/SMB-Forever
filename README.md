@@ -80,3 +80,5 @@ nouvelles depuis 30 jours sont oubliées.
 - Données d'objets et de recettes générées depuis les tables du client WoW Forever (via wago.tools).
 - Provenance des composants (`GuildUp_Sources.lua`) tirée une fois de **QuestieDB** (version Forever,
   GPL-3.0) : merci à ses auteurs. GuildUp n'a pas besoin de Questie pour fonctionner.
+- Images (`GuildUp/media/`) : bannières et anneau de Miko ; l'emote « GU! » et l'animation de Zaardoz Gu
+  appartiennent à la guilde et ne sont pas couvertes par la licence du code sans l'accord des personnes concernées.
