@@ -219,7 +219,7 @@ local COULEURS = {
 	tank       = { 0.20, 0.55, 1.00 }, -- bleu
 	heal       = { 0.25, 0.85, 0.30 }, -- vert
 	dps        = { 0.90, 0.15, 0.15 }, -- rouge
-	horscombat = { 0.80, 0.15, 0.40 }, -- bordeaux
+	horscombat = { 0.85, 0.68, 0.25 }, -- doré (bannière neutre : mascotte dorée)
 }
 
 -- Deux modèles d'image : V2 (ornée) et _min (sobre, utilisée en groupe ou en raid)
