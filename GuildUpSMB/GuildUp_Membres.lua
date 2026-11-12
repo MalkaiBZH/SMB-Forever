@@ -3,11 +3,19 @@
 -- d'eux : portrait, nom à la couleur de la classe, niveau, classe, rang, en ligne (zone) ou vu il y a…,
 -- pseudo et personnages (identités), rôle annoncé, SMB Forever (et sa version si connue), métiers et
 -- niveaux (fiches du registre), position partagée sur ma carte (distance), note publique de guilde.
--- En haut : recherche (nom, pseudo, zone, métier, rang, note), puces Tous / En ligne / Avec l'addon,
--- tri (en ligne d'abord, par niveau, par rang), compteur, bouton « Mon profil » (ns.OuvrirProfil).
+-- En haut : recherche (nom, pseudo, zone, métier, rang, note), puces Tous / En ligne / Avec l'addon /
+-- À suivre (avec son compteur), tri (en ligne d'abord, par niveau, par rang), compteur, bouton « Mon
+-- profil » (ns.OuvrirProfil).
 -- Rangée sur deux lignes (identité ; détails), infobulle complète au survol, clic = chuchoter (en
 -- ligne), clic droit = menu (Chuchoter, Inviter dans le groupe). Liste « virtuelle » : seules les
 -- rangées visibles existent, réutilisées au défilement (une guilde peut compter des centaines de membres).
+-- Vue « À suivre » (pour les officiers, visible par tous) : membres inactifs depuis 30 jours ou plus
+-- (dernière connexion), sans SMB Forever (aucun signe reçu), ou avec une version plus ancienne que la
+-- mienne (numéros comparés un à un : 2.10.0 > 2.9.3). Étiquettes colorées sur la rangée (« inactif
+-- 45 j », « sans l'addon », « version 2.5.0 ») ; tri propre à la vue (inactifs les plus anciens
+-- d'abord, puis les membres en ligne, puis les autres). Bouton « Rappeler » pour les membres en ligne
+-- sans l'addon ou en retard : un message privé court et poli (SendChatMessage, WHISPER), une fois
+-- toutes les 10 min au plus par joueur (heure du dernier rappel gardée dans GuildUpDB.rappels).
 -- Données lues ailleurs : ns.RosterGuilde() et ns.FicheMetiers() (GuildUp_Metiers.lua), ns.Identite()
 -- et ns.LignesIdentite() (GuildUp_Identite.lua), ns.RoleDeNom() (GuildUp.lua), ns.PositionsMembres()
 -- (GuildUp_Carte.lua), ns.DistanceMembre() (GuildUp_Interface.lua), ns.VersionMembre() si
@@ -15,7 +23,7 @@
 -- identité, fiche métiers, position ou rôle annoncé).
 -- Rafraîchie sur GUILD_ROSTER_UPDATE (la liste est demandée au jeu à l'ouverture de la page), quand une
 -- identité ou le profil change (ns.MajMembres) et toutes les 10 s tant qu'elle est affichée (fiches,
--- positions, rôles). Aucun message réseau.
+-- positions, rôles). Aucun message d'addon (seulement le message privé du bouton « Rappeler »).
 
 local NOM_ADDON, ns = ...
 local NomCourt = ns.NomCourt
@@ -32,17 +40,47 @@ local HAUTEUR_VUE = 470       -- hauteur de la liste avant la première mise en 
 local RAFRAICHIR = 10         -- secondes entre deux rafraîchissements tant que la page est affichée
 local FRAIS = 45              -- secondes : position partagée encore valable (comme la carte)
 
-local FILTRES = { "Tous", "En ligne", "Avec l'addon" }
+local FILTRES = { "Tous", "En ligne", "Avec l'addon", "À suivre" }
+local SUIVRE = 4              -- puce de la vue « À suivre » (la dernière : son compteur change sa largeur)
 local TRIS = { { "enligne", "En ligne d'abord" }, { "niveau", "Par niveau" }, { "rang", "Par rang" } }
+local INACTIF = 30            -- jours sans connexion à partir desquels un membre est « inactif »
+local DELAI_RAPPEL = 600      -- secondes : pas deux rappels au même joueur en 10 min
+local LARGEUR_RAPPEL = 84     -- bouton « Rappeler » à droite de la rangée
 
 local GRIS = "|cff9c9380"
 local VERT = "|cff6fd08c"
 local OR = "|cfff1cf6b"
 local CLAIR = "|cffd9cfb8"
 
+-- étiquettes de la vue « À suivre » : couleur du texte et de la bordure
+local ETIQUETTES = {
+	inactif = { 0.93, 0.5, 0.46 },
+	sansAddon = { 0.85, 0.66, 0.25 },
+	version = { 0.42, 0.65, 0.9 },
+}
+
 local filtre, tri, recherche = 1, "enligne", ""
 local page
 local membres = {}            -- membres affichés (après recherche, filtre et tri)
+
+-- -1 si a < b, 0 si égales, 1 si a > b, nombre par nombre (2.10.0 > 2.9.3 ; « -dev » ignoré) ;
+-- même règle que GuildUp_Version.lua, qui garde la sienne locale
+local Comparer = ns.ComparerVersions or function(a, b)
+	local ta, tb = {}, {}
+	for n in tostring(a):gmatch("%d+") do ta[#ta + 1] = tonumber(n) end
+	for n in tostring(b):gmatch("%d+") do tb[#tb + 1] = tonumber(n) end
+	for i = 1, math.max(#ta, #tb) do
+		local x, y = ta[i] or 0, tb[i] or 0
+		if x ~= y then return x < y and -1 or 1 end
+	end
+	return 0
+end
+
+-- jours depuis la dernière connexion (liste de guilde : ans, mois, jours, heures), nil si inconnu
+local function JoursAbsent(a)
+	if not a then return nil end
+	return (a.ans or 0) * 365 + (a.mois or 0) * 30 + (a.jours or 0) + (a.heures or 0) / 24
+end
 
 --------------------------------------------------------------------------------
 -- Ce que l'addon sait d'un membre
@@ -92,6 +130,16 @@ local function Infos(e, maCle)
 	if moi then m.version = ns.Version
 	elseif ns.VersionMembre then m.version = ns.VersionMembre(cle) end
 	m.addon = (moi or m.version or m.identite or m.fiche or m.position or m.role) and true or false
+	-- vue « À suivre » : inactif, sans l'addon, version plus ancienne que la mienne
+	if not moi then
+		local jours = not m.enLigne and JoursAbsent(e.absence)
+		if jours and jours >= INACTIF then m.inactif = math.floor(jours) end
+		m.sansAddon = not m.addon
+		if m.version and ns.Version and Comparer(m.version, ns.Version) < 0 then m.ancienne = true end
+		m.aSuivre = (m.inactif or m.sansAddon or m.ancienne) and true or false
+		-- rappel possible : en ligne, et quelque chose à lui dire
+		m.rappel = m.enLigne and (m.sansAddon or m.ancienne) and true or false
+	end
 	local id = m.identite
 	if id then
 		m.pseudo = (id.pseudo and id.pseudo ~= "") and id.pseudo or nil
@@ -145,11 +193,26 @@ local TRIER = {
 	end,
 }
 
--- Liste affichée et compteurs (tous les membres, en ligne, avec l'addon)
+-- Vue « À suivre » : inactifs (les plus anciens d'abord), puis en ligne (à rappeler), puis les autres
+local function GroupeSuivre(m)
+	if m.inactif then return 1 end
+	if m.enLigne then return 2 end
+	return 3
+end
+local function TrierSuivre(a, b)
+	local ga, gb = GroupeSuivre(a), GroupeSuivre(b)
+	if ga ~= gb then return ga < gb end
+	if ga == 1 and a.inactif ~= b.inactif then return a.inactif > b.inactif end
+	if (a.ancienne and true or false) ~= (b.ancienne and true or false) then return a.ancienne and true or false end
+	return a.tri < b.tri
+end
+
+-- Liste affichée et compteurs (tous les membres, en ligne, avec l'addon ; à suivre et ses catégories)
 local function Construire(relire)
 	local roster = ns.RosterGuilde and ns.RosterGuilde(relire) or {}
 	local maCle = ns.MaCle and ns.MaCle()
 	local n, enLigne, addon = 0, 0, 0
+	local suivre = { n = 0, inactifs = 0, sansAddon = 0, anciennes = 0 }
 	wipe(membres)
 	for _, e in ipairs(roster) do
 		if e.cle then
@@ -157,7 +220,14 @@ local function Construire(relire)
 			n = n + 1
 			if m.enLigne then enLigne = enLigne + 1 end
 			if m.addon then addon = addon + 1 end
+			if m.aSuivre then
+				suivre.n = suivre.n + 1
+				if m.inactif then suivre.inactifs = suivre.inactifs + 1 end
+				if m.sansAddon then suivre.sansAddon = suivre.sansAddon + 1 end
+				if m.ancienne then suivre.anciennes = suivre.anciennes + 1 end
+			end
 			local garde = (filtre == 1) or (filtre == 2 and m.enLigne) or (filtre == 3 and m.addon)
+				or (filtre == SUIVRE and m.aSuivre)
 			if garde and recherche ~= "" and not TexteRecherche(m):find(recherche, 1, true) then garde = false end
 			if garde then
 				m.tri = Cle(m.nom)
@@ -165,8 +235,52 @@ local function Construire(relire)
 			end
 		end
 	end
-	table.sort(membres, TRIER[tri] or TRIER.enligne)
-	return n, enLigne, addon, #roster
+	table.sort(membres, filtre == SUIVRE and TrierSuivre or TRIER[tri] or TRIER.enligne)
+	return n, enLigne, addon, #roster, suivre
+end
+
+--------------------------------------------------------------------------------
+-- Rappels (vue « À suivre ») : un message privé poli, pas deux fois au même joueur en 10 min
+--------------------------------------------------------------------------------
+
+local function Rappels()
+	local db = ns.DB and ns.DB()
+	if not db then return {} end
+	if type(db.rappels) ~= "table" then db.rappels = {} end
+	-- oubli des rappels trop anciens pour compter encore
+	local maintenant = time()
+	for cle, quand in pairs(db.rappels) do
+		if type(quand) ~= "number" or maintenant - quand >= DELAI_RAPPEL then db.rappels[cle] = nil end
+	end
+	return db.rappels
+end
+
+-- secondes avant de pouvoir rappeler ce membre (0 = possible)
+local function AttenteRappel(cle)
+	local quand = Rappels()[cle]
+	if not quand then return 0 end
+	return math.max(0, DELAI_RAPPEL - (time() - quand))
+end
+
+-- ma version telle qu'on peut l'annoncer (« 2.8.0 »), nil pour une version de développement
+local function VersionPublique()
+	local v = ns.Version
+	if not v or v == "0" or v:find("dev", 1, true) then return nil end
+	return v:match("^[%d%.]+")
+end
+
+-- version annoncée par un membre, réduite aux chiffres, points et tirets (texte venu du réseau)
+local function VersionPropre(v) return (tostring(v or "?"):gsub("[^%w%.%-]", ""):sub(1, 16)) end
+
+local function TexteRappel(m)
+	local nomAddon = ((ns.Config and ns.Config.nomPublic) or "SMB Forever"):gsub("[|~]", "")
+	if m.ancienne then
+		local v = VersionPublique()
+		local sienne = VersionPropre(m.version)
+		return (v and ("Salut ! La version %s de %s est sortie (tu as la %s) : mets-la à jour avec SMB Forever Updater."):format(v, nomAddon, sienne)
+			or ("Salut ! Une version plus récente de %s est sortie (tu as la %s) : mets-la à jour avec SMB Forever Updater."):format(nomAddon, sienne))
+	end
+	return ("Salut ! Si tu ne l'as pas encore, installe l'addon %s (avec SMB Forever Updater) pour profiter des groupes, des dons et de l'artisanat de la guilde."):format(nomAddon)
 end
 
 --------------------------------------------------------------------------------
@@ -194,6 +308,33 @@ local function Inviter(m)
 	if inviter then pcall(inviter, NomJeu(m)) end
 end
 
+local Dessiner -- (plus bas : redessine les rangées visibles)
+
+-- « Rappeler » : chuchote le message de rappel à un membre en ligne (une fois toutes les 10 min)
+local function Rappeler(m)
+	if m.moi or not m.rappel then return end
+	if not m.enLigne then
+		if ns.Erreur then ns.Erreur(NomCourt(m.nom) .. " est hors ligne") end
+		return
+	end
+	local attente = AttenteRappel(m.cle)
+	if attente > 0 then
+		if ns.Erreur then ns.Erreur(("%s a déjà été rappelé : attends encore %d min"):format(NomCourt(m.nom), math.ceil(attente / 60))) end
+		return
+	end
+	local cible = NomJeu(m)
+	if m.cle:find("#test", 1, true) then cible = UnitName("player") end -- (membres factices du mode test)
+	local envoi = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
+	if not (envoi and cible) then return end
+	local ok = pcall(envoi, TexteRappel(m), "WHISPER", nil, cible)
+	if not ok then
+		if ns.Erreur then ns.Erreur("Message impossible à envoyer à " .. NomCourt(m.nom)) end
+		return
+	end
+	Rappels()[m.cle] = time()
+	if Dessiner then Dessiner() end
+end
+
 local menu
 local function MontrerMenu(rangee, m)
 	menu = menu or ns.CadreMenu("GuildUpMenuMembre")
@@ -206,6 +347,9 @@ local function MontrerMenu(rangee, m)
 			{ actif .. "Chuchoter", function() Chuchoter(m) end },
 			{ actif .. "Inviter dans le groupe", function() Inviter(m) end },
 		}
+		if m.rappel then
+			lignes[#lignes + 1] = { (AttenteRappel(m.cle) > 0 and GRIS or "") .. "Rappeler (message privé)", function() Rappeler(m) end }
+		end
 	end
 	for i, l in ipairs(lignes) do
 		local b = ns.BoutonMenu(menu, i)
@@ -260,7 +404,10 @@ local function Infobulle(self)
 	end
 	if m.role then tt:AddLine("|cffffd100Rôle :|r " .. UI.TexteRole(m.role), 1, 1, 1) end
 	-- SMB Forever
-	if m.version then
+	if m.version and m.ancienne then
+		tt:AddLine("|cffffd100SMB Forever :|r " .. VersionPropre(m.version) .. " |cff6aa6e6(plus ancienne que la tienne : "
+			.. tostring(ns.Version) .. ")|r", 1, 1, 1)
+	elseif m.version then
 		tt:AddLine("|cffffd100SMB Forever :|r " .. m.version, 1, 1, 1)
 	elseif m.addon then
 		tt:AddLine("|cffffd100SMB Forever :|r oui", 1, 1, 1)
@@ -290,6 +437,14 @@ local function Infobulle(self)
 	if e.note and e.note ~= "" then
 		tt:AddLine(" ")
 		tt:AddLine("Note : « " .. e.note .. " »", 0.85, 0.81, 0.72, true)
+	end
+	if m.inactif then
+		tt:AddLine(("Inactif depuis %d jours"):format(m.inactif), 0.93, 0.5, 0.46)
+	end
+	if m.rappel then
+		local attente = AttenteRappel(m.cle)
+		tt:AddLine(attente > 0 and ("Rappelé : nouveau rappel possible dans %d min"):format(math.ceil(attente / 60))
+			or "Rappel possible (bouton « Rappeler » de la vue À suivre, ou clic droit)", 0.42, 0.65, 0.9, true)
 	end
 	tt:AddLine(" ")
 	if m.moi then
@@ -338,7 +493,52 @@ local function CreerRangee(parent)
 	r:SetScript("OnEnter", Infobulle)
 	r:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	UI.SonClic(r)
+	-- vue « À suivre » : étiquettes (créées à la demande) et bouton « Rappeler »
+	r.etiquettes = {}
+	r.rappeler = UI.Bouton(r, "Rappeler", "fantome", LARGEUR_RAPPEL, 22)
+	r.rappeler:SetPoint("RIGHT", r, "RIGHT", -12, 0)
+	r.rappeler.rangee = r
+	r.rappeler:SetScript("OnClick", function(self)
+		local m = self.rangee.m
+		if m then Rappeler(m) end
+	end)
+	r.rappeler:SetScript("OnEnter", function(self)
+		local m = self.rangee.m
+		if not m then return end
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText("Rappeler " .. NomCourt(m.nom))
+		GameTooltip:AddLine("Message privé envoyé :", 0.6, 0.6, 0.6)
+		GameTooltip:AddLine("« " .. TexteRappel(m) .. " »", 1, 1, 1, true)
+		local attente = AttenteRappel(m.cle)
+		if attente > 0 then
+			GameTooltip:AddLine(("Déjà rappelé : nouveau rappel possible dans %d min"):format(math.ceil(attente / 60)), 0.93, 0.5, 0.46, true)
+		end
+		GameTooltip:Show()
+	end)
+	r.rappeler:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	r.rappeler:Hide()
 	return r
+end
+
+-- étiquette colorée (« inactif 45 j », « sans l'addon », « version 2.5.0 ») : texte et bordure de la couleur
+local function Etiquette(r, i)
+	local t = r.etiquettes[i]
+	if not t then
+		t = UI.Cadre(r, { 0, 0, 0, 0.35 }, C.bord)
+		t:SetHeight(16)
+		t.texte = UI.Texte(t, "GameFontHighlightSmall")
+		t.texte:SetPoint("CENTER", t, "CENTER", 0, 0)
+		r.etiquettes[i] = t
+	end
+	return t
+end
+
+local function ListeEtiquettes(m)
+	local l = {}
+	if m.inactif then l[#l + 1] = { "inactif " .. m.inactif .. " j", ETIQUETTES.inactif } end
+	if m.sansAddon then l[#l + 1] = { "sans l'addon", ETIQUETTES.sansAddon } end
+	if m.ancienne then l[#l + 1] = { "version " .. VersionPropre(m.version), ETIQUETTES.version } end
+	return l
 end
 
 local function Remplir(r, m)
@@ -375,17 +575,52 @@ local function Remplir(r, m)
 	end
 	if e.note and e.note ~= "" then d[#d + 1] = "« " .. e.note .. " »" end
 	r.ligne2:SetText(table.concat(d, " · "))
-	-- à droite : en ligne (zone) ou vu il y a… ; SMB Forever
+	-- à droite : en ligne (zone) ou vu il y a… ; SMB Forever (vue « À suivre » : étiquettes, et le
+	-- bouton « Rappeler » tout à droite pour les membres en ligne)
 	if m.enLigne then
 		r.etat:SetText(VERT .. "En ligne|r" .. ((e.zone and e.zone ~= "") and (GRIS .. " · " .. e.zone .. "|r") or ""))
 	else
 		r.etat:SetText(GRIS .. TexteAbsence(e.absence) .. "|r")
 	end
-	r.addon:SetText(m.addon and ("SMB" .. (m.version and (" " .. m.version) or "")) or "")
+	local suivre = (filtre == SUIVRE)
+	local bouton = suivre and m.rappel
+	r.rappeler:SetShown(bouton and true or false)
+	if bouton then
+		local attente = AttenteRappel(m.cle)
+		r.rappeler:Ecrire(attente > 0 and "Rappelé" or "Rappeler")
+		r.rappeler:Activer(attente <= 0)
+	end
+	local droite = bouton and (12 + LARGEUR_RAPPEL + 10) or 12
+	r.etat:ClearAllPoints()
+	r.etat:SetPoint("TOPRIGHT", r, "TOPRIGHT", -droite, -9)
+	r.addon:ClearAllPoints()
+	r.addon:SetPoint("BOTTOMRIGHT", r, "BOTTOMRIGHT", -droite, 9)
+	local etiquettes = suivre and ListeEtiquettes(m) or {}
+	local gauche = r.addon -- élément le plus à gauche du bas à droite (borne de la ligne 2)
+	for i, et in ipairs(etiquettes) do
+		local t = Etiquette(r, i)
+		t.texte:SetText(et[1])
+		t.texte:SetTextColor(et[2][1], et[2][2], et[2][3])
+		t:SetBackdropBorderColor(et[2][1], et[2][2], et[2][3], 0.8)
+		t:SetWidth((tonumber(t.texte:GetStringWidth()) or 40) + 12)
+		t:ClearAllPoints()
+		if i == 1 then
+			t:SetPoint("BOTTOMRIGHT", r, "BOTTOMRIGHT", -droite, 7)
+		else
+			t:SetPoint("RIGHT", r.etiquettes[i - 1], "LEFT", -4, 0)
+		end
+		t:Show()
+		gauche = t
+	end
+	for i = #etiquettes + 1, #r.etiquettes do r.etiquettes[i]:Hide() end
+	r.addon:SetText((not suivre and m.addon) and ("SMB" .. (m.version and (" " .. m.version) or "")) or "")
+	r.ligne2:ClearAllPoints()
+	r.ligne2:SetPoint("BOTTOMLEFT", r.portrait, "BOTTOMRIGHT", 10, 1)
+	r.ligne2:SetPoint("RIGHT", gauche, "LEFT", -12, 0)
 end
 
 -- Dessine les rangées visibles (selon le défilement)
-local function Dessiner()
+Dessiner = function()
 	if not page then return end
 	local l = page.liste
 	local haut = tonumber(l:GetVerticalScroll()) or 0
@@ -435,6 +670,17 @@ end
 -- (GuildUp_Identite.lua : une identité reçue, le profil changé)
 ns.MajMembres = function() MajBientot(0.5) end
 
+local AIDE = "Tous les membres. Survole un membre pour tout voir ; clic : chuchoter, clic droit : menu."
+local AIDE_SUIVRE = "Inactifs depuis 30 jours ou plus, sans SMB Forever ou pas à jour. « Rappeler » : un message privé poli."
+
+-- puce « À suivre » avec son compteur (la dernière puce : sa largeur peut changer sans décaler les autres)
+local function MajPuceSuivre(p, n)
+	local b = p.puces and p.puces.boutons[SUIVRE]
+	if not b then return end
+	b.texte:SetText(FILTRES[SUIVRE] .. ((n and n > 0) and ("  " .. GRIS .. n .. "|r") or ""))
+	b:SetWidth((tonumber(b.texte:GetStringWidth()) or 60) + 24)
+end
+
 local function CreerPage(parent)
 	local p = CreateFrame("Frame", nil, parent)
 	p:SetAllPoints()
@@ -446,7 +692,8 @@ local function CreerPage(parent)
 	titre:SetText("Guilde")
 	local aide = UI.Texte(p, "GameFontHighlightSmall", C.gris)
 	aide:SetPoint("TOPLEFT", titre, "BOTTOMLEFT", 0, -6)
-	aide:SetText("Tous les membres. Survole un membre pour tout voir ; clic : chuchoter, clic droit : menu.")
+	aide:SetText(AIDE)
+	p.aide = aide
 
 	p.profil = UI.Bouton(p, "Mon profil", "fantome", 110, 26)
 	p.profil:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -14)
@@ -457,7 +704,7 @@ local function CreerPage(parent)
 	p.compte:SetJustifyH("RIGHT")
 
 	-- recherche, filtres, tri
-	p.recherche = UI.Champ(p, 240, "Nom, pseudo, zone, métier…")
+	p.recherche = UI.Champ(p, 200, "Nom, pseudo, zone, métier…")
 	p.recherche:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -64)
 	p.recherche.SurTexte = function(t)
 		recherche = Simplifier(strtrim(t or ""))
@@ -488,6 +735,7 @@ local function CreerPage(parent)
 	local tTri = UI.Texte(p, "GameFontHighlightSmall", C.gris)
 	tTri:SetPoint("RIGHT", p.tri, "LEFT", -8, 0)
 	tTri:SetText("Tri")
+	p.tTri = tTri
 
 	-- liste
 	p.liste = UI.Liste(p)
@@ -516,10 +764,25 @@ local function CreerPage(parent)
 	end)
 
 	p.Maj = function()
-		local n, enLigne, addon = Construire(true)
-		p.compte:SetText(n > 0 and (("%d membre%s · %s%d en ligne|r · %d avec l'addon"):format(n, n > 1 and "s" or "",
-			VERT, enLigne, addon) .. ((#membres < n) and (GRIS .. " · " .. #membres .. " affiché" .. (#membres > 1 and "s" or "") .. "|r") or ""))
-			or "")
+		local n, enLigne, addon, _, suivre = Construire(true)
+		local vueSuivre = (filtre == SUIVRE)
+		MajPuceSuivre(p, suivre.n)
+		p.aide:SetText(vueSuivre and AIDE_SUIVRE or AIDE)
+		-- la vue « À suivre » a son propre tri (inactifs les plus anciens d'abord) : pas de choix de tri
+		p.tri:SetShown(not vueSuivre)
+		p.tTri:SetShown(not vueSuivre)
+		if vueSuivre and n > 0 then
+			local d = {}
+			if suivre.inactifs > 0 then d[#d + 1] = suivre.inactifs .. " inactif" .. (suivre.inactifs > 1 and "s" or "") end
+			if suivre.sansAddon > 0 then d[#d + 1] = suivre.sansAddon .. " sans l'addon" end
+			if suivre.anciennes > 0 then d[#d + 1] = suivre.anciennes .. " en retard de version" end
+			p.compte:SetText(("%d à suivre%s"):format(suivre.n, #d > 0 and (GRIS .. " · " .. table.concat(d, " · ") .. "|r") or "")
+				.. ((#membres < suivre.n) and (GRIS .. " · " .. #membres .. " affiché" .. (#membres > 1 and "s" or "") .. "|r") or ""))
+		else
+			p.compte:SetText(n > 0 and (("%d membre%s · %s%d en ligne|r · %d avec l'addon"):format(n, n > 1 and "s" or "",
+				VERT, enLigne, addon) .. ((#membres < n) and (GRIS .. " · " .. #membres .. " affiché" .. (#membres > 1 and "s" or "") .. "|r") or ""))
+				or "")
+		end
 		p.liste:Hauteur(#membres * PAS)
 		Dessiner()
 		p.vide:SetShown(#membres == 0)
@@ -530,7 +793,9 @@ local function CreerPage(parent)
 		elseif recherche ~= "" then
 			p.vide:SetText("Aucun membre ne correspond à ta recherche.")
 		else
-			p.vide:SetText(filtre == 2 and "Aucun membre en ligne." or "Aucun membre avec SMB Forever pour l'instant.")
+			p.vide:SetText(filtre == 2 and "Aucun membre en ligne."
+				or vueSuivre and "Personne à suivre : tout le monde est actif, a SMB Forever et est à jour."
+				or "Aucun membre avec SMB Forever pour l'instant.")
 		end
 	end
 	-- ns.OuvrirInterface("guilde", texte) : la page avec une recherche

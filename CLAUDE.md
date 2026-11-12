@@ -47,7 +47,8 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
 - `GuildUp_Membres.lua` : page **Guilde** (`ns.AjouterPage("guilde")`) : tous les membres de la liste de guilde
   (`ns.RosterGuilde()` et `ns.FicheMetiers(cle)` de `GuildUp_Metiers.lua`) avec ce que l'addon sait d'eux (identité,
   rôle, version `ns.VersionMembre` si fournie, métiers, distance `ns.DistanceMembre` de `GuildUp_Interface.lua`, note) ;
-  liste virtuelle (seules les rangées visibles existent). `ns.MajMembres()` la rafraîchit. Aucun message réseau.
+  liste virtuelle (seules les rangées visibles existent). `ns.MajMembres()` la rafraîchit. Vue « À suivre » (inactifs,
+  sans l'addon, versions en retard) ; seul envoi : le chuchotement « Rappeler » (pas de message d'addon).
 - `GuildUp_Options.lua` : fenêtre d'options, `/smb diag`, réinitialisation, commandes `/smb`.
 - Les fichiers découpés accèdent à `GuildUpDB` par un mandataire `db` (même nom qu'avant) et reprennent les fonctions partagées en tête de fichier (`local Message = ns.Coeur.Message`).
 - Pages de la fenêtre GuildUpSMB (chacune enregistrée par son module avec `ns.AjouterPage`) : Guilde

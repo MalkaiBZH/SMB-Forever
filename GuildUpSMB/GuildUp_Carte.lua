@@ -9,9 +9,13 @@
 --   "O"                    partage coupé
 -- Envoi toutes les INTERVALLE secondes si le joueur a bougé, sinon un signal toutes les BATTEMENT s
 -- (message « jetable » : un seul en attente dans la file d'envoi).
--- Sur la carte : un point par membre, à la couleur de sa classe, cerclé de blanc et de noir (image
--- media\point.tga de l'addon, taille réglée dans GuildUp_Config.lua) ; nom, rôle et âge de la position
--- au survol. Les positions sont converties pour s'afficher aussi sur la carte du continent.
+-- Sur la carte : le médaillon de chaque membre (son portrait rond, media\portraits) dans un fin anneau à la
+-- couleur de sa classe, cerclé de noir ; s'il n'a pas de portrait connu, un point à la couleur de sa
+-- classe, cerclé de blanc et de noir (image media\point.tga de l'addon). Taille du point réglée dans
+-- GuildUp_Config.lua (taillePointCarte), médaillon 1,6 fois plus grand (taillePortraitCarte pour le
+-- régler à part, portraitsCarte = false pour garder les points). Nom, rôle et âge de la position au
+-- survol. Les membres superposés : la position la plus récente au-dessus. Les positions sont converties
+-- pour s'afficher aussi sur la carte du continent.
 
 local NOM_ADDON, ns = ...
 
@@ -20,15 +24,29 @@ local INTERVALLE = 6     -- secondes entre deux vérifications de ma position
 local BATTEMENT = 20     -- envoi même sans bouger, pour dire « je suis toujours là »
 local DUREE_VIE = 45     -- secondes sans nouvelles avant d'effacer un membre (plus de deux battements)
 local TAILLE_POINT = (ns.Config and tonumber(ns.Config.taillePointCarte)) or 16 -- diamètre du point (pixels)
+-- médaillon (portrait) : un peu plus grand que le point, pour qu'on reconnaisse le visage
+local TAILLE_PORTRAIT = (ns.Config and tonumber(ns.Config.taillePortraitCarte)) or math.floor(TAILLE_POINT * 1.6 + 0.5)
+local PORTRAITS = not (ns.Config and ns.Config.portraitsCarte == false)
+-- Dans l'image d'un portrait (256 × 256), le disque occupe environ 86 % de la largeur, un peu sous le
+-- centre (la tête et les accessoires débordent en haut) : l'anneau de classe suit ce disque
+local DISQUE, DECALAGE = 0.86, -0.035
+local MAX_EMPILES = 150  -- niveaux d'affichage réservés aux membres (le plus récent au-dessus)
 -- disque blanc de l'addon, teinté ici : ne dépend d'aucune image ni d'aucun masque du client
 -- Niveau d'affichage au-dessus du canevas de la carte : les couches du jeu (zones explorées, brouillard,
--- repères) montent bien plus haut que le canevas ; en dessous, un point reste survolable mais invisible
+-- repères) montent bien plus haut que le canevas ; en dessous, un point reste survolable mais invisible.
+-- Rangs : 0 ancrages des membres, 1 à MAX_EMPILES membres empilés, au-delà l'entrée de donjon.
 local function NiveauCarte(canevas, rang) return math.min(9000, canevas:GetFrameLevel() + 2600 + rang) end
 local ROND = (ns.MEDIA or ("Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\")) .. "point"
 
-local positions = {}     -- [nom normalisé] = { nom, carte, x, y, classe, vu, instance }
+local positions = {}     -- [nom normalisé] = { nom, carte, x, y, classe, portrait, vu, instance } (+ cle au dessin)
 local dernier = { carte = nil, x = -1, y = -1, t = 0, etat = nil }
-local epingles = {}      -- points affichés sur la carte (réutilisés)
+local epingles = {}      -- repères des membres affichés sur la carte (réutilisés)
+local visibles = {}      -- positions dessinées au dernier passage (table réutilisée)
+-- ordre d'empilement : position la plus ancienne d'abord (le plus récent finit au-dessus)
+local function PlusAncien(a, b)
+	if a.vu ~= b.vu then return a.vu < b.vu end
+	return a.cle < b.cle
+end
 local MajCarte
 local aRedessiner = true -- une position a changé depuis le dernier dessin de la carte
 
@@ -149,8 +167,9 @@ local CouleurClasse = ns.CouleurClasse
 
 local NOMS_ROLES = ns.NOMS_ROLES
 
--- Un point = un ancrage (taille 1, à l'échelle de la carte) + le point lui-même, à échelle
--- compensée pour garder la même taille à l'écran quel que soit le zoom
+-- Un repère de membre = un ancrage (taille 1, à l'échelle de la carte) + le repère lui-même, à échelle
+-- compensée pour garder la même taille à l'écran quel que soit le zoom. Il porte les deux apparences
+-- (point et médaillon), créées une fois : PoserApparence montre l'une ou l'autre.
 local function CreerEpingle(canevas)
 	local ancre = CreateFrame("Frame", nil, canevas)
 	ancre:SetSize(1, 1)
@@ -158,18 +177,27 @@ local function CreerEpingle(canevas)
 	e:SetSize(TAILLE_POINT + 8, TAILLE_POINT + 8) -- zone de survol un peu plus large que le point
 	e:SetPoint("CENTER", ancre, "CENTER", 0, 0)
 	e.ancre = ancre
-	-- trois disques empilés : contour noir, liseré blanc (visible sur toutes les cartes), couleur de classe
-	local function Disque(couche, taille, r, g, b, a)
+	local function Disque(couche, taille, r, g, b, a, dy)
 		local t = e:CreateTexture(nil, couche)
 		t:SetSize(taille, taille)
-		t:SetPoint("CENTER", e, "CENTER", 0, 0)
+		t:SetPoint("CENTER", e, "CENTER", 0, dy or 0)
 		t:SetTexture(ROND)
 		t:SetVertexColor(r, g, b, a)
 		return t
 	end
+	-- point : trois disques empilés, contour noir, liseré blanc (visible sur toutes les cartes), couleur de classe
 	e.contour = Disque("BACKGROUND", TAILLE_POINT + 6, 0, 0, 0, 0.9)
 	e.lisere = Disque("BORDER", TAILLE_POINT + 3, 1, 1, 1, 1)
 	e.point = Disque("ARTWORK", TAILLE_POINT, 1, 1, 1, 1)
+	-- médaillon : contour noir et anneau de classe derrière le disque du portrait, puis le portrait
+	local disque = TAILLE_PORTRAIT * DISQUE
+	local dy = TAILLE_PORTRAIT * DECALAGE
+	e.contourP = Disque("BACKGROUND", disque + 5, 0, 0, 0, 0.9, dy)
+	e.anneau = Disque("BORDER", disque + 3, 1, 1, 1, 1, dy)
+	e.portrait = e:CreateTexture(nil, "ARTWORK")
+	e.portrait:SetSize(TAILLE_PORTRAIT, TAILLE_PORTRAIT)
+	e.portrait:SetPoint("CENTER", e, "CENTER", 0, 0)
+	e.contourP:Hide(); e.anneau:Hide(); e.portrait:Hide()
 	e:SetScript("OnEnter", function(self)
 		local p = self.p
 		if not p then return end
@@ -184,6 +212,26 @@ local function CreerEpingle(canevas)
 	end)
 	e:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	return e
+end
+
+-- Médaillon si le portrait du membre est connu, sinon point ; textures touchées seulement quand
+-- l'apparence, l'image ou la couleur changent (la carte est redessinée souvent)
+local function PoserApparence(e, p)
+	local chemin = PORTRAITS and p.portrait or nil
+	local r, g, b = CouleurClasse(p.classe)
+	if e.pose and chemin == e.chemin and r == e.r and g == e.g and b == e.b then return end
+	e.pose = true
+	if chemin ~= e.chemin then
+		local medaillon = chemin ~= nil
+		if medaillon then e.portrait:SetTexture(chemin) end
+		e.portrait:SetShown(medaillon); e.anneau:SetShown(medaillon); e.contourP:SetShown(medaillon)
+		e.point:SetShown(not medaillon); e.lisere:SetShown(not medaillon); e.contour:SetShown(not medaillon)
+		local zone = (medaillon and TAILLE_PORTRAIT or TAILLE_POINT) + 8 -- zone de survol
+		e:SetSize(zone, zone)
+		e.chemin = chemin
+	end
+	e.r, e.g, e.b = r, g, b
+	if chemin then e.anneau:SetVertexColor(r, g, b, 1) else e.point:SetVertexColor(r, g, b, 1) end
 end
 
 --------------------------------------------------------------------------------
@@ -380,11 +428,11 @@ local function MajRepere(canevas, carte, largeur, hauteur, echelle)
 	end
 	local a = epingleEntree.ancre
 	a:SetParent(canevas)
-	a:SetFrameLevel(NiveauCarte(canevas, 2))
+	a:SetFrameLevel(NiveauCarte(canevas, MAX_EMPILES + 2))
 	a:ClearAllPoints()
 	a:SetPoint("CENTER", canevas, "TOPLEFT", x * largeur, -y * hauteur)
 	epingleEntree:SetScale(1 / echelle)
-	epingleEntree:SetFrameLevel(NiveauCarte(canevas, 3))
+	epingleEntree:SetFrameLevel(NiveauCarte(canevas, MAX_EMPILES + 3))
 	a:Show()
 	epingleEntree:Show()
 end
@@ -643,31 +691,38 @@ MajCarte = function()
 		if ok and s and s > 0 then echelle = s end
 	end
 
-	local maintenant, n = GetTime(), 0
+	-- membres visibles sur cette carte, du plus ancien au plus récent (le plus récent dessiné au-dessus)
+	local maintenant = GetTime()
+	wipe(visibles)
 	for cle, p in pairs(positions) do
 		if maintenant - p.vu > DUREE_VIE then
 			positions[cle] = nil
 		elseif not p.instance then
 			local x, y = PositionSurCarte(p, carte)
 			if x then
-				n = n + 1
-				local e = epingles[n]
-				if not e then
-					e = CreerEpingle(canevas)
-					epingles[n] = e
-				end
-				e.ancre:SetParent(canevas)
-				e.ancre:SetFrameLevel(NiveauCarte(canevas, 0))
-				e.ancre:ClearAllPoints()
-				e.ancre:SetPoint("CENTER", canevas, "TOPLEFT", x * largeur, -y * hauteur)
-				e:SetScale(1 / echelle)
-				e:SetFrameLevel(NiveauCarte(canevas, 1))
-				e.point:SetVertexColor(CouleurClasse(p.classe))
-				e.p, e.cle = p, cle
-				e.ancre:Show()
-				e:Show()
+				p.cle = cle
+				visibles[#visibles + 1] = p
 			end
 		end
+	end
+	table.sort(visibles, PlusAncien)
+	local n = #visibles
+	for i, p in ipairs(visibles) do
+		local e = epingles[i]
+		if not e then
+			e = CreerEpingle(canevas)
+			epingles[i] = e
+		end
+		e.ancre:SetParent(canevas)
+		e.ancre:SetFrameLevel(NiveauCarte(canevas, 0))
+		e.ancre:ClearAllPoints()
+		e.ancre:SetPoint("CENTER", canevas, "TOPLEFT", p.cacheX * largeur, -p.cacheY * hauteur)
+		e:SetScale(1 / echelle)
+		e:SetFrameLevel(NiveauCarte(canevas, math.min(MAX_EMPILES, i)))
+		PoserApparence(e, p)
+		e.p, e.cle = p, p.cle
+		e.ancre:Show()
+		e:Show()
 	end
 	for i = n + 1, #epingles do epingles[i].ancre:Hide() end
 	MajRepere(canevas, carte, largeur, hauteur, echelle)
@@ -702,13 +757,15 @@ end
 
 -- Pour /smb diag
 ns.DiagCarte = function(L)
-	local n, enInstance = 0, 0
+	local n, enInstance, portraits = 0, 0, 0
 	for _, p in pairs(positions) do
 		n = n + 1
 		if p.instance then enInstance = enInstance + 1 end
+		if p.portrait then portraits = portraits + 1 end
 	end
-	L(("carte de la guilde : partage %s, %d membre(s) reçu(s) dont %d en instance, carte du monde %s"):format(
-		Partage() and "activé" or "coupé", n, enInstance, tostring(WorldMapFrame ~= nil)))
+	L(("carte de la guilde : partage %s, %d membre(s) reçu(s) dont %d en instance et %d avec portrait, carte du monde %s, %d repère(s) au dernier dessin (médaillons %s, %d px)"):format(
+		Partage() and "activé" or "coupé", n, enInstance, portraits, tostring(WorldMapFrame ~= nil), #visibles,
+		PORTRAITS and "oui" or "non", TAILLE_PORTRAIT))
 end
 
 --------------------------------------------------------------------------------

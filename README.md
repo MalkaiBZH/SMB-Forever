@@ -66,6 +66,9 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
   Recherche (nom, pseudo, zone, métier), filtres Tous / En ligne / Avec l'addon, tri (en ligne d'abord,
   par niveau, par rang). Survol : la fiche complète ; clic : chuchoter ; clic droit : chuchoter ou
   inviter dans le groupe.
+  **À suivre** : les membres à relancer (inactifs depuis 30 jours ou plus, sans l'addon, version plus ancienne
+  que la tienne), avec une étiquette colorée ; « Rappeler » envoie un message privé poli à un membre en ligne
+  pour qu'il installe ou mette à jour SMB Forever (au plus une fois toutes les 10 minutes par joueur).
 - **Profil** : tant que ton pseudo, ton personnage principal ou ton rôle (Tank, Heal ou DPS, choisi à la
   main) manque, une alerte « Profil incomplet » s'affiche en haut de la fenêtre ; elle ouvre la fenêtre
   « Complète ton profil » (qui s'ouvre aussi d'elle-même la première fois que tu ouvres la fenêtre dans
@@ -73,7 +76,9 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
 - **Recherche de groupe de la guilde** : places Tank / Heal / DPS, groupes jusqu'à 40, et bouton
   « Rendre public » pour inscrire le groupe dans la recherche du jeu.
 - **Carte de la guilde** : position des membres sur la carte du monde (partage activé par défaut,
-  désactivable dans les options ou le menu rapide du médaillon).
+  désactivable dans les options ou le menu rapide du médaillon). Chaque membre y apparaît avec son médaillon
+  (son portrait), entouré d'un anneau à la couleur de sa classe ; un point de couleur s'il n'a pas de portrait.
+  Quand plusieurs membres se chevauchent, la position la plus récente est au-dessus.
 - **Quêtes en commun** : les quêtes que d'autres membres font aussi, avec « Créer un groupe ».
 - **Artisanat** :
   - *Registre* des métiers et recettes de chaque membre, commande en un clic ;
