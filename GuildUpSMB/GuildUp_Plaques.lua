@@ -740,8 +740,8 @@ local AGRANDISSEMENT_ALLIE = 1.5 -- taille fixe des noms hors guilde (x1.5 la po
 -- Taille des noms hors guilde : relevée une seule fois (police des barres de nom du jeu x 1,5), puis
 -- gardée pour tout le monde. La relire à chaque fois la faisait suivre les changements du jeu.
 local tailleNomsAllies
--- Cadre porteur du nom et de la guilde, par barre de nom : il ignore l'échelle de la barre (le jeu
--- peut l'agrandir quand on s'approche), pour que le texte garde la même taille à l'écran
+-- Cadre porteur du nom et de la guilde, par barre de nom : il suit l'échelle de la barre (donc la
+-- distance, voir CVARS_ALLIES) mais pas sa transparence
 local porteursNoms = {} -- [UnitFrame] = cadre
 local function PorteurNom(uf)
 	local p = porteursNoms[uf]
@@ -749,13 +749,10 @@ local function PorteurNom(uf)
 		p = CreateFrame("Frame", nil, uf)
 		p:SetSize(1, 1)
 		p:SetPoint("CENTER", uf, "CENTER")
-		if p.SetIgnoreParentScale then p:SetIgnoreParentScale(true) end
 		-- même transparence que l'écran, pas celle de la barre (le jeu rend les barres translucides)
 		if p.SetIgnoreParentAlpha then p:SetIgnoreParentAlpha(true) end
 		porteursNoms[uf] = p
 	end
-	-- taille de l'interface (le cadre ignore celle de la barre, qui la contient d'habitude)
-	if p.SetIgnoreParentScale then p:SetScale(UIParent:GetEffectiveScale()) end
 	p:SetFrameLevel(uf:GetFrameLevel() + 5)
 	return p
 end
@@ -1112,10 +1109,14 @@ local CVARS_IMPOSEES = {
 local CVARS_ALLIES = {
 	{ "nameplateShowFriends", "1" },
 	{ "nameplateShowFriendlyPlayers", "1" },
-	-- taille fixe : le jeu agrandit / réduit les barres de nom selon la distance (0,8 à 1 par
-	-- défaut) ; à 1 / 1, toutes les barres gardent la même taille quelle que soit la distance
-	{ "nameplateMinScale", "1" },
+	-- taille selon la distance, comme les noms flottants du jeu (qui suivent la perspective) : taille
+	-- normale jusqu'à 10 m, puis de plus en plus petite jusqu'à 20 % à 41 m, là où la barre de nom
+	-- prend le relais du nom flottant (mesuré en jeu : il y fait ~1/6 de notre nom de près). Sans
+	-- cela, le nom passait d'un coup de tout petit à très grand en entrant dans la portée.
+	{ "nameplateMinScale", "0.2" },
 	{ "nameplateMaxScale", "1" },
+	{ "nameplateMaxScaleDistance", "10" }, -- jusqu'ici : taille normale
+	{ "nameplateMinScaleDistance", "41" }, -- à partir d'ici : taille minimale
 	{ "nameplateSelectedScale", "1" }, -- la cible n'est plus agrandie (1,2 par défaut)
 }
 
