@@ -362,10 +362,15 @@ end
 ns.EcrireNomObjet = EcrireNomObjet
 
 -- Nom d'un membre à la couleur de sa classe, si elle est connue (positions partagées de la carte)
+-- nom à la couleur de sa classe (liste de guilde, sinon position partagée), sinon neutre
 local function NomMembreColore(cle, nom)
-	local positions = ns.PositionsMembres and ns.PositionsMembres()
-	local p = positions and cle and positions[(cle:gsub("#test$", ""))]
-	if p and p.classe and ns.CouleurClasseTexte then return ns.CouleurClasseTexte(p.classe) .. NomCourt(nom) .. "|r" end
+	local classe = ns.ClasseMembre and ns.ClasseMembre(cle)
+	if not classe then
+		local positions = ns.PositionsMembres and ns.PositionsMembres()
+		local p = positions and cle and positions[(cle:gsub("#test$", ""))]
+		classe = p and p.classe
+	end
+	if classe and ns.CouleurClasseTexte then return ns.CouleurClasseTexte(classe) .. NomCourt(nom) .. "|r" end
 	return NomCourt(nom)
 end
 ns.NomMembreColore = NomMembreColore

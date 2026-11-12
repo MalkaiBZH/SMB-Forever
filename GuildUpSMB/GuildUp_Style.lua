@@ -216,6 +216,7 @@ function UI.Portrait(parent, taille)
 			return
 		end
 		self.fond:Show()
+		classe = classe or (ns.ClasseMembre and ns.ClasseMembre(cle))
 		local coords = classe and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[classe]
 		self.image:ClearAllPoints()
 		self.image:SetPoint("CENTER")

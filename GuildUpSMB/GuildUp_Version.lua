@@ -86,8 +86,11 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "GuildUpSMB" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.4.1"] = {
+		"Les noms des membres (dons, besoins) sont à la couleur de leur classe, et les portraits montrent l'icône de leur classe, d'après la liste de guilde.",
+	},
 	["2.4.0"] = {
 		"|cffffd100Artisanat|r dans la fenêtre SMB Forever, au nouveau style : Registre (qui sait fabriquer quoi, commandes), Items (catégories et sous-catégories, Besoin, Ajouter à une liste ou un projet) et Projets de guilde (tâches « Je m'en occupe »).",
 		"|cffffd100Mes carnets|r dans la fenêtre : tes listes à gauche, la liste de courses à droite (matériaux, recettes, quantités). L'encyclopédie et la mini-liste passent aux nouvelles couleurs ; l'encyclopédie se colle à droite de la fenêtre.",

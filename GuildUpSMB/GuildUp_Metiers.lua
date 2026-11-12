@@ -702,6 +702,8 @@ end
 local roster, rosterLu = {}, false
 -- nom exact d'un membre dans la liste de guilde (pour lui écrire en privé)
 ns.NomListeGuilde = function(cle) return roster[cle] and roster[cle].nom end
+-- classe d'un membre d'après la liste de guilde (« WARRIOR »…), nil s'il n'y est pas
+ns.ClasseMembre = function(cle) return cle and roster[(cle:gsub("#test$", ""))] and roster[(cle:gsub("#test$", ""))].classe end
 
 local function DemanderRoster()
 	if C_GuildInfo and C_GuildInfo.GuildRoster then pcall(C_GuildInfo.GuildRoster)
