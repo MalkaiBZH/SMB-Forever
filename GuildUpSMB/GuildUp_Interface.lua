@@ -3,8 +3,10 @@
 -- Pages :
 --   Accueil : ce qui se passe dans la guilde (membres sur ma carte, groupes ouverts, appels à l'aide,
 --             demandes de dons, besoins que je sais fabriquer, avancement d'un projet).
---   Les autres entrées du menu ouvrent encore les fenêtres existantes (Groupes, Quêtes en commun,
---   Artisanat, Mes carnets, Dons, Événements, Options) : elles seront intégrées une à une.
+--   Groupes (GuildUp_GroupesFenetre.lua) et Quêtes en commun (GuildUp_Quetes.lua) : pages fournies par
+--   leur module (ns.AjouterPage), avec le kit d'interface ns.UI (GuildUp_Style.lua).
+--   Les autres entrées du menu ouvrent encore leur ancienne fenêtre (Artisanat, Mes carnets, Dons,
+--   Options) en attendant leur page ; Événements ouvre le calendrier du jeu.
 -- Fournit ns.NouveautesGuilde() (pastille du médaillon), ns.BasculerInterface(), ns.OuvrirInterface(page),
 -- ns.MajInterface(). Réglages : db.interface = { x, y } (position). Aucun message réseau.
 
@@ -17,124 +19,17 @@ local CouleurClasseTexte = ns.CouleurClasseTexte
 local function DB() return ns.DB and ns.DB() end
 
 --------------------------------------------------------------------------------
--- Style : couleurs et éléments de base
+-- Style : le kit commun (GuildUp_Style.lua)
 --------------------------------------------------------------------------------
 
-local BLANC = "Interface\\Buttons\\WHITE8X8"
-local ROND = MEDIA .. "point" -- disque blanc de l'addon, teinté
-local C = {
-	fond      = { 0.082, 0.071, 0.055, 0.97 },
-	bandeau   = { 0.067, 0.055, 0.043, 1 },
-	menu      = { 0.071, 0.059, 0.047, 1 },
-	carte     = { 0.114, 0.098, 0.078, 1 },
-	bord      = { 0.227, 0.192, 0.141, 1 },
-	bordFort  = { 0.42, 0.33, 0.19, 1 },
-	actif     = { 0.165, 0.133, 0.086, 1 },
-	ors       = { 0.945, 0.81, 0.42 },
-	orFonce   = { 0.85, 0.66, 0.25 },
-	texte     = { 0.91, 0.886, 0.83 },
-	gris      = { 0.61, 0.576, 0.5 },
-	rouge     = { 0.75, 0.2, 0.15 },
-	aide      = { 1, 0.7, 0.62 },
-	fondAide  = { 0.227, 0.098, 0.071, 1 },
-	bordAide  = { 0.66, 0.27, 0.18, 1 },
-}
-local LARGEUR, HAUTEUR = 820, 560
+local UI = ns.UI
+local C = UI.C
+local Habiller, Cadre, Texte, Bouton, Infobulle, Pastille = UI.Habiller, UI.Cadre, UI.Texte, UI.Bouton, UI.Infobulle, UI.Pastille
+local IlYa, Chuchoter = UI.IlYa, UI.Chuchoter
+local ROND = UI.ROND
+local LARGEUR, HAUTEUR = 980, 640
 local LARGEUR_MENU, HAUTEUR_TETE = 184, 52
-
--- fond plat et bordure d'un pixel (cadre créé avec "BackdropTemplate")
-local function Habiller(f, fond, bord)
-	if not f.SetBackdrop then return end
-	f:SetBackdrop({ bgFile = BLANC, edgeFile = BLANC, edgeSize = 1 })
-	f:SetBackdropColor(unpack(fond))
-	if bord then f:SetBackdropBorderColor(unpack(bord)) else f:SetBackdropBorderColor(0, 0, 0, 0) end
-end
-
-local function Cadre(parent, fond, bord)
-	local f = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-	Habiller(f, fond, bord)
-	return f
-end
-
-local function Texte(parent, modele, couleur)
-	local t = parent:CreateFontString(nil, "OVERLAY", modele or "GameFontHighlight")
-	if couleur then t:SetTextColor(unpack(couleur)) end
-	t:SetJustifyH("LEFT")
-	t:SetWordWrap(false)
-	return t
-end
-
--- Bouton plat : "or" (action principale), "fantome" (secondaire), "aide" (appel à l'aide)
-local function Bouton(parent, texte, style, largeur, hauteur)
-	local b = CreateFrame("Button", nil, parent, "BackdropTemplate")
-	b:SetSize(largeur or 84, hauteur or 24)
-	b.texte = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	b.texte:SetPoint("CENTER")
-	b.texte:SetText(texte or "")
-	if style == "or" then
-		Habiller(b, { C.orFonce[1], C.orFonce[2], C.orFonce[3], 1 }, { C.ors[1], C.ors[2], C.ors[3], 1 })
-		b.texte:SetTextColor(0.1, 0.08, 0.03)
-	elseif style == "aide" then
-		Habiller(b, C.fondAide, C.bordAide)
-		b.texte:SetFontObject("GameFontNormal")
-		b.texte:SetTextColor(unpack(C.aide))
-	else
-		Habiller(b, { 0, 0, 0, 0 }, { 0.35, 0.29, 0.17, 1 })
-		b.texte:SetTextColor(unpack(C.ors))
-	end
-	local survol = b:CreateTexture(nil, "HIGHLIGHT")
-	survol:SetAllPoints()
-	survol:SetColorTexture(1, 1, 1, 0.08)
-	b.Ecrire = function(self, t) self.texte:SetText(t) end
-	b.Activer = function(self, oui)
-		self:SetEnabled(oui and true or false)
-		self:SetAlpha(oui and 1 or 0.45)
-	end
-	return b
-end
-
-local function Infobulle(cadre, titre, texte)
-	cadre:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(titre)
-		if texte then GameTooltip:AddLine(texte, 1, 1, 1, true) end
-		GameTooltip:Show()
-	end)
-	cadre:SetScript("OnLeave", function() GameTooltip:Hide() end)
-end
-
--- pastille ronde (compteur) : rouge, ou discrète (neutre)
-local function Pastille(parent, neutre)
-	local p = CreateFrame("Frame", nil, parent)
-	p:SetSize(20, 20)
-	p.rond = p:CreateTexture(nil, "ARTWORK")
-	p.rond:SetTexture(ROND)
-	p.rond:SetAllPoints()
-	if neutre then p.rond:SetVertexColor(C.bord[1], C.bord[2], C.bord[3], 1) else p.rond:SetVertexColor(C.rouge[1], C.rouge[2], C.rouge[3], 1) end
-	p.n = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	p.n:SetPoint("CENTER", 0, 0)
-	if neutre then p.n:SetTextColor(unpack(C.ors)) end
-	p.Ecrire = function(self, n)
-		n = tonumber(n) or 0
-		self.n:SetText(n > 9 and "9+" or tostring(n))
-		self:SetShown(n > 0)
-	end
-	return p
-end
-
-local function IlYa(quand)
-	local s = math.max(0, time() - (quand or time()))
-	if s < 60 then return "à l'instant" end
-	if s < 3600 then return "il y a " .. math.floor(s / 60) .. " min" end
-	return "il y a " .. math.floor(s / 3600) .. " h"
-end
-
-local function Chuchoter(cle, nom)
-	local n = (cle and ns.NomListeGuilde and ns.NomListeGuilde(cle)) or NomCourt(nom or "")
-	if cle and cle:find("#test", 1, true) then n = UnitName("player") end
-	if ChatFrame_SendTell then ChatFrame_SendTell(n)
-	elseif ChatFrame_OpenChat then ChatFrame_OpenChat("/w " .. n .. " ") end
-end
+ns.TAILLE_PAGE = { LARGEUR - LARGEUR_MENU - 2, HAUTEUR - HAUTEUR_TETE - 2 } -- zone des pages
 
 --------------------------------------------------------------------------------
 -- Nouveautés (pastille du médaillon, compteurs du menu)
@@ -182,21 +77,7 @@ for _, s in ipairs(SECTIONS) do PAR_ID[s.id] = s end
 -- Page Accueil
 --------------------------------------------------------------------------------
 
--- carte (bloc) avec un titre doré et un compteur à droite
-local function CarteAccueil(parent, titre)
-	local c = Cadre(parent, C.carte, C.bord)
-	c.titre = Texte(c, "GameFontNormal", C.ors)
-	c.titre:SetPoint("TOPLEFT", c, "TOPLEFT", 14, -12)
-	c.titre:SetText(titre)
-	c.compte = Texte(c, "GameFontHighlightSmall", C.gris)
-	c.compte:SetPoint("TOPRIGHT", c, "TOPRIGHT", -14, -13)
-	c.compte:SetJustifyH("RIGHT")
-	c.vide = Texte(c, "GameFontHighlightSmall", C.gris)
-	c.vide:SetPoint("TOPLEFT", c, "TOPLEFT", 14, -40)
-	c.vide:SetPoint("RIGHT", c, "RIGHT", -14, 0)
-	c.vide:SetWordWrap(true)
-	return c
-end
+local CarteAccueil = UI.Carte
 
 -- ligne d'une carte : icône, titre, sous-titre, bouton à droite
 local function LigneCarte(c, i)
@@ -299,7 +180,7 @@ local function CreerAccueil(parent)
 	-- Groupes ouverts
 	local groupes = CarteAccueil(p, "Groupes ouverts")
 	groupes:SetPoint("TOPLEFT", zone, "BOTTOMLEFT", 0, -ECART)
-	groupes:SetSize(demi, 196)
+	groupes:SetSize(demi, 226)
 	groupes.lignes = { LigneCarte(groupes, 1), LigneCarte(groupes, 2), LigneCarte(groupes, 3) }
 	groupes.creer = Bouton(groupes, "Voir les groupes", "fantome", 120, 22)
 	groupes.creer:SetPoint("BOTTOMLEFT", groupes, "BOTTOMLEFT", 14, 10)
@@ -308,7 +189,7 @@ local function CreerAccueil(parent)
 	-- Appels à l'aide
 	local aide = CarteAccueil(p, "Appels à l'aide")
 	aide:SetPoint("TOPLEFT", groupes, "TOPRIGHT", ECART, 0)
-	aide:SetSize(demi, 196)
+	aide:SetSize(demi, 226)
 	aide.titre:SetTextColor(unpack(C.aide))
 	aide:SetBackdropBorderColor(0.43, 0.2, 0.14, 1)
 	aide.lignes = { LigneCarte(aide, 1), LigneCarte(aide, 2), LigneCarte(aide, 3) }
@@ -319,7 +200,7 @@ local function CreerAccueil(parent)
 	-- Dons : demandes reçues
 	local dons = CarteAccueil(p, "Dons")
 	dons:SetPoint("TOPLEFT", groupes, "BOTTOMLEFT", 0, -ECART)
-	dons:SetSize(demi, 158)
+	dons:SetSize(demi, 198)
 	dons.lignes = { LigneCarte(dons, 1), LigneCarte(dons, 2) }
 	dons.parcourir = Bouton(dons, "Parcourir les dons", "fantome", 130, 22)
 	dons.parcourir:SetPoint("BOTTOMLEFT", dons, "BOTTOMLEFT", 14, 10)
@@ -328,7 +209,7 @@ local function CreerAccueil(parent)
 	-- Tu peux aider : besoins que je sais fabriquer, avancement du dernier projet
 	local aider = CarteAccueil(p, "Tu peux aider")
 	aider:SetPoint("TOPLEFT", dons, "TOPRIGHT", ECART, 0)
-	aider:SetSize(demi, 158)
+	aider:SetSize(demi, 198)
 	aider.lignes = { LigneCarte(aider, 1), LigneCarte(aider, 2) }
 	aider.projet = Texte(aider, "GameFontHighlightSmall", C.texte)
 	aider.projet:SetPoint("BOTTOMLEFT", aider, "BOTTOMLEFT", 14, 24)
@@ -528,6 +409,9 @@ end
 
 local pages = {}     -- [id] = cadre de page (seulement les pages intégrées)
 local CREER_PAGE = { accueil = CreerAccueil }
+-- Une page fournie par un module (ex. GuildUp_GroupesPage.lua) : creer(parent) renvoie un cadre qui
+-- remplit parent, avec p.Maj() (rafraîchir) et, si besoin, p.Ouvrir(...) (arguments de OuvrirInterface)
+ns.AjouterPage = function(id, creer) CREER_PAGE[id] = creer end
 local pageActive = "accueil"
 local boutonsMenu = {}
 local boutonsRole = {}
@@ -747,12 +631,17 @@ ns.BasculerInterface = function()
 	if fenetre:IsShown() then fenetre:Hide() else fenetre:Show(); Aller(pageActive) end
 end
 
-ns.OuvrirInterface = function(id)
+-- ns.OuvrirInterface(page, ...) : ouvre la fenêtre sur une page ; les arguments suivants vont à
+-- p.Ouvrir de la page (onglet, objet…)
+ns.OuvrirInterface = function(id, ...)
 	if not Preparer() then return end
 	if id and not CREER_PAGE[id] then Aller(id); return end
 	fenetre:Show()
 	Aller(id or pageActive)
+	local p = pages[pageActive]
+	if p and p.Ouvrir and select("#", ...) > 0 then p.Ouvrir(...) end
 end
+ns.PageInterface = function() return fenetre and fenetre:IsShown() and pageActive or nil end
 
 -- compteurs du médaillon : les appels à l'aide expirent et les demandes changent sans prévenir
 if C_Timer and C_Timer.NewTicker then

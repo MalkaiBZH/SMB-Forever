@@ -86,8 +86,12 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "GuildUpSMB" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.1.0"] = {
+		"|cffffd100Groupes|r dans la fenêtre GuildUpSMB, au nouveau style : filtres (Donjons, Raids, Quêtes…) et recherche, portrait du chef, places par rôle, rôle recherché. « Mon groupe » : choix du contenu, places, commentaire et rappel sur un seul écran ; gestion des candidats et groupe public à côté de la composition.",
+		"|cffffd100Quêtes en commun|r : leur propre page dans la fenêtre GuildUpSMB.",
+	},
 	["2.0.1"] = {
 		"|cffffd100Repères à l'écran|r : toujours sur le tour de l'écran (les positions n'ont pas d'altitude) : en haut pour les membres devant toi, sur les côtés à gauche et à droite, en bas pour ceux qui sont derrière.",
 	},

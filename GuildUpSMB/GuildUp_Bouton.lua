@@ -112,7 +112,7 @@ local function MontrerMenu()
 	for _, role in ipairs({ "tank", "heal", "dps" }) do
 		local c = ROLES[role].couleur
 		local coche = (manuel == role) and "  |cffffd100(choisi)|r" or ((actuel == role) and "  |cff999999(auto)|r" or "")
-		lignes[#lignes + 1] = { ("|cff%02x%02x%02x%s|r%s"):format(c[1] * 255, c[2] * 255, c[3] * 255, ROLES[role].nom, coche),
+		lignes[#lignes + 1] = { ("|cff%02x%02x%02x%s|r%s"):format(math.floor(c[1] * 255), math.floor(c[2] * 255), math.floor(c[3] * 255), ROLES[role].nom, coche),
 			function() ChoisirRole(role) end }
 	end
 	lignes[#lignes + 1] = { (db.partagePosition and "|TInterface\\Buttons\\UI-CheckBox-Check:16:16|t " or "|TInterface\\Buttons\\UI-CheckBox-Up:16:16|t ") .. "Partager ma position",

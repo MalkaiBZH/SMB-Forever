@@ -1,13 +1,22 @@
--- GuildUpSMB : fenêtre de la recherche de groupe de la guilde (onglets Parcourir et Mon groupe), dans le
--- style de la recherche de groupe officielle de Forever. Le protocole, l'état (annonces, candidatures)
--- et les actions sont dans GuildUp_Groupes.lua.
+-- GuildUpSMB : page « Groupes » de la fenêtre GuildUpSMB (style sombre et doré, kit ns.UI).
+-- Le protocole, l'état (annonces, candidatures) et les actions sont dans GuildUp_Groupes.lua ;
+-- le catalogue des contenus dans GuildUp_Catalogue.lua. Aucun message réseau ici, sauf « Q »
+-- (Actualiser : « renvoyez-moi vos annonces », une fois toutes les 10 s au plus).
+-- Onglets :
+--   Parcourir : les annonces de la guilde (la plus récente d'abord, complètes comprises), filtres par
+--     catégorie et recherche ; par annonce : portrait du chef, contenu (+ entrée sur la carte), niveaux,
+--     chef, âge, commentaire, places par rôle, rôle recherché, bouton (Postuler / Annuler / Refusé /
+--     Complet / Rôle complet / Ton groupe) ; info-bulle avec les membres et les places libres.
+--   Mon groupe : sans annonce, le formulaire (catégorie, contenu, places recherchées par rôle,
+--     commentaire, rappel, Publier) ; avec une annonce, sa gestion (composition, candidats à inviter ou
+--     refuser, style de jeu et groupe public, Retirer l'annonce).
+-- Fonctions gardées pour les autres fichiers : ns.OuvrirGroupes, ns.BasculerGroupes, ns.NombreGroupes,
+-- ns.EnAttente, ns.SurChangementDeRole, ns.SurChangementTestSolo, ns.RafraichirGroupes, ns.DiagGroupes.
 
 local NOM_ADDON, ns = ...
 
--- (GuildUp_Groupes.lua est chargé avant ce fichier)
 local G = ns.Groupes
 local etat = G.etat
-local ATLAS_DEFAUT = G.ATLAS_DEFAUT
 local AnnulerCandidature = G.AnnulerCandidature
 local AtlasExiste = G.AtlasExiste
 local BesoinParDefaut = G.BesoinParDefaut
@@ -22,8 +31,6 @@ local DiffuserMonAnnonce = G.DiffuserMonAnnonce
 local Envoyer = G.Envoyer
 local EstPerso = G.EstPerso
 local FermerMonAnnonce = G.FermerMonAnnonce
-local IconeClasse = G.IconeClasse
-local IconeRole = G.IconeRole
 local InfoContenu = G.InfoContenu
 local Inviter = G.Inviter
 local MonNom = G.MonNom
@@ -31,7 +38,6 @@ local NomCourt = G.NomCourt
 local NombreMembres = G.NombreMembres
 local PeutAnnoncer = G.PeutAnnoncer
 local PlacesLibres = G.PlacesLibres
-local PoserAtlas = G.PoserAtlas
 local PoserIcone = G.PoserIcone
 local Postuler = G.Postuler
 local Prenom = G.Prenom
@@ -40,111 +46,65 @@ local Refuser = G.Refuser
 local TailleMaxContenu = G.TailleMaxContenu
 local TexteNiveaux = G.TexteNiveaux
 local TexteRole = G.TexteRole
-local Rafraichir -- défini plus bas, avec la fenêtre
+local Normaliser = ns.Normaliser
 
---------------------------------------------------------------------------------
--- Éléments d'interface
---------------------------------------------------------------------------------
+local UI = ns.UI
+local C = UI.C
 
-local function NouveauBouton(parent, texte, largeur, hauteur)
-	local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-	b:SetSize(largeur or 80, hauteur or 22)
-	b:SetText(texte)
-	return b
+-- toujours : médaillon (pastille, anneau) et fenêtre GuildUpSMB (accueil ou cette page, si affichée)
+local function Rafraichir()
+	if ns.MajBouton then ns.MajBouton() end
+	if ns.MajInterface then ns.MajInterface() end
 end
 
-local function Infobulle(cadre, Remplir)
-	cadre:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		Remplir(GameTooltip, self)
-		GameTooltip:Show()
-	end)
-	cadre:SetScript("OnLeave", function() GameTooltip:Hide() end)
+--------------------------------------------------------------------------------
+-- Petits outils
+--------------------------------------------------------------------------------
+
+local MARGE = 16
+
+-- catégorie de filtre d'un contenu : 2 Donjons, 3 Raids, 4 Quêtes, 5 Autres (1 = Tout)
+local function FiltreDe(e)
+	local c = e and e.idCategorie
+	if c == 2 or c == "Donjons" then return 2 end
+	if c == 114 or c == "Raids" then return 3 end
+	if c == 116 or c == "Quêtes" then return 4 end
+	return 5
 end
 
--- Places par rôle façon FF14 : une icône par place, chacune dans un petit cadre
--- (fond sombre + liseré doré) ; au-delà de 10 places, 3 icônes + « pris/besoin »
-local ECART_PLACES = 6
+local function Simplifier(t)
+	return ns.Simplifier and ns.Simplifier(t or "") or (t or ""):lower()
+end
 
-local function CreerEmplacements(parent, taille)
-	local w = CreateFrame("Frame", nil, parent)
-	w:SetSize(10 * (taille + ECART_PLACES), taille + 4)
-	w.icones, w.cadres, w.compteurs = {}, {}, {}
-	for i = 1, 10 do
-		local t = w:CreateTexture(nil, "ARTWORK")
-		t:SetSize(taille, taille)
-		w.icones[i] = t
-		local lisere = w:CreateTexture(nil, "BACKGROUND", nil, -1)
-		lisere:SetSize(taille + 4, taille + 4)
-		lisere:SetPoint("CENTER", t, "CENTER", 0, 0)
-		lisere:SetColorTexture(1, 0.82, 0, 0.55)
-		local fond = w:CreateTexture(nil, "BACKGROUND", nil, 0)
-		fond:SetSize(taille + 2, taille + 2)
-		fond:SetPoint("CENTER", t, "CENTER", 0, 0)
-		fond:SetColorTexture(0.05, 0.05, 0.05, 0.9)
-		w.cadres[i] = { lisere, fond }
-	end
+-- places d'une annonce, une par joueur : { role, pris }
+local function ListePlaces(besoin, pris)
+	local res = {}
 	for _, role in ipairs(ROLES) do
-		local fs = w:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-		w.compteurs[role] = fs
-	end
-	w.taille = taille
-	return w
-end
-
-local function MontrerPlace(w, i, visible)
-	w.icones[i]:SetShown(visible)
-	for _, c in ipairs(w.cadres[i]) do c:SetShown(visible) end
-end
-
-local function MajEmplacements(w, besoin, pris, taille)
-	local total = (besoin.tank or 0) + (besoin.heal or 0) + (besoin.dps or 0)
-	for _, fs in pairs(w.compteurs) do fs:Hide() end
-	for i = 1, 10 do MontrerPlace(w, i, false) end
-	if total <= 10 and taille <= 10 then
-		-- une place par joueur, alignées à droite
-		local pas = w.taille + ECART_PLACES
-		local i = 10 - total + 1
-		for _, role in ipairs(ROLES) do
-			for n = 1, besoin[role] or 0 do
-				local t = w.icones[i]
-				if t then
-					t:ClearAllPoints()
-					t:SetPoint("RIGHT", w, "RIGHT", -2 - (10 - i) * pas, 0)
-					IconeRole(t, role, n <= (pris[role] or 0))
-					MontrerPlace(w, i, true)
-				end
-				i = i + 1
-			end
-		end
-	else
-		-- grand groupe : 3 icônes + « pris/besoin » (icône éteinte quand le rôle est complet)
-		local decalage = 2
-		for n, role in ipairs(ROLES) do
-			local t = w.icones[n]
-			local fs = w.compteurs[role]
-			t:ClearAllPoints()
-			t:SetPoint("LEFT", w, "LEFT", decalage, 0)
-			IconeRole(t, role, (pris[role] or 0) < (besoin[role] or 0))
-			MontrerPlace(w, n, true)
-			fs:ClearAllPoints()
-			fs:SetPoint("LEFT", t, "RIGHT", 4, 0)
-			fs:SetText(("%d/%d"):format(pris[role] or 0, besoin[role] or 0))
-			fs:Show()
-			decalage = decalage + w.taille + 38
+		for n = 1, (besoin and besoin[role] or 0) do
+			res[#res + 1] = { role = role, pris = n <= (pris and pris[role] or 0) }
 		end
 	end
+	return res
 end
 
--- Petit bouton « entrée sur la carte » (repère sur la carte du monde, voir GuildUp_Carte.lua)
-local function CreerBoutonEntree(parent)
+-- « Tank 1/1  Heal 0/1  DPS 2/3 » (grands groupes)
+local function TextePlaces(besoin, pris)
+	local t = {}
+	for _, role in ipairs(ROLES) do
+		t[#t + 1] = UI.TexteRole(role) .. " " .. (pris and pris[role] or 0) .. "/" .. (besoin and besoin[role] or 0)
+	end
+	return table.concat(t, "   ")
+end
+
+-- bouton « Entrée sur la carte » (montré seulement si l'entrée du contenu est connue)
+local function BoutonEntree(parent)
 	local bt = CreateFrame("Button", nil, parent)
-	bt:SetSize(20, 20)
+	bt:SetSize(18, 18)
 	bt.icone = bt:CreateTexture(nil, "ARTWORK")
 	bt.icone:SetAllPoints(bt)
 	bt.icone:SetTexture("Interface\\Minimap\\Tracking\\POIArrow")
 	if AtlasExiste("Waypoint-MapPin-Untracked") then bt.icone:SetAtlas("Waypoint-MapPin-Untracked") end
-	bt:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	UI.Survol(bt, 0.15)
 	bt:SetScript("OnClick", function(self)
 		if self.nom and ns.MontrerEntree then ns.MontrerEntree(self.nom, self.mapID) end
 	end)
@@ -155,1022 +115,704 @@ local function CreerBoutonEntree(parent)
 		GameTooltip:Show()
 	end)
 	bt:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	bt.Poser = function(self, e)
+		local connue = e and ns.EntreeDonjon and ns.EntreeDonjon(e.nom, e.mapID)
+		self.nom, self.mapID = e and e.nom, e and e.mapID
+		self:SetShown(connue and true or false)
+	end
 	bt:Hide()
 	return bt
 end
 
--- Montre le bouton seulement si l'entrée de ce contenu est connue
-local function MajBoutonEntree(bt, e)
-	local connue = e and ns.EntreeDonjon and ns.EntreeDonjon(e.nom, e.mapID)
-	bt.nom, bt.mapID = e and e.nom, e and e.mapID
-	bt:SetShown(connue and true or false)
-end
-
--- remet les icônes en ligne (après un affichage « grand groupe »)
-local function RangerEmplacements(w)
-	for i, t in ipairs(w.icones) do
-		t:ClearAllPoints()
-		t:SetPoint("RIGHT", w, "RIGHT", -2 - (10 - i) * (w.taille + ECART_PLACES), 0)
-	end
-end
-
---------------------------------------------------------------------------------
--- Fenêtre principale : même disposition que la recherche de groupe officielle de Forever
--- (Blizzard_LFGVanilla_Browse.xml) : bande de pierre en haut, encart central illustré
--- (groupfinder-background + cadre common-insideframe), filets dorés, boutons dans la bande du bas.
---------------------------------------------------------------------------------
-
-local LARGEUR, HAUTEUR = 458, 535
-local HAUT_ENCART = -80          -- haut de l'encart central
-local LIGNE_HAUT = -100          -- filet doré du haut (20 sous le haut de l'encart)
-local BAS_LISTE = 66             -- bas des listes (au-dessus du filet du bas, à 61 du bas)
-local LARGEUR_LISTE = 404
-
-local function CreerCadrePrincipal()
-	local ok, f = pcall(CreateFrame, "Frame", "GuildUpGroupes", UIParent, "PortraitFrameTemplate")
-	if not ok then
-		ok, f = pcall(CreateFrame, "Frame", "GuildUpGroupes", UIParent, "BasicFrameTemplateWithInset")
-		if not ok then f = CreateFrame("Frame", "GuildUpGroupes", UIParent) end
-	end
-	f:SetSize(LARGEUR, HAUTEUR)
-	f:SetPoint("CENTER")
-	f:SetFrameStrata("HIGH")
-	f:SetToplevel(true)
-	f:SetMovable(true)
-	f:EnableMouse(true)
-	f:SetClampedToScreen(true)
-	f:RegisterForDrag("LeftButton")
-	f:SetScript("OnDragStart", f.StartMoving)
-	f:SetScript("OnDragStop", f.StopMovingOrSizing)
-	tinsert(UISpecialFrames, "GuildUpGroupes")
-	local titre = "Groupes de la guilde"
-	if f.SetTitle then pcall(f.SetTitle, f, titre)
-	elseif f.TitleText then f.TitleText:SetText(titre) end
-	if f.SetPortraitToAsset then
-		pcall(f.SetPortraitToAsset, f, "Interface\\Icons\\Ability_Warrior_RallyingCry")
-	end
-
-	-- bande de pierre sous le titre
-	local pierre = f:CreateTexture(nil, "BACKGROUND", nil, -5)
-	pierre:SetPoint("TOPLEFT", f, "TOPLEFT", 2, -21)
-	pierre:SetPoint("BOTTOMRIGHT", f, "TOPRIGHT", -2, HAUT_ENCART - 7)
-	PoserAtlas(pierre, "groupfinder-Stat-StoneBG", { 0.12, 0.1, 0.08, 1 })
-
-	-- encart central : illustration + cadre intérieur
-	local encart = CreateFrame("Frame", nil, f)
-	encart:SetPoint("TOPLEFT", f, "TOPLEFT", 4, HAUT_ENCART)
-	encart:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -4, 3)
-	encart:SetFrameLevel(f:GetFrameLevel() + 1)
-	local illustration = encart:CreateTexture(nil, "BACKGROUND")
-	illustration:SetPoint("TOPLEFT", encart, "TOPLEFT", 3, -3)
-	illustration:SetPoint("BOTTOMRIGHT", encart, "BOTTOMRIGHT", -3, 3)
-	PoserAtlas(illustration, "groupfinder-background", { 0.06, 0.05, 0.05, 1 })
-	local cadre = encart:CreateTexture(nil, "BORDER")
-	cadre:SetPoint("TOPLEFT", encart, "TOPLEFT", 0, 2)
-	cadre:SetPoint("BOTTOMRIGHT", encart, "BOTTOMRIGHT", 0, 0)
-	if not PoserAtlas(cadre, "common-insideframe") then cadre:Hide() end
-	f.encart = encart
-
-	-- filets dorés : haut de la liste, et au-dessus des boutons du bas
-	local function Filet(y, depuisLeBas)
-		local t = encart:CreateTexture(nil, "OVERLAY")
-		if AtlasExiste("groupfinder-ScrollLine") then
-			t:SetAtlas("groupfinder-ScrollLine", true)
+-- petit rond de la couleur d'un rôle + son nom
+local function PastilleRole(parent)
+	local f = CreateFrame("Frame", nil, parent)
+	f:SetSize(70, 16)
+	f.rond = f:CreateTexture(nil, "ARTWORK")
+	f.rond:SetTexture(UI.ROND)
+	f.rond:SetSize(10, 10)
+	f.rond:SetPoint("LEFT", f, "LEFT", 0, 0)
+	f.texte = UI.Texte(f, "GameFontHighlightSmall")
+	f.texte:SetPoint("LEFT", f.rond, "RIGHT", 6, 0)
+	f.Poser = function(self, role)
+		local r = role and UI.ROLES[role]
+		if r then
+			self.rond:SetVertexColor(r.plein[1], r.plein[2], r.plein[3], 1)
+			self.texte:SetText(UI.TexteRole(role))
 		else
-			t:SetColorTexture(1, 0.82, 0, 0.3)
-			t:SetHeight(1)
+			self.rond:SetVertexColor(0.4, 0.4, 0.4, 1)
+			self.texte:SetText("|cff999999rôle ?|r")
 		end
-		local point = depuisLeBas and "BOTTOMLEFT" or "TOPLEFT"
-		local point2 = depuisLeBas and "BOTTOMRIGHT" or "TOPRIGHT"
-		t:ClearAllPoints()
-		t:SetPoint("LEFT", f, point, 4, y)
-		t:SetPoint("RIGHT", f, point2, -4, y)
-		return t
 	end
-	Filet(LIGNE_HAUT, false)
-	Filet(61, true)
 	return f
 end
 
-local function NouvellePage(f)
-	local p = CreateFrame("Frame", nil, f)
-	p:SetAllPoints(f)
-	p:SetFrameLevel(f.encart:GetFrameLevel() + 2)
-	return p
-end
-
-local function NouvelleListe(p, haut, bas)
-	local defile = CreateFrame("ScrollFrame", nil, p, "UIPanelScrollFrameTemplate")
-	defile:SetPoint("TOPLEFT", p, "TOPLEFT", 10, haut)
-	defile:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -32, bas)
-	local contenu = CreateFrame("Frame", nil, defile)
-	contenu:SetSize(LARGEUR_LISTE, 10)
-	defile:SetScrollChild(contenu)
-	return defile, contenu
-end
-
-local function CreerOnglets(f, noms, Choisir)
-	f.onglets = {}
-	for i, nom in ipairs(noms) do
-		local ok, o = pcall(CreateFrame, "Button", "GuildUpGroupesTab" .. i, f, "PanelTabButtonTemplate")
-		if not ok then o = NouveauBouton(f, nom, 110, 24) end
-		o:SetID(i)
-		o:SetText(nom)
-		if PanelTemplates_TabResize then pcall(PanelTemplates_TabResize, o, 0) end
-		if i == 1 then
-			o:SetPoint("TOPLEFT", f, "BOTTOMLEFT", 12, 2)
-		else
-			o:SetPoint("LEFT", f.onglets[i - 1], "RIGHT", 3, 0)
-		end
-		o:SetScript("OnClick", function() Choisir(i) end)
-		f.onglets[i] = o
-	end
-	f.numTabs = #noms
-	f.Tabs = f.onglets
-end
-
-local function MarquerOnglet(f, i)
-	if PanelTemplates_SetTab then pcall(PanelTemplates_SetTab, f, i) end
-end
-
 --------------------------------------------------------------------------------
--- Onglet 1 : Parcourir
+-- Onglet « Parcourir »
 --------------------------------------------------------------------------------
 
--- Choix du rôle (Tank / Heal / DPS) dans la bande de pierre, comme les boutons de rôle de la
--- recherche de groupe officielle. Même choix que la barre de rôle (ns.ChoisirRole).
-local choixRoles = {} -- tous les sélecteurs créés, pour les remettre à jour ensemble
+local NOMS_FILTRES = { "Tout", "Donjons", "Raids", "Quêtes", "Autres" }
+local HAUTEUR_ANNONCE, ECART_ANNONCE = 68, 6
+local derniereDemande = -100
 
-local function MajChoixRole(w)
-	local actuel = ns.MonRole and ns.MonRole()
-	local manuel = ns.RoleChoisiALaMain and ns.RoleChoisiALaMain()
-	for role, b in pairs(w.boutons) do
-		IconeRole(b.icone, role, actuel == role)
-		b.coche:SetShown(manuel == role)
-	end
-end
-
-local function CreerChoixRole(parent)
-	local w = CreateFrame("Frame", nil, parent)
-	w:SetSize(3 * 42, 40)
-	w.boutons = {}
-	for i, role in ipairs(ROLES) do
-		local b = CreateFrame("Button", nil, w)
-		b:SetSize(38, 38)
-		b:SetPoint("LEFT", w, "LEFT", (i - 1) * 42, 0)
-		b.icone = b:CreateTexture(nil, "ARTWORK")
-		b.icone:SetAllPoints(b)
-		local survol = b:CreateTexture(nil, "HIGHLIGHT")
-		survol:SetAllPoints(b)
-		survol:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
-		survol:SetBlendMode("ADD")
-		survol:SetAlpha(0.5)
-		-- coche : rôle choisi à la main (sinon rôle automatique : groupe / spécialisation)
-		b.coche = b:CreateTexture(nil, "OVERLAY")
-		b.coche:SetSize(18, 18)
-		b.coche:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 4, -4)
-		b.coche:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
-		b:SetScript("OnClick", function()
-			if ns.ChoisirRole then ns.ChoisirRole(role) end
-			for _, autre in ipairs(choixRoles) do MajChoixRole(autre) end
-			if Rafraichir then Rafraichir() end
-		end)
-		Infobulle(b, function(tt)
-			tt:SetText(TexteRole(role))
-			tt:AddLine("Clic : annoncer ce rôle à la guilde.", 1, 1, 1)
-			tt:AddLine("Re-clic : revenir en automatique.", 0.7, 0.7, 0.7)
-		end)
-		w.boutons[role] = b
-	end
-	choixRoles[#choixRoles + 1] = w
-	return w
-end
-
--- appelé par GuildUp.lua quand le rôle change depuis la barre de rôle
-ns.SurChangementDeRole = function()
-	for _, w in ipairs(choixRoles) do MajChoixRole(w) end
-	if Rafraichir then Rafraichir() end
-end
-
-local HAUTEUR_ENTREE = 56
-
-local function CreerEntree(parent)
-	local b = CreateFrame("Button", nil, parent)
-	b:SetSize(LARGEUR_LISTE, HAUTEUR_ENTREE - 4)
-	b.fond = b:CreateTexture(nil, "BACKGROUND")
-	b.fond:SetAllPoints(b)
-	PoserAtlas(b.fond, "groupfinder-highlightbar", { 0.15, 0.13, 0.1, 0.8 })
-	local survol = b:CreateTexture(nil, "HIGHLIGHT")
-	survol:SetAllPoints(b)
-	if not PoserAtlas(survol, "groupfinder-highlightbar-blue") then survol:SetColorTexture(0.3, 0.5, 1, 0.15) end
-	survol:SetBlendMode("ADD")
-	survol:SetAlpha(0.6)
-
-	-- vignette large : les images de catégorie sont en paysage
-	b.icone = b:CreateTexture(nil, "ARTWORK")
-	b.icone:SetSize(72, 44)
-	b.icone:SetPoint("LEFT", b, "LEFT", 4, 0)
-
-	b.nom = b:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-	b.nom:SetPoint("TOPLEFT", b, "TOPLEFT", 82, -5)
-	b.nom:SetPoint("RIGHT", b, "RIGHT", -200, 0)
-	b.nom:SetJustifyH("LEFT")
-	b.nom:SetWordWrap(false)
-
-	b.chefIcone = b:CreateTexture(nil, "ARTWORK")
-	b.chefIcone:SetSize(14, 14)
-	b.chefIcone:SetPoint("TOPLEFT", b.nom, "BOTTOMLEFT", 0, -3)
-	if not PoserAtlas(b.chefIcone, "groupfinder-icon-leader") then
-		b.chefIcone:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
-	end
-	b.classe = b:CreateTexture(nil, "ARTWORK")
-	b.classe:SetSize(14, 14)
-	b.classe:SetPoint("LEFT", b.chefIcone, "RIGHT", 2, 0)
-	b.chef = b:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	b.chef:SetPoint("LEFT", b.classe, "RIGHT", 3, 0)
-	b.niveaux = b:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-	b.niveaux:SetPoint("LEFT", b.chef, "RIGHT", 8, 0)
-
-	b.commentaire = b:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-	b.commentaire:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", 82, 5)
-	b.commentaire:SetPoint("RIGHT", b, "RIGHT", -150, 0)
-	b.commentaire:SetJustifyH("LEFT")
-	b.commentaire:SetWordWrap(false)
-
-	b.places = CreerEmplacements(b, 13)
-	b.places:SetPoint("TOPRIGHT", b, "TOPRIGHT", -6, -6)
-	b.entree = CreerBoutonEntree(b)
-	b.entree:SetPoint("BOTTOMRIGHT", b.icone, "BOTTOMRIGHT", 2, -2)
-	b.compte = b:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	b.compte:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -100, 8)
-
-	b.bouton = NouveauBouton(b, "Postuler", 90, 20)
-	b.bouton:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -6, 5)
-
-	Infobulle(b, function(tt, self)
-		local a = self.annonce
-		if not a then return end
-		local e = InfoContenu(a.code)
-		tt:SetText(e.nom, 1, 0.82, 0)
-		tt:AddLine(TexteNiveaux(e) .. "  ·  " .. (a.membres or 1) .. "/" .. (a.taille or 5) .. " joueurs", 1, 1, 1)
-		tt:AddLine(" ")
-		tt:AddLine("Chef : " .. CouleurClasse(a.classe) .. NomCourt(a.chef) .. "|r (" .. (a.niveau or 0) .. ")", 1, 1, 1)
-		if ns.LignesIdentite then ns.LignesIdentite(tt, a.chef) end
-		for _, m in ipairs(a.liste or {}) do
-			if Prenom(m.nom) ~= Prenom(a.chef) then tt:AddLine("  " .. m.nom .. " — " .. TexteRole(m.role), 1, 1, 1) end
-		end
-		tt:AddLine(" ")
-		for _, role in ipairs(ROLES) do
-			local libres = PlacesLibres(a, role) or 0
-			tt:AddLine(("%s : %d/%d%s"):format(TexteRole(role), a.pris[role] or 0, a.besoin[role] or 0,
-				libres > 0 and ("  |cff33dd55(" .. libres .. " libre" .. (libres > 1 and "s" or "") .. ")|r") or ""), 1, 1, 1)
-		end
-		if a.commentaire ~= "" then
-			tt:AddLine(" ")
-			tt:AddLine(a.commentaire, 0.8, 0.8, 0.8, true)
-		end
-	end)
-	return b
-end
-
-local function CreerPageParcourir(f, AllerVersMonGroupe)
-	local p = NouvellePage(f)
-
-	-- bande du haut : titre et rôle
-	local titre = p:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-	titre:SetPoint("TOPLEFT", p, "TOPLEFT", 74, -34)
-	titre:SetText("Groupes de la guilde")
-	p.monRole = p:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	p.monRole:SetPoint("TOPLEFT", titre, "BOTTOMLEFT", 0, -6)
-	p.choixRole = CreerChoixRole(p)
-	p.choixRole:SetPoint("TOPRIGHT", p, "TOPRIGHT", -16, -30)
-
-	-- en-têtes de colonnes, au-dessus du filet
-	local colonne1 = p:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-	colonne1:SetPoint("TOPLEFT", p, "TOPLEFT", 16, -86)
-	colonne1:SetText("Contenu")
-	local colonne2 = p:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-	colonne2:SetPoint("TOPRIGHT", p, "TOPRIGHT", -44, -86)
-	colonne2:SetText("Places")
-
-	p.defile, p.contenu = NouvelleListe(p, LIGNE_HAUT - 4, BAS_LISTE)
-	p.entrees = {}
-
-	p.vide = p:CreateFontString(nil, "ARTWORK", "GameFontDisable")
-	p.vide:SetPoint("TOP", p, "TOP", 0, LIGNE_HAUT - 30)
-	p.vide:SetWidth(300)
-	p.vide:SetText("Aucun groupe ouvert pour l'instant. Si tu ne trouves pas ce que tu cherches, crée le tien.")
-
-	-- bande du bas
-	local actualiser = NouveauBouton(p, "Actualiser", 111, 28)
-	actualiser:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 21, 16)
-	local dernierQ = 0
-	actualiser:SetScript("OnClick", function()
-		-- au plus une demande toutes les 10 s
-		if GetTime() - dernierQ < 10 then
-			if Rafraichir then Rafraichir() end
-			return
-		end
-		dernierQ = GetTime()
-		Envoyer("Q", "GUILD")
-	end)
-	local creer = NouveauBouton(p, "Créer un groupe", 130, 28)
-	creer:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -21, 16)
-	creer:SetScript("OnClick", AllerVersMonGroupe)
-	return p
-end
-
-local function RafraichirParcourir(p)
-	local monRole = ns.MonRole and ns.MonRole()
-	p.monRole:SetText("Ton rôle : " .. TexteRole(monRole))
-	local liste = {}
-	for _, a in pairs(etat.annonces) do
-		if not (etat.monAnnonce and a.id == etat.monAnnonce.id) then liste[#liste + 1] = a end
-	end
-	table.sort(liste, function(a, b) return a.premiere > b.premiere end)
-	-- mon propre groupe, en tête de liste (visible, mais on ne peut pas y postuler)
-	if etat.monAnnonce then
-		local pris, membres = Composition(etat.monAnnonce.besoin)
-		local _, classe = UnitClass("player")
-		table.insert(liste, 1, {
-			id = etat.monAnnonce.id, estMoi = true, chef = UnitName("player"), premiere = GetTime(),
-			code = etat.monAnnonce.code, besoin = etat.monAnnonce.besoin, pris = pris,
-			taille = etat.monAnnonce.taille, membres = #membres, niveau = UnitLevel("player") or 0, classe = classe,
-			commentaire = etat.monAnnonce.commentaire, liste = membres,
-		})
-	end
-	p.vide:SetShown(#liste == 0)
-	for i, a in ipairs(liste) do
-		local b = p.entrees[i]
-		if not b then
-			b = CreerEntree(p.contenu)
-			p.entrees[i] = b
-		end
-		b:ClearAllPoints()
-		b:SetPoint("TOPLEFT", p.contenu, "TOPLEFT", 0, -(i - 1) * HAUTEUR_ENTREE)
-		b.annonce = a
-		local e = InfoContenu(a.code)
-		PoserIcone(b.icone, e.icone)
-		b.nom:SetText(e.nom)
-		IconeClasse(b.classe, a.classe)
-		b.chef:SetText(CouleurClasse(a.classe) .. NomCourt(a.chef) .. "|r (" .. (a.niveau or 0) .. ")")
-		b.niveaux:SetText(CouleurNiveau(e) .. TexteNiveaux(e) .. "|r")
-		b.commentaire:SetText(a.commentaire ~= "" and ("« " .. a.commentaire .. " »") or "")
-		RangerEmplacements(b.places)
-		MajEmplacements(b.places, a.besoin, a.pris, a.taille or 5)
-		MajBoutonEntree(b.entree, e)
-		b.compte:SetText((a.membres or 1) .. "/" .. (a.taille or 5))
-
-		local etat = etat.candidatures[a.id]
-		local libres = PlacesLibres(a, monRole)
-		local bt = b.bouton
-		bt:SetEnabled(true)
-		if a.estMoi then
-			bt:SetText("Ton groupe")
-			bt:SetEnabled(false)
-		elseif etat == "envoyee" then
-			bt:SetText("Annuler")
-			bt:SetScript("OnClick", function() AnnulerCandidature(a.id) end)
-		elseif etat == "refusee" then
-			bt:SetText("Refusé")
-			bt:SetEnabled(false)
-		elseif (a.membres or 1) >= (a.taille or 5) then
-			bt:SetText("Complet")
-			bt:SetEnabled(false)
-		elseif libres and libres <= 0 then
-			bt:SetText("Rôle complet")
-			bt:SetEnabled(false)
-		else
-			bt:SetText("Postuler")
-			bt:SetScript("OnClick", function() Postuler(a.id) end)
-		end
-		b:Show()
-	end
-	for i = #liste + 1, #p.entrees do p.entrees[i]:Hide() end
-	p.contenu:SetHeight(math.max(10, #liste * HAUTEUR_ENTREE))
-end
-
---------------------------------------------------------------------------------
--- Onglet 2 : Mon groupe (créer / gérer mon annonce)
---------------------------------------------------------------------------------
-
-local HAUTEUR_ACTIVITE = 26
-
--- Taille réelle du cadre des boutons de catégorie (atlas groupfinder-button-cover)
-local function TailleBoutonCategorie()
-	local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("groupfinder-button-cover")
-	local l, h = (info and info.width) or 319, (info and info.height) or 67
-	if l > 400 then h = h * 400 / l; l = 400 end -- au cas où, sans déformer
-	return l, h
-end
-
--- Bouton de catégorie comme dans la recherche de groupe officielle (LFGListingCategoryTemplate) :
--- image de la catégorie en retrait (5, 8, 5, 5), cadre à sa taille réelle, texte à gauche
-local function CreerBoutonCategorie(parent)
-	local l, h = TailleBoutonCategorie()
-	local b = CreateFrame("Button", nil, parent)
-	b:SetSize(l, h)
-	b.icone = b:CreateTexture(nil, "BACKGROUND")
-	b.icone:SetPoint("TOPLEFT", b, "TOPLEFT", 5, -8)
-	b.icone:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -5, 5)
-	b.cadre = b:CreateTexture(nil, "ARTWORK")
-	b.cadre:SetPoint("CENTER", b, "CENTER", 0, 0)
-	if AtlasExiste("groupfinder-button-cover") then
-		b.cadre:SetAtlas("groupfinder-button-cover", true)
-	else
-		b.cadre:Hide()
-	end
-	local survol = b:CreateTexture(nil, "HIGHLIGHT")
-	survol:SetPoint("CENTER", b, "CENTER", 0, 0)
-	if AtlasExiste("groupfinder-button-cover-hover") then
-		survol:SetAtlas("groupfinder-button-cover-hover", true)
-	else
-		survol:SetAllPoints(b)
-		survol:SetColorTexture(1, 1, 1, 0.15)
-	end
-	b.texte = b:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	b.texte:SetPoint("LEFT", b, "LEFT", 20, 0)
-	b.texte:SetJustifyH("LEFT")
-	return b
-end
-
-local function CreerLigneActivite(parent)
-	local b = CreateFrame("Button", nil, parent)
-	b:SetSize(LARGEUR_LISTE, HAUTEUR_ACTIVITE - 2)
-	b.fond = b:CreateTexture(nil, "BACKGROUND")
-	b.fond:SetAllPoints(b)
-	PoserAtlas(b.fond, "common-button-list-mid2", { 1, 1, 1, 0.05 })
-	local survol = b:CreateTexture(nil, "HIGHLIGHT")
-	survol:SetAllPoints(b)
-	if not PoserAtlas(survol, "common-button-list-mid2-hover") then survol:SetColorTexture(1, 1, 1, 0.1) end
-	-- la couche HIGHLIGHT passe au-dessus du texte : fondu additif léger, sinon tout devient marron
-	survol:SetBlendMode("ADD")
-	survol:SetAlpha(0.35)
-	b.choisi = b:CreateTexture(nil, "ARTWORK")
-	b.choisi:SetAllPoints(b)
-	if not PoserAtlas(b.choisi, "common-button-list-mid2-selected") then b.choisi:SetColorTexture(1, 0.82, 0, 0.25) end
-	b.choisi:SetBlendMode("ADD")
-	b.icone = b:CreateTexture(nil, "ARTWORK", nil, 2)
-	b.icone:SetSize(20, 20)
-	b.icone:SetPoint("LEFT", b, "LEFT", 4, 0)
-	b.nom = b:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	b.nom:SetJustifyH("LEFT")
-	b.nom:SetWordWrap(false)
-	b.infos = b:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-	b.infos:SetPoint("RIGHT", b, "RIGHT", -8, 0)
-	-- repère de l'entrée sur la carte, devant le nom
-	b.entree = CreerBoutonEntree(b)
-	b.entree:SetSize(18, 18)
-	b.entree:SetPoint("LEFT", b, "LEFT", 4, 0)
-	return b
-end
-
-local function CreerCompteurRole(parent, role, Changer)
-	local c = CreateFrame("Frame", nil, parent)
-	c:SetSize(118, 30)
-	-- petit cadre : liseré doré + fond sombre
-	local lisere = c:CreateTexture(nil, "BACKGROUND", nil, -1)
-	lisere:SetPoint("TOPLEFT", c, "TOPLEFT", -5, 4)
-	lisere:SetPoint("BOTTOMRIGHT", c, "BOTTOMRIGHT", 5, -4)
-	lisere:SetColorTexture(1, 0.82, 0, 0.55)
-	local fond = c:CreateTexture(nil, "BACKGROUND", nil, 0)
-	fond:SetPoint("TOPLEFT", lisere, "TOPLEFT", 1, -1)
-	fond:SetPoint("BOTTOMRIGHT", lisere, "BOTTOMRIGHT", -1, 1)
-	fond:SetColorTexture(0.05, 0.05, 0.05, 0.85)
-	c.icone = c:CreateTexture(nil, "ARTWORK")
-	c.icone:SetSize(26, 26)
-	c.icone:SetPoint("LEFT", c, "LEFT", 0, 0)
-	IconeRole(c.icone, role, true)
-	c.moins = NouveauBouton(c, "-", 22, 22)
-	c.moins:SetPoint("LEFT", c.icone, "RIGHT", 4, 0)
-	c.valeur = c:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge")
-	c.valeur:SetPoint("LEFT", c.moins, "RIGHT", 4, 0)
-	c.valeur:SetWidth(24)
-	c.plus = NouveauBouton(c, "+", 22, 22)
-	c.plus:SetPoint("LEFT", c.valeur, "RIGHT", 4, 0)
-	c.moins:SetScript("OnClick", function() Changer(role, -1) end)
-	c.plus:SetScript("OnClick", function() Changer(role, 1) end)
-	return c
-end
-
-local function CreerPageMonGroupe(f)
-	local p = NouvellePage(f)
-	p.categorieChoisie = nil
-	p.besoin = nil
-	-- choix du rôle, en haut à droite (visible en création comme une fois l'annonce publiée)
-	p.choixRole = CreerChoixRole(p)
-	p.choixRole:SetPoint("TOPRIGHT", p, "TOPRIGHT", -16, -30)
-	p.choixRole:SetFrameLevel(p:GetFrameLevel() + 5)
-
-	----------------------------------------------------------------- création
-	-- deux écrans, comme l'officiel : d'abord les catégories, puis les détails (avec « Retour »)
-	local creer = CreateFrame("Frame", nil, p)
-	creer:SetAllPoints(p)
-	p.creer = creer
-	p.etape = "categories"
-
-	-- bande de pierre : titre (catégorie choisie) et consigne
-	creer.titre = creer:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-	creer.titre:SetPoint("TOPLEFT", creer, "TOPLEFT", 74, -34)
-	creer.consigne = creer:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	creer.consigne:SetPoint("TOPLEFT", creer.titre, "BOTTOMLEFT", 0, -6)
-
-	-- écran 1 : grands boutons de catégorie empilés
-	creer.ecranCategories = CreateFrame("Frame", nil, creer)
-	creer.ecranCategories:SetAllPoints(creer)
-	creer.boutonsCategories = {}
-
-	local t1 = creer:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-	t1:SetPoint("TOPLEFT", creer, "TOPLEFT", 16, -86)
-	t1:SetText("Contenu")
-	local t1b = creer:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-	t1b:SetPoint("TOPRIGHT", creer, "TOPRIGHT", -44, -86)
-	t1b:SetText("Niveau  ·  Joueurs")
-
-	creer.defile, creer.liste = NouvelleListe(creer, LIGNE_HAUT - 4, HAUTEUR - 300)
-	creer.lignes = {}
-
-	local separation = creer:CreateTexture(nil, "ARTWORK")
-	if AtlasExiste("groupfinder-ScrollLine") then
-		separation:SetAtlas("groupfinder-ScrollLine", true)
-	else
-		separation:SetColorTexture(1, 0.82, 0, 0.3)
-		separation:SetHeight(1)
-	end
-	separation:SetPoint("LEFT", creer, "TOPLEFT", 4, -304)
-	separation:SetPoint("RIGHT", creer, "TOPRIGHT", -4, -304)
-
-	local t2 = creer:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	t2:SetPoint("TOPLEFT", creer, "TOPLEFT", 16, -314)
-	t2:SetText("Places recherchées")
-	creer.taille = creer:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	creer.taille:SetPoint("TOPRIGHT", creer, "TOPRIGHT", -16, -316)
-	creer.compteurs = {}
-	local function Changer(role, delta)
-		if not p.besoin then return end
-		local e = etat.fenetre.choix and InfoContenu(etat.fenetre.choix)
-		local taille = TailleMaxContenu(e)
-		local total = p.besoin.tank + p.besoin.heal + p.besoin.dps
-		local nouveau = (p.besoin[role] or 0) + delta
-		if nouveau < 0 or (delta > 0 and total >= taille) then return end
-		p.besoin[role] = nouveau
-		Rafraichir()
-	end
-	for i, role in ipairs(ROLES) do
-		local c = CreerCompteurRole(creer, role, Changer)
-		c:SetPoint("TOPLEFT", creer, "TOPLEFT", 20 + (i - 1) * 140, -334)
-		creer.compteurs[role] = c
-	end
-
-	local t3 = creer:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	t3:SetPoint("TOPLEFT", creer, "TOPLEFT", 16, -376)
-	t3:SetText("Commentaire")
-	local saisie = CreateFrame("EditBox", nil, creer, "InputBoxTemplate")
-	saisie:SetSize(400, 22)
-	saisie:SetPoint("TOPLEFT", creer, "TOPLEFT", 24, -396)
-	saisie:SetAutoFocus(false)
-	saisie:SetMaxLetters(50)
-	saisie:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-	saisie:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-	creer.saisie = saisie
-
-	creer.publier = NouveauBouton(creer, "Publier le groupe", 150, 28)
-	creer.publier:SetPoint("BOTTOMRIGHT", creer, "BOTTOMRIGHT", -21, 16)
-	creer.publier:SetScript("OnClick", function()
-		saisie:ClearFocus()
-		CreerMonAnnonce(etat.fenetre.choix, p.besoin or BesoinParDefaut(5), saisie:GetText())
-	end)
-	local retour = NouveauBouton(creer, "Retour", 111, 28)
-	retour:SetPoint("BOTTOMLEFT", creer, "BOTTOMLEFT", 21, 16)
-	retour:SetScript("OnClick", function()
-		saisie:ClearFocus()
-		p.etape = "categories"
-		Rafraichir()
-	end)
-
-	-- « Rappel » : la guilde reçoit une bulle silencieuse toutes les 5 min tant que le groupe cherche
-	local rappel = CreateFrame("CheckButton", nil, creer, "UICheckButtonTemplate")
-	rappel:SetSize(22, 22)
-	rappel:SetPoint("LEFT", retour, "RIGHT", 14, 0)
-	local texteRappel = rappel.Text or rappel.text
-	if not texteRappel then
-		texteRappel = rappel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-		texteRappel:SetPoint("LEFT", rappel, "RIGHT", 1, 0)
-	end
-	texteRappel:SetFontObject("GameFontHighlightSmall")
-	texteRappel:SetText("Rappel")
-	rappel:SetScript("OnShow", function(self)
-		local db = DB()
-		self:SetChecked(db and db.rappelGroupe and true or false)
-	end)
-	rappel:SetScript("OnClick", function(self)
-		local db = DB()
-		if db then db.rappelGroupe = self:GetChecked() and true or nil end
-	end)
-	rappel:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:SetText("Rappel")
-		GameTooltip:AddLine("Tant que ton groupe cherche du monde, la guilde reçoit une bulle de rappel (sans son) toutes les 5 minutes.", 1, 1, 1, true)
-		GameTooltip:Show()
-	end)
-	rappel:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-	-- écran 2 : détails (tout ce qui précède, sauf le titre et la consigne)
-	local details = CreateFrame("Frame", nil, creer)
-	details:SetAllPoints(creer)
-	creer.details = details
-	for _, element in ipairs({ t1, t1b, separation, t2, creer.taille, t3, creer.defile, saisie, creer.publier, retour, rappel }) do
-		element:SetParent(details)
-	end
-	for _, c in pairs(creer.compteurs) do c:SetParent(details) end
-
-	-- « Voir tous les niveaux » : sinon, seulement les contenus déjà accessibles à mon niveau
-	local tous = CreateFrame("CheckButton", nil, details, "UICheckButtonTemplate")
-	tous:SetSize(20, 20)
-	tous:SetPoint("LEFT", t1, "RIGHT", 16, 0)
-	local texteTous = tous.Text or tous.text
-	if not texteTous then
-		texteTous = tous:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-		texteTous:SetPoint("LEFT", tous, "RIGHT", 1, 0)
-	end
-	texteTous:SetFontObject("GameFontHighlightSmall")
-	texteTous:SetText("Voir tous les niveaux")
-	tous:SetScript("OnShow", function(self)
-		local db = DB()
-		self:SetChecked(db and db.tousNiveaux and true or false)
-	end)
-	tous:SetScript("OnClick", function(self)
-		local db = DB()
-		if db then db.tousNiveaux = self:GetChecked() and true or nil end
-		creer.defile:SetVerticalScroll(0)
-		Rafraichir()
-	end)
-	tous:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText("Voir tous les niveaux")
-		GameTooltip:AddLine("Décoché : seulement les contenus accessibles à ton niveau.", 1, 1, 1, true)
-		GameTooltip:Show()
-	end)
-	tous:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-	----------------------------------------------------------------- gestion
-	local gerer = CreateFrame("Frame", nil, p)
-	gerer:SetAllPoints(p)
-	p.gerer = gerer
-
-	-- bande de pierre : contenu de l'annonce
-	gerer.icone = gerer:CreateTexture(nil, "ARTWORK")
-	gerer.icone:SetSize(78, 48)
-	gerer.icone:SetPoint("TOPLEFT", gerer, "TOPLEFT", 70, -27)
-	gerer.nom = gerer:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-	gerer.nom:SetPoint("TOPLEFT", gerer, "TOPLEFT", 156, -32)
-	gerer.nom:SetPoint("RIGHT", gerer, "RIGHT", -150, 0) -- laisse la place au choix du rôle
-	gerer.nom:SetJustifyH("LEFT")
-	gerer.infos = gerer:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	gerer.infos:SetPoint("TOPLEFT", gerer.nom, "BOTTOMLEFT", 0, -6)
-	gerer.entree = CreerBoutonEntree(gerer)
-	gerer.entree:SetPoint("BOTTOMRIGHT", gerer.icone, "BOTTOMRIGHT", 2, -2)
-
-	-- encart : composition
-	local tc = gerer:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-	tc:SetPoint("TOPLEFT", gerer, "TOPLEFT", 16, -86)
-	tc:SetText("Composition")
-	gerer.places = CreerEmplacements(gerer, 16)
-	gerer.places:SetPoint("TOPRIGHT", gerer, "TOPRIGHT", -16, -82)
-	gerer.membres = {}
-	for i = 1, 5 do
-		local l = CreateFrame("Frame", nil, gerer)
-		l:SetSize(400, 20)
-		l:SetPoint("TOPLEFT", gerer, "TOPLEFT", 22, -108 - (i - 1) * 22)
-		l.role = l:CreateTexture(nil, "ARTWORK")
-		l.role:SetSize(18, 18)
-		l.role:SetPoint("LEFT", l, "LEFT", 0, 0)
-		l.nom = l:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-		l.nom:SetPoint("LEFT", l.role, "RIGHT", 6, 0)
-		gerer.membres[i] = l
-	end
-	gerer.resumeGrand = gerer:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-	gerer.resumeGrand:SetPoint("TOPLEFT", gerer, "TOPLEFT", 22, -112)
-
-	local ligne = gerer:CreateTexture(nil, "ARTWORK")
-	if AtlasExiste("groupfinder-ScrollLine") then
-		ligne:SetAtlas("groupfinder-ScrollLine", true)
-	else
-		ligne:SetColorTexture(1, 0.82, 0, 0.3)
-		ligne:SetHeight(1)
-	end
-	ligne:SetPoint("LEFT", gerer, "TOPLEFT", 4, -222)
-	ligne:SetPoint("RIGHT", gerer, "TOPRIGHT", -4, -222)
-
-	-- encart : candidats
-	local tca = gerer:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-	tca:SetPoint("TOPLEFT", gerer, "TOPLEFT", 16, -230)
-	tca:SetText("Candidats")
-	gerer.aucun = gerer:CreateFontString(nil, "ARTWORK", "GameFontDisable")
-	gerer.aucun:SetPoint("TOP", gerer, "TOP", 0, -270)
-	gerer.aucun:SetText("Pas encore de candidat.")
-	gerer.candidats = {}
-	gerer.decalage = 0 -- premier candidat affiché (molette sur la liste)
-	local function Defiler(_, delta)
-		local maxi = math.max(0, #etat.candidats - #gerer.candidats)
-		gerer.decalage = math.max(0, math.min(maxi, gerer.decalage - delta))
-		if Rafraichir then Rafraichir() end
-	end
-	local zone = CreateFrame("Frame", nil, gerer)
-	zone:SetPoint("TOPLEFT", gerer, "TOPLEFT", 10, -248)
-	zone:SetSize(LARGEUR_LISTE + 20, 6 * 30)
-	zone:EnableMouseWheel(true)
-	zone:SetScript("OnMouseWheel", Defiler)
-	gerer.plus = gerer:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-	gerer.plus:SetPoint("TOPRIGHT", zone, "BOTTOMRIGHT", -4, -2)
-	for i = 1, 6 do
-		local l = CreateFrame("Frame", nil, gerer)
-		l:SetSize(LARGEUR_LISTE + 20, 28)
-		l:SetPoint("TOPLEFT", gerer, "TOPLEFT", 10, -248 - (i - 1) * 30)
-		l:EnableMouseWheel(true)
-		l:SetScript("OnMouseWheel", Defiler)
-		l.fond = l:CreateTexture(nil, "BACKGROUND")
-		l.fond:SetAllPoints(l)
-		PoserAtlas(l.fond, "groupfinder-highlightbar", { 0.15, 0.13, 0.1, 0.8 })
-		l.role = l:CreateTexture(nil, "ARTWORK")
-		l.role:SetSize(20, 20)
-		l.role:SetPoint("LEFT", l, "LEFT", 6, 0)
-		l.classe = l:CreateTexture(nil, "ARTWORK")
-		l.classe:SetSize(16, 16)
-		l.classe:SetPoint("LEFT", l.role, "RIGHT", 4, 0)
-		l.nom = l:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-		l.nom:SetPoint("LEFT", l.classe, "RIGHT", 4, 0)
-		l.inviter = NouveauBouton(l, "Inviter", 76, 22)
-		l.inviter:SetPoint("RIGHT", l, "RIGHT", -84, 0)
-		l.refuser = NouveauBouton(l, "Refuser", 76, 22)
-		l.refuser:SetPoint("RIGHT", l, "RIGHT", -4, 0)
-		gerer.candidats[i] = l
-	end
-
-	-- commentaire sous les infos (la bande du bas sert aux boutons)
-	gerer.commentaire = gerer:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-	gerer.commentaire:SetPoint("TOPLEFT", gerer.infos, "BOTTOMLEFT", 0, -3)
-	gerer.commentaire:SetPoint("RIGHT", gerer, "RIGHT", -150, 0)
-	gerer.commentaire:SetJustifyH("LEFT")
-	gerer.commentaire:SetWordWrap(false)
-	-- bande du bas : [Style ▾] [Rendre public] [Retirer l'annonce]
-	gerer.fermer = NouveauBouton(gerer, "Retirer l'annonce", 150, 28)
-	gerer.fermer:SetPoint("BOTTOMRIGHT", gerer, "BOTTOMRIGHT", -21, 16)
-	if ns.CreerBoutonsPublic then
-		gerer.public = ns.CreerBoutonsPublic(gerer)
-		gerer.public.public:SetPoint("RIGHT", gerer.fermer, "LEFT", -4, 0)
-		gerer.public.style:SetPoint("RIGHT", gerer.public.public, "LEFT", -4, 0)
-	end
-	gerer.fermer:SetScript("OnClick", function() FermerMonAnnonce("retirée par toi") end)
-	return p
-end
-
-local function RafraichirCreation(p)
-	local creer = p.creer
-	local cat = Catalogue()
-
-	local enDetails = p.etape == "details" and p.categorieChoisie ~= nil
-	creer.ecranCategories:SetShown(not enDetails)
-	creer.details:SetShown(enDetails)
-
-	if not enDetails then
-		-- écran 1 : grands boutons de catégorie empilés et centrés, à leur taille réelle
-		creer.titre:SetText("Créer un groupe")
-		creer.consigne:SetText(not IsInGuild() and "|cffff6666Tu n'es pas dans une guilde.|r"
-			or (not PeutAnnoncer() and "|cffff6666Seul le chef du groupe peut publier.|r"
-			or "Choisis une catégorie."))
-		local _, h = TailleBoutonCategorie()
-		for i, c in ipairs(Categories()) do
-			local b = creer.boutonsCategories[i]
-			if not b then
-				b = CreerBoutonCategorie(creer.ecranCategories)
-				creer.boutonsCategories[i] = b
+local function InfobulleAnnonce(self)
+	local a, e = self.annonce, self.contenu
+	if not a then return end
+	local tt = GameTooltip
+	tt:SetOwner(self, "ANCHOR_RIGHT")
+	tt:SetText(e.nom or "?", C.ors[1], C.ors[2], C.ors[3])
+	tt:AddLine(TexteNiveaux(e) .. " · " .. (a.membres or 1) .. "/" .. (a.taille or 5) .. " joueurs", 1, 1, 1)
+	tt:AddLine("Chef : " .. CouleurClasse(a.classe) .. NomCourt(a.chef or "?") .. "|r" .. ((a.niveau or 0) > 0 and (" (" .. a.niveau .. ")") or ""), 1, 1, 1)
+	if ns.LignesIdentite and not a.estMoi then ns.LignesIdentite(tt, a.chef) end
+	if a.liste and #a.liste > 0 then
+		for _, m in ipairs(a.liste) do
+			if Prenom(m.nom) ~= Prenom(a.chef) then
+				tt:AddLine("  " .. NomCourt(m.nom) .. " — " .. TexteRole(m.role), 0.9, 0.9, 0.9)
 			end
-			b:ClearAllPoints()
-			b:SetPoint("TOP", creer.ecranCategories, "TOP", -2, LIGNE_HAUT - 8 - (i - 1) * (h + 6))
-			if not PoserAtlas(b.icone, c.atlas) then PoserAtlas(b.icone, ATLAS_DEFAUT, { 0.2, 0.2, 0.2, 1 }) end
-			b.texte:SetText(c.nom)
-			b:SetScript("OnClick", function()
-				if p.categorieChoisie ~= c.id then
-					p.categorieChoisie = c.id
-					etat.fenetre.choix = nil
-					creer.defile:SetVerticalScroll(0)
-				end
-				p.etape = "details"
-				Rafraichir()
-			end)
-			b:Show()
-		end
-		for i = #Categories() + 1, #creer.boutonsCategories do creer.boutonsCategories[i]:Hide() end
-		return
-	end
-
-	-- écran 2 : titre = catégorie choisie
-	for _, c in ipairs(Categories()) do
-		if c.id == p.categorieChoisie then creer.titre:SetText(c.nom) end
-	end
-
-	-- contenus de la catégorie
-	local nb = 0
-	for _, e in ipairs(cat) do
-		-- contenus accessibles à mon niveau (sauf si « Voir tous les niveaux » est coché)
-		local dbN = DB()
-		local accessible = (dbN and dbN.tousNiveaux) or (e.min or 0) <= (UnitLevel("player") or 0)
-		if e.idCategorie == p.categorieChoisie and accessible then
-			nb = nb + 1
-			local b = creer.lignes[nb]
-			if not b then
-				b = CreerLigneActivite(creer.liste)
-				creer.lignes[nb] = b
-			end
-			b:ClearAllPoints()
-			b:SetPoint("TOPLEFT", creer.liste, "TOPLEFT", 0, -(nb - 1) * HAUTEUR_ACTIVITE)
-			-- petite icône seulement si c'est une vraie icône de donjon (pas l'image de catégorie)
-			b.nom:ClearAllPoints()
-			MajBoutonEntree(b.entree, e)
-			local gauche = b.entree:IsShown() and 26 or 4  -- place du bouton carte
-			b.icone:ClearAllPoints()
-			b.icone:SetPoint("LEFT", b, "LEFT", gauche, 0)
-			if e.icone and e.icone.fichier then
-				PoserIcone(b.icone, e.icone)
-				b.icone:Show()
-				b.nom:SetPoint("LEFT", b.icone, "RIGHT", 6, 0)
-			else
-				b.icone:Hide()
-				b.nom:SetPoint("LEFT", b, "LEFT", gauche + 6, 0)
-			end
-			b.nom:SetPoint("RIGHT", b, "RIGHT", -130, 0)
-			b.nom:SetText(e.nom)
-			b.infos:SetText(("%s%s|r  ·  %d j."):format(CouleurNiveau(e), TexteNiveaux(e), e.taille or 5))
-			b.choisi:SetShown(etat.fenetre.choix == e.code)
-			b:SetScript("OnClick", function()
-				if etat.fenetre.choix ~= e.code then
-					etat.fenetre.choix = e.code
-					p.besoin = BesoinParDefaut(e.taille or 5)
-				end
-				Rafraichir()
-			end)
-			b:Show()
 		end
 	end
-	for i = nb + 1, #creer.lignes do creer.lignes[i]:Hide() end
-	creer.liste:SetHeight(math.max(10, nb * HAUTEUR_ACTIVITE))
-
-	-- composition
-	local e = etat.fenetre.choix and InfoContenu(etat.fenetre.choix)
-	local taille = TailleMaxContenu(e)
-	if not p.besoin then p.besoin = BesoinParDefaut(e and e.taille or 5) end
-	local total = p.besoin.tank + p.besoin.heal + p.besoin.dps
 	for _, role in ipairs(ROLES) do
-		local c = creer.compteurs[role]
-		c.valeur:SetText(p.besoin[role])
-		c.moins:SetEnabled(p.besoin[role] > 0)
-		c.plus:SetEnabled(total < taille)
+		local b = a.besoin and a.besoin[role] or 0
+		if b > 0 then
+			local libres = PlacesLibres(a, role) or 0
+			tt:AddLine(UI.TexteRole(role) .. " : " .. (a.pris and a.pris[role] or 0) .. "/" .. b
+				.. (libres > 0 and ("  |cff6fd08c(" .. libres .. " libre" .. (libres > 1 and "s" or "") .. ")|r") or ""), 1, 1, 1)
+		end
 	end
-	if EstPerso(e) then
-		creer.taille:SetText(("%d place(s) (jusqu'à %d)"):format(total, taille))
-	else
-		creer.taille:SetText(("%d place(s) sur %d"):format(total, taille))
-	end
-
-	local possible = IsInGuild() and PeutAnnoncer() and etat.fenetre.choix ~= nil and total > 0
-	creer.publier:SetEnabled(possible)
-	if not IsInGuild() then
-		creer.consigne:SetText("|cffff6666Tu n'es pas dans une guilde.|r")
-	elseif not PeutAnnoncer() then
-		creer.consigne:SetText("|cffff6666Seul le chef du groupe peut publier.|r")
-	elseif not etat.fenetre.choix then
-		creer.consigne:SetText("Choisis un contenu dans la liste.")
-	else
-		creer.consigne:SetText("Contenu : |cffffd100" .. (e and e.nom or "?") .. "|r")
-	end
+	if a.commentaire and a.commentaire ~= "" then tt:AddLine("« " .. a.commentaire .. " »", 0.8, 0.8, 0.8, true) end
+	tt:Show()
 end
 
-local function RafraichirGestion(p)
-	local g = p.gerer
-	local e = InfoContenu(etat.monAnnonce.code)
-	PoserIcone(g.icone, e.icone)
-	g.nom:SetText(e.nom)
-	g.infos:SetText(("%d/%d joueurs  ·  %s%s|r"):format(NombreMembres(), etat.monAnnonce.taille, CouleurNiveau(e), TexteNiveaux(e)))
-	g.commentaire:SetText(etat.monAnnonce.commentaire ~= "" and ("« " .. etat.monAnnonce.commentaire .. " »") or "")
-	if g.public then g.public.maj(etat.monAnnonce, e.nom) end
+local function CreerAnnonce(parent)
+	local r = UI.Rangee(parent, HAUTEUR_ANNONCE)
+	r.portrait = UI.Portrait(r, 44)
+	r.portrait:SetPoint("LEFT", r, "LEFT", 12, 0)
+	r.bouton = UI.Bouton(r, "Postuler", "or", 104, 28)
+	r.bouton:SetPoint("RIGHT", r, "RIGHT", -12, 0)
+	r.cherche = UI.Texte(r, "GameFontHighlightSmall")
+	r.cherche:SetPoint("RIGHT", r.bouton, "LEFT", -12, 0)
+	r.cherche:SetWidth(96)
+	r.cherche:SetWordWrap(true)
+	r.places = UI.Places(r, 10)
+	r.places:SetPoint("RIGHT", r.cherche, "LEFT", -10, 0)
+	r.placesTexte = UI.Texte(r, "GameFontHighlightSmall")
+	r.placesTexte:SetPoint("RIGHT", r.cherche, "LEFT", -10, 0)
+	r.titre = UI.Texte(r, "GameFontNormal", C.texte)
+	r.titre:SetPoint("TOPLEFT", r.portrait, "TOPRIGHT", 12, 4)
+	r.entree = BoutonEntree(r)
+	r.sous = UI.Texte(r, "GameFontHighlightSmall", C.gris)
+	r.sous:SetPoint("TOPLEFT", r.titre, "BOTTOMLEFT", 0, -4)
+	r.sous:SetPoint("RIGHT", r.places, "LEFT", -10, 0)
+	r.commentaire = UI.Texte(r, "GameFontDisableSmall")
+	r.commentaire:SetPoint("TOPLEFT", r.sous, "BOTTOMLEFT", 0, -3)
+	r.commentaire:SetPoint("RIGHT", r.places, "LEFT", -10, 0)
+	r:SetScript("OnEnter", InfobulleAnnonce)
+	r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	return r
+end
 
-	local pris, membres = Composition(etat.monAnnonce.besoin)
-	RangerEmplacements(g.places)
-	MajEmplacements(g.places, etat.monAnnonce.besoin, pris, etat.monAnnonce.taille)
-	MajBoutonEntree(g.entree, e)
-
-	-- une ligne par place façon FF14 (groupes de 5)
-	if etat.monAnnonce.taille <= 5 then
-		g.resumeGrand:Hide()
-		local lignes, restants = {}, {}
-		for _, m in ipairs(membres) do restants[#restants + 1] = m end
-		for _, role in ipairs(ROLES) do
-			for _ = 1, etat.monAnnonce.besoin[role] or 0 do
-				local occupant
-				for k, m in ipairs(restants) do
-					if m.role == role then occupant = table.remove(restants, k); break end
-				end
-				lignes[#lignes + 1] = { role = role, membre = occupant }
-			end
-		end
-		for _, l in ipairs(lignes) do
-			if not l.membre and #restants > 0 then l.membre = table.remove(restants, 1) end
-		end
-		for i, l in ipairs(g.membres) do
-			local d = lignes[i]
-			if d then
-				IconeRole(l.role, d.role, d.membre ~= nil)
-				if d.membre then
-					l.nom:SetText(d.membre.nom .. (d.membre.role and "" or "  |cff999999(rôle inconnu)|r"))
-				else
-					l.nom:SetText("|cff777777— place libre —|r")
-				end
-				l:Show()
-			else
-				l:Hide()
-			end
-		end
+local function MajAnnonce(r, a)
+	local e = InfoContenu(a.code)
+	r.annonce, r.contenu = a, e
+	r.portrait:Poser(a.estMoi and ns.MaCle and ns.MaCle() or Normaliser(a.chef or ""), a.classe)
+	r.titre:SetText(e.nom or "?")
+	r.titre:SetWidth(math.min(r.titre:GetStringWidth() + 2, 300))
+	r.entree:ClearAllPoints()
+	r.entree:SetPoint("LEFT", r.titre, "RIGHT", 6, 0)
+	r.entree:Poser(e)
+	local age = a.premiere and math.floor((GetTime() - a.premiere) / 60) or 0
+	r.sous:SetText(("%s|r · %s%s|r%s · %s"):format(CouleurNiveau(e) .. TexteNiveaux(e), CouleurClasse(a.classe), NomCourt(a.chef or "?"),
+		(a.niveau or 0) > 0 and (" (" .. a.niveau .. ")") or "", a.estMoi and "ton annonce" or (age < 1 and "à l'instant" or ("il y a " .. age .. " min"))))
+	r.commentaire:SetText((a.commentaire and a.commentaire ~= "") and ("« " .. a.commentaire .. " »") or "")
+	-- places : un rond par joueur (jusqu'à 10), sinon le compte par rôle
+	local places = ListePlaces(a.besoin, a.pris)
+	if #places <= 10 then
+		r.places:Poser(places)
+		r.places:Show()
+		r.placesTexte:Hide()
 	else
-		for _, l in ipairs(g.membres) do l:Hide() end
-		g.resumeGrand:SetText(("%s %d/%d    %s %d/%d    %s %d/%d"):format(
-			TexteRole("tank"), pris.tank, etat.monAnnonce.besoin.tank, TexteRole("heal"), pris.heal, etat.monAnnonce.besoin.heal,
-			TexteRole("dps"), pris.dps, etat.monAnnonce.besoin.dps))
-		g.resumeGrand:Show()
+		r.places:Hide()
+		r.placesTexte:SetText(TextePlaces(a.besoin, a.pris))
+		r.placesTexte:Show()
+	end
+	-- rôle recherché
+	local complet = (a.membres or 1) >= (a.taille or 5)
+	if complet then
+		r.cherche:SetText("|cff999999Complet|r")
+	else
+		local t = {}
+		for _, role in ipairs(ROLES) do if (PlacesLibres(a, role) or 0) > 0 then t[#t + 1] = UI.TexteRole(role) end end
+		r.cherche:SetText(#t == 3 and "|cff999999Tous rôles|r" or (#t > 0 and ("Cherche " .. table.concat(t, ", ")) or "|cff999999Complet|r"))
+	end
+	-- bouton (l'ordre des cas compte)
+	local cand = etat.candidatures[a.id]
+	local libres = PlacesLibres(a, ns.MonRole and ns.MonRole())
+	local b = r.bouton
+	b:SetScript("OnClick", nil)
+	if a.estMoi then
+		b:Ecrire("Ton groupe"); b:Activer(false)
+	elseif cand == "envoyee" then
+		b:Ecrire("Annuler"); b:Activer(true)
+		b:SetScript("OnClick", function() AnnulerCandidature(a.id) end)
+	elseif cand == "refusee" then
+		b:Ecrire("Refusé"); b:Activer(false)
+	elseif complet then
+		b:Ecrire("Complet"); b:Activer(false)
+	elseif libres and libres <= 0 then
+		b:Ecrire("Rôle complet"); b:Activer(false)
+	else
+		b:Ecrire("Postuler"); b:Activer(true)
+		b:SetScript("OnClick", function() Postuler(a.id) end)
+	end
+	r:Fort(a.estMoi or cand == "envoyee")
+end
+
+-- annonces à montrer : toutes sauf la mienne (complètes comprises), la plus récente d'abord, et ma
+-- propre annonce en tête (« Ton groupe »)
+local function AnnoncesParcourir()
+	local liste = {}
+	for id, a in pairs(etat.annonces) do
+		if not (etat.monAnnonce and id == etat.monAnnonce.id) then liste[#liste + 1] = a end
+	end
+	table.sort(liste, function(x, y) return (x.premiere or 0) > (y.premiere or 0) end)
+	local m = etat.monAnnonce
+	if m then
+		local pris, membres = Composition(m.besoin)
+		local _, classe = UnitClass("player")
+		table.insert(liste, 1, { id = m.id, code = m.code, besoin = m.besoin, pris = pris, taille = m.taille,
+			membres = #membres, chef = UnitName("player"), classe = classe, niveau = UnitLevel("player"),
+			commentaire = m.commentaire, liste = membres, estMoi = true })
+	end
+	return liste
+end
+
+local function CreerParcourir(page)
+	local p = CreateFrame("Frame", nil, page)
+	p:SetAllPoints()
+	p.filtre, p.recherche = 1, ""
+	p.puces = UI.Puces(p, NOMS_FILTRES, function(i) p.filtre = i; p.puces:Choisir(i); p.liste:Haut(); Rafraichir() end)
+	p.puces:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -60)
+	p.puces:Choisir(1)
+	p.champ = UI.Champ(p, 210, "Rechercher un contenu, un joueur")
+	p.champ:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -60)
+	p.champ.SurTexte = function(t) p.recherche = Simplifier(t); p.liste:Haut(); Rafraichir() end
+	p.liste = UI.Liste(p)
+	p.liste:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -100)
+	p.liste:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE + 6, 56)
+	p.vide = UI.Texte(p, "GameFontHighlight", C.gris)
+	p.vide:SetPoint("TOPLEFT", p.liste, "TOPLEFT", 4, -8)
+	p.vide:SetPoint("RIGHT", p, "RIGHT", -MARGE, 0)
+	p.vide:SetWordWrap(true)
+	p.lignes = {}
+
+	-- bas : quêtes en commun, Actualiser
+	p.quetes = UI.Cadre(p, { 0, 0, 0, 0 }, C.bordMoyen)
+	p.quetes:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", MARGE, 12)
+	p.quetes:SetPoint("RIGHT", p, "RIGHT", -MARGE - 130, 0)
+	p.quetes:SetHeight(34)
+	p.quetes.texte = UI.Texte(p.quetes, "GameFontHighlightSmall", C.texte)
+	p.quetes.texte:SetPoint("LEFT", p.quetes, "LEFT", 12, 0)
+	p.quetes.voir = UI.Bouton(p.quetes, "Voir les quêtes en commun", "fantome", 180, 24)
+	p.quetes.voir:SetPoint("RIGHT", p.quetes, "RIGHT", -6, 0)
+	p.quetes.voir:SetScript("OnClick", function() if ns.OuvrirInterface then ns.OuvrirInterface("quetes") end end)
+	p.actualiser = UI.Bouton(p, "Actualiser", "fantome", 118, 34)
+	p.actualiser:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE, 12)
+	p.actualiser:SetScript("OnClick", function()
+		if GetTime() - derniereDemande >= 10 then
+			derniereDemande = GetTime()
+			Envoyer("Q", "GUILD")
+		end
+		Rafraichir()
+	end)
+	UI.Infobulle(p.actualiser, "Actualiser", "Redemande les annonces à la guilde (une fois toutes les 10 secondes).")
+
+	p.Maj = function()
+		local liste = AnnoncesParcourir()
+		local y, n = 0, 0
+		for _, a in ipairs(liste) do
+			local e = InfoContenu(a.code)
+			local ok = (p.filtre == 1 or FiltreDe(e) == p.filtre)
+			if ok and p.recherche ~= "" then
+				local texte = Simplifier((e.nom or "") .. " " .. NomCourt(a.chef or "") .. " " .. (a.commentaire or ""))
+				ok = texte:find(p.recherche, 1, true) ~= nil
+			end
+			if ok then
+				n = n + 1
+				local r = p.lignes[n]
+				if not r then r = CreerAnnonce(p.liste.contenu); p.lignes[n] = r end
+				r:ClearAllPoints()
+				r:SetPoint("TOPLEFT", p.liste.contenu, "TOPLEFT", 0, -y)
+				r:SetPoint("RIGHT", p.liste.contenu, "RIGHT", 0, 0)
+				MajAnnonce(r, a)
+				r:Show()
+				y = y + HAUTEUR_ANNONCE + ECART_ANNONCE
+			end
+		end
+		for i = n + 1, #p.lignes do p.lignes[i]:Hide() end
+		p.liste:Hauteur(y)
+		p.vide:SetShown(n == 0)
+		p.vide:SetText(#liste == 0 and "Aucun groupe ouvert pour l'instant. Si tu ne trouves pas ce que tu cherches, crée le tien."
+			or "Aucun groupe ne correspond à ce filtre.")
+		local nq = ns.QuetesEnCommun and #ns.QuetesEnCommun() or 0
+		p.quetes.texte:SetText(nq > 0 and (nq .. " de tes quêtes " .. (nq > 1 and "sont" or "est") .. " aussi faite" .. (nq > 1 and "s" or "") .. " par d'autres membres.")
+			or "Aucune de tes quêtes n'est faite par d'autres membres pour l'instant.")
+	end
+	return p
+end
+
+--------------------------------------------------------------------------------
+-- Onglet « Mon groupe » : création d'une annonce
+--------------------------------------------------------------------------------
+
+local HAUTEUR_CONTENU = 32
+local LARGEUR_ANNONCE = 280 -- colonne de droite (« Ton annonce »)
+
+local function CreerCreation(page)
+	local p = CreateFrame("Frame", nil, page)
+	p:SetAllPoints()
+	p.lignes = {}
+
+	-- gauche : catégorie, niveaux, contenus
+	p.consigne = UI.Texte(p, "GameFontHighlightSmall", C.gris)
+	p.consigne:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -56)
+	p.consigne:SetPoint("RIGHT", p, "RIGHT", -MARGE - LARGEUR_ANNONCE - 16, 0)
+	p.tousNiveaux = UI.Case(p, "Voir tous les niveaux", function(oui)
+		local db = DB()
+		if db then db.tousNiveaux = oui end
+		p.liste:Haut()
+		Rafraichir()
+	end)
+	p.tousNiveaux:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE - LARGEUR_ANNONCE - 16, -52)
+	UI.Infobulle(p.tousNiveaux, "Voir tous les niveaux", "Décoché : seulement les contenus accessibles à ton niveau.")
+	p.liste = UI.Liste(p)
+	p.liste:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -116)
+	p.liste:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE - LARGEUR_ANNONCE - 10, 12)
+	p.vide = UI.Texte(p, "GameFontHighlight", C.gris)
+	p.vide:SetPoint("TOPLEFT", p.liste, "TOPLEFT", 4, -8)
+	p.vide:SetText("Aucun contenu à ton niveau dans cette catégorie (coche « Voir tous les niveaux »).")
+
+	-- droite : l'annonce
+	local a = UI.Carte(p, "Ton annonce")
+	a:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -52)
+	a:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE, 12)
+	a:SetWidth(LARGEUR_ANNONCE)
+	p.annonce = a
+	a.contenu = UI.Texte(a, "GameFontHighlight", C.texte)
+	a.contenu:SetPoint("TOPLEFT", a, "TOPLEFT", 14, -40)
+	a.contenu:SetPoint("RIGHT", a, "RIGHT", -14, 0)
+	a.contenu:SetWordWrap(true)
+	local tPlaces = UI.Texte(a, "GameFontNormalSmall", C.ors)
+	tPlaces:SetPoint("TOPLEFT", a, "TOPLEFT", 14, -86)
+	tPlaces:SetText("Places recherchées")
+	a.compteurs = {}
+	for i, role in ipairs(ROLES) do
+		local l = CreateFrame("Frame", nil, a)
+		l:SetSize(LARGEUR_ANNONCE - 28, 28)
+		l:SetPoint("TOPLEFT", a, "TOPLEFT", 14, -104 - (i - 1) * 32)
+		l.role = PastilleRole(l)
+		l.role:SetPoint("LEFT", l, "LEFT", 0, 0)
+		l.role:Poser(role)
+		l.plus = UI.Bouton(l, "+", "fantome", 28, 24)
+		l.plus:SetPoint("RIGHT", l, "RIGHT", 0, 0)
+		l.valeur = UI.Texte(l, "GameFontHighlight", C.texte)
+		l.valeur:SetJustifyH("CENTER")
+		l.valeur:SetWidth(30)
+		l.valeur:SetPoint("RIGHT", l.plus, "LEFT", -4, 0)
+		l.moins = UI.Bouton(l, "-", "fantome", 28, 24)
+		l.moins:SetPoint("RIGHT", l.valeur, "LEFT", -4, 0)
+		local function Changer(d)
+			local e = page.choix and InfoContenu(page.choix)
+			page.besoin = page.besoin or BesoinParDefaut(e and e.taille or 5)
+			local total = 0
+			for _, r in ipairs(ROLES) do total = total + (page.besoin[r] or 0) end
+			local v = (page.besoin[role] or 0) + d
+			if v < 0 or (d > 0 and total >= TailleMaxContenu(e)) then return end
+			page.besoin[role] = v
+			Rafraichir()
+		end
+		l.plus:SetScript("OnClick", function() Changer(1) end)
+		l.moins:SetScript("OnClick", function() Changer(-1) end)
+		a.compteurs[role] = l
+	end
+	a.taille = UI.Texte(a, "GameFontHighlightSmall", C.gris)
+	a.taille:SetPoint("TOPLEFT", a, "TOPLEFT", 14, -204)
+	local tCom = UI.Texte(a, "GameFontNormalSmall", C.ors)
+	tCom:SetPoint("TOPLEFT", a, "TOPLEFT", 14, -232)
+	tCom:SetText("Commentaire")
+	a.commentaire = UI.Champ(a, LARGEUR_ANNONCE - 28, "Ex. : on part dans 10 min")
+	a.commentaire:SetPoint("TOPLEFT", a, "TOPLEFT", 14, -250)
+	a.commentaire.saisie:SetMaxLetters(50)
+	a.rappel = UI.Case(a, "Rappel à la guilde toutes les 5 min", function(oui)
+		local db = DB()
+		if db then db.rappelGroupe = oui end
+	end)
+	a.rappel:SetPoint("TOPLEFT", a, "TOPLEFT", 14, -290)
+	UI.Infobulle(a.rappel, "Rappel", "Tant que ton groupe cherche du monde, la guilde reçoit une bulle de rappel (sans son) toutes les 5 minutes.")
+	a.publier = UI.Bouton(a, "Publier le groupe", "or", LARGEUR_ANNONCE - 28, 34)
+	a.publier:SetPoint("BOTTOMLEFT", a, "BOTTOMLEFT", 14, 14)
+	a.publier:SetScript("OnClick", function()
+		if not page.choix then return end
+		a.commentaire.saisie:ClearFocus()
+		CreerMonAnnonce(page.choix, page.besoin or BesoinParDefaut(5), a.commentaire:Lire())
+		Rafraichir()
+	end)
+	a.etat = UI.Texte(a, "GameFontHighlightSmall", C.aide)
+	a.etat:SetPoint("BOTTOMLEFT", a.publier, "TOPLEFT", 0, 10)
+	a.etat:SetPoint("RIGHT", a, "RIGHT", -14, 0)
+	a.etat:SetWordWrap(true)
+
+	local function CreerLigneContenu()
+		local r = UI.Rangee(p.liste.contenu, HAUTEUR_CONTENU - 2)
+		r.icone = r:CreateTexture(nil, "ARTWORK")
+		r.icone:SetSize(22, 22)
+		r.icone:SetPoint("LEFT", r, "LEFT", 8, 0)
+		r.nom = UI.Texte(r, "GameFontHighlight", C.texte)
+		r.nom:SetPoint("LEFT", r.icone, "RIGHT", 8, 0)
+		r.info = UI.Texte(r, "GameFontHighlightSmall", C.gris)
+		r.info:SetPoint("RIGHT", r, "RIGHT", -10, 0)
+		r.info:SetJustifyH("RIGHT")
+		r.nom:SetPoint("RIGHT", r.info, "LEFT", -30, 0)
+		r.entree = BoutonEntree(r)
+		r.entree:SetPoint("RIGHT", r.info, "LEFT", -6, 0)
+		r:SetScript("OnClick", function(self)
+			if page.choix ~= self.code then
+				page.choix = self.code
+				page.besoin = BesoinParDefaut(self.taille or 5)
+			end
+			Rafraichir()
+		end)
+		return r
 	end
 
-	g.aucun:SetShown(#etat.candidats == 0)
-	g.decalage = math.max(0, math.min(g.decalage or 0, #etat.candidats - #g.candidats))
-	local caches = #etat.candidats - #g.candidats
-	g.plus:SetText(caches > 0 and ("%d-%d sur %d candidats (molette)"):format(g.decalage + 1,
-		g.decalage + #g.candidats, #etat.candidats) or "")
-	for i, l in ipairs(g.candidats) do
-		local cd = etat.candidats[i + g.decalage]
-		if cd then
-			IconeRole(l.role, cd.role, true)
-			IconeClasse(l.classe, cd.classe)
-			local plein = cd.role and etat.monAnnonce.besoin[cd.role] and (pris[cd.role] or 0) >= etat.monAnnonce.besoin[cd.role]
-			l.nom:SetText(("%s%s|r (%d)%s%s"):format(CouleurClasse(cd.classe), NomCourt(cd.nom), cd.niveau or 0,
-				cd.statut == "invite" and "  |cff999999invité|r" or "",
-				plein and "  |cffff6666rôle déjà pris|r" or ""))
-			l.inviter:SetScript("OnClick", function() Inviter(cd.nom) end)
-			l.refuser:SetScript("OnClick", function() Refuser(cd.nom) end)
-			-- invitation sans réponse (déclinée, échouée) : on peut réinviter après quelques secondes
-			l.inviter:SetText(cd.statut == "invite" and "Réinviter" or "Inviter")
-			l.inviter:SetEnabled(cd.statut ~= "invite" or GetTime() - (cd.invite or 0) > 10)
-			l:Show()
+	p.Maj = function()
+		local db = DB()
+		-- catégories (puces), refaites si la liste change (catalogue reconstruit)
+		local cats = Categories()
+		local cles = {}
+		for _, c in ipairs(cats) do cles[#cles + 1] = tostring(c.id) end
+		local cle = table.concat(cles, ",")
+		if p.clesCategories ~= cle then
+			p.clesCategories = cle
+			if p.puces then p.puces:Hide() end
+			local noms = {}
+			for _, c in ipairs(cats) do noms[#noms + 1] = c.nom end
+			p.puces = UI.Puces(p, noms, function(i)
+				local c = cats[i]
+				if c and page.categorie ~= c.id then page.categorie = c.id; p.liste:Haut() end
+				Rafraichir()
+			end)
+			p.puces:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -78)
+			p.categories = cats
+		end
+		if not page.categorie and cats[1] then page.categorie = cats[1].id end
+		for i, c in ipairs(p.categories or {}) do if c.id == page.categorie then p.puces:Choisir(i) end end
+
+		-- consigne
+		if not IsInGuild() then
+			p.consigne:SetText("|cffff6655Tu n'es pas dans une guilde.|r")
+		elseif not PeutAnnoncer() then
+			p.consigne:SetText("|cffff6655Seul le chef du groupe peut publier.|r")
 		else
-			l:Hide()
+			p.consigne:SetText("Choisis une catégorie puis un contenu.")
 		end
+		p.tousNiveaux:Poser(db and db.tousNiveaux)
+
+		-- contenus de la catégorie
+		local niveau = UnitLevel("player") or 0
+		local y, n = 0, 0
+		for _, e in ipairs(Catalogue()) do
+			if e.idCategorie == page.categorie and ((db and db.tousNiveaux) or (e.min or 0) <= niveau) then
+				n = n + 1
+				local r = p.lignes[n]
+				if not r then r = CreerLigneContenu(); p.lignes[n] = r end
+				r.code, r.taille = e.code, e.taille
+				if e.icone and e.icone.fichier then PoserIcone(r.icone, e.icone); r.icone:Show() else r.icone:Hide() end
+				r.nom:SetText(e.nom or "?")
+				r.info:SetText(CouleurNiveau(e) .. TexteNiveaux(e) .. "|r · " .. (e.taille or 5) .. " j.")
+				r.entree:Poser(e)
+				local choisi = (page.choix == e.code)
+				r:SetBackdropColor(unpack(choisi and C.actif or C.carte))
+				r:Fort(choisi)
+				r:ClearAllPoints()
+				r:SetPoint("TOPLEFT", p.liste.contenu, "TOPLEFT", 0, -y)
+				r:SetPoint("RIGHT", p.liste.contenu, "RIGHT", 0, 0)
+				r:Show()
+				y = y + HAUTEUR_CONTENU
+			end
+		end
+		for i = n + 1, #p.lignes do p.lignes[i]:Hide() end
+		p.liste:Hauteur(y)
+		p.vide:SetShown(n == 0)
+
+		-- l'annonce
+		local e = page.choix and InfoContenu(page.choix)
+		a.contenu:SetText(e and ("|cfff1cf6b" .. e.nom .. "|r") or "|cff999999Choisis un contenu dans la liste.|r")
+		page.besoin = page.besoin or BesoinParDefaut(e and e.taille or 5)
+		local total = 0
+		for _, role in ipairs(ROLES) do total = total + (page.besoin[role] or 0) end
+		local max = TailleMaxContenu(e)
+		for role, l in pairs(a.compteurs) do
+			local v = page.besoin[role] or 0
+			l.valeur:SetText(tostring(v))
+			l.moins:Activer(v > 0)
+			l.plus:Activer(total < max)
+		end
+		a.taille:SetText(EstPerso(e) and (total .. " place" .. (total > 1 and "s" or "") .. " (jusqu'à " .. max .. ")")
+			or (total .. " place" .. (total > 1 and "s" or "") .. " sur " .. max))
+		a.rappel:Poser(db and db.rappelGroupe)
+		local peut = IsInGuild() and PeutAnnoncer()
+		a.publier:Activer(peut and page.choix ~= nil and total > 0)
+		a.etat:SetText(not IsInGuild() and "Tu n'es pas dans une guilde."
+			or (not PeutAnnoncer() and "Seul le chef du groupe peut publier.") or "")
 	end
+	return p
 end
 
 --------------------------------------------------------------------------------
--- Assemblage
+-- Onglet « Mon groupe » : gestion de mon annonce
 --------------------------------------------------------------------------------
 
-local function ChoisirOnglet(i)
-	if not etat.fenetre then return end
-	etat.fenetre.onglet = i
-	MarquerOnglet(etat.fenetre, i)
-	etat.fenetre.pageParcourir:SetShown(i == 1)
-	etat.fenetre.pageMonGroupe:SetShown(i == 2)
-	Rafraichir()
+local HAUTEUR_CANDIDAT = 44
+
+local function CreerGestion(page)
+	local p = CreateFrame("Frame", nil, page)
+	p:SetAllPoints()
+
+	-- en-tête : le contenu
+	local tete = UI.Cadre(p, C.carte, C.bordMoyen)
+	tete:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -52)
+	tete:SetPoint("RIGHT", p, "RIGHT", -MARGE - LARGEUR_ANNONCE - 16, 0)
+	tete:SetHeight(76)
+	tete.icone = tete:CreateTexture(nil, "ARTWORK")
+	tete.icone:SetSize(76, 46)
+	tete.icone:SetPoint("LEFT", tete, "LEFT", 14, 0)
+	tete.entree = BoutonEntree(tete)
+	tete.entree:SetPoint("BOTTOMRIGHT", tete.icone, "BOTTOMRIGHT", 2, -2)
+	tete.nom = UI.Texte(tete, "GameFontNormalLarge", C.ors)
+	tete.nom:SetPoint("TOPLEFT", tete.icone, "TOPRIGHT", 14, 0)
+	tete.nom:SetPoint("RIGHT", tete, "RIGHT", -14, 0)
+	tete.infos = UI.Texte(tete, "GameFontHighlightSmall", C.texte)
+	tete.infos:SetPoint("TOPLEFT", tete.nom, "BOTTOMLEFT", 0, -5)
+	tete.commentaire = UI.Texte(tete, "GameFontDisableSmall")
+	tete.commentaire:SetPoint("TOPLEFT", tete.infos, "BOTTOMLEFT", 0, -4)
+	tete.commentaire:SetPoint("RIGHT", tete, "RIGHT", -14, 0)
+
+	-- candidats
+	local cand = UI.Carte(p, "Candidats")
+	cand:SetPoint("TOPLEFT", tete, "BOTTOMLEFT", 0, -12)
+	cand:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE - LARGEUR_ANNONCE - 16, 12)
+	cand.liste = UI.Liste(cand)
+	cand.liste:SetPoint("TOPLEFT", cand, "TOPLEFT", 12, -38)
+	cand.liste:SetPoint("BOTTOMRIGHT", cand, "BOTTOMRIGHT", -6, 10)
+	cand.vide:SetText("Pas encore de candidat. Les membres qui postulent apparaissent ici : invite-les dans ton groupe.")
+	cand.lignes = {}
+	local function CreerCandidat()
+		local r = UI.Rangee(cand.liste.contenu, HAUTEUR_CANDIDAT - 4)
+		r.portrait = UI.Portrait(r, 30)
+		r.portrait:SetPoint("LEFT", r, "LEFT", 8, 0)
+		r.refuser = UI.Bouton(r, "Refuser", "fantome", 72, 24)
+		r.refuser:SetPoint("RIGHT", r, "RIGHT", -8, 0)
+		r.inviter = UI.Bouton(r, "Inviter", "or", 84, 24)
+		r.inviter:SetPoint("RIGHT", r.refuser, "LEFT", -6, 0)
+		r.nom = UI.Texte(r, "GameFontHighlight")
+		r.nom:SetPoint("TOPLEFT", r.portrait, "TOPRIGHT", 10, 0)
+		r.nom:SetPoint("RIGHT", r.inviter, "LEFT", -8, 0)
+		r.sous = UI.Texte(r, "GameFontHighlightSmall", C.gris)
+		r.sous:SetPoint("TOPLEFT", r.nom, "BOTTOMLEFT", 0, -3)
+		r.sous:SetPoint("RIGHT", r.inviter, "LEFT", -8, 0)
+		return r
+	end
+
+	-- droite : composition et actions
+	local compo = UI.Carte(p, "Composition")
+	compo:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -52)
+	compo:SetSize(LARGEUR_ANNONCE, 250)
+	compo.places = UI.Places(compo, 10)
+	compo.places:SetPoint("TOPRIGHT", compo, "TOPRIGHT", -14, -12)
+	compo.lignes = {}
+	for i = 1, 5 do
+		local l = CreateFrame("Frame", nil, compo)
+		l:SetSize(LARGEUR_ANNONCE - 28, 30)
+		l:SetPoint("TOPLEFT", compo, "TOPLEFT", 14, -40 - (i - 1) * 34)
+		l.role = PastilleRole(l)
+		l.role:SetPoint("LEFT", l, "LEFT", 0, 0)
+		l.nom = UI.Texte(l, "GameFontHighlight")
+		l.nom:SetPoint("LEFT", l, "LEFT", 74, 0)
+		l.nom:SetPoint("RIGHT", l, "RIGHT", 0, 0)
+		compo.lignes[i] = l
+	end
+	compo.resume = UI.Texte(compo, "GameFontHighlight", C.texte)
+	compo.resume:SetPoint("TOPLEFT", compo, "TOPLEFT", 14, -44)
+	compo.resume:SetPoint("RIGHT", compo, "RIGHT", -14, 0)
+	compo.resume:SetWordWrap(true)
+
+	local actions = UI.Carte(p, "Mon annonce")
+	actions:SetPoint("TOPRIGHT", compo, "BOTTOMRIGHT", 0, -12)
+	actions:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE, 12)
+	actions:SetWidth(LARGEUR_ANNONCE)
+	if ns.CreerBoutonsPublic then
+		p.public = ns.CreerBoutonsPublic(actions)
+		p.public.style:SetWidth(LARGEUR_ANNONCE - 28)
+		p.public.style:SetPoint("TOPLEFT", actions, "TOPLEFT", 14, -40)
+		p.public.public:SetWidth(LARGEUR_ANNONCE - 28)
+		p.public.public:SetPoint("TOPLEFT", p.public.style, "BOTTOMLEFT", 0, -8)
+	end
+	p.retirer = UI.Bouton(actions, "Retirer l'annonce", "aide", LARGEUR_ANNONCE - 28, 32)
+	p.retirer:SetPoint("BOTTOMLEFT", actions, "BOTTOMLEFT", 14, 14)
+	p.retirer:SetScript("OnClick", function() FermerMonAnnonce("retirée par toi") end)
+
+	p.Maj = function()
+		local m = etat.monAnnonce
+		if not m then return end
+		local e = InfoContenu(m.code)
+		PoserIcone(tete.icone, e.icone)
+		tete.entree:Poser(e)
+		tete.nom:SetText(e.nom or "?")
+		tete.infos:SetText(NombreMembres() .. "/" .. (m.taille or 5) .. " joueurs · " .. CouleurNiveau(e) .. TexteNiveaux(e) .. "|r"
+			.. (m.rappel and " · |cff999999rappel toutes les 5 min|r" or ""))
+		tete.commentaire:SetText((m.commentaire and m.commentaire ~= "") and ("« " .. m.commentaire .. " »") or "")
+
+		-- composition
+		local pris, membres = Composition(m.besoin)
+		local places = ListePlaces(m.besoin, pris)
+		if #places <= 10 then compo.places:Poser(places); compo.places:Show() else compo.places:Hide() end
+		local taille = m.taille or 5
+		if taille <= 5 then
+			compo.resume:Hide()
+			-- une ligne par place, dans l'ordre tank, heal, dps ; les places vides prennent les membres restants
+			local restants = {}
+			for _, mb in ipairs(membres) do restants[#restants + 1] = mb end
+			local lignes = {}
+			for _, role in ipairs(ROLES) do
+				for _ = 1, (m.besoin[role] or 0) do
+					local trouve
+					for i, mb in ipairs(restants) do
+						if mb.role == role then trouve = table.remove(restants, i); break end
+					end
+					lignes[#lignes + 1] = { role = role, membre = trouve }
+				end
+			end
+			for _, l in ipairs(lignes) do
+				if not l.membre and #restants > 0 then l.membre = table.remove(restants, 1) end
+			end
+			for i, l in ipairs(compo.lignes) do
+				local d = lignes[i]
+				if d then
+					l.role:Poser(d.role)
+					if d.membre then
+						l.nom:SetText(NomCourt(d.membre.nom) .. (d.membre.role and "" or "  |cff999999(rôle inconnu)|r"))
+						l.nom:SetTextColor(unpack(C.texte))
+					else
+						l.nom:SetText("— place libre —")
+						l.nom:SetTextColor(unpack(C.gris))
+					end
+					l:Show()
+				else
+					l:Hide()
+				end
+			end
+		else
+			for _, l in ipairs(compo.lignes) do l:Hide() end
+			compo.resume:SetText(TextePlaces(m.besoin, pris))
+			compo.resume:Show()
+		end
+
+		-- candidats
+		local liste = etat.candidats or {}
+		cand.titre:SetText("Candidats" .. (#liste > 0 and ("  |cff6fd08c(" .. #liste .. ")|r") or ""))
+		local y = 0
+		for i, cd in ipairs(liste) do
+			local r = cand.lignes[i]
+			if not r then r = CreerCandidat(); cand.lignes[i] = r end
+			r.portrait:Poser(Normaliser(cd.nom or ""), cd.classe)
+			r.nom:SetText(CouleurClasse(cd.classe) .. NomCourt(cd.nom or "?") .. "|r" .. ((cd.niveau or 0) > 0 and ("  |cff999999(" .. cd.niveau .. ")|r") or ""))
+			local plein = cd.role and m.besoin[cd.role] and (pris[cd.role] or 0) >= (m.besoin[cd.role] or 0)
+			r.sous:SetText(TexteRole(cd.role) .. (cd.statut == "invite" and "  · |cff6fd08cinvité|r" or "")
+				.. (plein and "  · |cffff6655rôle déjà pris|r" or ""))
+			local reinviter = cd.statut == "invite"
+			r.inviter:Ecrire(reinviter and "Réinviter" or "Inviter")
+			r.inviter:Activer(not (reinviter and cd.invite and GetTime() - cd.invite < 10))
+			r.inviter:SetScript("OnClick", function() Inviter(cd.nom); Rafraichir() end)
+			r.refuser:SetScript("OnClick", function() Refuser(cd.nom); Rafraichir() end)
+			r:ClearAllPoints()
+			r:SetPoint("TOPLEFT", cand.liste.contenu, "TOPLEFT", 0, -y)
+			r:SetPoint("RIGHT", cand.liste.contenu, "RIGHT", 0, 0)
+			r:Show()
+			y = y + HAUTEUR_CANDIDAT
+		end
+		for i = #liste + 1, #cand.lignes do cand.lignes[i]:Hide() end
+		cand.liste:Hauteur(y)
+		cand.vide:SetShown(#liste == 0)
+
+		if p.public then p.public.maj(m, e.nom) end
+	end
+	return p
 end
 
-local function CreerFenetre()
-	local f = CreerCadrePrincipal()
-	f.pageParcourir = CreerPageParcourir(f, function() ChoisirOnglet(2) end)
-	f.pageMonGroupe = CreerPageMonGroupe(f)
-	CreerOnglets(f, { "Parcourir", "Mon groupe" }, ChoisirOnglet)
-	-- quêtes en commun, accrochées à droite (GuildUp_Quetes.lua)
-	if ns.CreerPanneauQuetes then
-		f.quetes = ns.CreerPanneauQuetes(f)
-		-- l'ensemble (groupes + quêtes) reste centré à l'écran
-		f:ClearAllPoints()
-		f:SetPoint("CENTER", UIParent, "CENTER", -165, 0)
+--------------------------------------------------------------------------------
+-- La page
+--------------------------------------------------------------------------------
+
+local function CreerPage(parent)
+	local p = CreateFrame("Frame", nil, parent)
+	p:SetAllPoints()
+	p.onglet = 1
+	local function Choisir(i)
+		p.onglet = i
+		p.onglets:Choisir(i)
+		Rafraichir()
 	end
-	f.onglet = 1
-	f:SetScript("OnShow", function() ChoisirOnglet(f.onglet or 1) end)
-	f:Hide()
-	return f
+	p.onglets = UI.Onglets(p, { "Parcourir", "Mon groupe" }, Choisir)
+	p.onglets:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -10)
+	p.onglets:SetPoint("RIGHT", p, "RIGHT", -MARGE, 0)
+	p.creer = UI.Bouton(p, "+ Créer un groupe", "or", 150, 28)
+	p.creer:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -12)
+	p.creer:SetScript("OnClick", function() Choisir(2) end)
+
+	p.parcourir = CreerParcourir(p)
+	p.creation = CreerCreation(p)
+	p.gestion = CreerGestion(p)
+	p.onglets:Choisir(1)
+
+	p.Maj = function()
+		local n = 0
+		for id in pairs(etat.annonces) do
+			if not (etat.monAnnonce and id == etat.monAnnonce.id) then n = n + 1 end
+		end
+		p.onglets:Compte(1, n)
+		p.onglets:Compte(2, etat.monAnnonce and #(etat.candidats or {}) or 0)
+		p.creer:SetShown(p.onglet == 1 and not etat.monAnnonce)
+		p.parcourir:SetShown(p.onglet == 1)
+		p.creation:SetShown(p.onglet == 2 and not etat.monAnnonce)
+		p.gestion:SetShown(p.onglet == 2 and etat.monAnnonce ~= nil)
+		if p.onglet == 1 then p.parcourir.Maj()
+		elseif etat.monAnnonce then p.gestion.Maj()
+		else p.creation.Maj() end
+	end
+	-- ns.OuvrirInterface("groupes", onglet)
+	p.Ouvrir = function(onglet) if onglet then Choisir(onglet) end end
+	return p
 end
+if ns.AjouterPage then ns.AjouterPage("groupes", CreerPage) end
+
+--------------------------------------------------------------------------------
+-- Fonctions partagées
+--------------------------------------------------------------------------------
 
 -- Nombre de groupes de la guilde qui cherchent encore du monde (hors le mien)
-local function NombreGroupes()
+ns.NombreGroupes = function()
 	local n = 0
 	for id, a in pairs(etat.annonces) do
 		if not (etat.monAnnonce and id == etat.monAnnonce.id) and (a.membres or 1) < (a.taille or 5) then n = n + 1 end
 	end
 	return n
 end
-ns.NombreGroupes = NombreGroupes
 
 -- Suis-je en attente ? (mon annonce ouverte, une candidature envoyée, ou mon groupe public)
 ns.EnAttente = function()
 	if etat.monAnnonce then return true end
-	for _, etat in pairs(etat.candidatures) do
-		if etat == "envoyee" then return true end
+	for _, e in pairs(etat.candidatures) do
+		if e == "envoyee" then return true end
 	end
 	if C_LFGList and C_LFGList.HasActiveEntryInfo then
 		local ok, oui = pcall(C_LFGList.HasActiveEntryInfo)
@@ -1179,36 +821,21 @@ ns.EnAttente = function()
 	return false
 end
 
-Rafraichir = function()
-	-- compteur du médaillon GuildUpSMB (et accueil de la fenêtre), même fenêtre fermée
-	if ns.MajBouton then ns.MajBouton() end
-	if ns.MajInterface then ns.MajInterface() end
-	if not etat.fenetre or not etat.fenetre:IsShown() then return end
-	local n = 0
-	for id in pairs(etat.annonces) do
-		if not (etat.monAnnonce and id == etat.monAnnonce.id) then n = n + 1 end
-	end
-	if etat.fenetre.onglets then
-		etat.fenetre.onglets[1]:SetText(n > 0 and ("Parcourir (" .. n .. ")") or "Parcourir")
-		etat.fenetre.onglets[2]:SetText((etat.monAnnonce and #etat.candidats > 0) and ("Mon groupe (" .. #etat.candidats .. ")") or "Mon groupe")
-		for _, o in ipairs(etat.fenetre.onglets) do
-			if PanelTemplates_TabResize then pcall(PanelTemplates_TabResize, o, 0) end
-		end
-	end
-	for _, w in ipairs(choixRoles) do MajChoixRole(w) end
-	if etat.fenetre.onglet == 1 then
-		RafraichirParcourir(etat.fenetre.pageParcourir)
-	else
-		local p = etat.fenetre.pageMonGroupe
-		p.creer:SetShown(etat.monAnnonce == nil)
-		p.gerer:SetShown(etat.monAnnonce ~= nil)
-		if etat.monAnnonce then RafraichirGestion(p) else RafraichirCreation(p) end
-	end
+-- appelé par GuildUp_Bouton.lua quand le rôle change
+ns.SurChangementDeRole = function() Rafraichir() end
+
+-- Ouvre la page sur « Parcourir » (bulles, accueil, /smb groupes…)
+ns.OuvrirGroupes = function()
+	if ns.OuvrirInterface then ns.OuvrirInterface("groupes", 1) end
 end
 
+-- /smb groupes : ouvre la page, ou ferme la fenêtre si elle y est déjà
 ns.BasculerGroupes = function()
-	etat.fenetre = etat.fenetre or (ns.AvecSons and ns.AvecSons(CreerFenetre(), "fenetre")) or CreerFenetre()
-	etat.fenetre:SetShown(not etat.fenetre:IsShown())
+	if ns.PageInterface and ns.PageInterface() == "groupes" then
+		if ns.BasculerInterface then ns.BasculerInterface() end
+	elseif ns.OuvrirInterface then
+		ns.OuvrirInterface("groupes")
+	end
 end
 
 -- Test seul activé / coupé : on montre ou on retire la copie « test » de mon annonce
@@ -1223,13 +850,6 @@ ns.SurChangementTestSolo = function()
 	Rafraichir()
 end
 
--- Ouvre la fenêtre sur « Parcourir » (clic sur la bulle d'alerte)
-ns.OuvrirGroupes = function()
-	etat.fenetre = etat.fenetre or (ns.AvecSons and ns.AvecSons(CreerFenetre(), "fenetre")) or CreerFenetre()
-	etat.fenetre.onglet = 1
-	if etat.fenetre:IsShown() then ChoisirOnglet(1) else etat.fenetre:Show() end
-end
-
 -- Pour /smb diag
 ns.DiagGroupes = function(L)
 	if ns.CatalogueGroupes then ns.CatalogueGroupes.Diag(L) end
@@ -1240,11 +860,11 @@ ns.DiagGroupes = function(L)
 		tostring(MonNom()), tostring(etat.dernierNomRecuDeMoi or "pas encore (publie une annonce pour le voir)")))
 	local atlas = {}
 	for _, a in ipairs({ "groupfinder-icon-role-large-tank", "groupfinder-icon-role-large-heal", "groupfinder-icon-role-large-dps",
-		"groupfinder-highlightbar", "groupfinder-Stat-StoneBG", "groupfinder-button-dungeons", "groupfinder-icon-leader" }) do
+		"Waypoint-MapPin-Untracked" }) do
 		atlas[#atlas + 1] = a .. "=" .. tostring(AtlasExiste(a))
 	end
 	L("  atlas : " .. table.concat(atlas, ", "))
 end
 
 -- appelée par GuildUp_Groupes.lua quand les annonces ou les candidatures changent
-ns.RafraichirGroupes = function() if Rafraichir then Rafraichir() end end
+ns.RafraichirGroupes = Rafraichir

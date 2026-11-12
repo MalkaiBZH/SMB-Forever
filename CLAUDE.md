@@ -32,12 +32,16 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
 - `GuildUp_Plaques.lua` : bannières derrière le nom et la barre de vie (barres de nom et cadre de cible), modèles de bannière (passés en paramètre), mise en page des barres de nom, réglages du jeu imposés (CVars), événements des barres de nom. Exporte `ns.Plaques`.
 - `GuildUp_Bouton.lua` : médaillon flottant (`ns.MajBouton`), menu rapide, `ns.ChoisirRole`, bulles
   `ns.Notifier(catégorie, titre, texte, son, action)`.
+- `GuildUp_Style.lua` : **kit d'interface** `ns.UI` (couleurs `UI.C`, `Bouton`, `Carte`, `Rangee`, `Onglets`, `Puces`,
+  `Liste`, `Champ`, `Case`, `Choix`, `Places`, `Portrait`…). Toute nouvelle interface passe par lui (style sombre et
+  doré des maquettes) : pas de modèle du jeu (`UIPanelButtonTemplate`, parchemins…) dans les pages.
 - `GuildUp_Interface.lua` : fenêtre principale (style sombre et doré : `Habiller`, `Bouton`, `CarteAccueil`…),
   menu des sections et page Accueil ; `ns.OuvrirInterface(page)`, `ns.MajInterface()`, `ns.NouveautesGuilde()`.
-  Les sections pas encore intégrées ouvrent leur ancienne fenêtre (`ouvrir` dans `SECTIONS`).
+  Un module fournit sa page avec `ns.AjouterPage(id, creer)` (`creer(parent)` renvoie un cadre avec `Maj()` et
+  `Ouvrir(...)`). Les sections pas encore refaites ouvrent leur ancienne fenêtre (`ouvrir` dans `SECTIONS`).
 - `GuildUp_Options.lua` : fenêtre d'options, `/smb diag`, réinitialisation, commandes `/smb`.
 - Les fichiers découpés accèdent à `GuildUpDB` par un mandataire `db` (même nom qu'avant) et reprennent les fonctions partagées en tête de fichier (`local Message = ns.Coeur.Message`).
-- Groupes : `GuildUp_Catalogue.lua` (contenus de la recherche de groupe), `GuildUp_Groupes.lua` (protocole, état partagé `ns.Groupes.etat`, actions), `GuildUp_GroupesFenetre.lua` (interface).
+- Groupes : `GuildUp_Catalogue.lua` (contenus de la recherche de groupe), `GuildUp_Groupes.lua` (protocole, état partagé `ns.Groupes.etat`, actions), `GuildUp_GroupesFenetre.lua` (page Groupes de la fenêtre GuildUpSMB).
 - `GuildUp_Reperes.lua` : repères des membres de la même carte à l'écran (HUD : au-dessus de la tête, en haut, ou au bord), calculés à partir des
   positions de `GuildUp_Carte.lua` (`ns.PositionsMembres`, `ns.MaPosition`, portrait dans le message `P`) ; pas de préfixe propre.
 - `GuildUp_Config.lua` : **réglages propres à la guilde** (`ns.Config` : nom public, cri de guilde, emote animée,

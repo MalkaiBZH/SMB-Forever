@@ -136,55 +136,26 @@ ns.RetirerPublic = function(force)
 end
 
 --------------------------------------------------------------------------------
--- Contrôles de l'onglet « Mon groupe » : [Style : Détente ▾] [Rendre public]
+-- Contrôles de l'onglet « Mon groupe » (page Groupes) : [Style : Détente ▾] [Rendre public]
 --------------------------------------------------------------------------------
 
 ns.CreerBoutonsPublic = function(parent)
+	local UI = ns.UI
 	local c = {}
 
-	-- choix du style : bouton qui ouvre une petite liste
-	local style = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-	style:SetSize(130, 28)
-	c.style = style
-	local liste = CreateFrame("Frame", nil, style, "BackdropTemplate")
-	liste:SetFrameStrata("DIALOG")
-	liste:SetPoint("BOTTOMLEFT", style, "TOPLEFT", 0, 2)
-	liste:SetSize(130, #STYLES * 20 + 12)
-	if liste.SetBackdrop then
-		liste:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-			edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14,
-			insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-		liste:SetBackdropColor(0.05, 0.05, 0.05, 0.95)
-	end
-	liste:Hide()
-	for i, s in ipairs(STYLES) do
-		local b = CreateFrame("Button", nil, liste)
-		b:SetSize(120, 20)
-		b:SetPoint("TOPLEFT", liste, "TOPLEFT", 5, -6 - (i - 1) * 20)
-		b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
-		b.texte = b:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-		b.texte:SetPoint("LEFT", b, "LEFT", 6, 0)
-		b.texte:SetText(NomStyle(s[1]))
-		b:SetScript("OnClick", function()
-			local db = DB()
-			if db then db.styleJeu = s[1] end
-			liste:Hide()
-			if c.maj then c.maj() end
-		end)
-	end
-	style:SetScript("OnClick", function() liste:SetShown(not liste:IsShown()) end)
-	style:SetScript("OnHide", function() liste:Hide() end)
-	style:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:SetText("Style de jeu")
-		GameTooltip:AddLine("Affiché dans la recherche de groupe du jeu quand le groupe est public.", 1, 1, 1, true)
-		GameTooltip:Show()
+	-- choix du style de jeu (liste sombre du kit d'interface)
+	local options = {}
+	for _, s in ipairs(STYLES) do options[#options + 1] = { s[1], "Style : " .. NomStyle(s[1]) } end
+	local style = UI.Choix(parent, 160, options, function(v)
+		local db = DB()
+		if db then db.styleJeu = v end
+		if c.maj then c.maj() end
 	end)
-	style:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	c.style = style
+	UI.Infobulle(style, "Style de jeu", "Affiché dans la recherche de groupe du jeu quand le groupe est public.")
 
 	-- rendre public / retirer du public
-	local public = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-	public:SetSize(120, 28)
+	local public = UI.Bouton(parent, "Rendre public", "fantome", 160, 28)
 	c.public = public
 	public:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -204,10 +175,11 @@ ns.CreerBoutonsPublic = function(parent)
 
 	c.maj = function(annonce, nomContenu)
 		if annonce then c.annonce, c.nomContenu = annonce, nomContenu end
-		style:SetText("Style : " .. NomStyle(StyleChoisi()))
+		style:Poser(StyleChoisi())
 		local inscrit = EstInscrit()
-		public:SetText(inscrit and "Retirer du public" or "Rendre public")
+		public:Ecrire(inscrit and "Retirer du public" or "Rendre public")
 		style:SetEnabled(not inscrit)
+		style:SetAlpha(inscrit and 0.45 or 1)
 	end
 	public:SetScript("OnClick", function()
 		if EstInscrit() then
