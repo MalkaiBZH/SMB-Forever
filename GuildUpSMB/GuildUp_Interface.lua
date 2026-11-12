@@ -58,6 +58,8 @@ local Aller -- (défini plus bas)
 
 local SECTIONS = {
 	{ id = "accueil", nom = "Accueil", icone = "Interface\\Icons\\INV_Misc_Book_09" },
+	{ id = "ensemble", nom = "Jouer ensemble", icone = "Interface\\Icons\\INV_Misc_GroupNeedMore", neutre = true,
+		badge = function() return ns.NombreSuggestions and ns.NombreSuggestions() or 0 end },
 	{ id = "guilde", nom = "Guilde", icone = "Interface\\Icons\\INV_Shirt_GuildTabard_01" },
 	{ id = "groupes", nom = "Groupes", icone = "Interface\\Icons\\INV_Sword_04",
 		ouvrir = function() if ns.OuvrirGroupes then ns.OuvrirGroupes() end end,

@@ -92,6 +92,12 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
   désactivable dans les options ou le menu rapide du médaillon). Chaque membre y apparaît avec son médaillon
   (son portrait), entouré d'un anneau à la couleur de sa classe ; un point de couleur s'il n'a pas de portrait.
   Quand plusieurs membres se chevauchent, la position la plus récente est au-dessus.
+- **Jouer ensemble** (3.0) : ce que tu peux faire maintenant avec la guilde. Suggestions classées par intérêt :
+  tes quêtes en commun regroupées par zone avec les membres en ligne qui les ont (« Former le groupe » les
+  invite), les membres dispo proches de ton niveau (« Inviter »), les groupes de la guilde qui cherchent ton rôle
+  ou montés pour une de tes quêtes (« Postuler »). Clic droit : ignorer une suggestion. À droite, « Dispo
+  maintenant » : les membres qui ont coché **Dispo pour grouper** (case de la page, menu rapide du médaillon ou
+  `/smb dispo` ; valable jusqu'à la déconnexion). Clic : chuchoter, clic droit : inviter.
 - **Quêtes en commun** : les quêtes que d'autres membres font aussi, avec « Créer un groupe ». Si tu es déjà
   en groupe, le bouton devient « Inviter » (les membres en ligne qui ont la quête et ne sont pas encore avec
   toi), ou « Déjà groupés » quand ils sont tous dans ton groupe ; « (groupe) » marque ceux qui y sont.
@@ -127,6 +133,8 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
 | `/smb taille 1.2` | Taille de la fenêtre GuildUpSMB (de 0.7 à 1.6, 1.1 par défaut) |
 | `/smb groupes` | Recherche de groupe de la guilde |
 | `/smb metiers` | Registre des métiers |
+| `/smb ensemble` | Jouer ensemble |
+| `/smb dispo` | Dispo pour grouper (oui / non) |
 | `/smb quetes` | Quêtes en commun |
 | `/smb evenements` | Créer un événement de guilde |
 | `/smb echanges` | Dons et besoins |

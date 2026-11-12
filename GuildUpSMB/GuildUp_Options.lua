@@ -49,6 +49,8 @@ local function Aide()
 	print("  /smb taille 1.2 — taille de la fenêtre SMB Forever (de 0.7 à 1.6)")
 	print("  /smb groupes — recherche de groupe de la guilde")
 	print("  /smb metiers — registre des métiers de la guilde")
+	print("  /smb ensemble — Jouer ensemble : suggestions de groupe et membres dispo")
+	print("  /smb dispo — dispo pour grouper (" .. OuiNon(ns.EstDispo and ns.EstDispo()) .. ")")
 	print("  /smb quetes — quêtes en commun avec la guilde")
 	print("  /smb evenements — ouvrir la page Événements (calendrier de la guilde)")
 	print("  /smb echanges — dons et besoins de la guilde")
@@ -343,7 +345,7 @@ local function Diag()
 		local ok, err = pcall(ns.DiagCarte, L)
 		if not ok then L("carte : ERREUR " .. tostring(err)) end
 	end
-	for _, d in ipairs({ { "métiers", ns.DiagMetiers }, { "version", ns.DiagVersion }, { "quêtes", ns.DiagQuetes }, { "objectifs", ns.DiagObjectifs },
+	for _, d in ipairs({ { "métiers", ns.DiagMetiers }, { "version", ns.DiagVersion }, { "quêtes", ns.DiagQuetes }, { "objectifs", ns.DiagObjectifs }, { "ensemble", ns.DiagEnsemble },
 		{ "événements", ns.DiagEvenements }, { "recherche", ns.DiagRecherche }, { "besoins", ns.DiagBesoins }, { "échanges", ns.DiagEchanges }, { "discord", ns.DiagDiscord }, { "carnet", ns.DiagCarnet }, { "carnet2", ns.DiagCarnet2 }, { "projets", ns.DiagProjets }, { "identité", ns.DiagIdentite }, { "gu", ns.DiagGU } }) do
 		if d[2] then
 			local ok, err = pcall(d[2], L)
@@ -612,6 +614,12 @@ SlashCmdList.GUILDUP = function(msg)
 		return
 	elseif cmd == "echanges" or cmd == "échanges" or cmd == "dons" then
 		if ns.BasculerEchanges then ns.BasculerEchanges() end
+		return
+	elseif cmd == "ensemble" or cmd == "jouer" then
+		if ns.OuvrirEnsemble then ns.OuvrirEnsemble() end
+		return
+	elseif cmd == "dispo" then
+		if ns.BasculerDispo then ns.BasculerDispo() end
 		return
 	elseif cmd == "quetes" or cmd == "quêtes" then
 		if ns.BasculerQuetes then ns.BasculerQuetes() end
