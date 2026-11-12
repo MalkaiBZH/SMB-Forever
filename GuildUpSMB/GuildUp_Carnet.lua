@@ -2123,28 +2123,26 @@ ns.MontrerMenuListes = MontrerMenuListes
 
 -- Rangée d'un objet : icône, nom (qualité), niveau et fabrication, « Besoin », « Ajouter »
 local HAUTEUR_ITEM, ECART_ITEM = 52, 6
+local objetChoisi, objetChoisiLie -- objet montré dans le panneau de détail (et s'il est lié quand ramassé)
+local RendreItems -- (défini plus bas)
 local function CreerLigneItem(parent)
 	local b = UI.Rangee(parent, HAUTEUR_ITEM)
 	b.icone = b:CreateTexture(nil, "ARTWORK")
 	b.icone:SetSize(36, 36)
 	b.icone:SetPoint("LEFT", b, "LEFT", 10, 0)
 	b.icone:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-	b.ajouter = UI.Bouton(b, "Ajouter", "or", 84, 28)
-	b.ajouter:SetPoint("RIGHT", b, "RIGHT", -10, 0)
-	b.besoin = UI.Bouton(b, "Besoin", "fantome", 76, 28)
-	b.besoin:SetPoint("RIGHT", b.ajouter, "LEFT", -6, 0)
 	b.nom = UI.Texte(b, "GameFontNormal")
 	b.nom:SetPoint("TOPLEFT", b.icone, "TOPRIGHT", 10, -2)
-	b.nom:SetPoint("RIGHT", b, "RIGHT", -186, 0)
+	b.nom:SetPoint("RIGHT", b, "RIGHT", -10, 0)
 	b.info = UI.Texte(b, "GameFontHighlightSmall", C.gris)
 	b.info:SetPoint("TOPLEFT", b.nom, "BOTTOMLEFT", 0, -6)
-	b.info:SetPoint("RIGHT", b, "RIGHT", -186, 0)
+	b.info:SetPoint("RIGHT", b, "RIGHT", -10, 0)
 	b:SetScript("OnEnter", function(self)
 		if not self.objet then return end
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		pcall(GameTooltip.SetItemByID, GameTooltip, self.objet)
 		GameTooltip:AddLine(" ")
-		GameTooltip:AddLine("Clic : fiche (d'où ça vient, qui le fabrique)", 0.6, 0.6, 0.6)
+		GameTooltip:AddLine("Clic : détails et artisans de la guilde, à droite", 0.6, 0.6, 0.6)
 		GameTooltip:AddLine("Maj-clic : lien dans la discussion", 0.6, 0.6, 0.6)
 		GameTooltip:Show()
 	end)
@@ -2156,18 +2154,9 @@ local function CreerLigneItem(parent)
 			if lien and ChatEdit_InsertLink then ChatEdit_InsertLink(lien) end
 			return
 		end
-		if ns.OuvrirFiche then ns.OuvrirFiche(self.objet) end
+		objetChoisi, objetChoisiLie = self.objet, self.lie
+		RendreItems()
 	end)
-	b.besoin:SetScript("OnClick", function(self)
-		local o = self:GetParent().objet
-		if o and ns.AjouterBesoin and ns.AjouterBesoin(o, 1) and ns.Notifier then
-			ns.Notifier(nil, "Besoin ajouté", ((InfoObjet(o)) or "Objet") .. " est dans tes besoins : la guilde le voit.", "aucun",
-				function() if ns.OuvrirBesoins then ns.OuvrirBesoins() end end)
-		end
-	end)
-	UI.Infobulle(b.besoin, "Ajouter à mes besoins", "La guilde voit que tu cherches cet objet (onglet Besoins de la page Dons).")
-	b.ajouter:SetScript("OnClick", function(self) MontrerMenuListes(self, self:GetParent().objet) end)
-	UI.Infobulle(b.ajouter, "Ajouter à une liste", "Choisis une de tes listes ou un de tes projets de guilde, ou crée-en un nouveau.")
 	b.objet = false
 	return b
 end
@@ -2243,7 +2232,7 @@ local function FabricableParLaGuilde(id)
 end
 
 -- Onglet Items : la liste (150 objets au plus) selon la catégorie, la recherche, les filtres et le tri
-local function RendreItems()
+RendreItems = function()
 	if not page then return end
 	local cat = CATEGORIES_ITEMS[categorieItems]
 	page.MajCategories()
@@ -2287,9 +2276,10 @@ local function RendreItems()
 		b:ClearAllPoints()
 		b:SetPoint("TOPLEFT", contenu, "TOPLEFT", 0, -y)
 		b:SetPoint("RIGHT", contenu, "RIGHT", 0, 0)
-		b.objet = o[1]
-		-- objet lié quand ramassé : on ne peut pas le donner, pas de « Besoin »
-		b.besoin:SetShown(not o[7])
+		b.objet, b.lie = o[1], o[7] -- (lié quand ramassé : pas de « Besoin » dans le détail)
+		local choisi = (o[1] == objetChoisi)
+		b:SetBackdropColor(unpack(choisi and C.actif or C.carte))
+		b:Fort(choisi)
 		local nom, _, qualite, icone = InfoObjet(o[1])
 		b.icone:SetTexture(icone or ICONE_INCONNUE)
 		b.nom:SetText(nom or o[3])
@@ -2318,6 +2308,7 @@ local function RendreItems()
 	page.compte:SetText(total > MAX_AFFICHES and ("%d objets (%d affichés)"):format(total, MAX_AFFICHES)
 		or ("%d objet%s"):format(total, total > 1 and "s" or ""))
 	page.vide:SetShown(#res == 0)
+	if page.MajDetail then page.MajDetail() end
 end
 
 -- (données changées : listes, objets reçus) l'onglet Items, s'il est à l'écran
@@ -2549,14 +2540,160 @@ local function CreerPageItems(parent)
 		p.nivMin:Ecrire(db and db.itemsNivMin and tostring(db.itemsNivMin) or "")
 		p.nivMax:Ecrire(db and db.itemsNivMax and tostring(db.itemsNivMax) or "")
 	end
+	-- liste à gauche, détail de l'objet choisi à droite
+	local LARGEUR_DETAIL = 250
 	p.liste = UI.Liste(p)
 	p.liste:SetPoint("TOPLEFT", p, "TOPLEFT", x0, -152)
-	p.liste:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE + 6, MARGE)
+	p.liste:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE - LARGEUR_DETAIL - 4, MARGE)
 	p.vide = UI.Texte(p, "GameFontHighlight", C.gris)
 	p.vide:SetPoint("TOPLEFT", p.liste, "TOPLEFT", 4, -8)
 	p.vide:SetText("Aucun objet ne correspond.")
+
+	-- Panneau de détail : l'objet, ses actions, et les membres qui savent le fabriquer
+	local d = UI.Carte(p, "")
+	d:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -152)
+	d:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE, MARGE)
+	d:SetWidth(LARGEUR_DETAIL)
+	d.titre:Hide()
+	d.compte:Hide()
+	d.vide:ClearAllPoints()
+	d.vide:SetPoint("TOPLEFT", d, "TOPLEFT", 14, -14)
+	d.vide:SetPoint("RIGHT", d, "RIGHT", -14, 0)
+	d.vide:SetText("Clique sur un objet pour voir qui, dans la guilde, sait le fabriquer.")
+	d.icone = d:CreateTexture(nil, "ARTWORK")
+	d.icone:SetSize(38, 38)
+	d.icone:SetPoint("TOPLEFT", d, "TOPLEFT", 12, -12)
+	d.icone:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+	d.nom = UI.Texte(d, "GameFontNormal")
+	d.nom:SetPoint("TOPLEFT", d.icone, "TOPRIGHT", 8, -1)
+	d.nom:SetPoint("RIGHT", d, "RIGHT", -10, 0)
+	d.nom:SetWordWrap(true)
+	if d.nom.SetMaxLines then d.nom:SetMaxLines(2) end
+	d.sous = UI.Texte(d, "GameFontHighlightSmall", C.gris)
+	d.sous:SetPoint("TOPLEFT", d.icone, "BOTTOMLEFT", 0, -6)
+	d.sous:SetPoint("RIGHT", d, "RIGHT", -10, 0)
+	d.sous:SetWordWrap(true)
+	local largeurBouton = (LARGEUR_DETAIL - 24 - 6) / 2
+	d.ajouter = UI.Bouton(d, "Ajouter", "or", largeurBouton, 26)
+	d.ajouter:SetPoint("TOPLEFT", d, "TOPLEFT", 12, -94)
+	d.ajouter:SetScript("OnClick", function(self) if objetChoisi then MontrerMenuListes(self, objetChoisi) end end)
+	UI.Infobulle(d.ajouter, "Ajouter à une liste", "Choisis une de tes listes ou un de tes projets de guilde, ou crée-en un nouveau.")
+	d.besoin = UI.Bouton(d, "Besoin", "fantome", largeurBouton, 26)
+	d.besoin:SetPoint("LEFT", d.ajouter, "RIGHT", 6, 0)
+	d.besoin:SetScript("OnClick", function()
+		local o = objetChoisi
+		if o and ns.AjouterBesoin and ns.AjouterBesoin(o, 1) and ns.Notifier then
+			ns.Notifier(nil, "Besoin ajouté", ((InfoObjet(o)) or "Objet") .. " est dans tes besoins : la guilde le voit.", "aucun",
+				function() if ns.OuvrirBesoins then ns.OuvrirBesoins() end end)
+		end
+	end)
+	UI.Infobulle(d.besoin, "Ajouter à mes besoins", "La guilde voit que tu cherches cet objet (onglet Besoins de la page Dons).")
+	d.fiche = UI.Bouton(d, "Encyclopédie", "fantome", LARGEUR_DETAIL - 24, 26)
+	d.fiche:SetPoint("TOPLEFT", d.ajouter, "BOTTOMLEFT", 0, -6)
+	d.fiche:SetScript("OnClick", function() if objetChoisi and ns.OuvrirFiche then ns.OuvrirFiche(objetChoisi) end end)
+	UI.Infobulle(d.fiche, "Encyclopédie", "D'où vient l'objet, ses composants, où le trouver sur la carte.")
+	d.titreArtisans = UI.Texte(d, "GameFontNormal", C.ors)
+	d.titreArtisans:SetPoint("TOPLEFT", d.fiche, "BOTTOMLEFT", 0, -14)
+	d.artisans = UI.Liste(d)
+	d.artisans:SetPoint("TOPLEFT", d.titreArtisans, "BOTTOMLEFT", 0, -8)
+	d.artisans:SetPoint("BOTTOMRIGHT", d, "BOTTOMRIGHT", -4, 10)
+	d.aucun = UI.Texte(d, "GameFontHighlightSmall", C.gris)
+	d.aucun:SetPoint("TOPLEFT", d.artisans, "TOPLEFT", 0, -2)
+	d.aucun:SetPoint("RIGHT", d, "RIGHT", -12, 0)
+	d.aucun:SetWordWrap(true)
+	d.aucun:SetText("Personne dans la guilde ne sait le fabriquer, d'après le registre des métiers (chacun doit avoir ouvert sa fenêtre de métier avec l'addon).")
+	d.lignes = {}
+	local HAUTEUR_ARTISAN = 42
+	local function CreerArtisan()
+		local l = UI.Rangee(d.artisans.contenu, HAUTEUR_ARTISAN - 4)
+		l.portrait = UI.Portrait(l, 28)
+		l.portrait:SetPoint("LEFT", l, "LEFT", 6, 0)
+		l.commander = UI.Bouton(l, "Commander", "or", 84, 24)
+		l.commander:SetPoint("RIGHT", l, "RIGHT", -6, 0)
+		UI.Infobulle(l.commander, "Commander", "Demande-lui de te fabriquer cet objet (tu choisis la quantité).")
+		l.nom = UI.Texte(l, "GameFontHighlight")
+		l.nom:SetPoint("TOPLEFT", l.portrait, "TOPRIGHT", 8, 1)
+		l.nom:SetPoint("RIGHT", l.commander, "LEFT", -6, 0)
+		l.sous = UI.Texte(l, "GameFontHighlightSmall", C.gris)
+		l.sous:SetPoint("TOPLEFT", l.nom, "BOTTOMLEFT", 0, -3)
+		l.sous:SetPoint("RIGHT", l.commander, "LEFT", -6, 0)
+		-- clic sur la ligne : chuchoter (s'il est en ligne)
+		l:SetScript("OnClick", function(self)
+			if self.a and self.a.enLigne and not self.a.moi then UI.Chuchoter(self.a.cle, self.a.nom) end
+		end)
+		l:SetScript("OnEnter", function(self)
+			local a = self.a
+			if not a then return end
+			GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+			GameTooltip:SetText(NomCourt(a.nom or "?"))
+			GameTooltip:AddLine(NomMetier(a.metier) .. " " .. (a.niveau or "?"), 1, 1, 1)
+			if a.moi then GameTooltip:AddLine("C'est toi.", 0.6, 0.6, 0.6)
+			elseif a.enLigne then GameTooltip:AddLine("Clic : chuchoter", 0.6, 0.6, 0.6)
+			else GameTooltip:AddLine("Hors ligne", 0.6, 0.6, 0.6) end
+			GameTooltip:Show()
+		end)
+		l:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		return l
+	end
+
+	p.MajDetail = function()
+		local o = objetChoisi
+		local montre = o ~= nil
+		d.vide:SetShown(not montre)
+		for _, e in ipairs({ d.icone, d.nom, d.sous, d.ajouter, d.besoin, d.fiche, d.titreArtisans, d.artisans }) do e:SetShown(montre) end
+		if not montre then
+			d.aucun:Hide()
+			return
+		end
+		local nom, _, qualite, icone, requis = InfoObjet(o)
+		if not nom and ns.Precharger then ns.Precharger(o) end
+		d.icone:SetTexture(icone or ICONE_INCONNUE)
+		d.nom:SetText(nom or "chargement…")
+		local qc = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite or 1]
+		if qc then d.nom:SetTextColor(qc.r, qc.g, qc.b) else d.nom:SetTextColor(unpack(C.texte)) end
+		local recs = RecettesDe(o)
+		d.sous:SetText(((requis or 0) > 1 and ("Niveau requis " .. requis .. " · ") or "")
+			.. (recs and recs[1] and ("Fabriqué : " .. TexteRecette(recs[1])) or ""))
+		d.besoin:Activer(not objetChoisiLie)
+		-- les membres qui savent le fabriquer : moi, puis en ligne, puis les autres
+		local artisans = ns.ArtisansDe and ns.ArtisansDe(o) or {}
+		local enLigne = 0
+		for _, a in ipairs(artisans) do if a.enLigne and not a.moi then enLigne = enLigne + 1 end end
+		d.titreArtisans:SetText("Dans la guilde" .. (#artisans > 0 and ("  |cff6fd08c" .. enLigne .. " en ligne|r") or ""))
+		local y = 0
+		for i, a in ipairs(artisans) do
+			local l = d.lignes[i]
+			if not l then l = CreerArtisan(); d.lignes[i] = l end
+			l.a = a
+			l.portrait:Poser(a.cle)
+			l.nom:SetText(ns.NomMembreColore and ns.NomMembreColore(a.cle, a.nom) or NomCourt(a.nom or "?"))
+			l.sous:SetText(NomMetier(a.metier) .. " " .. (a.niveau or "?") .. " · "
+				.. (a.moi and "toi" or a.enLigne and "|cff6fd08cen ligne|r" or "hors ligne"))
+			l.commander:SetShown(not a.moi)
+			l.commander:Activer(a.enLigne and true or false)
+			l.commander:SetScript("OnClick", function()
+				if ns.CommanderObjet then ns.CommanderObjet(a.cle, a.nom, o, 1) end
+			end)
+			l:SetAlpha((a.enLigne or a.moi) and 1 or 0.6)
+			l:ClearAllPoints()
+			l:SetPoint("TOPLEFT", d.artisans.contenu, "TOPLEFT", 0, -y)
+			l:SetPoint("RIGHT", d.artisans.contenu, "RIGHT", 0, 0)
+			l:Show()
+			y = y + HAUTEUR_ARTISAN
+		end
+		for i = #artisans + 1, #d.lignes do d.lignes[i]:Hide() end
+		d.artisans:Hauteur(y)
+		d.aucun:SetShown(#artisans == 0)
+	end
 	p.Maj = RendreItems
 	return p
+end
+
+-- Ouvre Artisanat > Items sur un objet (son détail et ses artisans à droite)
+ns.MontrerObjetItems = function(objet)
+	objetChoisi, objetChoisiLie = objet, nil
+	if ns.OuvrirArtisanat then ns.OuvrirArtisanat(2) end
+	if RendreItems then RendreItems() end
 end
 
 --------------------------------------------------------------------------------

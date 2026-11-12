@@ -91,8 +91,11 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.8.0"] = {
+		"|cffffd100Artisanat > Items|r : un clic sur un objet l'affiche à droite avec |cffffd100les membres de la guilde qui savent le fabriquer|r (en ligne d'abord, avec leur métier et leur niveau) : clic pour chuchoter, « Commander » pour lui demander. Les boutons Ajouter, Besoin et Encyclopédie sont dans ce panneau.",
+	},
 	["2.7.0"] = {
 		"|cffffd100Page Guilde|r : tous les membres, en ligne et hors ligne, avec ce que l'addon sait d'eux (niveau, rang, zone ou dernière connexion, pseudo et personnage principal, rôle, métiers, version de l'addon, distance, note). Recherche, filtres, clic pour chuchoter, clic droit pour inviter.",
 		"|cffffd100Ton profil|r : une fenêtre te propose de renseigner ton pseudo, ton personnage principal et ton rôle ; tant qu'il manque quelque chose, un panneau « Profil incomplet » dans le bandeau la rouvre.",
