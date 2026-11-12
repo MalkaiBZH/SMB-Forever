@@ -264,7 +264,11 @@ local function Placer(m, plaque)
 	m:ClearAllPoints()
 	local uf = plaque.UnitFrame
 	local barre = uf and not (uf.IsForbidden and uf:IsForbidden()) and (uf.healthBar or uf.HealthBarsContainer)
-	if barre and barre:IsShown() and uf:IsShown() then
+	-- case du niveau à droite de la barre de vie (« 12 ») : le « ! » se met après elle
+	local niveau = barre and (uf.PlayerLevelDiffFrame or uf.LevelFrame)
+	if niveau and niveau.IsShown and niveau:IsShown() then
+		m:SetPoint("LEFT", niveau, "RIGHT", 3, 0)
+	elseif barre and barre:IsShown() and uf:IsShown() then
 		m:SetPoint("LEFT", barre, "RIGHT", 4, 0)
 	else
 		m:SetPoint("LEFT", plaque, "RIGHT", -4, 0)
