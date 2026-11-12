@@ -630,8 +630,10 @@ local function NiveauVisible(uf)
 	return n and n:IsShown() or false
 end
 
+local incantationRefusee = false -- le jeu a refusé de déplacer la barre : coupé pour la session
+
 local function PlacerIncantation(uf)
-	if not db or not db.actif or not db.incantationHaut then return end
+	if not db or not db.actif or not db.incantationHaut or incantationRefusee then return end
 	local cb, hb, nom = uf.CastBarsContainer, uf.healthBar, uf.name
 	local barre = cb and cb.castBar
 	if not barre or not hb or not nom then return end
@@ -644,10 +646,12 @@ local function PlacerIncantation(uf)
 		barre:SetHeight(HAUTEUR_INCANTATION)
 	end)
 	if not ok then
-		-- refusé par le jeu : on remet la barre dans son conteneur et on coupe l'option
+		-- refusé par le jeu : on remet la barre dans son conteneur et on arrête pour cette session
+		-- (le réglage est gardé : un /reload réessaie)
 		barre:ClearAllPoints()
 		barre:SetAllPoints(cb)
-		db.incantationHaut = false
+		incantationRefusee = true
+		Message("le jeu refuse de déplacer la barre d'incantation : elle reste à sa place pour cette session.")
 		error(err, 0)
 	end
 end
@@ -1379,7 +1383,7 @@ ev:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4)
 	elseif event == "UNIT_SPELLCAST_START" or event == "UNIT_SPELLCAST_CHANNEL_START"
 		or event == "UNIT_SPELLCAST_EMPOWER_START" then
 		-- Blizzard peut replacer la barre d'incantation quand elle s'affiche : on repasse après lui
-		if arg1 and arg1:find("^nameplate") and db.incantationHaut then
+		if arg1 and arg1:find("^nameplate") and db.incantationHaut and not incantationRefusee then
 			C_Timer.After(0, function()
 				local plaque = C_NamePlate.GetNamePlateForUnit(arg1)
 				if plaque and not (plaque.IsForbidden and plaque:IsForbidden()) and plaque.UnitFrame
@@ -1583,7 +1587,10 @@ local function DiagCollecte(L)
 			Decrire("AurasFrame", af)
 			Decrire("BuffListFrame", af.BuffListFrame)
 			Decrire("DebuffListFrame", af.DebuffListFrame)
-			-- fonctions de mise en page de Blizzard (pour remettre une barre de nom dans son état d'origine)
+		else
+			L("  AurasFrame : absent")
+		end
+		-- fonctions de mise en page de Blizzard (pour remettre une barre de nom dans son état d'origine)
 		local function Fonctions(titre, obj)
 			if type(obj) ~= "table" then return end
 			local noms = {}
@@ -1614,9 +1621,6 @@ local function DiagCollecte(L)
 		Decrire("LevelFrame", uf.LevelFrame)
 		Decrire("PlayerLevelDiffFrame", uf.PlayerLevelDiffFrame)
 		L("  déplacement des auras : " .. Tenter(DeplacerAuras))
-		else
-			L("  AurasFrame : absent")
-		end
 		local ok, err = pcall(MajBarre, uf)
 		L("  MajBarre : " .. (ok and "ok" or ("ERREUR " .. tostring(err))))
 		local f = fondsPlaques[uf]
@@ -2670,7 +2674,7 @@ SlashCmdList.GUILDUP = function(msg)
 	elseif cmd == "couleur" then
 		local r, g, b = reste:match("^([%d%.]+)%s+([%d%.]+)%s+([%d%.]+)$")
 		r, g, b = tonumber(r), tonumber(g), tonumber(b)
-		if not r then
+		if not (r and g and b) then
 			OuvrirSelecteur(); return
 		end
 		if r > 1 or g > 1 or b > 1 then r, g, b = r / 255, g / 255, b / 255 end
