@@ -257,8 +257,8 @@ local annules = {}     -- [id] = true : quelqu'un a déjà renvoyé ce projet ap
 local reponsePrevue = false
 
 local function Alerte(texte, id)
-	if ns.Alerte then
-		ns.Alerte("Projet de guilde", texte, nil, function() ns.OuvrirProjet(id) end)
+	if ns.Notifier then
+		ns.Notifier("commandes", "Projet de guilde", texte, nil, function() ns.OuvrirProjet(id) end)
 	end
 end
 

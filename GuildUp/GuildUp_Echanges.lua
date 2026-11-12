@@ -289,10 +289,10 @@ end
 
 local function AlerteDon(cle, nom, objet, d)
 	local g = Guilde()
-	if not (g and g[cle] and g[cle].liste[objet]) or not ns.Alerte then return end -- retiré entre-temps
+	if not (g and g[cle] and g[cle].liste[objet]) or not ns.Notifier then return end -- retiré entre-temps
 	if DejaConnu(objet) then return end
 	local nomO, lien = InfoObjet(objet)
-	ns.Alerte("Plan à donner", ("%s donne %s (%s)"):format(NomCourt(nom), lien or nomO or ("plan " .. objet),
+	ns.Notifier("plans", "Plan à donner", ("%s donne %s (%s)"):format(NomCourt(nom), lien or nomO or ("plan " .. objet),
 		TexteMetier(d.c, d.n)), nil, function() if ns.OuvrirEchanges then ns.OuvrirEchanges(2, DONS) end end)
 end
 
@@ -433,8 +433,8 @@ local function ResumerAbsence()
 		resumePrevu = false
 		local n = resumeN
 		resumeN = 0
-		if ns.Alerte then
-			ns.Alerte("Demande de don", ("%d demande%s de dons pendant ton absence"):format(n, n > 1 and "s" or ""),
+		if ns.Notifier then
+			ns.Notifier("plans", "Demande de don", ("%d demande%s de dons pendant ton absence"):format(n, n > 1 and "s" or ""),
 				"TELL_MESSAGE", function() if ns.OuvrirEchanges then ns.OuvrirEchanges(nil, DEMANDES) end end)
 		end
 	end)
@@ -546,9 +546,9 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		objet = tonumber(objet)
 		if not donneur or not objet then return end
 		NoterMerci(donneur, cle, objet, Maintenant())
-		if (donneur == moi or (TestSolo() and donneur == moi .. "#test")) and ns.Alerte then
+		if (donneur == moi or (TestSolo() and donneur == moi .. "#test")) and ns.Notifier then
 			local nomO, lien = InfoObjet(objet)
-			ns.Alerte("Merci !", ("%s te remercie pour %s"):format(NomCourt(nom), lien or nomO or ("l'objet " .. objet)),
+			ns.Notifier("plans", "Merci !", ("%s te remercie pour %s"):format(NomCourt(nom), lien or nomO or ("l'objet " .. objet)),
 				nil, function() end)
 		end
 		if MajTout then MajTout() end
@@ -576,9 +576,9 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		end
 		NoterDemande(nom, objet, quand)
 		local nomO, lien = InfoObjet(objet)
-		if ns.Alerte then
+		if ns.Notifier then
 			-- sans son : le message privé du demandeur sonne déjà
-			ns.Alerte("Demande de don", ("%s voudrait %s"):format(NomCourt(nom), lien or nomO or ("l'objet " .. objet)),
+			ns.Notifier("plans", "Demande de don", ("%s voudrait %s"):format(NomCourt(nom), lien or nomO or ("l'objet " .. objet)),
 				"aucun", function()
 					local nomMP = cle:find("#test", 1, true) and UnitName("player")
 						or (ns.NomListeGuilde and ns.NomListeGuilde(cle)) or NomCourt(nom)
@@ -600,8 +600,8 @@ local function Demander(d)
 		local prenom, famille = UnitFullName("player")
 		GarderPourPlusTard(d.cle, famille and famille ~= "" and (prenom .. "-" .. famille) or prenom, d.objet, quand)
 		local nomO, lien = InfoObjet(d.objet)
-		if ns.Alerte then
-			ns.Alerte("Demande de don", ("%s est hors ligne : ta demande pour %s lui sera transmise dès que possible"):format(
+		if ns.Notifier then
+			ns.Notifier("plans", "Demande de don", ("%s est hors ligne : ta demande pour %s lui sera transmise dès que possible"):format(
 				NomCourt(d.e.nom), lien or nomO or ("objet " .. d.objet)), "aucun", function() end)
 		end
 		if MajTout then MajTout() end
@@ -1523,7 +1523,7 @@ PhotoConnexion = function()
 	photo = { dons = ClesDons(), besoins = ClesBesoins() }
 end
 RecapConnexion = function()
-	if not photo or not ns.Alerte or not IsInGuild() then return end
+	if not photo or not ns.Notifier or not IsInGuild() then return end
 	local morceaux = {}
 	-- nouveaux dons (et plans que je peux apprendre)
 	local nDons, nPlans = 0, 0
@@ -1558,7 +1558,7 @@ RecapConnexion = function()
 	if nGroupes > 0 then morceaux[#morceaux + 1] = ("%d groupe%s ouvert%s"):format(nGroupes, nGroupes > 1 and "s" or "", nGroupes > 1 and "s" or "") end
 	photo = nil
 	if #morceaux == 0 then return end
-	ns.Alerte("Pendant ton absence", table.concat(morceaux, " · "), nil, function()
+	ns.Notifier(nil, "Pendant ton absence", table.concat(morceaux, " · "), nil, function()
 		if nDem > 0 then
 			if ns.OuvrirEchanges then ns.OuvrirEchanges(nil, DEMANDES) end
 		elseif nPlans > 0 then

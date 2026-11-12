@@ -123,8 +123,8 @@ local function MajMesQuetes()
 			for cle, a in pairs(autres) do
 				if a.quetes[id] and EstEnLigne(cle) then noms[#noms + 1] = NomCourt(a.nom) end
 			end
-			if #noms > 0 and ns.Alerte then
-				ns.Alerte("Quête en commun", ("%s fait aussi : |cffffd100%s|r"):format(table.concat(noms, ", "), q.titre),
+			if #noms > 0 and ns.Notifier then
+				ns.Notifier("quetes", "Quête en commun", ("%s fait aussi : |cffffd100%s|r"):format(table.concat(noms, ", "), q.titre),
 					nil, function() if ns.BasculerQuetes then ns.BasculerQuetes(true) end end)
 			end
 		end

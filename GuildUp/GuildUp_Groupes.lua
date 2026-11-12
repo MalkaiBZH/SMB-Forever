@@ -652,10 +652,10 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 				-- calme de connexion : pas de bulle
 			elseif idQuete then
 				-- groupe de quête : seulement les membres qui ont cette quête sont prévenus
-				if ns.AQuete and ns.AQuete(idQuete) and ns.Alerte then
+				if ns.AQuete and ns.AQuete(idQuete) and ns.Notifier then
 					local titre = ns.InfoQuete and ns.InfoQuete(idQuete) or "?"
 					local zone = annonces[id].commentaire ~= "" and (" (" .. annonces[id].commentaire .. ")") or ""
-					ns.Alerte("Groupe pour ta quête", ("%s : |cffffd100%s|r%s"):format(NomCourt(expediteur), titre, zone),
+					ns.Notifier("quetes", "Groupe pour ta quête", ("%s : |cffffd100%s|r%s"):format(NomCourt(expediteur), titre, zone),
 						nil, function() if ns.OuvrirGroupes then ns.OuvrirGroupes() end end)
 				end
 			elseif ns.AlerteNouveauGroupe then
@@ -683,8 +683,8 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			candidats[#candidats + 1] = c
 		end
 		c.role, c.classe, c.niveau, c.statut = p[3], p[4] ~= "" and p[4] or nil, tonumber(p[5]) or 0, "attente"
-		if ns.Alerte then
-			ns.Alerte("Nouvelle candidature", ("%s postule : %s"):format(NomCourt(expediteur), TexteRole(c.role)), "TELL_MESSAGE")
+		if ns.Notifier then
+			ns.Notifier("candidatures", "Nouvelle candidature", ("%s postule : %s"):format(NomCourt(expediteur), TexteRole(c.role)), "TELL_MESSAGE")
 		end
 		if Rafraichir then Rafraichir() end
 
@@ -699,7 +699,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		local id = p[2]
 		if id and candidatures[id] then
 			candidatures[id] = "refusee"
-			if ns.Alerte then ns.Alerte("Candidature refusée", "par " .. NomCourt(expediteur)) end
+			if ns.Notifier then ns.Notifier("candidatures", "Candidature refusée", "par " .. NomCourt(expediteur)) end
 			if Rafraichir then Rafraichir() end
 		end
 	end
@@ -712,7 +712,7 @@ end
 -- Rappel (option du créateur) : bulle silencieuse toutes les 5 min tant que le groupe cherche
 local DELAI_RAPPEL = 300
 local function Rappels(maintenant)
-	if not ns.Alerte then return end
+	if not ns.Notifier then return end
 	for id, a in pairs(annonces) do
 		local mien = monAnnonce and (id == monAnnonce.id or id == "test:" .. monAnnonce.id)
 		if a.rappel and not mien and (a.membres or 1) < (a.taille or 5) and not candidatures[id] then
@@ -723,7 +723,7 @@ local function Rappels(maintenant)
 				-- groupe de quête : seulement pour ceux qui ont la quête (comme la bulle de création)
 				if not idQuete or (ns.AQuete and ns.AQuete(idQuete)) then
 					local libres = (a.taille or 5) - (a.membres or 1)
-					ns.Alerte("Groupe toujours en recherche", ("%s : |cffffd100%s|r (%d place%s)"):format(
+					ns.Notifier("groupes", "Groupe toujours en recherche", ("%s : |cffffd100%s|r (%d place%s)"):format(
 						NomCourt(a.chef), InfoContenu(a.code).nom, libres, libres > 1 and "s" or ""), "aucun",
 						function() if ns.OuvrirGroupes then ns.OuvrirGroupes() end end)
 				end

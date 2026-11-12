@@ -21,7 +21,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUp/`. Voir `README.md
 ## Architecture
 
 - `GuildUp.lua` : cœur (bannières sur les barres de nom et le cadre de cible, rôles, bouton et volet de
-  mini-carte, fenêtre d'options, bulles `ns.Alerte`, commandes `/smb`, `DEFAUT` = réglages par défaut).
+  mini-carte, fenêtre d'options, bulles `ns.Notifier(catégorie, titre, texte, son, action)`, commandes `/smb`, `DEFAUT` = réglages par défaut).
   Fournit `ns.DB()`, `ns.Normaliser`, `ns.EnvoyerAddon` (file d'envoi : un message toutes les 0,3 s),
   `ns.Erreur`, `ns.TestSolo`.
 - Un fichier par fonctionnalité, chacun avec **son préfixe de message d'addon** sur le canal `GUILD` :
