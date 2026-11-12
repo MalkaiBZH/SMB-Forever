@@ -17,6 +17,8 @@ l'addon voient et partagent ces informations**.
 - **Bannières par rôle** : bannière derrière le nom et la barre de vie des membres de la guilde
   (barres de nom et cadre de cible), selon leur rôle tank / heal / dps. Modèle orné hors groupe,
   sobre en groupe ou en raid. Lueur dorée sur la cible.
+- **Portraits** : sur la bannière, le médaillon du joueur (race, classe et sexe reconnus par le jeu,
+  56 portraits Alliance dans `GuildUpSMB/media/portraits/`) remplace la mascotte ; `/smb medaillons` pour couper.
 - **Bouton de mini-carte** : choix de son rôle, accès à toutes les fenêtres, notifications.
   Halo doré quand des groupes sont ouverts, anneau vert quand on est en attente.
 - **Recherche de groupe de la guilde** : places Tank / Heal / DPS, groupes jusqu'à 40, et bouton
@@ -59,6 +61,7 @@ l'addon voient et partagent ces informations**.
 | `/smb barre` | Afficher / cacher le bouton de la mini-carte |
 | `/smb noms` | Nom et guilde des autres joueurs |
 | `/smb lueur` | Lueur derrière la bannière de la cible |
+| `/smb medaillons` | Portraits des joueurs sur les bannières |
 | `/smb annonces` | Annonces de la guilde en bulle |
 | `/smb gu` | Emote du cri de guilde |
 | `/smb diag` | Informations techniques à copier en cas de problème |
@@ -85,3 +88,5 @@ nouvelles depuis 30 jours sont oubliées.
 - Images (`GuildUpSMB/media/`) : bannières et anneau de Miko ; chopes du cri de guilde (`gu_emote.tga`,
   `emote_animee.tga`) dessinées pour cette version ; l'animation de Zaardoz Gu (`zaardoz.tga`, inutilisée ici)
   appartient à la guilde d'origine et n'est pas couverte par la licence du code sans l'accord des personnes concernées.
+- Portraits (`GuildUp/media/portraits/`) : 56 médaillons Alliance (race, classe, homme et femme), nommés
+  `race-classe-sexe.tga`, générés par IA (Nano Banana Pro) pour la guilde. TGA 32 bits 256×256, fond transparent.

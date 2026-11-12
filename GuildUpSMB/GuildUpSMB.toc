@@ -10,8 +10,13 @@ GuildUp_Config.lua
 GuildUp.lua
 GuildUp_Outils.lua
 GuildUp_Reseau.lua
+GuildUp_Plaques.lua
+GuildUp_MiniCarte.lua
+GuildUp_Options.lua
 GuildUp_Identite.lua
+GuildUp_Catalogue.lua
 GuildUp_Groupes.lua
+GuildUp_GroupesFenetre.lua
 GuildUp_Carte.lua
 GuildUp_Recettes.lua
 GuildUp_Metiers.lua
