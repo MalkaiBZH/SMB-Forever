@@ -271,7 +271,7 @@ local function EnvoyerResume()
 end
 
 local function PlanifierResume()
-	if PlanifierMaj then PlanifierMaj() end
+	if PlanifierMaj then PlanifierMaj() end -- (refait aussi l'index des artisans)
 	if not pret or resumePrevu then return end
 	resumePrevu = true
 	C_Timer.After(4, function()
@@ -865,7 +865,12 @@ local MajFenetre
 local lignesMembres = {}
 local pools = { metier = {}, recette = {}, info = {} }
 
+local indexArtisans          -- [code recette] = { { f = fiche, metier, p }, … } ; nil = à reconstruire
+local function InvaliderIndex() indexArtisans = nil end
+
 PlanifierMaj = function(delai)
+	-- données de métiers changées (fiche reçue, recettes lues) : l'index des artisans est à refaire
+	InvaliderIndex()
 	if not fen or not fen.page or not fen.page:IsVisible() or majPrevue then return end
 	majPrevue = true
 	C_Timer.After(delai or 0.2, function()
@@ -911,22 +916,33 @@ ns.MembresAvecMetier = function(code)
 	return res
 end
 
--- Pour le carnet de craft : qui sait fabriquer cet objet (moi compris), en ligne d'abord
-ns.ArtisansDe = function(objet)
-	local code = "i" .. tostring(objet)
-	local res = {}
+-- Index inversé : pour chaque recette, les membres qui la connaissent (reconstruit après un
+-- changement des données, ou au plus toutes les 60 s)
+local function IndexArtisans()
+	if indexArtisans and GetTime() - indexArtisans.t < 60 then return indexArtisans.parCode end
+	local parCode = {}
 	for _, f in ipairs(Fiches()) do
 		for metier, p in pairs(f.e.profs or {}) do
 			if type(p) == "table" and type(p.r) == "table" then
 				for _, c in ipairs(p.r) do
-					if c == code then
-						res[#res + 1] = { cle = f.cle, nom = f.e.nom or f.cle, moi = f.moi, metier = metier,
-							niveau = p.n, enLigne = f.moi or EnLigne(f.cle, f.e) }
-						break
-					end
+					local l = parCode[c]
+					if not l then l = {}; parCode[c] = l end
+					l[#l + 1] = { f = f, metier = metier, p = p }
 				end
 			end
 		end
+	end
+	indexArtisans = { t = GetTime(), parCode = parCode }
+	return parCode
+end
+
+-- Pour le carnet de craft : qui sait fabriquer cet objet (moi compris), en ligne d'abord
+ns.ArtisansDe = function(objet)
+	local res = {}
+	for _, a in ipairs(IndexArtisans()["i" .. tostring(objet)] or {}) do
+		local f = a.f
+		res[#res + 1] = { cle = f.cle, nom = f.e.nom or f.cle, moi = f.moi, metier = a.metier,
+			niveau = a.p.n, enLigne = f.moi or EnLigne(f.cle, f.e) }
 	end
 	table.sort(res, function(a, b)
 		if a.moi ~= b.moi then return a.moi end
