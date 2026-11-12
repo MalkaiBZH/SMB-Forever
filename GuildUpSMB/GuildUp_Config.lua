@@ -14,9 +14,9 @@ ns.Config = {
 	cri = "33",
 
 	-- Emote animée : planche d'images de media\ lue de gauche à droite puis de haut en bas
-	-- (TGA 32 bits ; ici 512 x 256 : 8 images de 128 x 128, 4 par rangée, 10 images par seconde).
+	-- (TGA 32 bits ; ici 1024 x 256 : 16 images de 128 x 128, 8 par rangée, 10 images par seconde).
 	-- false = image fixe media\gu_emote.tga (128 x 128), qui sert aussi d'icône de l'addon.
-	emoteAnimation = { fichier = "emote_animee", images = 8, colonnes = 4, rangees = 2, ips = 10 },
+	emoteAnimation = { fichier = "emote_animee", images = 16, colonnes = 8, rangees = 2, ips = 10 },
 
 	-- Membre « vedette » : quand il monte de niveau, la bulle passe en version fête (corne, texte
 	-- arc-en-ciel, animation). Écrire "Prénom-Famille" (ex. "Zaardoz-Gu"), ou false pour rien.
