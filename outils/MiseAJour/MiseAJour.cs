@@ -40,8 +40,8 @@ using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: System.Reflection.AssemblyTitle("GuildUpSMB - mise à jour")]
-[assembly: System.Reflection.AssemblyProduct("GuildUpSMB")]
+[assembly: System.Reflection.AssemblyTitle("SMB Forever Updater")]
+[assembly: System.Reflection.AssemblyProduct("SMB Forever Updater")]
 [assembly: System.Reflection.AssemblyVersion("2.0.0.0")]
 
 namespace GuildUpSMB
@@ -665,7 +665,7 @@ namespace GuildUpSMB
 			fenetre.Hide();
 			if (rangeeSignalee) return;
 			rangeeSignalee = true;
-			Bulle("GuildUpSMB reste actif", "Les mises à jour continuent en arrière-plan. Clic droit sur l'icône pour quitter.",
+			Bulle("SMB Forever Updater reste actif", "Les mises à jour continuent en arrière-plan. Clic droit sur l'icône pour quitter.",
 				ToolTipIcon.Info, null);
 		}
 
@@ -729,7 +729,7 @@ namespace GuildUpSMB
 			{
 				Infobulle(bilan.Version + " à jour (vérifié à " + heure + ")");
 				if (manuel && !fenetre.Visible)
-					Bulle("GuildUpSMB est à jour", "Version " + bilan.Version + ".", ToolTipIcon.Info, null);
+					Bulle("SMB Forever est à jour", "Version " + bilan.Version + ".", ToolTipIcon.Info, null);
 				return;
 			}
 			Infobulle(bilan.Version + " installée à " + heure);
@@ -743,7 +743,7 @@ namespace GuildUpSMB
 			else
 				texte = "Tapez /reload en jeu pour la charger.";
 			fenetre.Noter(heure + "  " + texte);
-			Bulle("GuildUpSMB " + bilan.Version + " installé", texte, ToolTipIcon.Info, null);
+			Bulle("SMB Forever " + bilan.Version + " installé", texte, ToolTipIcon.Info, null);
 		}
 
 		void Bulle(string titre, string texte, ToolTipIcon type, Action clic)
@@ -755,7 +755,7 @@ namespace GuildUpSMB
 		// Infobulle de l'icône : 63 caractères au plus (au-delà, Windows Forms refuse).
 		void Infobulle(string etat)
 		{
-			string t = "GuildUpSMB : " + etat;
+			string t = "SMB Forever Updater : " + etat;
 			icone.Text = t.Length > 63 ? t.Substring(0, 63) : t;
 		}
 
@@ -794,7 +794,7 @@ namespace GuildUpSMB
 		public Fenetre(Appli appli)
 		{
 			this.appli = appli;
-			Text = "GuildUpSMB - mise à jour";
+			Text = "SMB Forever Updater";
 			Icon = MiseAJour.Icone(new Size(32, 32));
 			FormBorderStyle = FormBorderStyle.FixedDialog;
 			MaximizeBox = false;

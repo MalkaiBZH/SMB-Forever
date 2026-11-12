@@ -8,18 +8,18 @@ l'addon voient et partagent ces informations**.
 
 ## Installation
 
-Le plus simple, sous Windows : **[télécharger GuildUpSMB-MiseAJour.exe](https://github.com/MalkaiBZH/SMB-Forever/releases/latest/download/GuildUpSMB-MiseAJour.exe)**
+Le plus simple, sous Windows : **[télécharger SMB Forever Updater](https://github.com/MalkaiBZH/SMB-Forever/releases/latest/download/GuildUpSMB-MiseAJour.exe)**
 et le lancer : il installe l'addon et le tient à jour tout seul (voir ci-dessous).
 
 À la main :
 
 1. Copier le dossier `GuildUpSMB/` dans `World of Warcraft/<version du client>/Interface/AddOns/`.
-2. Lancer le jeu (ou `/reload`) et vérifier que « GuildUpSMB » est coché dans la liste des addons.
-3. Cliquer sur le médaillon GuildUpSMB (en haut à droite, déplaçable), ou taper `/smb`.
+2. Lancer le jeu (ou `/reload`) et vérifier que « SMB Forever » est coché dans la liste des addons.
+3. Cliquer sur le médaillon SMB Forever (en haut à droite, déplaçable), ou taper `/smb`.
 
-### Mise à jour automatique (Windows)
+### Mise à jour automatique (Windows) : SMB Forever Updater
 
-[`GuildUpSMB-MiseAJour.exe`](https://github.com/MalkaiBZH/SMB-Forever/releases/latest) installe l'addon
+**SMB Forever Updater** ([`GuildUpSMB-MiseAJour.exe`](https://github.com/MalkaiBZH/SMB-Forever/releases/latest)) installe l'addon
 et le garde à jour depuis la branche `main` de ce dépôt. Au premier lancement, Windows peut afficher
 « Windows a protégé votre ordinateur » (programme non signé) : **Informations complémentaires**, puis
 **Exécuter quand même**. Le programme vit ensuite dans la zone de notification (icône de la chope, à
