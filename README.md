@@ -86,7 +86,9 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
   désactivable dans les options ou le menu rapide du médaillon). Chaque membre y apparaît avec son médaillon
   (son portrait), entouré d'un anneau à la couleur de sa classe ; un point de couleur s'il n'a pas de portrait.
   Quand plusieurs membres se chevauchent, la position la plus récente est au-dessus.
-- **Quêtes en commun** : les quêtes que d'autres membres font aussi, avec « Créer un groupe ».
+- **Quêtes en commun** : les quêtes que d'autres membres font aussi, avec « Créer un groupe ». Si tu es déjà
+  en groupe, le bouton devient « Inviter » (les membres en ligne qui ont la quête et ne sont pas encore avec
+  toi), ou « Déjà groupés » quand ils sont tous dans ton groupe ; « (groupe) » marque ceux qui y sont.
 - **Artisanat** :
   - *Registre* des métiers et recettes de chaque membre, commande en un clic ;
   - *Commandes* : les commandes reçues et passées, gardées 30 jours, avec leur état (en attente, acceptée, refusée, faite, annulée). L'artisan accepte, refuse ou marque « Fait » ; le client annule ou marque « Reçue ». Chaque changement prévient l'autre par une bulle (envoyé à son retour s'il est hors ligne). Le nombre de commandes reçues en attente s'affiche sur l'onglet ;

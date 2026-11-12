@@ -4,7 +4,8 @@
 --   "Q"            « envoyez vos listes » (à la connexion)
 -- La page « Quêtes en commun » de la fenêtre GuildUpSMB montre mes quêtes que d'autres membres font
 -- aussi, avec un bouton « Créer un groupe » : l'annonce de groupe (GuildUp_Groupes.lua) prévient par
--- une bulle les membres qui ont cette quête.
+-- une bulle les membres qui ont cette quête. Déjà en groupe : « Inviter » (membres en ligne qui ont la
+-- quête et ne sont pas dans mon groupe, ns.Groupes.DansMonGroupe) ou « Déjà groupés » (tous y sont).
 
 local NOM_ADDON, ns = ...
 
@@ -182,21 +183,30 @@ end
 -- Page « Quêtes en commun » de la fenêtre GuildUpSMB (style sombre et doré, kit ns.UI)
 --------------------------------------------------------------------------------
 
+-- Chaque quête : membres qui l'ont (groupe = déjà dans mon groupe), et aInviter = ceux qui sont en ligne
+-- mais pas encore dans mon groupe (le bouton de la ligne en dépend : Créer un groupe / Inviter / Déjà groupés)
 local function Partages()
 	local res = {}
+	local DansMonGroupe = IsInGroup and IsInGroup() and ns.Groupes and ns.Groupes.DansMonGroupe
 	for id, q in pairs(mesQuetes) do
-		local membres = {}
+		local membres, aInviter, groupes = {}, {}, 0
 		for cle, a in pairs(autres) do
 			if a.quetes[id] then
-				membres[#membres + 1] = { cle = cle, nom = a.nom, enLigne = EstEnLigne(cle) }
+				local m = { cle = cle, nom = a.nom, enLigne = EstEnLigne(cle) }
+				m.groupe = DansMonGroupe and DansMonGroupe(a.nom) or false
+				if m.groupe then groupes = groupes + 1
+				elseif m.enLigne then aInviter[#aInviter + 1] = m end
+				membres[#membres + 1] = m
 			end
 		end
 		if #membres > 0 then
 			table.sort(membres, function(x, y)
+				if x.groupe ~= y.groupe then return x.groupe end
 				if x.enLigne ~= y.enLigne then return x.enLigne end
 				return x.nom < y.nom
 			end)
-			res[#res + 1] = { id = id, titre = q.titre, zone = q.zone, niveau = q.niveau, membres = membres }
+			res[#res + 1] = { id = id, titre = q.titre, zone = q.zone, niveau = q.niveau, membres = membres,
+				aInviter = aInviter, groupes = groupes }
 		end
 	end
 	table.sort(res, function(a, b)
@@ -262,10 +272,35 @@ local function CreerLigne(parent)
 	r.groupe:SetPoint("RIGHT", r, "RIGHT", -12, 0)
 	r.groupe:SetScript("OnClick", function(self)
 		local q = self:GetParent().q
-		if q and ns.CreerGroupeQuete then ns.CreerGroupeQuete(q.id, q.titre, q.zone) end
+		if not q then return end
+		if self.action == "inviter" then
+			-- déjà en groupe : on invite directement ceux qui ont la quête et sont en ligne
+			local inviter = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
+			if inviter then
+				for _, m in ipairs(q.aInviter or {}) do pcall(inviter, m.nom) end
+			end
+		elseif self.action == "creer" and ns.CreerGroupeQuete then
+			ns.CreerGroupeQuete(q.id, q.titre, q.zone)
+		end
 	end)
-	UI.Infobulle(r.groupe, "Créer un groupe pour cette quête",
-		"Publie une annonce dans les groupes de la guilde. Les membres qui ont cette quête sont prévenus par une bulle.")
+	r.groupe:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		if self.action == "groupes" then
+			GameTooltip:SetText("Déjà groupés")
+			GameTooltip:AddLine("Les membres en ligne qui ont cette quête sont déjà dans ton groupe.", 1, 1, 1, true)
+		elseif self.action == "inviter" then
+			GameTooltip:SetText("Inviter dans ton groupe")
+			local q = self:GetParent().q
+			local noms = {}
+			for _, m in ipairs(q and q.aInviter or {}) do noms[#noms + 1] = NomCourt(m.nom) end
+			GameTooltip:AddLine("Invite " .. table.concat(noms, ", ") .. " : ils ont cette quête et sont en ligne.", 1, 1, 1, true)
+		else
+			GameTooltip:SetText("Créer un groupe pour cette quête")
+			GameTooltip:AddLine("Publie une annonce dans les groupes de la guilde. Les membres qui ont cette quête sont prévenus par une bulle.", 1, 1, 1, true)
+		end
+		GameTooltip:Show()
+	end)
+	r.groupe:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	r.titre = UI.Texte(r, "GameFontNormal", C.texte)
 	r.titre:SetPoint("TOPLEFT", r.icone, "TOPRIGHT", 12, 2)
 	r.titre:SetPoint("RIGHT", r.groupe, "LEFT", -12, 0)
@@ -326,8 +361,27 @@ local function CreerPage(parent)
 			local noms = {}
 			for _, m in ipairs(q.membres) do
 				noms[#noms + 1] = (m.enLigne and "|cff6fd08c" or "|cff8a826f") .. NomCourt(m.nom) .. "|r"
+					.. (m.groupe and " |cfff1cf6b(groupe)|r" or "")
 			end
 			r.membres:SetText(table.concat(noms, ", "))
+			-- bouton : déjà groupé avec tous ceux en ligne ; en groupe avec d'autres à inviter (chef ou
+			-- assistant) ; sinon créer une annonce de groupe
+			local enGroupe = IsInGroup and IsInGroup()
+			local peutInviter = not enGroupe or UnitIsGroupLeader("player")
+				or (UnitIsGroupAssistant and UnitIsGroupAssistant("player"))
+			if q.groupes > 0 and #q.aInviter == 0 then
+				r.groupe.action = "groupes"
+				r.groupe:Ecrire("Déjà groupés")
+				r.groupe:Activer(false)
+			elseif enGroupe and #q.aInviter > 0 then
+				r.groupe.action = "inviter"
+				r.groupe:Ecrire(#q.aInviter > 1 and ("Inviter (" .. #q.aInviter .. ")") or "Inviter")
+				r.groupe:Activer(peutInviter and true or false)
+			else
+				r.groupe.action = "creer"
+				r.groupe:Ecrire("Créer un groupe")
+				r.groupe:Activer(not enGroupe or UnitIsGroupLeader("player"))
+			end
 			r:ClearAllPoints()
 			r:SetPoint("TOPLEFT", p.liste.contenu, "TOPLEFT", 0, -y)
 			r:SetPoint("RIGHT", p.liste.contenu, "RIGHT", 0, 0)
@@ -373,7 +427,7 @@ end
 ns.Ecouter(PREFIXE, Recevoir)
 
 local ev = CreateFrame("Frame")
-for _, nom in ipairs({ "PLAYER_ENTERING_WORLD", "QUEST_LOG_UPDATE", "GUILD_ROSTER_UPDATE" }) do
+for _, nom in ipairs({ "PLAYER_ENTERING_WORLD", "QUEST_LOG_UPDATE", "GUILD_ROSTER_UPDATE", "GROUP_ROSTER_UPDATE" }) do
 	pcall(ev.RegisterEvent, ev, nom)
 end
 local premiere, prevu = true, false
@@ -388,6 +442,9 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 		end)
 	elseif event == "GUILD_ROSTER_UPDATE" then
 		LireRoster()
+		if MajFenetre then MajFenetre() end
+	elseif event == "GROUP_ROSTER_UPDATE" then
+		-- quelqu'un rejoint ou quitte mon groupe : boutons Créer un groupe / Inviter / Déjà groupés
 		if MajFenetre then MajFenetre() end
 	elseif event == "PLAYER_ENTERING_WORLD" and premiere then
 		premiere = false

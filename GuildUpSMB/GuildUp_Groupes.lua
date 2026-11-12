@@ -938,6 +938,7 @@ ns.Groupes = {
 	CouleurClasse = CouleurClasse,
 	CouleurNiveau = CouleurNiveau,
 	CreerMonAnnonce = CreerMonAnnonce,
+	DansMonGroupe = DansMonGroupe, -- (aussi pour la page Quêtes, GuildUp_Quetes.lua)
 	DB = DB,
 	DiffuserMonAnnonce = DiffuserMonAnnonce,
 	Envoyer = Envoyer,
