@@ -58,8 +58,13 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   (SkillLineAbility, SpellEffect, SpellReagents ; CSV gardés dans `outils/cache/`, ignoré par git).
   `--verifier` compare au fichier actuel sans rien écrire. Le niveau requis vaut 1 pour presque toutes
   les recettes (le client ne le renseigne pas) : l'interface affiche alors le niveau « jaune ».
-- `GuildUp_Objets.lua` : objets échangeables (ItemSparse) et objets liés fabricables. Après une
-  régénération des recettes, relancer `python outils/filtrer_objets_lies.py`.
+- `GuildUp_Objets.lua` (noms français) et `GuildUp_Objets_enUS.lua` (noms anglais) : objets échangeables
+  (`ns.DONNEES_OBJETS`) et objets liés fabricables (`ns.DONNEES_OBJETS_LIES`), même sélection dans les deux.
+  Générés par `python outils/generer_objets.py <build>` depuis wago.tools (ItemSparse en `frFR` et `enUS`
+  via `&locale=`, Item pour la classe ; même cache, même `--verifier`). Chaque fichier ne remplit
+  `ns.DONNEES_OBJETS*` que si `GetLocale()` lui correspond (`enUS`/`enGB` → anglais, sinon français) :
+  les modules consommateurs n'ont rien à savoir. Après une régénération des recettes, relancer
+  `generer_objets.py` (les objets liés ne gardent que ceux fabriqués par une recette de `GuildUp_Craft.lua`).
 - `GuildUp_Recettes.lua` (recettes apprises avec un plan) et `GuildUp_Sources.lua` (tiré de QuestieDB,
   GPL-3.0) : générés par l'outil d'export de l'auteur d'origine (`ns.Exporter`, `/gup export`), absent de
   ce dépôt.

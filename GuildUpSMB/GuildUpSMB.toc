@@ -27,6 +27,7 @@ GuildUp_Annonces.lua
 GuildUp_GU.lua
 GuildUp_Recherche.lua
 GuildUp_Objets.lua
+GuildUp_Objets_enUS.lua
 GuildUp_Besoins.lua
 GuildUp_Echanges.lua
 GuildUp_Aide.lua

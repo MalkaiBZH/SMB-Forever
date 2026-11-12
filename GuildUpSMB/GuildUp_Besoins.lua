@@ -219,7 +219,8 @@ local lignesMes, lignesGuilde = {}, {}
 local choix                    -- objet choisi dans la zone d'ajout
 
 --------------------------------------------------------------------------------
--- Recherche d'un objet par son nom dans tout le jeu (GuildUp_Objets.lua), même sans l'avoir
+-- Recherche d'un objet par son nom dans tout le jeu (GuildUp_Objets.lua, ou GuildUp_Objets_enUS.lua
+-- sur un client anglais : noms dans la langue du client), même sans l'avoir
 --------------------------------------------------------------------------------
 
 local Simplifier = ns.Simplifier
