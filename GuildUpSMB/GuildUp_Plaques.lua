@@ -117,6 +117,10 @@ local function MedaillonUnite(unit)
 	return nom and (MEDIA .. "portraits\\" .. nom .. ".tga") or nil
 end
 ns.PortraitUnite = PortraitUnite
+-- chemin de l'image d'un portrait connu (« nain-chaman-femme »), nil pour un nom inconnu (message reçu)
+ns.CheminPortrait = function(nom)
+	return nom and PORTRAITS[nom] and (MEDIA .. "portraits\\" .. nom .. ".tga") or nil
+end
 
 -- image de la bannière d'un état (tank, heal, dps, horscombat) dans un modèle
 local function ImageBanniere(etat, m) return MEDIA .. "M_DC_Banner_" .. etat .. m.suffixe .. ".tga" end
