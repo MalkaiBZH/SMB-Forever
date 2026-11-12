@@ -37,6 +37,7 @@ local function OuiNon(v) return v and "|cff00ff00oui|r" or "|cffff4444non|r" end
 local function Aide()
 	Message("/smb tout seul ouvre la fenêtre GuildUpSMB. Commandes :")
 	print("  /smb options — réglages de l'addon")
+	print("  /smb taille 1.2 — taille de la fenêtre GuildUpSMB (de 0.7 à 1.6)")
 	print("  /smb groupes — recherche de groupe de la guilde")
 	print("  /smb metiers — registre des métiers de la guilde")
 	print("  /smb quetes — quêtes en commun avec la guilde")
@@ -621,6 +622,16 @@ SlashCmdList.GUILDUP = function(msg)
 	elseif cmd == "medaillons" or cmd == "médaillons" or cmd == "portraits" then
 		db.medaillons = (db.medaillons == false)
 		Message("portraits des joueurs sur les bannières : " .. OuiNon(db.medaillons))
+	elseif cmd == "taille" then
+		local e = tonumber((((reste or ""):gsub(",", "."))))
+		if e and ns.EchelleInterface then
+			e = ns.EchelleInterface(e)
+		elseif ns.EchelleInterface then
+			Message("ex. /smb taille 1.2 (de 0.7 à 1.6)")
+			e = ns.EchelleInterface()
+		end
+		Message(("taille de la fenêtre GuildUpSMB : %.2f"):format(e or 1.1))
+		return
 	elseif cmd == "reperes" or cmd == "repères" or cmd == "hud" then
 		db.reperes = (db.reperes == false)
 		Message("membres de ta zone à l'écran : " .. OuiNon(db.reperes))

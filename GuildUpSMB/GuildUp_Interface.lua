@@ -422,6 +422,20 @@ local function Reglages()
 	return db.interface
 end
 
+-- Taille de la fenêtre (échelle, 1,1 par défaut : un peu plus grande que les fenêtres du jeu)
+local ECHELLE_DEFAUT = 1.1
+local function Echelle()
+	local e = tonumber(Reglages().echelle) or ECHELLE_DEFAUT
+	return math.max(0.7, math.min(1.6, e))
+end
+-- ns.EchelleInterface(e) : change la taille (nil = la lire) ; renvoie la taille en vigueur
+ns.EchelleInterface = function(e)
+	if not DB() then return ECHELLE_DEFAUT end
+	if e then Reglages().echelle = e end
+	if fenetre then fenetre:SetScale(Echelle()) end
+	return Echelle()
+end
+
 local function MajEntete()
 	if not fenetre then return end
 	local guilde = IsInGuild and IsInGuild() and GetGuildInfo("player")
@@ -508,6 +522,7 @@ local function CreerFenetre()
 	local f = CreateFrame("Frame", "GuildUpInterface", UIParent, "BackdropTemplate")
 	Habiller(f, C.fond, C.bordFort)
 	f:SetSize(LARGEUR, HAUTEUR)
+	f:SetScale(Echelle())
 	f:SetFrameStrata("HIGH")
 	f:SetToplevel(true)
 	f:SetClampedToScreen(true)

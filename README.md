@@ -86,6 +86,7 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
 |---|---|
 | `/smb` | Fenêtre GuildUpSMB |
 | `/smb options` | Fenêtre d'options (pseudo, notifications…) |
+| `/smb taille 1.2` | Taille de la fenêtre GuildUpSMB (de 0.7 à 1.6, 1.1 par défaut) |
 | `/smb groupes` | Recherche de groupe de la guilde |
 | `/smb metiers` | Registre des métiers |
 | `/smb quetes` | Quêtes en commun |
