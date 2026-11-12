@@ -17,6 +17,8 @@ l'addon voient et partagent ces informations**.
 - **Bannières par rôle** : bannière derrière le nom et la barre de vie des membres de la guilde
   (barres de nom et cadre de cible), selon leur rôle tank / heal / dps. Modèle orné hors groupe,
   sobre en groupe ou en raid. Lueur dorée sur la cible.
+- **Portraits** : sur la bannière, le médaillon du joueur (race, classe et sexe reconnus par le jeu,
+  56 portraits Alliance dans `media/portraits/`) remplace la mascotte ; `/smb medaillons` pour couper.
 - **Bouton de mini-carte** : choix de son rôle, accès à toutes les fenêtres, notifications.
   Halo doré quand des groupes sont ouverts, anneau vert quand on est en attente.
 - **Recherche de groupe de la guilde** : places Tank / Heal / DPS, groupes jusqu'à 40, et bouton
@@ -57,6 +59,7 @@ l'addon voient et partagent ces informations**.
 | `/smb barre` | Afficher / cacher le bouton de la mini-carte |
 | `/smb noms` | Nom et guilde des autres joueurs |
 | `/smb lueur` | Lueur derrière la bannière de la cible |
+| `/smb medaillons` | Portraits des joueurs sur les bannières |
 | `/smb annonces` | Annonces de la guilde en bulle |
 | `/smb gu` | Emote « GU! » |
 | `/smb diag` | Informations techniques à copier en cas de problème |

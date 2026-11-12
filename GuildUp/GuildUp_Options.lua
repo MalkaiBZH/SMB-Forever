@@ -52,6 +52,7 @@ local function Aide()
 	print("  /smb barre — afficher / cacher le bouton de la mini-carte")
 	print("  /smb noms — nom et guilde des autres joueurs (" .. OuiNon(db.nomsAllies) .. ")")
 	print("  /smb lueur — lueur derrière la bannière de ta cible (" .. OuiNon(db.lueur) .. ")")
+	print("  /smb medaillons — portraits des joueurs sur les bannières (" .. OuiNon(db.medaillons ~= false) .. ")")
 	print("  /smb annonces — annonces de la guilde en bulle (" .. OuiNon(db.annoncesGuilde ~= false) .. ")")
 	print("  /smb diag — informations techniques à copier (en cas de problème)")
 	print("  /smb debug — afficher / cacher la partie Debug de la fenêtre d'options")
@@ -373,6 +374,8 @@ local function CreerFenetre()
 
 	NouvelleCase(f, x, Ligne(), "Activer les bannières",
 		function() return db.actif end, function(v) db.actif = v; SurActivation() end)
+	NouvelleCase(f, x, Ligne(), "Portraits des joueurs sur les bannières",
+		function() return db.medaillons ~= false end, function(v) db.medaillons = v; ToutRafraichir() end)
 	NouvelleCase(f, x, Ligne(), "Afficher le bouton de la mini-carte",
 		function() return db.barre == nil or db.barre.visible ~= false end, function(v)
 			if type(db.barre) ~= "table" then db.barre = {} end
@@ -554,6 +557,9 @@ SlashCmdList.GUILDUP = function(msg)
 		SurActivation()
 	elseif cmd == "auras" then
 		db.aurasSous = not db.aurasSous; Message("améliorations sous la barre : " .. OuiNon(db.aurasSous))
+	elseif cmd == "medaillons" or cmd == "médaillons" or cmd == "portraits" then
+		db.medaillons = (db.medaillons == false)
+		Message("portraits des joueurs sur les bannières : " .. OuiNon(db.medaillons))
 	elseif cmd == "lueur" then
 		db.lueur = not db.lueur; Message("lueur jaune de sélection : " .. OuiNon(db.lueur))
 	elseif cmd == "style" then

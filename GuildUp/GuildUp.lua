@@ -14,6 +14,7 @@ local DEFAUT = {
 	style     = "banniere",  -- "banniere" ou "degrade"
 	couleurs  = true,        -- barre de vie colorée selon le rôle (barres de nom + cadre de cible)
 	lueur     = true,        -- lueur jaune autour de la barre de vie quand le joueur est ciblé
+	medaillons = true,       -- portrait du joueur (race, classe, sexe) à la place de la mascotte de la bannière
 	aurasSous = true,        -- icônes d'améliorations sous la barre de vie (barres de nom)
 	nomsAllies = true,       -- barres de nom alliées toujours affichées ; hors guilde et hors groupe : nom + <guilde> seuls
 	partagePosition = true,  -- partager ma position sur la carte avec la guilde (activé de base, coupable dans le volet)
