@@ -70,7 +70,7 @@ end
 
 --------------------------------------------------------------------------------
 -- Fenêtre « Nouveautés » : s'ouvre une fois à la première connexion après une mise à jour
--- (/gup nouveautes pour la rouvrir)
+-- (/smb nouveautes pour la rouvrir)
 --------------------------------------------------------------------------------
 
 local NOM_PUBLIC = "GuildUp Zz"
@@ -83,14 +83,14 @@ local NOTES = {
 		"|cffffd100Items|r (Artisanat) : tous les objets fabricables, rangés comme à l'hôtel des ventes (catégories, sous-catégories, tri par niveau d'objet).",
 		"|cffffd100Projets de guilde|r : des listes partagées avec toute la guilde ; chacun coche « Je m'en occupe » sur ce qu'il sait faire, et son nom s'affiche.",
 		"|cffffd100Pseudo et personnages|r : un pseudo commun et ton personnage principal, visibles au survol de ton nom (le vrai nom reste partout ailleurs).",
-		"|cffffd100À l'aide !|r (/gup sos), |cffffd100Merci !|r et les donateurs du mois, et un récapitulatif à la connexion de ce qui s'est passé pendant ton absence.",
+		"|cffffd100À l'aide !|r (/smb sos), |cffffd100Merci !|r et les donateurs du mois, et un récapitulatif à la connexion de ce qui s'est passé pendant ton absence.",
 		"Menu de la mini-carte réorganisé (Groupes, Artisanat, Mes carnets, Dons…) ; notifications repliables.",
 	},
 	["1.5.1"] = {
 		"|cffffd100Besoins|r : cherche n'importe quel objet du jeu par son nom (les ingrédients en premier), même sans l'avoir sur toi.",
 		"|cffffd100Demandes|r : nouvel onglet avec l'historique de qui t'a demandé un don (gardé 30 jours). On peut aussi demander un don à un joueur hors ligne : la demande lui est transmise dès que possible.",
 		"|cffffd100Listes à jour|r : les dons et besoins des absents te sont renvoyés par les membres connectés.",
-		"|cffffd100Nouveautés|r : cette fenêtre, à chaque mise à jour (/gup nouveautes pour la revoir).",
+		"|cffffd100Nouveautés|r : cette fenêtre, à chaque mise à jour (/smb nouveautes pour la revoir).",
 		"Échap ferme le menu de la mini-carte ; le Maj-clic sur un objet sert de nouveau à diviser une pile.",
 		"Correctifs : icône du bouton de mini-carte quand le rôle est inconnu, compatibilité avec les addons de mini-carte.",
 	},
@@ -214,7 +214,7 @@ local function VerifierNouveautes()
 	end
 end
 
--- Pour /gup diag
+-- Pour /smb diag
 ns.DiagVersion = function(L)
 	local n, plusAncienne, plusRecente = 0, 0, 0
 	for _, e in pairs(versions) do

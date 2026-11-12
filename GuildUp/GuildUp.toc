@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: GuildUp
-## Notes: Outils de guilde : bannières par rôle, groupes et quêtes, artisanat et dons, calendrier, carte.|n|n/gup pour les options
+## Notes: Outils de guilde : bannières par rôle, groupes et quêtes, artisanat et dons, calendrier, carte.|n|n/smb pour les options
 ## Author: Miko
 ## Version: 1.6.0
 ## SavedVariables: GuildUpDB, GuildUpMetiersDB

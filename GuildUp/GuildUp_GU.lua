@@ -13,7 +13,7 @@ local ZAARDOZ = "zaardoz-gu"
 local CORNE, CORNE2 = 566064, 567386 -- sound/doodad/dwarfhorn.ogg, sound/events/scourge_horn.ogg
 
 local function Normaliser(nom) return ns.Normaliser and ns.Normaliser(nom) or nom end
--- emote coupée ? (case « GU! » des notifications du volet, ou /gup gu ; ancien réglage db.emoteGU lu aussi)
+-- emote coupée ? (case « GU! » des notifications du volet, ou /smb gu ; ancien réglage db.emoteGU lu aussi)
 local function Coupee()
 	local db = ns.DB and ns.DB()
 	if not db then return false end
@@ -33,7 +33,7 @@ local PREFIXE = "GuildUpGU"
 local TAILLE, DUREE, DESCENTE = 50, 3.4, 140 -- taille, durée de vie, hauteur parcourue (pixels)
 local MAX_ECRAN = 15                           -- au plus 15 emotes à la fois
 local pool = {}
-local diag = { detectees = 0, affichees = 0, refus = "" } -- pour /gup diag
+local diag = { detectees = 0, affichees = 0, refus = "" } -- pour /smb diag
 local derniere = {}                            -- [cle] = moment de la dernière emote de ce joueur
 
 local function NouvelleEmote()
@@ -104,7 +104,7 @@ ns.DiagGU = function(L)
 	for _, e in ipairs(pool) do if e:IsShown() then n = n + 1 end end
 	local db = ns.DB and ns.DB()
 	L(("GU! : %d détectés, %d affichés, %d à l'écran%s%s"):format(diag.detectees, diag.affichees, n,
-		diag.refus ~= "" and (", dernier refus : " .. diag.refus) or "", Coupee() and " (COUPÉE : notifications du volet ou /gup gu)" or ""))
+		diag.refus ~= "" and (", dernier refus : " .. diag.refus) or "", Coupee() and " (COUPÉE : notifications du volet ou /smb gu)" or ""))
 end
 
 local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end end

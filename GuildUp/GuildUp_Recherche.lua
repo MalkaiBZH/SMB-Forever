@@ -476,7 +476,7 @@ ns.DiagRecherche = function(L)
 		", œil du jeu = " .. tostring(_G.MiniMapLFGFrame ~= nil or _G.QueueStatusButton ~= nil or _G.LFGMinimapFrame ~= nil))
 	-- appels relevés depuis le dernier /reload
 	if #appels == 0 then
-		L("recherche : aucun appel relevé (inscris un groupe à la main avec la fenêtre du jeu, puis refais /gup diag)")
+		L("recherche : aucun appel relevé (inscris un groupe à la main avec la fenêtre du jeu, puis refais /smb diag)")
 	end
 	for _, a in ipairs(appels) do L("recherche : appel " .. a) end
 	-- zones de texte de la fenêtre « Annonce » (titre / commentaire)

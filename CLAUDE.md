@@ -21,7 +21,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUp/`. Voir `README.md
 ## Architecture
 
 - `GuildUp.lua` : cœur (bannières sur les barres de nom et le cadre de cible, rôles, bouton et volet de
-  mini-carte, fenêtre d'options, bulles `ns.Alerte`, commandes `/gup`, `DEFAUT` = réglages par défaut).
+  mini-carte, fenêtre d'options, bulles `ns.Alerte`, commandes `/smb`, `DEFAUT` = réglages par défaut).
   Fournit `ns.DB()`, `ns.Normaliser`, `ns.EnvoyerAddon` (file d'envoi : un message toutes les 0,3 s),
   `ns.Erreur`, `ns.TestSolo`.
 - Un fichier par fonctionnalité, chacun avec **son préfixe de message d'addon** sur le canal `GUILD` :
@@ -39,7 +39,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUp/`. Voir `README.md
   Forever (wago.tools).
 - `GuildUp_Sources.lua` : extrait une fois de QuestieDB (GPL-3.0).
 - Ces fichiers font ~30 000 lignes : **ne pas les lire en entier**, utiliser Grep. L'outil d'export
-  (`ns.Exporter`, `/gup export`) n'est pas dans ce dépôt.
+  (`ns.Exporter`, `/smb export`) n'est pas dans ce dépôt.
 
 ## Particularités de Forever
 
@@ -53,9 +53,9 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUp/`. Voir `README.md
 Pas de build ni de tests automatisés : on teste **en jeu**, après `/reload`.
 - Mode Debug : mettre `afficherDebug = true` dans `GuildUpDB`
   (`WTF/Account/<compte>/SavedVariables/GuildUp.lua`, jeu fermé). Les cases Debug apparaissent alors
-  dans `/gup` : `test` (tout le monde compte comme membre de la guilde), `testSolo` (ses propres
+  dans `/smb` : `test` (tout le monde compte comme membre de la guilde), `testSolo` (ses propres
   messages sont traités comme ceux d'un autre membre), `testGroupe` (bannières de groupe partout).
-- `/gup diag` : diagnostic de la barre de nom de la cible.
+- `/smb diag` : diagnostic de la barre de nom de la cible.
 
 ## Publier une version
 

@@ -266,7 +266,7 @@ local function CarteParNom(noms)
 end
 
 local entreesVues = {} -- cache par nom
--- Entrées relevées en jeu par le joueur (/gup entree <nom>), prioritaires : pour les donjons
+-- Entrées relevées en jeu par le joueur (/smb entree <nom>), prioritaires : pour les donjons
 -- propres à Forever, absents de la table ci-dessus
 local function EntreesPerso()
 	local db = DB()
@@ -300,10 +300,10 @@ ns.EntreeDonjon = function(nom, mapID)
 	return e
 end
 
--- /gup entree <mot du nom> : enregistre ma position actuelle comme entrée de ce contenu
+-- /smb entree <mot du nom> : enregistre ma position actuelle comme entrée de ce contenu
 ns.EnregistrerEntree = function(nom)
 	nom = Simplifier((nom or ""):gsub("^%s+", ""):gsub("%s+$", ""))
-	if nom == "" then return nil, "donne un mot du nom, ex. /gup entree mortemines" end
+	if nom == "" then return nil, "donne un mot du nom, ex. /smb entree mortemines" end
 	local carte, x, y = MaPosition()
 	if not carte then return nil, "position introuvable ici (en instance ?)" end
 	EntreesPerso()[nom] = { carte = carte, x = x, y = y }
@@ -682,7 +682,7 @@ local function InstallerSuivi()
 	end)
 end
 
--- Pour /gup diag
+-- Pour /smb diag
 ns.DiagCarte = function(L)
 	local n, enInstance = 0, 0
 	for _, p in pairs(positions) do

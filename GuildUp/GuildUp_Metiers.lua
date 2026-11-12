@@ -210,7 +210,7 @@ local function NomCompletUnite(u)
 end
 
 --------------------------------------------------------------------------------
--- Données (SavedVariables à part : /gup reset ne les efface pas)
+-- Données (SavedVariables à part : /smb reset ne les efface pas)
 --   GuildUpMetiersDB.moi[cle]              mes métiers (par personnage)
 --   GuildUpMetiersDB.guildes[guilde][cle]  fiches reçues des autres membres
 -- fiche = { nom, classe, niveau, vu, profs = { AL = { n, max, nr, h, r = { "s123", ... } } } }
@@ -297,7 +297,7 @@ end
 local pret = false            -- vrai quelques secondes après la connexion
 local dernierResume = 0
 local resumePrevu = false
-local derniereLecture         -- pour /gup diag
+local derniereLecture         -- pour /smb diag
 local PlanifierMaj
 
 local function Resume()
@@ -490,7 +490,7 @@ end
 
 -- Recette « spéciale » : apprise ailleurs que chez l'entraîneur (plan trouvé, vendeur, quête…).
 -- D'après le texte « source » de la recette dans le jeu (rien ou « Entraîneur » = recette normale).
-local exemplesSources = {}    -- quelques textes lus, pour /gup diag
+local exemplesSources = {}    -- quelques textes lus, pour /smb diag
 local function RecetteSpeciale(T, id)
 	if not T.GetRecipeSourceText then return false end
 	local ok, s = pcall(T.GetRecipeSourceText, id)
@@ -1821,13 +1821,13 @@ local function CreerPage(f)
 end
 ns.CreerPageRegistre = CreerPage
 
--- Bouton « Métiers » du volet, /gup metiers : la fenêtre commune, onglet Registre
+-- Bouton « Métiers » du volet, /smb metiers : la fenêtre commune, onglet Registre
 ns.BasculerMetiers = function()
 	if ns.BasculerArtisanat then ns.BasculerArtisanat(1) end
 end
 
 --------------------------------------------------------------------------------
--- /gup diag
+-- /smb diag
 --------------------------------------------------------------------------------
 
 ns.DiagMetiers = function(L)

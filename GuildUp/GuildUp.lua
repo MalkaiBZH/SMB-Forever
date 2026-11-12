@@ -49,7 +49,7 @@ ns.Son = Son
 
 local SONS_FENETRES = {
 	fenetre = { "IG_CHARACTER_INFO_OPEN", "IG_CHARACTER_INFO_CLOSE" }, -- grandes fenêtres
-	options = { "IG_MAINMENU_OPEN", "IG_MAINMENU_CLOSE" },             -- options /gup
+	options = { "IG_MAINMENU_OPEN", "IG_MAINMENU_CLOSE" },             -- options /smb
 	volet   = { "IG_MAINMENU_OPTION_CHECKBOX_ON", "IG_MAINMENU_OPTION_CHECKBOX_OFF" },
 }
 
@@ -1240,7 +1240,7 @@ local function ImposerCVars()
 		for _, c in ipairs(CVARS_ALLIES) do voulues[c[1]] = c[2] end
 	end
 	if type(db.cvarsAvant) ~= "table" then db.cvarsAvant = {} end
-	-- anciens essais retirés (/gup portee, noms flottants coupés) : réglages du jeu remis
+	-- anciens essais retirés (/smb portee, noms flottants coupés) : réglages du jeu remis
 	for _, nom in ipairs({ "nameplateMaxDistance", "UnitNameFriendlyPlayerName" }) do
 		if db.cvarsAvant[nom] then
 			pcall(ecrire, nom, db.cvarsAvant[nom])
@@ -1262,7 +1262,7 @@ local function ImposerCVars()
 	end
 end
 
--- GuildUp désactivé (ou /gup noms coupé) : barres de nom alliées remises comme avant
+-- GuildUp désactivé (ou /smb noms coupé) : barres de nom alliées remises comme avant
 local function RendreCVarsAllies()
 	if InCombatLockdown() then
 		local attente = CreateFrame("Frame")
@@ -1304,7 +1304,7 @@ ev:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4)
 		-- aperçus de test (plus dans la fenêtre) : toujours désactivés au chargement
 		db.role = "auto"
 		db.debugIncantation = false
-		-- partie Debug cachée (/gup debug pour l'afficher) : aucun essai ne reste actif à l'insu du joueur
+		-- partie Debug cachée (/smb debug pour l'afficher) : aucun essai ne reste actif à l'insu du joueur
 		if not db.afficherDebug then db.test, db.testSolo, db.testGroupe = false, false, false end
 		-- la lueur de cible avait été coupée (option plus visible dans la fenêtre) : remise une fois
 		if not db.lueurRemise then db.lueur = true; db.lueurRemise = true end
@@ -1398,30 +1398,30 @@ ev:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4)
 end)
 
 --------------------------------------------------------------------------------
--- Commandes /gup
+-- Commandes /smb
 --------------------------------------------------------------------------------
 
 local function OuiNon(v) return v and "|cff00ff00oui|r" or "|cffff4444non|r" end
 
 local function Aide()
-	Message("/gup tout seul ouvre la fenêtre d'options. Commandes :")
-	print("  /gup groupes — recherche de groupe de la guilde")
-	print("  /gup metiers — registre des métiers de la guilde")
-	print("  /gup quetes — quêtes en commun avec la guilde")
-	print("  /gup evenements — créer un événement de guilde (calendrier du jeu)")
-	print("  /gup echanges — dons et besoins de la guilde")
-	print("  /gup carnet — carnet de craft (tes listes de courses)")
-	print("  /gup encyclo — encyclopédie (ou Alt + clic sur un objet)")
-	print("  /gup items — tous les objets fabricables")
-	print("  /gup projets — projets de guilde")
-	print("  /gup nouveautes — les nouveautés de cette version")
-	print("  /gup sos — appeler la guilde à l'aide")
-	print("  /gup on | off — bannières de la guilde (" .. OuiNon(db.actif) .. ")")
-	print("  /gup barre — afficher / cacher le bouton de la mini-carte")
-	print("  /gup noms — nom et guilde des autres joueurs (" .. OuiNon(db.nomsAllies) .. ")")
-	print("  /gup lueur — lueur derrière la bannière de ta cible (" .. OuiNon(db.lueur) .. ")")
-	print("  /gup diag — informations techniques à copier (en cas de problème)")
-	print("  /gup reset — réglages par défaut")
+	Message("/smb tout seul ouvre la fenêtre d'options. Commandes :")
+	print("  /smb groupes — recherche de groupe de la guilde")
+	print("  /smb metiers — registre des métiers de la guilde")
+	print("  /smb quetes — quêtes en commun avec la guilde")
+	print("  /smb evenements — créer un événement de guilde (calendrier du jeu)")
+	print("  /smb echanges — dons et besoins de la guilde")
+	print("  /smb carnet — carnet de craft (tes listes de courses)")
+	print("  /smb encyclo — encyclopédie (ou Alt + clic sur un objet)")
+	print("  /smb items — tous les objets fabricables")
+	print("  /smb projets — projets de guilde")
+	print("  /smb nouveautes — les nouveautés de cette version")
+	print("  /smb sos — appeler la guilde à l'aide")
+	print("  /smb on | off — bannières de la guilde (" .. OuiNon(db.actif) .. ")")
+	print("  /smb barre — afficher / cacher le bouton de la mini-carte")
+	print("  /smb noms — nom et guilde des autres joueurs (" .. OuiNon(db.nomsAllies) .. ")")
+	print("  /smb lueur — lueur derrière la bannière de ta cible (" .. OuiNon(db.lueur) .. ")")
+	print("  /smb diag — informations techniques à copier (en cas de problème)")
+	print("  /smb reset — réglages par défaut")
 end
 
 local fenetre, MajFenetre -- fenêtre d'options, définies plus bas
@@ -1433,7 +1433,7 @@ end
 
 local function OuvrirSelecteur()
 	if not (ColorPickerFrame and ColorPickerFrame.SetupColorPickerAndShow) then
-		Message("sélecteur indisponible sur ce client, utilise /gup couleur R V B")
+		Message("sélecteur indisponible sur ce client, utilise /smb couleur R V B")
 		return
 	end
 	local avant = { r = db.r, g = db.g, b = db.b, a = db.a }
@@ -1457,7 +1457,7 @@ end
 
 local ETATS = { auto = true, tank = true, heal = true, dps = true, horscombat = true }
 
--- /gup diag : décrit la barre de nom de ta cible, pour comprendre pourquoi rien ne s'affiche
+-- /smb diag : décrit la barre de nom de ta cible, pour comprendre pourquoi rien ne s'affiche
 local function DiagCollecte(L)
 	do
 		local lire = (C_CVar and C_CVar.GetCVar) or GetCVar
@@ -1693,7 +1693,7 @@ local function Diag()
 end
 
 --------------------------------------------------------------------------------
--- Fenêtre d'options (/gup)
+-- Fenêtre d'options (/smb)
 --------------------------------------------------------------------------------
 
 local controles = {} -- { maj = fonction qui recale l'état affiché }
@@ -1796,7 +1796,7 @@ local function CreerFenetre()
 		detecte:SetText("Rôle annoncé : " .. (r and r:upper() or "inconnu (bannière neutre)"))
 	end })
 
-	-- Partie Debug : cachée par défaut, affichée avec /gup debug (pour tester l'addon)
+	-- Partie Debug : cachée par défaut, affichée avec /smb debug (pour tester l'addon)
 	local hauteurSansDebug = -Ligne(0) + 50
 	Ligne(6)
 	local dbg = CreateFrame("Frame", nil, f)
@@ -2493,7 +2493,7 @@ end
 ns.MEDIA = MEDIA
 
 -- Catégorie de chaque bulle (d'après son titre), pour pouvoir les couper une par une
--- dans la fenêtre /gup (db.notifs[catégorie] = false)
+-- dans la fenêtre /smb (db.notifs[catégorie] = false)
 local CATEGORIES_BULLES = {
 	["Nouveau groupe de la guilde"] = "groupes",
 	["Nouvelle candidature"] = "candidatures", ["Candidature refusée"] = "candidatures",
@@ -2553,7 +2553,7 @@ ns.AlerteNouveauGroupe = function(chef, contenu)
 	ns.Alerte("Nouveau groupe de la guilde", ("%s ouvre un groupe : |cffffd100%s|r"):format(chef or "?", contenu or "?"))
 end
 
-SLASH_GUILDUP1 = "/gup"
+SLASH_GUILDUP1 = "/smb"
 SLASH_GUILDUP2 = "/guildup"
 SlashCmdList.GUILDUP = function(msg)
 	local cmd, reste = (msg or ""):lower():match("^%s*(%S*)%s*(.-)%s*$")
@@ -2630,10 +2630,10 @@ SlashCmdList.GUILDUP = function(msg)
 	elseif cmd == "lueur" then
 		db.lueur = not db.lueur; Message("lueur jaune de sélection : " .. OuiNon(db.lueur))
 	elseif cmd == "style" then
-		if reste ~= "banniere" and reste ~= "degrade" then Message("ex. /gup style banniere"); return end
+		if reste ~= "banniere" and reste ~= "degrade" then Message("ex. /smb style banniere"); return end
 		db.style = reste; Message("style : " .. reste)
 	elseif cmd == "role" then
-		if not ETATS[reste] then Message("ex. /gup role tank (ou auto)"); return end
+		if not ETATS[reste] then Message("ex. /smb role tank (ou auto)"); return end
 		db.role = reste; Message("rôle : " .. reste)
 	elseif cmd == "couleur" then
 		local r, g, b = reste:match("^([%d%.]+)%s+([%d%.]+)%s+([%d%.]+)$")
@@ -2646,7 +2646,7 @@ SlashCmdList.GUILDUP = function(msg)
 		Message(("couleur : %.2f %.2f %.2f"):format(db.r, db.g, db.b))
 	elseif cmd == "opacite" or cmd == "opacité" then
 		local a = tonumber(reste)
-		if not a then Message("ex. /gup opacite 0.8"); return end
+		if not a then Message("ex. /smb opacite 0.8"); return end
 		db.a = math.max(0, math.min(a, 1)); Message(("opacité : %.2f"):format(db.a))
 	elseif cmd == "reset" then
 		for k in pairs(db) do db[k] = nil end

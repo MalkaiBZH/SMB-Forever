@@ -10,7 +10,7 @@ l'addon voient et partagent ces informations**.
 
 1. Copier le dossier `GuildUp/` dans `World of Warcraft/<version du client>/Interface/AddOns/`.
 2. Lancer le jeu (ou `/reload`) et vérifier que « GuildUp » est coché dans la liste des addons.
-3. Taper `/gup` pour ouvrir les options, ou cliquer sur le bouton de la mini-carte.
+3. Taper `/smb` pour ouvrir les options, ou cliquer sur le bouton de la mini-carte.
 
 ## Fonctionnalités
 
@@ -31,7 +31,7 @@ l'addon voient et partagent ces informations**.
   - *Dons* (un hôtel des ventes gratuit), *Demandes* et *Besoins* ;
   - *Projets de guilde* : une liste d'objets à fabriquer, découpée en tâches à prendre.
 - **Annonces** en bulle : montées de niveau, nouveaux métiers, paliers de métier.
-- **À l'aide !** (`/gup sos`) : appel à la guilde avec sa position.
+- **À l'aide !** (`/smb sos`) : appel à la guilde avec sa position.
 - **Événements** : création via le calendrier du jeu et notification des nouveaux événements.
 - **Identité** : un pseudo commun à tous ses personnages et son personnage principal, visibles au survol.
 - **Vérification de version** : prévient quand un membre a une version plus récente.
@@ -41,28 +41,28 @@ l'addon voient et partagent ces informations**.
 
 | Commande | Effet |
 |---|---|
-| `/gup` | Fenêtre d'options |
-| `/gup groupes` | Recherche de groupe de la guilde |
-| `/gup metiers` | Registre des métiers |
-| `/gup quetes` | Quêtes en commun |
-| `/gup evenements` | Créer un événement de guilde |
-| `/gup echanges` | Dons et besoins |
-| `/gup carnet` | Carnet de craft (listes de courses) |
-| `/gup encyclo` | Encyclopédie |
-| `/gup items` | Tous les objets fabricables |
-| `/gup projets` | Projets de guilde |
-| `/gup sos` | Appeler la guilde à l'aide |
-| `/gup nouveautes` | Nouveautés de la version |
-| `/gup on` / `off` | Activer / couper les bannières |
-| `/gup barre` | Afficher / cacher le bouton de la mini-carte |
-| `/gup noms` | Nom et guilde des autres joueurs |
-| `/gup lueur` | Lueur derrière la bannière de la cible |
-| `/gup annonces` | Annonces de la guilde en bulle |
-| `/gup gu` | Emote « GU! » |
-| `/gup diag` | Informations techniques à copier en cas de problème |
-| `/gup reset` | Réglages par défaut |
+| `/smb` | Fenêtre d'options |
+| `/smb groupes` | Recherche de groupe de la guilde |
+| `/smb metiers` | Registre des métiers |
+| `/smb quetes` | Quêtes en commun |
+| `/smb evenements` | Créer un événement de guilde |
+| `/smb echanges` | Dons et besoins |
+| `/smb carnet` | Carnet de craft (listes de courses) |
+| `/smb encyclo` | Encyclopédie |
+| `/smb items` | Tous les objets fabricables |
+| `/smb projets` | Projets de guilde |
+| `/smb sos` | Appeler la guilde à l'aide |
+| `/smb nouveautes` | Nouveautés de la version |
+| `/smb on` / `off` | Activer / couper les bannières |
+| `/smb barre` | Afficher / cacher le bouton de la mini-carte |
+| `/smb noms` | Nom et guilde des autres joueurs |
+| `/smb lueur` | Lueur derrière la bannière de la cible |
+| `/smb annonces` | Annonces de la guilde en bulle |
+| `/smb gu` | Emote « GU! » |
+| `/smb diag` | Informations techniques à copier en cas de problème |
+| `/smb reset` | Réglages par défaut |
 
-`/guildup` fonctionne comme `/gup`.
+`/guildup` fonctionne comme `/smb`.
 
 ## Données enregistrées
 

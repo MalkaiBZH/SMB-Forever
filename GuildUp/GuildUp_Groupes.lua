@@ -114,7 +114,7 @@ local function Prenom(nom)
 	return (NomCourt(nom) or "?"):match("^(%S+)") or nom
 end
 
-local dernierNomRecuDeMoi -- pour /gup diag : comment le serveur écrit mon nom dans les messages
+local dernierNomRecuDeMoi -- pour /smb diag : comment le serveur écrit mon nom dans les messages
 local finCalme = math.huge -- pas d'alerte avant la connexion + 25 s (voir PLAYER_ENTERING_WORLD)
 
 -- texte libre sûr pour un message d'addon : sans séparateur, ni « | », ni retour à la ligne
@@ -1938,7 +1938,7 @@ ns.OuvrirGroupes = function()
 	if fenetre:IsShown() then ChoisirOnglet(1) else fenetre:Show() end
 end
 
--- Pour /gup diag
+-- Pour /smb diag
 ns.DiagGroupes = function(L)
 	ConstruireCatalogue()
 	L("groupes (catalogue des contenus) :")
