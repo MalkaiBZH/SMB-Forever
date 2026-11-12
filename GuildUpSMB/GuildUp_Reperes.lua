@@ -1,38 +1,31 @@
 -- GuildUpSMB : repères des membres de la guilde dans le HUD, comme dans un jeu de tir.
 --
 -- Les membres qui partagent leur position (GuildUp_Carte.lua, message P) et se trouvent sur la même
--- carte que moi ont un repère à l'écran, placé selon leur direction vue depuis mon personnage
--- (GetPlayerFacing : c'est l'orientation du personnage, pas celle de la caméra quand on la tourne au
--- clic gauche) :
---   - barre de nom du membre affichée (il est à l'écran et assez proche) : chevron doré et distance
---     au-dessus de sa tête, accrochés à sa barre de nom (placement exact, suit ses mouvements) ;
---   - devant moi mais trop loin pour avoir une barre de nom : portrait, prénom et distance au milieu
---     de l'écran, sur la ligne d'horizon (là où se trouve un personnage lointain), à l'horizontale
---     dans sa direction ;
---   - hors du champ de vision : même repère au bord de l'écran, avec une flèche. Le tour de l'écran
---     suit la direction : à droite ou à gauche sur les côtés (à partir de l'horizon), plus bas à
---     mesure qu'il passe derrière moi, puis en bas, au centre quand il est juste derrière.
+-- carte que moi ont un repère (portrait, prénom, distance) toujours sur le tour de l'écran, placé selon
+-- leur direction vue depuis mon personnage (GetPlayerFacing : c'est l'orientation du personnage, pas
+-- celle de la caméra quand on la tourne au clic gauche). Les positions n'ont pas d'altitude : le
+-- repère ne se pose jamais au milieu de l'écran.
+--   - devant moi (dans le champ de vision) : bord du haut, à l'horizontale exacte de sa direction
+--     (projection comme sur l'écran) ;
+--   - hors du champ de vision : bord de gauche ou de droite, de plus en plus bas à mesure qu'il passe
+--     derrière moi, puis bord du bas, au centre quand il est juste derrière ; avec une flèche.
 -- Seuls les membres dont le portrait est connu sont affichés (addon à jour, race avec portrait).
--- Pas de hauteur : les positions de la carte n'ont pas d'altitude.
 -- Clic : chuchoter. Réglage db.reperes (/smb reperes, case dans les options).
 -- Aucun message réseau propre : tout vient des positions de GuildUp_Carte.lua (une toutes les 6 s
--- au plus pour un membre qui bouge), d'où des petits sauts quand un membre proche se déplace (sauf
--- au-dessus de sa tête : la barre de nom suit le personnage en continu).
+-- au plus pour un membre qui bouge), d'où des petits sauts quand un membre proche se déplace.
 
 local NOM_ADDON, ns = ...
 
 local NomCourt = ns.NomCourt
 local CouleurClasse = ns.CouleurClasse
-local NomComplet = ns.Coeur and ns.Coeur.NomComplet
 
 local CHAMP = math.rad((ns.Config and tonumber(ns.Config.champVisionReperes)) or 90) -- largeur de l'écran (angle)
-local HORIZON = (ns.Config and tonumber(ns.Config.horizonReperes)) or 40 -- ligne d'horizon, au-dessus du centre de l'écran
+local HAUT = (ns.Config and tonumber(ns.Config.hautReperes)) or 34 -- centre des repères du haut, sous le haut de l'écran
 local BAS = (ns.Config and tonumber(ns.Config.basReperes)) or 150 -- centre des repères du bas (au-dessus des barres d'action)
 local TAILLE = 40        -- diamètre du portrait (pixels)
 local MARGE = 50         -- distance minimale au bord de l'écran (côtés)
 local DUREE_VIE = 45     -- secondes sans nouvelles d'un membre avant de cacher son repère
 local PERIODE = 0.02     -- secondes entre deux mises à jour (mouvement fluide)
-local PERIODE_PLAQUES = 1 -- secondes entre deux relevés complets des barres de nom (en plus des évènements)
 local UNITE = (GetLocale() == "enUS" or GetLocale() == "enGB") and "yd" or "m"
 local POLICE = (GameFontNormal and GameFontNormal:GetFont()) or STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 local atan2 = math.atan2 or math.atan
@@ -73,41 +66,6 @@ local function MondeMembre(cle, p)
 end
 
 --------------------------------------------------------------------------------
--- Barres de nom affichées
---------------------------------------------------------------------------------
-
--- [nom normalisé] = région à laquelle accrocher le repère (nom de la barre, ou la barre elle-même).
--- Relevé aux évènements des barres de nom et toutes les PERIODE_PLAQUES secondes, pas à chaque image.
-local plaques = {}
-local plaquesARelever = true
-local depuisReleve = 0
-
-local function ReleverPlaques()
-	plaquesARelever, depuisReleve = false, 0
-	for k in pairs(plaques) do plaques[k] = nil end
-	if not (C_NamePlate and C_NamePlate.GetNamePlates and NomComplet) then return end
-	for _, plaque in ipairs(C_NamePlate.GetNamePlates() or {}) do
-		if not (plaque.IsForbidden and plaque:IsForbidden()) then
-			local uf = plaque.UnitFrame
-			local unite = plaque.namePlateUnitToken or (uf and uf.unit)
-			if unite and UnitIsPlayer(unite) then
-				local cle = NomComplet(unite)
-				-- le nom de Blizzard est juste au-dessus de la tête ; s'il est caché (autre addon de
-				-- barres de nom), la barre elle-même
-				local ancre = (uf and uf:IsShown() and uf.name and uf.name:IsShown()) and uf.name or plaque
-				if cle then plaques[cle] = ancre end
-			end
-		end
-	end
-end
-
-local ev = CreateFrame("Frame")
-for _, e in ipairs({ "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "UNIT_NAME_UPDATE", "PLAYER_ENTERING_WORLD" }) do
-	pcall(ev.RegisterEvent, ev, e)
-end
-ev:SetScript("OnEvent", function() plaquesARelever = true end)
-
---------------------------------------------------------------------------------
 -- Repères
 --------------------------------------------------------------------------------
 
@@ -126,10 +84,12 @@ local function NouveauRepere()
 	b.portrait:SetAllPoints()
 	b.nom = b:CreateFontString(nil, "OVERLAY")
 	b.nom:SetFont(POLICE, 13, "OUTLINE")
+	b.nom:SetPoint("TOP", b, "BOTTOM", 0, -2)
 	b.distance = b:CreateFontString(nil, "OVERLAY")
 	b.distance:SetFont(POLICE, 10, "OUTLINE")
 	b.distance:SetTextColor(0.85, 0.85, 0.85)
-	-- flèche vers le membre (bord de l'écran) ou chevron au-dessus de sa tête
+	b.distance:SetPoint("TOP", b.nom, "BOTTOM", 0, -1)
+	-- flèche vers le membre quand il est hors du champ de vision
 	b.fleche = b:CreateFontString(nil, "OVERLAY")
 	b.fleche:SetFont(POLICE, 22, "OUTLINE")
 	b.fleche:SetTextColor(1, 0.82, 0)
@@ -151,29 +111,13 @@ local function NouveauRepere()
 	return b
 end
 
--- Mise en page d'un repère, refaite seulement quand elle change :
--- "tete" (au-dessus de la barre de nom), "horizon" (sans flèche), "<", ">", "v" (bord de l'écran)
+-- Flèche d'un repère, refaite seulement quand elle change : "haut" (devant moi, sans flèche),
+-- "<", ">" (côtés), "v" (bas, derrière moi)
 local function Disposer(r, mode)
 	if r.mode == mode then return end
 	r.mode = mode
-	r.nom:ClearAllPoints(); r.distance:ClearAllPoints(); r.fleche:ClearAllPoints()
-	if mode == "tete" then
-		-- le portrait et le nom sont déjà sur la barre de nom : chevron et distance seulement, et pas de
-		-- clic (le repère est au milieu du monde, il ne doit pas gêner le clic droit sur le joueur)
-		r.portrait:Hide(); r.nom:Hide()
-		r.fleche:SetPoint("BOTTOM", r, "BOTTOM", 0, 0)
-		r.fleche:SetText("v")
-		r.fleche:Show()
-		r.distance:SetPoint("BOTTOM", r.fleche, "TOP", 0, -4)
-		r:EnableMouse(false)
-		r:SetAlpha(1)
-		return
-	end
-	r.portrait:Show(); r.nom:Show()
-	r.nom:SetPoint("TOP", r, "BOTTOM", 0, -2)
-	r.distance:SetPoint("TOP", r.nom, "BOTTOM", 0, -1)
-	r:EnableMouse(true)
-	if mode == "horizon" then
+	r.fleche:ClearAllPoints()
+	if mode == "haut" then
 		r.fleche:Hide()
 		r:SetAlpha(1)
 		return
@@ -183,12 +127,12 @@ local function Disposer(r, mode)
 	else r.fleche:SetPoint("TOP", r.distance, "BOTTOM", 0, 2) end
 	r.fleche:SetText(mode)
 	r.fleche:Show()
-	r:SetAlpha(0.7)
+	r:SetAlpha(0.8)
 end
 
 -- Membre hors du champ de vision : place sur le tour de l'écran (centre du repère, depuis le centre
--- de l'écran) et flèche. On part du côté à hauteur de l'horizon (bord du champ de vision), on
--- descend le côté, puis on suit le bas jusqu'au centre (droit derrière moi).
+-- de l'écran) et flèche. On part du coin du haut (bord du champ de vision), on descend le côté, puis
+-- on suit le bas jusqu'au centre (droit derrière moi).
 local function PlaceAuBord(angle, demiL, yHaut, yBas)
 	local cote = (angle > 0) and -1 or 1 -- angle positif = à ma gauche
 	local f = (math.abs(angle) - CHAMP / 2) / (PI - CHAMP / 2)
@@ -217,7 +161,6 @@ local function Maj()
 	if not (carte and cap) then return ToutCacher() end -- en instance, ou position inconnue
 	local monNord, monOuest = Monde(carte, x, y)
 	if not monNord then return ToutCacher() end
-	if plaquesARelever or depuisReleve >= PERIODE_PLAQUES then ReleverPlaques() end
 
 	-- membres sur ma carte, avec un portrait
 	local maintenant = GetTime()
@@ -238,21 +181,16 @@ local function Maj()
 
 	local demi = cadre:GetWidth() / 2
 	local demiL = math.max(0, demi - MARGE)
-	local yHaut = HORIZON -- centre du portrait, depuis le centre de l'écran
+	local yHaut = cadre:GetHeight() / 2 - HAUT -- centre des portraits du haut, depuis le centre de l'écran
 	local yBas = -cadre:GetHeight() / 2 + BAS
 	local tanDemi = math.tan(CHAMP / 2)
 	for i, v in ipairs(visibles) do
 		local r = reperes[i]
 		if not r then r = NouveauRepere(); reperes[i] = r end
 		r:ClearAllPoints()
-		local ancre = plaques[v.cle]
-		if ancre then
-			-- à l'écran et assez proche pour avoir une barre de nom : au-dessus de sa tête
-			Disposer(r, "tete")
-			r:SetPoint("BOTTOM", ancre, "TOP", 0, 2)
-		elseif math.abs(v.angle) < CHAMP / 2 then
-			-- devant moi, loin : sur l'horizon ; projection comme sur l'écran (tangente)
-			Disposer(r, "horizon")
+		if math.abs(v.angle) < CHAMP / 2 then
+			-- devant moi : bord du haut ; projection comme sur l'écran (tangente)
+			Disposer(r, "haut")
 			local px = -math.tan(v.angle) / tanDemi * demi
 			if px < -demiL then px = -demiL elseif px > demiL then px = demiL end
 			r:SetPoint("CENTER", cadre, "CENTER", px, yHaut)
@@ -274,7 +212,6 @@ end
 
 local attente = 0
 cadre:SetScript("OnUpdate", function(self, ecoule)
-	depuisReleve = depuisReleve + ecoule
 	attente = attente + ecoule
 	if attente < PERIODE then return end
 	attente = 0

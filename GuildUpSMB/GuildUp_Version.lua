@@ -86,8 +86,11 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "GuildUpSMB" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.0.1"] = {
+		"|cffffd100Repères à l'écran|r : toujours sur le tour de l'écran (les positions n'ont pas d'altitude) : en haut pour les membres devant toi, sur les côtés à gauche et à droite, en bas pour ceux qui sont derrière.",
+	},
 	["2.0.0"] = {
 		"|cffffd100Nouvelle interface|r : le bouton de la mini-carte devient un médaillon à placer où tu veux (anneau à la couleur de ton rôle, pastille des nouveautés). Clic : la fenêtre GuildUpSMB et son accueil, qui résume la guilde (membres de ta zone, groupes ouverts, appels à l'aide, demandes de dons, besoins que tu sais fabriquer, projets). Clic droit : menu rapide (rôle, position, groupes, à l'aide).",
 		"|cffffd100Repères à l'écran|r : les membres de la guilde sur ta carte apparaissent dans le HUD, avec leur portrait et leur distance, au-dessus de leur tête ou dans leur direction (/smb reperes).",

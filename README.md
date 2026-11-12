@@ -47,12 +47,11 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
   56 portraits Alliance dans `GuildUpSMB/media/portraits/`) s'affiche à gauche de leur nom, sur les barres
   de nom et le cadre de cible. Les anciennes bannières horizontales derrière le nom ne sont plus dessinées :
   sans portrait, rien derrière le nom. Lueur dorée sur la cible. `/smb medaillons` pour couper.
-- **Repères dans le HUD** : les membres de la guilde présents sur la même carte ont un repère à l'écran,
-  comme dans un jeu de tir. Proche et visible : chevron doré et distance au-dessus de sa tête. Devant mais
-  loin : portrait, prénom à la couleur de la classe et distance au milieu de l'écran, dans sa direction.
-  Hors du champ de vision : au bord de l'écran avec une flèche (sur les côtés, ou en bas quand il est
-  derrière). Clic : chuchoter. Seulement les membres qui partagent leur position et ont un portrait.
-  `/smb reperes` pour couper.
+- **Repères dans le HUD** : les membres de la guilde présents sur la même carte ont un repère (portrait,
+  prénom à la couleur de la classe, distance) toujours sur le tour de l'écran, comme dans un jeu de tir :
+  en haut quand ils sont devant (dans leur direction exacte), sur les côtés quand ils sont à gauche ou à
+  droite, en bas quand ils sont derrière, avec une flèche. Clic : chuchoter. Seulement les membres qui
+  partagent leur position et ont un portrait. `/smb reperes` pour couper.
 - **Médaillon GuildUpSMB** : bouton rond à placer où l'on veut sur l'écran (glisser), anneau à la
   couleur de son rôle, pastille des nouveautés (groupes ouverts, appels à l'aide, demandes de dons).
   Halo doré quand des groupes sont ouverts, anneau vert quand on est en attente. Clic : la fenêtre
@@ -103,7 +102,7 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
 | `/smb noms` | Nom et guilde des autres joueurs |
 | `/smb lueur` | Lueur derrière la bannière de la cible |
 | `/smb medaillons` | Portraits des joueurs sur les bannières |
-| `/smb reperes` | Membres de ta zone en haut de l'écran |
+| `/smb reperes` | Membres de ta zone sur le tour de l'écran |
 | `/smb annonces` | Annonces de la guilde en bulle |
 | `/smb gu` | Emote du cri de guilde |
 | `/smb diag` | Informations techniques à copier en cas de problème |
