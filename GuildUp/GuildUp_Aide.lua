@@ -106,11 +106,4 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	end
 end
 
-do
-	local inscription = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
-	if inscription then pcall(inscription, PREFIXE) end
-end
-
-local ev = CreateFrame("Frame")
-ev:RegisterEvent("CHAT_MSG_ADDON")
-ev:SetScript("OnEvent", function(_, _, a1, a2, a3, a4) Recevoir(a1, a2, a3, a4) end)
+ns.Ecouter(PREFIXE, Recevoir)

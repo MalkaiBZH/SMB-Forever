@@ -51,19 +51,13 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	end
 end
 
-do
-	local inscription = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
-	if inscription then pcall(inscription, PREFIXE) end
-end
+ns.Ecouter(PREFIXE, Recevoir)
 
 local ev = CreateFrame("Frame")
-ev:RegisterEvent("CHAT_MSG_ADDON")
 ev:RegisterEvent("PLAYER_LEVEL_UP")
 ev:RegisterEvent("PLAYER_ENTERING_WORLD")
 ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
-	if event == "CHAT_MSG_ADDON" then
-		Recevoir(a1, a2, a3, a4)
-	elseif event == "PLAYER_LEVEL_UP" then
+	if event == "PLAYER_LEVEL_UP" then
 		if a1 then Envoyer("N~" .. tostring(a1)) end
 	elseif event == "PLAYER_ENTERING_WORLD" and not dejaEntre then
 		-- calme seulement après la connexion, pas après chaque écran de chargement (instance, bateau)

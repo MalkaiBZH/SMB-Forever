@@ -28,8 +28,13 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUp/`. Voir `README.md
 
 - `GuildUp.lua` : cœur (bannières sur les barres de nom et le cadre de cible, rôles, bouton et volet de
   mini-carte, fenêtre d'options, bulles `ns.Notifier(catégorie, titre, texte, son, action)`, commandes `/smb`, `DEFAUT` = réglages par défaut).
-  Fournit `ns.DB()`, `ns.Normaliser`, `ns.EnvoyerAddon` (file d'envoi : un message toutes les 0,3 s),
-  `ns.Erreur`, `ns.TestSolo`.
+  Fournit `ns.DB()`, `ns.Normaliser`, `ns.Erreur`, `ns.TestSolo`.
+- `GuildUp_Reseau.lua` : **tout le réseau passe par lui**.
+  - `ns.EnvoyerAddon(préfixe, msg, canal, cible, { jetable = true })` : file unique, un message toutes les 0,3 s, nouvel essai si le jeu refuse, refus au-delà de 255 octets.
+  - `ns.Ecouter(préfixe, fonction, canaux)` : réception unique, canal `GUILD` par défaut.
+  - `ns.Morceaux(mots, taille)` découpe une longue liste, `ns.Reassembleur(max)` la recompose.
+  - `ns.StatsReseau()` donne les compteurs pour `/smb diag`.
+  - Ne jamais appeler `SendAddonMessage` ni écouter `CHAT_MSG_ADDON` ailleurs.
 - Un fichier par fonctionnalité, chacun avec **son préfixe de message d'addon** sur le canal `GUILD` :
   `GuildUpGrp` (groupes), `GuildUpPos` (carte), `GuildUpQst` (quêtes), `GuildUpMet` (métiers),
   `GuildUpEch` (dons), `GuildUpBes` (besoins), `GuildUpPrj` (projets), `GuildUpId` (identité),

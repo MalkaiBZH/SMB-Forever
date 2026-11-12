@@ -270,16 +270,7 @@ EnvoyerMaListe = function()
 		end
 	end
 	table.sort(mots)
-	local morceaux, cour, taille = {}, {}, 0
-	for _, m in ipairs(mots) do
-		if taille + #m + 1 > TAILLE_MORCEAU and #cour > 0 then
-			morceaux[#morceaux + 1] = table.concat(cour, ",")
-			cour, taille = {}, 0
-		end
-		cour[#cour + 1] = m
-		taille = taille + #m + 1
-	end
-	morceaux[#morceaux + 1] = table.concat(cour, ",")
+	local morceaux = ns.Morceaux(mots, TAILLE_MORCEAU)
 	for i, txt in ipairs(morceaux) do Envoyer(("L~%d~%d~%s"):format(i, #morceaux, txt)) end
 	dernierEnvoi = GetTime()
 end
@@ -293,7 +284,7 @@ local function AlerteDon(cle, nom, objet, d)
 		TexteMetier(d.c, d.n)), nil, function() if ns.OuvrirEchanges then ns.OuvrirEchanges(2, DONS) end end)
 end
 
-local enCours = {}   -- [cle] = { total, n, parts }
+local reassembleur = ns.Reassembleur(30) -- listes de dons en cours de réception
 -- Mes demandes de dons (gardées 30 jours) : db.mesDemandesDons[perso][cle .. objet] = { quand, merci }
 local function MesDemandes()
 	local db = DB()
@@ -505,16 +496,7 @@ local function RelayerListes(pour)
 				for o, d in pairs(e.liste or {}) do
 					mots[#mots + 1] = ("%d:%d:%s:%d"):format(o, d.q or 1, d.c or "", d.n or 0)
 				end
-				local morceaux, cour, taille = {}, {}, 0
-				for _, m in ipairs(mots) do
-					if taille + #m + 1 > TAILLE_MORCEAU - 30 and #cour > 0 then
-						morceaux[#morceaux + 1] = table.concat(cour, ",")
-						cour, taille = {}, 0
-					end
-					cour[#cour + 1] = m
-					taille = taille + #m + 1
-				end
-				morceaux[#morceaux + 1] = table.concat(cour, ",")
+				local morceaux = ns.Morceaux(mots, TAILLE_MORCEAU - 30)
 				for i, txt in ipairs(morceaux) do
 					Envoyer(("W~%s~%d~%d~%d~%s"):format(qui, e.maj or e.vu or 0, i, #morceaux, txt))
 				end
@@ -554,20 +536,15 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		part, total = tonumber(part), tonumber(total)
 		if not part or not total or total < 1 or total > 30 or part > total then return end
 		relayees[qui] = GetTime()
-		local k = genre .. qui
-		local t = enCours[k]
-		if not t or t.total ~= total or part == 1 then
-			t = { total = total, n = 0, parts = {} }
-			enCours[k] = t
-		end
-		if not t.parts[part] then t.parts[part] = mots or ""; t.n = t.n + 1 end
-		if t.n < t.total then return end
-		enCours[k] = nil
+		-- un envoi = type + membre concerné + expéditeur réel (+ date pour un relais) : deux relais
+		-- simultanés de la même liste ne se mélangent plus
+		local parts = reassembleur:Ajouter(genre .. qui .. "|" .. cle, genre == "W" and date or nil, part, total, mots)
+		if not parts then return end
 		local g = Guilde()
 		if not g then return end
 		local liste = {}
-		for i = 1, t.total do
-			for o, q, c, n in (t.parts[i] or ""):gmatch("(%d+):(%d+):(%a*):(%d+)") do
+		for i = 1, #parts do
+			for o, q, c, n in parts[i]:gmatch("(%d+):(%d+):(%a*):(%d+)") do
 				o = tonumber(o)
 				if o then liste[o] = { q = tonumber(q) or 1, c = c ~= "" and c or nil, n = tonumber(n) or 0 } end
 			end
@@ -1598,13 +1575,10 @@ end
 -- Évènements
 --------------------------------------------------------------------------------
 
-do
-	local inscription = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
-	if inscription then pcall(inscription, PREFIXE) end
-end
+ns.Ecouter(PREFIXE, Recevoir)
 
 local ev = CreateFrame("Frame")
-for _, nom in ipairs({ "CHAT_MSG_ADDON", "PLAYER_ENTERING_WORLD", "BAG_UPDATE_DELAYED", "BANKFRAME_OPENED",
+for _, nom in ipairs({ "PLAYER_ENTERING_WORLD", "BAG_UPDATE_DELAYED", "BANKFRAME_OPENED",
 	"BANKFRAME_CLOSED", "PLAYERBANKSLOTS_CHANGED", "PLAYERBANKBAGSLOTS_CHANGED", "BAG_UPDATE",
 	"GET_ITEM_INFO_RECEIVED", "GUILD_ROSTER_UPDATE" }) do
 	pcall(ev.RegisterEvent, ev, nom)
@@ -1623,9 +1597,7 @@ local function Relire()
 	end)
 end
 ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
-	if event == "CHAT_MSG_ADDON" then
-		Recevoir(a1, a2, a3, a4)
-	elseif event == "BAG_UPDATE_DELAYED" or event == "PLAYERBANKSLOTS_CHANGED" or event == "PLAYERBANKBAGSLOTS_CHANGED" then
+	if event == "BAG_UPDATE_DELAYED" or event == "PLAYERBANKSLOTS_CHANGED" or event == "PLAYERBANKBAGSLOTS_CHANGED" then
 		Relire()
 	elseif event == "BAG_UPDATE" then
 		-- sacs de banque (numéros au-delà des sacs du joueur) : seulement banque ouverte

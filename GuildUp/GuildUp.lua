@@ -83,71 +83,6 @@ local function SonsSurBoutons(cadre, vus)
 end
 ns.SonsSurBoutons = SonsSurBoutons
 
--- Coupe un texte à au plus maxOctets octets et/ou maxLettres caractères, sans jamais couper un
--- caractère UTF-8 en deux (les zones de saisie comptent des lettres, les messages des octets)
-local function CouperUTF8(texte, maxOctets, maxLettres)
-	texte = texte or ""
-	local n, fin = 0, 0
-	for debut, car in texte:gmatch("()([%z\1-\127\194-\244][\128-\191]*)") do
-		n = n + 1
-		local f = debut + #car - 1
-		if (maxLettres and n > maxLettres) or (maxOctets and f > maxOctets) then break end
-		fin = f
-	end
-	return texte:sub(1, fin)
-end
-ns.CouperUTF8 = CouperUTF8
-
--- Longueur maximale d'un message d'addon accepté par le jeu (octets)
-local LONGUEUR_MAX = 255
-ns.LONGUEUR_MAX = LONGUEUR_MAX
-
--- Message d'addon qui n'a pas pu partir : prévenu à l'écran (au plus une fois toutes les 30 s)
-local dernierAvertissement = 0
-local function AvertirEchec(prefixe, raison)
-	if GetTime() - dernierAvertissement < 30 then return end
-	dernierAvertissement = GetTime()
-	if UIErrorsFrame and UIErrorsFrame.AddMessage then
-		UIErrorsFrame:AddMessage(("GuildUp : un message (%s) n'a pas pu partir : %s"):format(prefixe or "?", raison), 1, 0.82, 0)
-	end
-end
-
--- File d'envoi des messages d'addon (le jeu limite leur nombre par seconde) : un toutes les 0,3 s,
--- nouvel essai si le jeu refuse (trop de messages)
-do
-	local file, attente = {}, 0
-	local pompe = CreateFrame("Frame")
-	pompe:Hide()
-	pompe:SetScript("OnUpdate", function(self, ecoule)
-		attente = attente - ecoule
-		if attente > 0 then return end
-		local m = file[1]
-		if not m then self:Hide(); return end
-		local envoi = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
-		local ok, res = false, nil
-		if envoi then ok, res = pcall(envoi, m[1], m[2], m[3] or "GUILD", m[4]) end
-		local bloque = ok and (res == false or res == 3 or res == 8)
-		if bloque and m.essais < 6 then
-			m.essais = m.essais + 1
-			attente = 1.5
-		else
-			if not ok then AvertirEchec(m[1], tostring(res)) elseif bloque then AvertirEchec(m[1], "trop de messages") end
-			table.remove(file, 1)
-			attente = 0.3
-		end
-	end)
-	ns.EnvoyerAddon = function(prefixe, msg, canal, cible)
-		if (canal or "GUILD") == "GUILD" and not IsInGuild() then return end
-		if #msg > LONGUEUR_MAX then
-			-- le jeu le refuserait sans rien dire : on prévient au lieu de le perdre en silence
-			AvertirEchec(prefixe, ("trop long (%d octets)"):format(#msg))
-			return
-		end
-		file[#file + 1] = { prefixe, msg, canal, cible, essais = 0 }
-		pompe:Show()
-	end
-end
-
 -- Avertissement à l'écran (texte en haut, comme les erreurs du jeu) au lieu du chat
 local function Erreur(texte)
 	if UIErrorsFrame and UIErrorsFrame.AddMessage then
@@ -1213,11 +1148,7 @@ end
 local PREFIXE = "GuildUp"
 local dernierEnvoi, envoiPrevu, dernierRoleAnnonce = 0, false, nil
 
-local function Envoyer(msg)
-	if not IsInGuild() then return end
-	local envoi = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
-	if envoi then pcall(envoi, PREFIXE, msg, "GUILD") end
-end
+local function Envoyer(msg) ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end
 
 -- Annonce mon rôle s'il a changé (ou toujours si force), au plus une fois toutes les 10 s
 local function Annoncer(force)
@@ -1380,21 +1311,18 @@ ev:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4)
 		-- partage de position activé de base (1.5.0) : allumé une fois pour tout le monde, chacun peut le couper
 		if not db.partageDeBase then db.partagePosition = true; db.partageDeBase = true end
 		self:UnregisterEvent("ADDON_LOADED")
-		local inscription = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
-		if inscription then pcall(inscription, PREFIXE) end
+		-- rôles annoncés par les autres membres (canal de guilde seulement)
+		ns.Ecouter(PREFIXE, function(prefixe, msg, _, expediteur) Recevoir(prefixe, msg, expediteur) end)
 		for _, e in ipairs({
 			"NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "PLAYER_TARGET_CHANGED",
 			"UNIT_NAME_UPDATE", "PLAYER_GUILD_UPDATE", "GUILD_ROSTER_UPDATE", "GROUP_ROSTER_UPDATE",
-			"PLAYER_ROLES_ASSIGNED", "PLAYER_ENTERING_WORLD", "UNIT_AURA", "CHAT_MSG_ADDON",
+			"PLAYER_ROLES_ASSIGNED", "PLAYER_ENTERING_WORLD", "UNIT_AURA",
 			"PLAYER_SPECIALIZATION_CHANGED", "ACTIVE_TALENT_GROUP_CHANGED", "CVAR_UPDATE",
 			"PLAYER_FLAGS_CHANGED", "UNIT_FLAGS", "UNIT_HEALTH", "UNIT_MAXHEALTH",
 			"UNIT_SPELLCAST_START", "UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_EMPOWER_START",
 		}) do
 			pcall(self.RegisterEvent, self, e) -- certains évènements peuvent ne pas exister sur ce client
 		end
-	elseif event == "CHAT_MSG_ADDON" then
-		-- arguments : préfixe, message, canal, expéditeur
-		Recevoir(arg1, arg2, arg4)
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		ToutRafraichir()
 		if premiereEntree then

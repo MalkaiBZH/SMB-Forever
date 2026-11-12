@@ -240,37 +240,8 @@ end
 -- Envoi (file d'attente : le jeu limite le nombre de messages d'addon par seconde)
 --------------------------------------------------------------------------------
 
-local file = {}
-local stats = { envoyes = 0, recus = 0, bloques = 0 }
-local pompe = CreateFrame("Frame")
-pompe:Hide()
-local attente = 0
-pompe:SetScript("OnUpdate", function(self, ecoule)
-	attente = attente - ecoule
-	if attente > 0 then return end
-	local m = file[1]
-	if not m then self:Hide(); return end
-	local envoi = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
-	local ok, res = false, nil
-	if envoi and IsInGuild() then ok, res = pcall(envoi, PREFIXE, m.t, "GUILD") end
-	-- false (ancienne API) ou 3 / 8 (Enum.SendAddonMessageResult : trop de messages) : on réessaie
-	local bloque = ok and (res == false or res == 3 or res == 8)
-	if bloque and m.essais < 6 then
-		m.essais = m.essais + 1
-		stats.bloques = stats.bloques + 1
-		attente = 1.5
-	else
-		table.remove(file, 1)
-		if ok and not bloque then stats.envoyes = stats.envoyes + 1 end
-		attente = 0.35
-	end
-end)
-
-local function Envoyer(texte)
-	if not IsInGuild() then return end
-	file[#file + 1] = { t = texte, essais = 0 }
-	pompe:Show()
-end
+-- (file commune : ns.EnvoyerAddon, GuildUp_Reseau.lua)
+local function Envoyer(texte) ns.EnvoyerAddon(PREFIXE, texte, "GUILD") end
 
 --------------------------------------------------------------------------------
 -- Lecture de mes métiers
@@ -551,7 +522,7 @@ end
 
 local demandes = {}      -- [cle .. code] = moment de la dernière demande de recettes
 local diffusions = {}    -- [code] = moment de ma dernière diffusion
-local enCours = {}       -- recettes en cours de réception : [cle .. code] = { h, total, n, parts }
+local reassembleur = ns.Reassembleur(60) -- recettes en cours de réception (par membre et métier)
 
 local function RepondreQ()
 	if not pret then return end
@@ -565,20 +536,12 @@ local function DiffuserRecettes(code)
 	if not p or not p.r or #p.r == 0 then return end
 	if diffusions[code] and GetTime() - diffusions[code] < 20 then return end
 	diffusions[code] = GetTime()
-	local morceaux, courant, taille = {}, {}, 0
+	local mots = {}
 	for _, c in ipairs(p.r) do
 		local id = tonumber(c:sub(2))
-		if id then
-			local mot = c:sub(1, 1) .. Base36(id)
-			if taille + #mot + 1 > TAILLE_MORCEAU and #courant > 0 then
-				morceaux[#morceaux + 1] = table.concat(courant, ",")
-				courant, taille = {}, 0
-			end
-			courant[#courant + 1] = mot
-			taille = taille + #mot + 1
-		end
+		if id then mots[#mots + 1] = c:sub(1, 1) .. Base36(id) end
 	end
-	if #courant > 0 then morceaux[#morceaux + 1] = table.concat(courant, ",") end
+	local morceaux = ns.Morceaux(mots, TAILLE_MORCEAU)
 	for i, txt in ipairs(morceaux) do
 		Envoyer(("R~%s~%s~%d~%d~%s"):format(code, p.h or "0", i, #morceaux, txt))
 	end
@@ -657,7 +620,6 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	if prefixe ~= PREFIXE or canal ~= "GUILD" or not msg or not expediteur then return end
 	local g = Guilde()
 	if not g then return end
-	stats.recus = stats.recus + 1
 	local cle = Normaliser(expediteur)
 	local nom = expediteur
 	if cle == MaCle() then
@@ -715,27 +677,17 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		local p = e.profs[code]
 		if type(p) ~= "table" then p = { r = {} }; e.profs[code] = p end
 		if p.h == h then return end -- déjà à jour
-		local k = cle .. code
-		local t = enCours[k]
-		if not t or t.h ~= h or t.total ~= total then
-			t = { h = h, total = total, n = 0, parts = {} }
-			enCours[k] = t
-		end
-		if not t.parts[part] then
-			t.parts[part] = ids or ""
-			t.n = t.n + 1
-		end
-		if t.n >= t.total then
+		local parts = reassembleur:Ajouter(cle .. code, h, part, total, ids)
+		if parts then
 			local liste = {}
-			for i = 1, t.total do
-				for mot in (t.parts[i] or ""):gmatch("[^,]+") do
+			for i = 1, #parts do
+				for mot in parts[i]:gmatch("[^,]+") do
 					local genreR, id = mot:sub(1, 1), tonumber(mot:sub(2), 36)
 					if id and (genreR == "s" or genreR == "i") then liste[#liste + 1] = genreR .. id end
 				end
 			end
 			table.sort(liste)
 			p.r, p.h, p.nr, p.attendu = liste, h, #liste, nil
-			enCours[k] = nil
 			if PlanifierMaj then PlanifierMaj() end
 		end
 	end
@@ -1688,22 +1640,18 @@ ns.DiagMetiers = function(L)
 	end
 	L(("  guilde : %s, %d fiche(s) reçue(s), liste de guilde %d membre(s) listé(s), mon nom dans la liste = %s"):format(
 		tostring(GetGuildInfo("player")), n, rn, tostring(exemple)))
-	L(("  messages : %d envoyé(s), %d reçu(s), %d bloqué(s) puis réessayé(s), %d en attente"):format(
-		stats.envoyes, stats.recus, stats.bloques, #file))
+	L("  " .. (ns.StatsReseau and ns.StatsReseau() or "?"))
 end
 
 --------------------------------------------------------------------------------
 -- Évènements
 --------------------------------------------------------------------------------
 
-do
-	local inscription = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
-	if inscription then pcall(inscription, PREFIXE) end
-end
+ns.Ecouter(PREFIXE, Recevoir)
 
 local ev = CreateFrame("Frame")
 for _, nom in ipairs({
-	"PLAYER_ENTERING_WORLD", "CHAT_MSG_ADDON", "SKILL_LINES_CHANGED",
+	"PLAYER_ENTERING_WORLD", "SKILL_LINES_CHANGED",
 	"TRADE_SKILL_SHOW", "TRADE_SKILL_UPDATE", "TRADE_SKILL_LIST_UPDATE",
 	"CRAFT_SHOW", "CRAFT_UPDATE", "GUILD_ROSTER_UPDATE", "PLAYER_GUILD_UPDATE",
 	"GET_ITEM_INFO_RECEIVED",
@@ -1725,9 +1673,7 @@ end
 
 local premiereEntree = true
 ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
-	if event == "CHAT_MSG_ADDON" then
-		Recevoir(a1, a2, a3, a4)
-	elseif event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_UPDATE" or event == "TRADE_SKILL_LIST_UPDATE" then
+	if event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_UPDATE" or event == "TRADE_SKILL_LIST_UPDATE" then
 		Plus_tard("metier", 0.5, LireMetierOuvert)
 	elseif event == "CRAFT_SHOW" or event == "CRAFT_UPDATE" then
 		Plus_tard("craft", 0.5, LireArtisanatOuvert)

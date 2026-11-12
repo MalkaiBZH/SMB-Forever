@@ -218,19 +218,13 @@ ns.DiagVersion = function(L)
 		MA_VERSION, n, plusAncienne, plusRecente))
 end
 
-do
-	local inscription = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
-	if inscription then pcall(inscription, PREFIXE) end
-end
+ns.Ecouter(PREFIXE, Recevoir)
 
 local ev = CreateFrame("Frame")
-ev:RegisterEvent("CHAT_MSG_ADDON")
 ev:RegisterEvent("PLAYER_ENTERING_WORLD")
 local premiere = true
 ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
-	if event == "CHAT_MSG_ADDON" then
-		Recevoir(a1, a2, a3, a4)
-	elseif premiere then
+	if premiere then
 		premiere = false
 		C_Timer.After(12, Annoncer)
 		C_Timer.After(6, VerifierNouveautes)

@@ -253,21 +253,13 @@ local CANAUX = { "CHAT_MSG_SAY", "CHAT_MSG_YELL", "CHAT_MSG_PARTY", "CHAT_MSG_PA
 local ev = CreateFrame("Frame")
 for _, nom in ipairs(CANAUX) do pcall(ev.RegisterEvent, ev, nom) end
 pcall(ev.RegisterEvent, ev, "PLAYER_LEVEL_UP")
-pcall(ev.RegisterEvent, ev, "CHAT_MSG_ADDON")
-do
-	local inscription = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
-	if inscription then pcall(inscription, PREFIXE) end
-end
+-- un membre a écrit « GU! » hors du canal de guilde : on le voit aussi
+ns.Ecouter(PREFIXE, function(_, msg, _, expediteur)
+	if msg ~= "G" then return end
+	local cle = Normaliser(expediteur)
+	if cle ~= MaCle() and not Coupee() then Emote(cle) end
+end)
 ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
-	if event == "CHAT_MSG_ADDON" then
-		-- un membre a écrit « GU! » hors du canal de guilde : on le voit aussi
-		if a1 == PREFIXE and a2 == "G" and a3 == "GUILD" and a4 then
-			local cle = Normaliser(a4)
-			local db = ns.DB and ns.DB()
-			if cle ~= MaCle() and not Coupee() then Emote(cle) end
-		end
-		return
-	end
 	if event == "PLAYER_LEVEL_UP" then
 		-- c'est moi, Zaardoz : je vois aussi mon GIF (les autres le reçoivent par l'annonce)
 		if MaCle():lower() == ZAARDOZ then

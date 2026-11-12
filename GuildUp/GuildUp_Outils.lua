@@ -2,7 +2,7 @@
 -- Une seule version de chaque petite fonction : noms, recherche sans accents, atlas, objets, dates,
 -- couleurs de classe, menus déroulants, case où déposer un objet, fenêtre déplaçable.
 -- Les modules les reprennent en local en tête de fichier (local NomCourt = ns.NomCourt).
--- (ns.Normaliser, ns.TestSolo, ns.Erreur, ns.EnvoyerAddon et ns.CouperUTF8 sont dans GuildUp.lua.)
+-- (ns.Normaliser, ns.TestSolo et ns.Erreur sont dans GuildUp.lua ; le réseau dans GuildUp_Reseau.lua.)
 
 local NOM_ADDON, ns = ...
 
@@ -45,6 +45,21 @@ local ACCENTS = {
 ns.Simplifier = function(s)
 	return ((s or ""):gsub("[\195\197][\128-\191]", ACCENTS):gsub("’", " "):gsub("'", " "):lower())
 end
+
+-- Coupe un texte à au plus maxOctets octets et/ou maxLettres caractères, sans jamais couper un
+-- caractère UTF-8 en deux (les zones de saisie comptent des lettres, les messages des octets)
+local function CouperUTF8(texte, maxOctets, maxLettres)
+	texte = texte or ""
+	local n, fin = 0, 0
+	for debut, car in texte:gmatch("()([%z\1-\127\194-\244][\128-\191]*)") do
+		n = n + 1
+		local f = debut + #car - 1
+		if (maxLettres and n > maxLettres) or (maxOctets and f > maxOctets) then break end
+		fin = f
+	end
+	return texte:sub(1, fin)
+end
+ns.CouperUTF8 = CouperUTF8
 
 -- Nombre en base 36 (identifiants compacts dans les messages d'addon)
 local CHIFFRES = "0123456789abcdefghijklmnopqrstuvwxyz"

@@ -281,20 +281,15 @@ end
 -- Évènements
 --------------------------------------------------------------------------------
 
-do
-	local inscription = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
-	if inscription then pcall(inscription, PREFIXE) end
-end
+ns.Ecouter(PREFIXE, Recevoir)
 
 local ev = CreateFrame("Frame")
-for _, nom in ipairs({ "CHAT_MSG_ADDON", "PLAYER_ENTERING_WORLD", "PLAYER_GUILD_UPDATE", "PLAYER_LEVEL_UP" }) do
+for _, nom in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_GUILD_UPDATE", "PLAYER_LEVEL_UP" }) do
 	pcall(ev.RegisterEvent, ev, nom)
 end
 local premiere = true
 ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
-	if event == "CHAT_MSG_ADDON" then
-		Recevoir(a1, a2, a3, a4)
-	elseif event == "PLAYER_ENTERING_WORLD" and premiere then
+	if event == "PLAYER_ENTERING_WORLD" and premiere then
 		premiere = false
 		C_Timer.After(15, function()
 			pcall(Purger)

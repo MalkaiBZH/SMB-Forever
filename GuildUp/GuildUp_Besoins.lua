@@ -746,20 +746,15 @@ end
 -- Évènements
 --------------------------------------------------------------------------------
 
-do
-	local inscription = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
-	if inscription then pcall(inscription, PREFIXE) end
-end
+ns.Ecouter(PREFIXE, Recevoir)
 
 local ev = CreateFrame("Frame")
-for _, nom in ipairs({ "CHAT_MSG_ADDON", "PLAYER_ENTERING_WORLD", "GET_ITEM_INFO_RECEIVED", "GUILD_ROSTER_UPDATE" }) do
+for _, nom in ipairs({ "PLAYER_ENTERING_WORLD", "GET_ITEM_INFO_RECEIVED", "GUILD_ROSTER_UPDATE" }) do
 	pcall(ev.RegisterEvent, ev, nom)
 end
 local premiere, prevu = true, false
 ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
-	if event == "CHAT_MSG_ADDON" then
-		Recevoir(a1, a2, a3, a4)
-	elseif event == "GET_ITEM_INFO_RECEIVED" or event == "GUILD_ROSTER_UPDATE" then
+	if event == "GET_ITEM_INFO_RECEIVED" or event == "GUILD_ROSTER_UPDATE" then
 		if page and page:IsShown() and not prevu then
 			prevu = true
 			C_Timer.After(0.3, function() prevu = false; if Maj then Maj() end end)
