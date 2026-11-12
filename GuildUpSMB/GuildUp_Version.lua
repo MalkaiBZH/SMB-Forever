@@ -86,8 +86,11 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "GuildUpSMB" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.3.1"] = {
+		"La fenêtre GuildUpSMB s'appelle désormais |cffffd100SMB Forever|r, suivi de la version de l'addon.",
+	},
 	["2.3.0"] = {
 		"|cffffd100Dons|r dans la fenêtre GuildUpSMB, au nouveau style : Dons (catégories, recherche, Demander puis Merci !), Mes dons (glisser un objet pour le donner), Demandes reçues et Besoins (les tiens et ceux de la guilde, avec « tu sais le fabriquer »).",
 		"Son de clic sur tous les boutons de la fenêtre GuildUpSMB.",
