@@ -3,10 +3,11 @@
 -- Pages :
 --   Accueil : ce qui se passe dans la guilde (membres sur ma carte, groupes ouverts, appels à l'aide,
 --             demandes de dons, besoins que je sais fabriquer, avancement d'un projet).
---   Groupes (GuildUp_GroupesFenetre.lua) et Quêtes en commun (GuildUp_Quetes.lua) : pages fournies par
---   leur module (ns.AjouterPage), avec le kit d'interface ns.UI (GuildUp_Style.lua).
---   Les autres entrées du menu ouvrent encore leur ancienne fenêtre (Artisanat, Mes carnets, Dons,
---   Options) en attendant leur page ; Événements ouvre le calendrier du jeu.
+--   Groupes (GuildUp_GroupesFenetre.lua), Quêtes en commun (GuildUp_Quetes.lua) et Options
+--   (GuildUp_Options.lua) : pages fournies par leur module (ns.AjouterPage), avec le kit d'interface
+--   ns.UI (GuildUp_Style.lua).
+--   Les autres entrées du menu ouvrent encore leur ancienne fenêtre (Artisanat, Mes carnets, Dons) en
+--   attendant leur page ; Événements ouvre le calendrier du jeu.
 -- Fournit ns.NouveautesGuilde() (pastille du médaillon), ns.BasculerInterface(), ns.OuvrirInterface(page),
 -- ns.MajInterface(). Réglages : db.interface = { x, y } (position). Aucun message réseau.
 
@@ -347,7 +348,7 @@ local function CreerAccueil(parent)
 				l.sous:SetText((d.vu and "" or "|cff6fd08cnouvelle|r · ") .. IlYa(d.quand))
 				l.bouton:Ecrire("Voir")
 				l.bouton:Activer(true)
-				l.bouton:SetScript("OnClick", function() if ns.OuvrirEchanges then fenetre:Hide(); ns.OuvrirEchanges(nil, 3) end end)
+				l.bouton:SetScript("OnClick", function() if ns.OuvrirEchanges then ns.OuvrirEchanges(nil, 3) end end)
 				l:Show()
 			else
 				l:Hide()
@@ -395,7 +396,7 @@ local function CreerAccueil(parent)
 			local l = aider.barre:GetWidth()
 			aider.plein:SetWidth(math.max(1, (l > 0 and l or (demi - 28)) * (total > 0 and faites / total or 0)))
 			aider.plein:SetShown(faites > 0)
-			aider.projetBouton:SetScript("OnClick", function() if ns.OuvrirProjet then fenetre:Hide(); ns.OuvrirProjet(pr.id) end end)
+			aider.projetBouton:SetScript("OnClick", function() if ns.OuvrirProjet then ns.OuvrirProjet(pr.id) end end)
 		else
 			aider.plein:Hide()
 		end
@@ -619,13 +620,17 @@ local function CreerFenetre()
 	f.contenu:SetPoint("TOPLEFT", menu, "TOPRIGHT", 0, 0)
 	f.contenu:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1, 1)
 
-	-- tant qu'elle est ouverte : mise à jour toutes les 2 s (distances, appels, compteurs)
+	-- tant qu'elle est ouverte : mise à jour toutes les 2 s (distances, appels, compteurs) ; une page
+	-- lourde (p.rafraichirAuto = false) ne suit pas ce rythme : son module la rafraîchit sur ses
+	-- évènements (ns.MajInterface)
 	local attente = 0
 	f:SetScript("OnUpdate", function(_, ecoule)
 		attente = attente + ecoule
 		if attente < 2 then return end
 		attente = 0
-		ns.MajInterface()
+		MajEntete()
+		local p = pages[pageActive]
+		if p and p.Maj and p.rafraichirAuto ~= false then p.Maj() end
 	end)
 	f:SetScript("OnShow", function() ns.MajInterface() end)
 	f:Hide()

@@ -1,7 +1,7 @@
 -- GuildUpSMB : kit d'interface de la fenêtre GuildUpSMB (style sombre et doré des maquettes).
 -- Tous les éléments graphiques des pages viennent d'ici (ns.UI) : couleurs, cadres plats, textes,
 -- boutons (or, fantôme, aide), pastilles, cartes, rangées, onglets soulignés, puces de filtre, liste
--- défilante, champ de saisie, case à cocher, liste de choix, places par rôle, portrait de joueur.
+-- défilante, champ de saisie, case à cocher, liste de choix, curseur, places par rôle, portrait de joueur.
 -- Les pages ne créent pas de modèle du jeu (UIPanelButtonTemplate…) : elles passent par ces fonctions,
 -- pour garder une seule apparence. Aucun message réseau.
 
@@ -502,6 +502,70 @@ function UI.Choix(parent, largeur, options, choisir)
 		m:SetPoint("TOPLEFT", self, "BOTTOMLEFT", 0, -2)
 		m:Show()
 	end)
+	return c
+end
+
+-- Curseur : piste fine, partie remplie dorée, poignée ronde, valeur écrite à droite (c.valeur).
+-- changer(valeur) quand on relâche la poignée, qu'on clique sur la piste ou à la molette (pas pendant le
+-- glissement : la valeur peut changer la taille de la fenêtre qui contient le curseur) ;
+-- c:Poser(valeur) sans appeler changer (ignoré pendant un glissement) ; c.Format(valeur) → texte affiché
+-- (deux décimales au plus, virgule)
+function UI.Curseur(parent, largeur, min, max, pas, changer)
+	local c = CreateFrame("Slider", nil, parent)
+	c:SetSize(largeur, 16)
+	if c.SetOrientation then c:SetOrientation("HORIZONTAL") end
+	c:SetMinMaxValues(min, max)
+	c:SetValueStep(pas)
+	if c.SetObeyStepOnDrag then c:SetObeyStepOnDrag(true) end
+	c:EnableMouse(true)
+	c:EnableMouseWheel(true)
+	local piste = c:CreateTexture(nil, "BACKGROUND")
+	piste:SetColorTexture(0.165, 0.137, 0.094, 1)
+	piste:SetHeight(4)
+	piste:SetPoint("LEFT", c, "LEFT", 0, 0)
+	piste:SetPoint("RIGHT", c, "RIGHT", 0, 0)
+	local plein = c:CreateTexture(nil, "ARTWORK")
+	plein:SetColorTexture(C.orFonce[1], C.orFonce[2], C.orFonce[3], 1)
+	plein:SetHeight(4)
+	plein:SetPoint("LEFT", piste, "LEFT", 0, 0)
+	-- poignée : un objet texture si le client l'accepte, sinon un chemin de fichier
+	local poignee = c:CreateTexture(nil, "OVERLAY")
+	poignee:SetTexture(ROND)
+	poignee:SetSize(14, 14)
+	if not pcall(c.SetThumbTexture, c, poignee) then
+		c:SetThumbTexture(ROND)
+		poignee = c.GetThumbTexture and c:GetThumbTexture() or poignee
+		poignee:SetSize(14, 14)
+	end
+	poignee:SetVertexColor(C.ors[1], C.ors[2], C.ors[3], 1)
+	c.valeur = UI.Texte(c, "GameFontHighlight", C.gris)
+	c.valeur:SetPoint("LEFT", c, "RIGHT", 10, 0)
+	c.Format = function(v)
+		local t = ("%.2f"):format(v):gsub("0$", "")
+		return (t:gsub("%.", ","))
+	end
+	local function Arrondi(v) return math.max(min, math.min(max, math.floor(v / pas + 0.5) * pas)) end
+	local pose = false
+	c:SetScript("OnValueChanged", function(self, v)
+		v = Arrondi(v)
+		local part = (max > min) and (v - min) / (max - min) or 0
+		plein:SetWidth(math.max(1, part * (largeur - 14) + 7))
+		self.valeur:SetText(self.Format(v))
+	end)
+	local function Valider(self)
+		if changer and not pose then changer(Arrondi(self:GetValue())) end
+	end
+	c:SetScript("OnMouseUp", Valider)
+	c:SetScript("OnMouseWheel", function(self, sens)
+		self:SetValue(Arrondi(self:GetValue() + sens * pas))
+		Valider(self)
+	end)
+	c.Poser = function(self, v)
+		if self.IsDraggingThumb and self:IsDraggingThumb() then return end -- (rafraîchissement pendant un glissement)
+		pose = true
+		self:SetValue(Arrondi(v))
+		pose = false
+	end
 	return c
 end
 

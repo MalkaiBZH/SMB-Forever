@@ -1,7 +1,14 @@
--- GuildUpSMB : fenêtre d'options, diagnostic (/smb diag), réinitialisation et commandes /smb.
+-- GuildUpSMB : page « Options » de la fenêtre GuildUpSMB, diagnostic (/smb diag), réinitialisation et
+-- commandes /smb.
+-- Page Options (ns.AjouterPage("options"), kit ns.UI de GuildUp_Style.lua) : cartes « Affichage »
+-- (bannières, portraits, repères, médaillon, taille de la fenêtre), « Moi » (pseudo, persos, partage de
+-- position, mon rôle), « Notifications » (une case par type de bulle), « Debug » (seulement avec
+-- /smb debug) et bouton « Réinitialiser les réglages ».
+-- Fournit ns.OuvrirOptions(), ns.BasculerOptions() (ferme la fenêtre si elle est déjà sur cette page) et
+-- ns.MajOptions() (rafraîchit la page si elle est affichée). Aucun message réseau ici : le pseudo et le
+-- rôle partent par ns.AnnoncerIdentite / ns.ChoisirRole.
 
 local NOM_ADDON, ns = ...
-local MEDIA = "Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\" -- le dossier de l'addon, quel que soit son nom
 
 -- GuildUpDB (réglages) : la table est chargée par GuildUp.lua (ADDON_LOADED) ; ce mandataire y donne
 -- accès sous le même nom « db » (nil avant le chargement)
@@ -24,6 +31,7 @@ local function ReinitialiserReglages()
 	for _, k in ipairs(REGLAGES_HORS_DEFAUT) do db[k] = nil end
 	for k, v in pairs(DEFAUT) do db[k] = v end
 	SurActivation()
+	if ns.EchelleInterface then ns.EchelleInterface() end -- taille de la fenêtre par défaut
 end
 
 
@@ -57,18 +65,18 @@ local function Aide()
 	print("  /smb reperes — membres de ta zone à l'écran (" .. OuiNon(db.reperes ~= false) .. ")")
 	print("  /smb annonces — annonces de la guilde en bulle (" .. OuiNon(db.annoncesGuilde ~= false) .. ")")
 	print("  /smb diag — informations techniques à copier (en cas de problème)")
-	print("  /smb debug — afficher / cacher la partie Debug de la fenêtre d'options")
+	print("  /smb debug — afficher / cacher la partie Debug de la page Options")
 	print("  /smb entree <mot> — noter ma position comme entrée de ce donjon (ex. /smb entree mortemines)")
 	print("  /smb reset — réglages par défaut")
 end
 
-local fenetre, MajFenetre -- fenêtre d'options, définies plus bas
--- pour le médaillon et la fenêtre GuildUpSMB (rôle, position) : rafraîchit la fenêtre si elle est ouverte
-ns.MajOptions = function() if fenetre and fenetre:IsShown() then MajFenetre() end end
+local page -- page Options, créée par la fenêtre GuildUpSMB (plus bas)
+-- pour le médaillon et la fenêtre GuildUpSMB (rôle, position) : rafraîchit la page si elle est affichée
+ns.MajOptions = function() if page and page:IsVisible() then page.Maj() end end
 
 local function Rafraichir()
 	ToutRafraichir()
-	if fenetre and fenetre:IsShown() then MajFenetre() end
+	ns.MajOptions()
 end
 
 local function OuvrirSelecteur()
@@ -245,18 +253,40 @@ local fenetreCopie
 
 local function AfficherCopie(texte)
 	if not fenetreCopie then
-		local f = ns.FenetreDeplacable("GuildUpCopie", 520, 380)
-		if f.TitleText then f.TitleText:SetText("GuildUpSMB — diag (Ctrl+C pour copier)") end
+		-- cadre plat aux couleurs du kit, déplaçable, fermé par Échap
+		local UI = ns.UI
+		local f = CreateFrame("Frame", "GuildUpCopie", UIParent, "BackdropTemplate")
+		UI.Habiller(f, UI.C.fond, UI.C.bordFort)
+		f:SetSize(520, 380)
+		f:SetPoint("CENTER")
+		f:SetFrameStrata("DIALOG")
+		f:SetMovable(true)
+		f:EnableMouse(true)
+		f:SetClampedToScreen(true)
+		f:RegisterForDrag("LeftButton")
+		f:SetScript("OnDragStart", f.StartMoving)
+		f:SetScript("OnDragStop", f.StopMovingOrSizing)
+		tinsert(UISpecialFrames, "GuildUpCopie")
+		local titre = UI.Texte(f, "GameFontNormal", UI.C.ors)
+		titre:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -12)
+		titre:SetText("GuildUpSMB — diag (Ctrl+C pour copier)")
+		local fermer = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+		fermer:SetPoint("TOPRIGHT", f, "TOPRIGHT", -2, -2)
+		fermer:SetScript("OnClick", function() f:Hide() end)
+		local fond = UI.Cadre(f, UI.C.champ, UI.C.bord)
+		fond:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -36)
+		fond:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -10, 10)
 
 		local defile = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
-		defile:SetPoint("TOPLEFT", f, "TOPLEFT", 12, -30)
-		defile:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -32, 12)
+		defile:SetPoint("TOPLEFT", fond, "TOPLEFT", 6, -6)
+		defile:SetPoint("BOTTOMRIGHT", fond, "BOTTOMRIGHT", -26, 6)
 
 		local edit = CreateFrame("EditBox", nil, defile)
 		edit:SetMultiLine(true)
 		edit:SetAutoFocus(false)
 		edit:SetFontObject("ChatFontNormal")
-		edit:SetWidth(470)
+		edit:SetTextColor(unpack(UI.C.texte))
+		edit:SetWidth(460)
 		edit:SetScript("OnEscapePressed", function() f:Hide() end)
 		-- le texte ne doit pas être modifié : on le remet si on tape dedans
 		edit:SetScript("OnTextChanged", function(self, parUtilisateur)
@@ -323,143 +353,129 @@ local function Diag()
 end
 
 --------------------------------------------------------------------------------
--- Fenêtre d'options (/smb)
+-- Page Options de la fenêtre GuildUpSMB (/smb options)
 --------------------------------------------------------------------------------
 
-local controles = {} -- { maj = fonction qui recale l'état affiché }
+local UI = ns.UI
+local C = UI.C
+local MARGE, ECART = 16, 12
+local HAUT_CARTE, HAUT_NOTIFS = 186, 126
 
-MajFenetre = function()
-	for _, c in ipairs(controles) do c.maj() end
-end
+-- types de bulles du médaillon (db.notifs[cat] == false : coupées), quatre par ligne
+local NOTIFS = {
+	{ "groupes", "Groupes" }, { "candidatures", "Candidatures" }, { "niveaux", "Niveaux" }, { "metiers", "Métiers" },
+	{ "evenements", "Événements" }, { "quetes", "Quêtes" }, { "commandes", "Commandes" }, { "plans", "Échanges" },
+	{ "version", "Version" }, { "aide", "Aide" },
+	{ "gu", (ns.Config and ns.Config.cri) and (tostring(ns.Config.cri):upper() .. "!") or "Cri" },
+}
+local MES_ROLES = { "auto", "tank", "heal", "dps" }                  -- puces « Mon rôle »
+local ROLES_DEBUG = { "auto", "tank", "heal", "dps", "horscombat" }  -- puces « Rôle affiché » (db.role)
 
-local function Appliquer()
-	ToutRafraichir()
-	MajFenetre()
-end
+local function CreerPage(parent)
+	local p = CreateFrame("Frame", nil, parent)
+	p:SetAllPoints()
+	local largeur = (ns.TAILLE_PAGE and ns.TAILLE_PAGE[1] or 794) - 2 * MARGE
+	local demi = (largeur - ECART) / 2
+	local cases = {} -- { case, lire } : recalées par p.Maj
 
-local function NouvelleCase(parent, x, y, texte, lire, ecrire, radio)
-	local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-	cb:SetSize(24, 24)
-	cb:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-	local label = cb.Text or cb.text
-	if not label then
-		label = cb:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-		label:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+	-- après chaque changement : barres de nom, puis la page
+	local function Appliquer()
+		ToutRafraichir()
+		p.Maj()
 	end
-	label:SetFontObject("GameFontHighlight")
-	label:SetText(texte)
-	cb:SetScript("OnClick", function(self)
-		if radio then ecrire() else ecrire(self:GetChecked() and true or false) end
-		Appliquer()
-	end)
-	table.insert(controles, { maj = function() cb:SetChecked(lire()) end })
-	return cb
-end
 
-local function NouveauTitre(parent, x, y, texte)
-	local t = parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	t:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-	t:SetText(texte)
-	return t
-end
+	-- case liée à un réglage : lire() → coché ou non, ecrire(oui) au clic
+	local function Case(carte, x, y, texte, lire, ecrire)
+		local c = UI.Case(carte, texte, function(oui) ecrire(oui); Appliquer() end)
+		c:SetPoint("TOPLEFT", carte, "TOPLEFT", x, y)
+		cases[#cases + 1] = { c, lire }
+		return c
+	end
 
-local function CreerFenetre()
-	local f = ns.FenetreDeplacable("GuildUpFenetre", 330, 354)
-	f:SetScript("OnShow", MajFenetre)
-
-	local titre = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	if not f.TitleText then titre:SetPoint("TOP", f, "TOP", 0, -16) end
-	titre:SetText("GuildUpSMB")
-
-	local x, y = 16, -34
-	local function Ligne(h) local v = y; y = y - (h or 24); return v end
-
-	NouvelleCase(f, x, Ligne(), "Activer les bannières",
+	-- Affichage : bannières, portraits, repères, médaillon, taille de la fenêtre
+	local affichage = UI.Carte(p, "Affichage")
+	affichage:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -MARGE)
+	affichage:SetSize(demi, HAUT_CARTE)
+	Case(affichage, 14, -40, "Activer les bannières",
 		function() return db.actif end, function(v) db.actif = v; SurActivation() end)
-	NouvelleCase(f, x, Ligne(), "Portraits des joueurs sur les bannières",
-		function() return db.medaillons ~= false end, function(v) db.medaillons = v; ToutRafraichir() end)
-	NouvelleCase(f, x, Ligne(), "Membres de ma zone à l'écran",
+	Case(affichage, 14, -66, "Portraits des joueurs",
+		function() return db.medaillons ~= false end, function(v) db.medaillons = v end)
+	Case(affichage, 14, -92, "Membres de ma zone sur le tour de l'écran",
 		function() return db.reperes ~= false end, function(v) db.reperes = v end)
-	NouvelleCase(f, x, Ligne(), "Afficher le médaillon GuildUpSMB",
-		function() return ns.BoutonVisible and ns.BoutonVisible() end, function(v)
-			if ns.BasculerBouton then ns.BasculerBouton(v) end
-		end)
-
-	NouveauTitre(f, x, Ligne(20) - 6, "Mon rôle (annoncé à la guilde)")
-	local yMoi1, yMoi2 = Ligne(), Ligne()
-	local mesRoles = {
-		{ "auto", "Auto (groupe / spécialisation)", x, yMoi1 },
-		{ "tank", "Tank", x, yMoi2 },
-		{ "heal", "Heal", x + 90, yMoi2 },
-		{ "dps", "DPS", x + 180, yMoi2 },
-	}
-	for _, r in ipairs(mesRoles) do
-		local cle = r[1]
-		NouvelleCase(f, r[3], r[4], r[2],
-			function() return RoleManuel() == cle end, function()
-				PoserRoleManuel(cle)
-				Annoncer(true)
-			end, true)
-	end
-	local detecte = f:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-	detecte:SetPoint("TOPLEFT", f, "TOPLEFT", x + 4, Ligne(16) - 2)
-	table.insert(controles, { maj = function()
-		local r = MonRole()
-		detecte:SetText("Rôle annoncé : " .. (r and r:upper() or "inconnu (bannière neutre)"))
-	end })
-
-	-- Moi : pseudo commun à mes personnages (visible seulement au survol), mes personnages, position
-	NouveauTitre(f, x, Ligne(20) - 6, "Moi")
-	local yPseudo = Ligne(26)
-	local tPseudo = f:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-	tPseudo:SetPoint("TOPLEFT", f, "TOPLEFT", x + 4, yPseudo - 4)
-	tPseudo:SetText("Pseudo")
-	local pseudo = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
-	pseudo:SetSize(110, 18)
-	pseudo:SetPoint("LEFT", tPseudo, "RIGHT", 12, 0)
-	pseudo:SetAutoFocus(false)
-	pseudo:SetMaxLetters(16)
-	pseudo:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-	pseudo:SetScript("OnEscapePressed", function(self) self:SetText(db.pseudo or ""); self:ClearFocus() end)
-	pseudo:SetScript("OnEditFocusLost", function(self)
-		local t = strtrim(((self:GetText() or ""):gsub("[~|,\n]", "")))
-		db.pseudo = t ~= "" and t or nil
-		if ns.AnnoncerIdentite then ns.AnnoncerIdentite() end
+	Case(affichage, 14, -118, "Afficher le médaillon GuildUpSMB",
+		function() return ns.BoutonVisible and ns.BoutonVisible() end,
+		function(v) if ns.BasculerBouton then ns.BasculerBouton(v) end end)
+	local tTaille = UI.Texte(affichage, "GameFontHighlight", C.texte)
+	tTaille:SetPoint("TOPLEFT", affichage, "TOPLEFT", 14, -154)
+	tTaille:SetText("Taille de la fenêtre")
+	local taille = UI.Curseur(affichage, demi - 14 - 140 - 50, 0.7, 1.6, 0.05, function(v)
+		if ns.EchelleInterface then ns.EchelleInterface(v) end
 	end)
-	pseudo:SetScript("OnEnter", function(self)
+	taille:SetPoint("LEFT", tTaille, "LEFT", 140, 0)
+	UI.Infobulle(taille, "Taille de la fenêtre", "De 0,7 à 1,6 (aussi : /smb taille 1.2).")
+
+	-- Moi : pseudo commun à mes personnages (visible seulement au survol), persos, position, rôle
+	local moi = UI.Carte(p, "Moi")
+	moi:SetPoint("TOPLEFT", affichage, "TOPRIGHT", ECART, 0)
+	moi:SetSize(demi, HAUT_CARTE)
+	local tPseudo = UI.Texte(moi, "GameFontHighlight", C.texte)
+	tPseudo:SetPoint("TOPLEFT", moi, "TOPLEFT", 14, -46)
+	tPseudo:SetText("Pseudo")
+	local persos = UI.Bouton(moi, "Persos", "fantome", 70, 28)
+	persos:SetPoint("TOPRIGHT", moi, "TOPRIGHT", -14, -38)
+	persos:SetScript("OnClick", function(self) if ns.MenuPersos then ns.MenuPersos(self) end end)
+	UI.Infobulle(persos, "Mes personnages", "Choisir ton personnage principal parmi tes personnages.")
+	local pseudo = UI.Champ(moi, demi - 78 - 70 - 8 - 14, "Nom commun à tes persos")
+	pseudo:SetPoint("TOPLEFT", moi, "TOPLEFT", 78, -38)
+	pseudo.saisie:SetMaxLetters(16)
+	pseudo.saisie:SetScript("OnEscapePressed", function(self) self:SetText(db.pseudo or ""); self:ClearFocus() end)
+	-- validé à la perte du focus (Entrée, clic ailleurs) ; annoncé à la guilde s'il change
+	pseudo.SurValider = function(texte)
+		local t = strtrim((texte:gsub("[~|,\r\n]", "")))
+		local nouveau = (t ~= "") and t or nil
+		pseudo:Ecrire(nouveau or "")
+		if nouveau == db.pseudo then return end
+		db.pseudo = nouveau
+		if ns.AnnoncerIdentite then ns.AnnoncerIdentite() end
+	end
+	pseudo.saisie:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetText("Pseudo")
 		GameTooltip:AddLine("Un nom commun à tous tes personnages (par exemple « Miko »).", 1, 1, 1, true)
 		GameTooltip:AddLine("La guilde le voit seulement au survol de ton nom : partout ailleurs, ton vrai nom reste affiché (pour le courrier et les messages, qui partent toujours au bon personnage).", 0.7, 0.7, 0.7, true)
 		GameTooltip:Show()
 	end)
-	pseudo:SetScript("OnLeave", function() GameTooltip:Hide() end)
-	table.insert(controles, { maj = function() if not pseudo:HasFocus() then pseudo:SetText(db.pseudo or "") end end })
-	local persos = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-	persos:SetSize(70, 20)
-	persos:SetPoint("LEFT", pseudo, "RIGHT", 8, 0)
-	persos:SetText("Persos")
-	persos:SetScript("OnClick", function(self) if ns.MenuPersos then ns.MenuPersos(self) end end)
-	NouvelleCase(f, x, Ligne(), "Partager ma position avec la guilde",
-		function() return db.partagePosition end, function()
-			if ns.BasculerPartagePosition then ns.BasculerPartagePosition() end
-		end, true)
+	pseudo.saisie:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	local note = UI.Texte(moi, "GameFontHighlightSmall", C.gris)
+	note:SetPoint("TOPLEFT", moi, "TOPLEFT", 14, -74)
+	note:SetText("Visible seulement au survol de ton nom.")
+	Case(moi, 14, -92, "Partager ma position avec la guilde",
+		function() return db.partagePosition end, function(v)
+			if (db.partagePosition and true or false) ~= v and ns.BasculerPartagePosition then ns.BasculerPartagePosition() end
+		end)
+	local tRole = UI.Texte(moi, "GameFontHighlight", C.texte)
+	tRole:SetPoint("TOPLEFT", moi, "TOPLEFT", 14, -128)
+	tRole:SetText("Mon rôle")
+	local roles = UI.Puces(moi, { "Auto", "Tank", "Heal", "DPS" }, function(i)
+		local cle = MES_ROLES[i]
+		if RoleManuel() ~= cle then
+			if ns.ChoisirRole then ns.ChoisirRole(cle) else PoserRoleManuel(cle); Annoncer(true) end
+		end
+		Appliquer()
+	end)
+	roles:SetPoint("LEFT", tRole, "LEFT", 78, 0)
+	local annonce = UI.Texte(moi, "GameFontHighlightSmall", C.gris)
+	annonce:SetPoint("TOPLEFT", moi, "TOPLEFT", 14, -158)
 
-	-- Notifications : une case par type de bulle (deux colonnes)
-	NouveauTitre(f, x, Ligne(20) - 6, "Notifications")
-	local NOTIFS = {
-		{ "groupes", "Groupes" }, { "candidatures", "Candidatures" },
-		{ "niveaux", "Niveaux" }, { "metiers", "Métiers" },
-		{ "evenements", "Événements" }, { "quetes", "Quêtes" },
-		{ "commandes", "Commandes" }, { "plans", "Échanges" },
-		{ "version", "Version" }, { "aide", "Aide" },
-		{ "gu", (ns.Config and ns.Config.cri) and (tostring(ns.Config.cri):upper() .. "!") or "Cri" },
-	}
-	local yNotif
+	-- Notifications : une case par type de bulle
+	local notifs = UI.Carte(p, "Notifications")
+	notifs:SetPoint("TOPLEFT", affichage, "BOTTOMLEFT", 0, -ECART)
+	notifs:SetSize(largeur, HAUT_NOTIFS)
+	notifs.compte:SetText("bulles du médaillon")
+	local colonne = (largeur - 28) / 4
 	for i, n in ipairs(NOTIFS) do
 		local cat = n[1]
-		if i % 2 == 1 then yNotif = Ligne() end
-		NouvelleCase(f, (i % 2 == 0) and (x + 150) or x, yNotif, n[2],
+		Case(notifs, 14 + ((i - 1) % 4) * colonne, -40 - math.floor((i - 1) / 4) * 26, n[2],
 			function() return not (type(db.notifs) == "table" and db.notifs[cat] == false) end,
 			function(v)
 				if type(db.notifs) ~= "table" then db.notifs = {} end
@@ -467,71 +483,84 @@ local function CreerFenetre()
 			end)
 	end
 
-	-- Partie Debug : cachée par défaut, affichée avec /smb debug (pour tester l'addon)
-	local hauteurSansDebug = -Ligne(0) + 50
-	Ligne(6)
-	local dbg = CreateFrame("Frame", nil, f)
-	dbg:SetAllPoints(f)
-	NouvelleCase(dbg, x, Ligne(), "Debug (tous les joueurs = guilde)",
+	-- Debug : seulement avec /smb debug (pour tester l'addon)
+	local carteDebug = UI.Carte(p, "Debug")
+	carteDebug:SetPoint("TOPLEFT", notifs, "BOTTOMLEFT", 0, -ECART)
+	carteDebug:SetSize(largeur, HAUT_NOTIFS)
+	carteDebug.compte:SetText("/smb debug pour cacher")
+	Case(carteDebug, 14, -40, "Debug (tous les joueurs = guilde)",
 		function() return db.test end, function(v) db.test = v end)
-	NouvelleCase(dbg, x + 20, Ligne(), "Me voir comme un autre membre (test seul)",
+	Case(carteDebug, 34, -66, "Me voir comme un autre membre (test seul)",
 		function() return db.testSolo end, function(v)
 			db.testSolo = v
 			if v and not db.test then Erreur("Coche aussi « Debug » pour activer le test seul") end
 			if ns.SurChangementTestSolo then ns.SurChangementTestSolo() end
 		end)
-	NouvelleCase(dbg, x + 20, Ligne(), "Bannières de groupe sur tout le monde",
+	Case(carteDebug, 34, -92, "Bannières de groupe sur tout le monde",
 		function() return db.testGroupe end, function(v)
 			db.testGroupe = v
 			if v and not db.test then Erreur("Coche aussi « Debug » pour voir les bannières de groupe") end
 		end)
+	-- forcer la bannière d'un rôle sur tout le monde (remis en Auto à chaque connexion)
+	local xDroite = demi + ECART + 14
+	local tAffiche = UI.Texte(carteDebug, "GameFontHighlight", C.texte)
+	tAffiche:SetPoint("TOPLEFT", carteDebug, "TOPLEFT", xDroite, -44)
+	tAffiche:SetText("Rôle affiché")
+	local rolesDebug = UI.Puces(carteDebug, { "Auto", "Tank", "Heal", "DPS", "Neutre" }, function(i)
+		local cle = ROLES_DEBUG[i]
+		db.role = cle
+		if cle ~= "auto" and not db.test then Erreur("Coche aussi « Debug » pour le voir sur tout le monde") end
+		Appliquer()
+	end)
+	rolesDebug:SetPoint("TOPLEFT", carteDebug, "TOPLEFT", xDroite, -64)
+	local noteDebug = UI.Texte(carteDebug, "GameFontHighlightSmall", C.gris)
+	noteDebug:SetPoint("TOPLEFT", carteDebug, "TOPLEFT", xDroite, -100)
+	noteDebug:SetText("Remis en Auto à chaque connexion.")
 
-	-- debug : forcer la bannière d'un rôle sur tout le monde (remis en Auto à chaque connexion)
-	local etiquette = dbg:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	local yRoles = Ligne(22)
-	etiquette:SetPoint("TOPLEFT", dbg, "TOPLEFT", x + 24, yRoles - 6)
-	etiquette:SetText("Rôle affiché :")
-	local yRoles2 = Ligne()
-	local rolesDebug = {
-		{ "auto", "Auto", x + 20, yRoles2 },
-		{ "tank", "Tank", x + 75, yRoles2 },
-		{ "heal", "Heal", x + 130, yRoles2 },
-		{ "dps", "DPS", x + 185, yRoles2 },
-		{ "horscombat", "Neutre", x + 235, yRoles2 },
-	}
-	for _, r in ipairs(rolesDebug) do
-		local cle = r[1]
-		NouvelleCase(dbg, r[3], r[4], r[2],
-			function() return db.role == cle end, function()
-				db.role = cle
-				if cle ~= "auto" and not db.test then Erreur("Coche aussi « Debug » pour le voir sur tout le monde") end
-			end, true)
-	end
-
-	local hauteurAvecDebug = -Ligne(0) + 50
-	table.insert(controles, { maj = function()
-		dbg:SetShown(db.afficherDebug and true or false)
-		f:SetHeight(db.afficherDebug and hauteurAvecDebug or hauteurSansDebug)
-	end })
-
-	local reset = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-	reset:SetSize(130, 22)
-	reset:SetPoint("BOTTOM", f, "BOTTOM", 0, 14)
-	reset:SetText("Réinitialiser")
+	-- Réinitialiser : seulement les réglages, sous la dernière carte affichée
+	local reset = UI.Bouton(p, "Réinitialiser les réglages", "fantome", 190, 26)
 	reset:SetScript("OnClick", function()
 		ReinitialiserReglages()
 		Appliquer()
 	end)
+	local phrase = UI.Texte(p, "GameFontHighlightSmall", C.gris)
+	phrase:SetPoint("RIGHT", reset, "LEFT", -12, 0)
+	phrase:SetJustifyH("RIGHT")
+	phrase:SetText("Tes carnets, dons, besoins et projets sont gardés si tu réinitialises.")
 
-	f:Hide()
-	return f
+	p.Maj = function()
+		if not ns.DB() then return end
+		for _, c in ipairs(cases) do c[1]:Poser(c[2]()) end
+		taille:Poser(ns.EchelleInterface and ns.EchelleInterface() or 1.1)
+		if not pseudo.saisie:HasFocus() then pseudo:Ecrire(db.pseudo or "") end
+		local manuel = RoleManuel() or "auto"
+		for i, cle in ipairs(MES_ROLES) do if cle == manuel then roles:Choisir(i) end end
+		local r = MonRole()
+		annonce:SetText("Annoncé : " .. (r and r:upper() or "inconnu (bannière neutre)")
+			.. ((r and manuel == "auto") and " (groupe ou spécialisation)" or ""))
+		local avecDebug = db.afficherDebug and true or false
+		carteDebug:SetShown(avecDebug)
+		local role = ROLES_DEBUG[1]
+		for _, cle in ipairs(ROLES_DEBUG) do if db.role == cle then role = cle end end
+		for i, cle in ipairs(ROLES_DEBUG) do if cle == role then rolesDebug:Choisir(i) end end
+		reset:ClearAllPoints()
+		reset:SetPoint("TOPRIGHT", avecDebug and carteDebug or notifs, "BOTTOMRIGHT", 0, -ECART)
+	end
+	page = p
+	return p
 end
+if ns.AjouterPage then ns.AjouterPage("options", CreerPage) end
 
-local function BasculerFenetre()
-	fenetre = fenetre or ns.AvecSons(CreerFenetre(), "options")
-	fenetre:SetShown(not fenetre:IsShown())
+ns.OuvrirOptions = function() if ns.OuvrirInterface then ns.OuvrirInterface("options") end end
+-- (menu de la fenêtre GuildUpSMB, menu rapide du médaillon, /smb options) : ferme la fenêtre si elle
+-- est déjà sur la page Options
+ns.BasculerOptions = function()
+	if ns.PageInterface and ns.PageInterface() == "options" then
+		if ns.BasculerInterface then ns.BasculerInterface() end
+	else
+		ns.OuvrirOptions()
+	end
 end
-ns.BasculerOptions = BasculerFenetre -- (fenêtre GuildUpSMB, menu rapide du médaillon)
 
 
 SLASH_GUILDUP1 = "/smb"
@@ -602,9 +631,9 @@ SlashCmdList.GUILDUP = function(msg)
 	elseif cmd == "debug" then
 		db.afficherDebug = not db.afficherDebug or nil
 		if not db.afficherDebug then db.test, db.testSolo, db.testGroupe = false, false, false end
-		Message("partie Debug de la fenêtre d'options : " .. OuiNon(db.afficherDebug))
+		Message("partie Debug de la page Options : " .. OuiNon(db.afficherDebug))
 		if db.afficherDebug and ns.InstallerEspionRecherche then ns.InstallerEspionRecherche() end
-		if fenetre and fenetre:IsShown() then MajFenetre() end
+		ns.MajOptions()
 		return
 	elseif cmd == "entree" or cmd == "entrée" then
 		if not ns.EnregistrerEntree then return end
@@ -631,6 +660,7 @@ SlashCmdList.GUILDUP = function(msg)
 			e = ns.EchelleInterface()
 		end
 		Message(("taille de la fenêtre GuildUpSMB : %.2f"):format(e or 1.1))
+		ns.MajOptions()
 		return
 	elseif cmd == "reperes" or cmd == "repères" or cmd == "hud" then
 		db.reperes = (db.reperes == false)
@@ -661,14 +691,14 @@ SlashCmdList.GUILDUP = function(msg)
 		Message("réglages par défaut (tes carnets, dons, besoins et projets sont gardés)")
 	else
 		if cmd == "" then
-			if ns.BasculerInterface then ns.BasculerInterface() else BasculerFenetre() end
+			if ns.BasculerInterface then ns.BasculerInterface() else ns.BasculerOptions() end
 		elseif cmd == "options" or cmd == "reglages" or cmd == "réglages" then
-			BasculerFenetre()
+			ns.BasculerOptions()
 		else
 			Aide()
 		end
 		return
 	end
 	ToutRafraichir()
-	if fenetre and fenetre:IsShown() then MajFenetre() end
+	ns.MajOptions()
 end
