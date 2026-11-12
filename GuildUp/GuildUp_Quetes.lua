@@ -42,29 +42,56 @@ end
 -- Mes quêtes (titre + zone : les en-têtes du journal de quêtes sont les zones)
 --------------------------------------------------------------------------------
 
-local function LireQuetes()
-	local t = {}
+-- Le journal ne liste que les lignes visibles : les quêtes d'une zone repliée n'y sont pas.
+-- On garde donc celles qu'on connaissait déjà (« avant », gardées aussi d'une session à l'autre)
+-- quand leur zone est repliée, sauf si le jeu dit qu'on ne les a plus (C_QuestLog.IsOnQuest).
+local function LireQuetes(avant)
+	local t, repliees = {}, {}
 	local zone
 	if C_QuestLog and C_QuestLog.GetNumQuestLogEntries and C_QuestLog.GetInfo then
 		for i = 1, (C_QuestLog.GetNumQuestLogEntries() or 0) do
 			local info = C_QuestLog.GetInfo(i)
 			if info and info.isHeader then
 				zone = info.title
+				if info.isCollapsed and zone then repliees[zone] = true end
 			elseif info and info.questID and info.questID > 0 then
 				t[info.questID] = { titre = info.title or ("Quête " .. info.questID), zone = zone, niveau = info.level }
 			end
 		end
 	elseif GetNumQuestLogEntries and GetQuestLogTitle then
 		for i = 1, (GetNumQuestLogEntries() or 0) do
-			local titre, niveau, _, entete, _, _, _, id = GetQuestLogTitle(i)
+			local titre, niveau, _, entete, repliee, _, _, id = GetQuestLogTitle(i)
 			if entete then
 				zone = titre
+				if repliee and zone then repliees[zone] = true end
 			elseif id and id > 0 then
 				t[id] = { titre = titre, zone = zone, niveau = niveau }
 			end
 		end
 	end
+	local enCours = C_QuestLog and C_QuestLog.IsOnQuest
+	for id, q in pairs(avant or {}) do
+		if not t[id] and type(q) == "table" and q.zone and repliees[q.zone] then
+			local garder = true
+			if enCours then
+				local ok, oui = pcall(enCours, id)
+				if ok then garder = oui and true or false end
+			end
+			if garder then t[id] = q end
+		end
+	end
 	return t
+end
+
+-- Mes quêtes connues, par personnage (pour les zones repliées dès la connexion)
+local function QuetesGardees()
+	local db = ns.DB and ns.DB()
+	if not db then return {} end
+	if type(db.quetesPerso) ~= "table" then db.quetesPerso = {} end
+	local cle = MaCle()
+	if not cle then return {} end
+	if type(db.quetesPerso[cle]) ~= "table" then db.quetesPerso[cle] = {} end
+	return db.quetesPerso[cle], db.quetesPerso, cle
 end
 
 -- Pour GuildUp_Groupes.lua : ai-je cette quête ? et son titre (mon journal, sinon le jeu)
@@ -115,7 +142,9 @@ end
 -- Mes quêtes ont changé : prévenir la guilde, et bulle si un membre connecté a la nouvelle quête
 local function MajMesQuetes()
 	local avant = mesQuetes
-	mesQuetes = LireQuetes()
+	mesQuetes = LireQuetes(next(avant) and avant or QuetesGardees())
+	local _, toutes, cle = QuetesGardees()
+	if toutes and cle then toutes[cle] = mesQuetes end
 	if not pret then return end
 	for id, q in pairs(mesQuetes) do
 		if not avant[id] then
@@ -532,7 +561,9 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 	elseif event == "PLAYER_ENTERING_WORLD" and premiere then
 		premiere = false
 		C_Timer.After(14, function()
-			mesQuetes = LireQuetes()
+			mesQuetes = LireQuetes(next(mesQuetes) and mesQuetes or QuetesGardees())
+			local _, toutes, cle = QuetesGardees()
+			if toutes and cle then toutes[cle] = mesQuetes end
 			pret = true
 			LireRoster()
 			Emettre(true)
