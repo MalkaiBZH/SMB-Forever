@@ -86,8 +86,17 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "GuildUpSMB" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.0.0"] = {
+		"|cffffd100Nouvelle interface|r : le bouton de la mini-carte devient un médaillon à placer où tu veux (anneau à la couleur de ton rôle, pastille des nouveautés). Clic : la fenêtre GuildUpSMB et son accueil, qui résume la guilde (membres de ta zone, groupes ouverts, appels à l'aide, demandes de dons, besoins que tu sais fabriquer, projets). Clic droit : menu rapide (rôle, position, groupes, à l'aide).",
+		"|cffffd100Repères à l'écran|r : les membres de la guilde sur ta carte apparaissent dans le HUD, avec leur portrait et leur distance, au-dessus de leur tête ou dans leur direction (/smb reperes).",
+		"|cffffd100Portraits|r : le portrait de chaque membre (race, classe, sexe) s'affiche à côté de son nom ; les bannières horizontales disparaissent.",
+		"Barres de nom : leur taille suit de nouveau le jeu, les noms des autres joueurs ne grossissent plus d'un coup.",
+		"Carte : le point des membres est plus visible, et visible aussi hors groupe.",
+		"Noms des objets en anglais sur un client anglais ; emote du cri de guilde : une chope en bois animée.",
+		"Pseudo, personnages, partage de position et choix des notifications : dans les options (/smb options).",
+	},
 	["1.6.0"] = {
 		"|cffffd100Carnet de craft|r : tes listes de courses. Choisis des objets, GuildUpSMB calcule tous les composants (sous-recettes comprises) et ce qu'il te manque d'après tes sacs et ta banque. Réduit, il ne laisse à l'écran que la liste des composants, mise à jour en direct.",
 		"|cffffd100Encyclopédie|r : d'où vient chaque objet (marchands, butin classé par zone avec les élites, récolte, quêtes), zones et marchands sur la carte du monde, modèle 3D des monstres, formules et recettes, « Utilisé dans ». |cffffd100Alt + clic|r sur n'importe quel objet du jeu pour l'ouvrir.",

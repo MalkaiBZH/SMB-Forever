@@ -92,8 +92,19 @@ Pas de build ni de tests automatisés : on teste **en jeu**, après `/reload`.
   messages sont traités comme ceux d'un autre membre), `testGroupe` (bannières de groupe partout).
 - `/smb diag` : diagnostic de la barre de nom de la cible.
 
-## Publier une version
+## Version (semver) : toujours la mettre à jour
 
-1. Monter `## Version` dans `GuildUpSMB/GuildUpSMB.toc`. Un suffixe `-dev` (ex. `1.6.1-dev`) empêche
+**Chaque modification poussée sur `main` monte la version**, selon le semver `MAJEUR.MINEUR.CORRECTIF` :
+- **correctif** (`2.0.0` → `2.0.1`) : correction de bug, petit réglage sans nouvelle fonctionnalité ;
+- **mineur** (`2.0.1` → `2.1.0`) : nouvelle fonctionnalité ou amélioration visible, compatible avec les
+  versions précédentes (les autres membres de la guilde peuvent garder l'ancienne) ;
+- **majeur** (`2.1.0` → `3.0.0`) : refonte importante, ou changement de protocole réseau incompatible avec
+  les anciennes versions.
+
+À chaque fois :
+1. Monter `## Version` dans `GuildUpSMB/GuildUpSMB.toc`. Un suffixe `-dev` (ex. `2.0.1-dev`) empêche
    d'annoncer la version à la guilde.
-2. Ajouter les nouveautés dans `GuildUp_Version.lua` (tables `ORDRE` et `NOTES`, la plus récente en premier).
+2. Ajouter les nouveautés dans `GuildUp_Version.lua` (tables `ORDRE` et `NOTES`, la plus récente en premier),
+   en français, du point de vue du joueur.
+3. Si le changement touche les commandes ou les fonctionnalités, mettre à jour le `README.md` dans le même
+   commit.
