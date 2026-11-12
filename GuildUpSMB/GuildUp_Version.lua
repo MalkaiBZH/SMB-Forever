@@ -3,6 +3,10 @@
 -- Si un membre a une version plus récente, une bulle propose de mettre l'addon à jour avec le
 -- programme SMB Forever Updater (outils/MiseAJour, voir le README).
 -- Si un membre a une version plus ancienne, on lui renvoie la nôtre pour qu'il soit prévenu.
+-- Présence : à chaque annonce « V » d'un membre qui arrive, les autres répondent « R~version » après
+-- un petit délai au hasard (une seule réponse pour plusieurs arrivées rapprochées). Le nouveau venu
+-- sait ainsi tout de suite qui a SMB Forever (en-tête de la fenêtre, page Guilde). « R » ne déclenche
+-- aucune réponse ; les versions d'avant 2.13.1 l'ignorent.
 -- Fenêtre « Nouveautés » (ns.MontrerNouveautes, /smb nouveautes) : notes de chaque version, au style
 -- sombre et doré du kit ns.UI ; elle s'ouvre seule une fois après une mise à jour.
 
@@ -50,17 +54,30 @@ local function Annoncer()
 	dernierEnvoi = GetTime()
 end
 
+-- Réponse de présence à l'annonce d'un membre qui arrive : « R~version », 1 à 7 s plus tard (les
+-- réponses de la guilde s'étalent) ; une seule pour plusieurs annonces pendant ce délai
+local presencePrevue = false
+local function RepondrePresence()
+	if DEV or presencePrevue or not ns.EnvoyerAddon then return end
+	presencePrevue = true
+	C_Timer.After(1 + math.random() * 6, function()
+		presencePrevue = false
+		ns.EnvoyerAddon(PREFIXE, "R~" .. MA_VERSION, "GUILD")
+	end)
+end
+
 local derniereAnnonceVue = 0 -- un membre a annoncé une version au moins égale à la mienne
 local reponsePrevue = false
 
 local function Recevoir(prefixe, msg, canal, expediteur)
 	if prefixe ~= PREFIXE or canal ~= "GUILD" or not msg or not expediteur then return end
-	local v = msg:match("^V~(.+)$")
+	local sorte, v = msg:match("^([VR])~([^~]+)$")
 	if not v then return end
 	local cle = ns.Normaliser and ns.Normaliser(expediteur) or expediteur
 	local moi = ns.Normaliser and ns.Normaliser(UnitName("player")) or UnitName("player")
 	if cle == moi then return end
 	versions[cle] = { nom = expediteur, v = v }
+	if sorte == "V" then RepondrePresence() end
 	local c = Comparer(v, MA_VERSION)
 	if c >= 0 then derniereAnnonceVue = GetTime() end
 	if c > 0 then
@@ -72,7 +89,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 					nil, function() end)
 			end
 		end
-	elseif c < 0 and GetTime() - dernierEnvoi > 60 and not reponsePrevue then
+	elseif sorte == "V" and c < 0 and GetTime() - dernierEnvoi > 60 and not reponsePrevue then
 		-- il est en retard : on lui renvoie notre version (au plus une fois par minute), sauf si un
 		-- autre membre à jour l'a fait pendant notre petit délai au hasard
 		reponsePrevue = true
@@ -92,8 +109,11 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.13.1"] = {
+		"Le nombre de membres « en ligne avec l'addon » est juste dès ta connexion : les membres présents se signalent à ton arrivée, et un membre silencieux n'est plus oublié au bout de 10 minutes.",
+	},
 	["2.13.0"] = {
 		"|cffffd100Groupes programmés|r : « Mortemines à 21:00 » ; on s'inscrit à l'avance, rappel 10 min avant, « Inviter tous les inscrits » à l'heure. Ils apparaissent aussi sur l'accueil avec leur heure de départ.",
 	},

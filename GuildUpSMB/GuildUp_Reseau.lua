@@ -95,6 +95,7 @@ end
 
 local ecouteurs = {}   -- [préfixe] = { fonction, canaux }
 local actifs = {}      -- [clé] = dernier message reçu de ce membre (il a GuildUpSMB et il est là)
+local vus = {}         -- [clé] = true : un message reçu de ce membre depuis le début de la session
 local cadre = CreateFrame("Frame")
 cadre:RegisterEvent("CHAT_MSG_ADDON")
 cadre:SetScript("OnEvent", function(_, _, prefixe, msg, canal, expediteur)
@@ -107,7 +108,7 @@ cadre:SetScript("OnEvent", function(_, _, prefixe, msg, canal, expediteur)
 	stats.recus = stats.recus + 1
 	if canal == "GUILD" and ns.Normaliser then
 		local cle = ns.Normaliser(expediteur)
-		if cle then actifs[cle] = GetTime() end
+		if cle then actifs[cle] = GetTime(); vus[cle] = true end
 	end
 	local ok, err = pcall(e.fonction, prefixe, msg, canal, expediteur)
 	if not ok then
@@ -145,14 +146,22 @@ ns.EstLeRelais = function(exclu)
 	return true
 end
 
--- Nombre de membres connectés qui ont GuildUpSMB (un message reçu depuis moins de 10 min), moi compris
+-- Nombre de membres connectés qui ont GuildUpSMB, moi compris : un message reçu pendant la session
+-- (les présents répondent à l'annonce de version de chaque arrivant, GuildUp_Version.lua) et en ligne
+-- d'après la liste de guilde ; sans liste de guilde lue, un message reçu depuis moins de 10 min.
 ns.MembresActifs = function()
 	local moi = ns.MaCle and ns.MaCle()
 	local maintenant, n = GetTime(), moi and 1 or 0
-	for cle, t in pairs(actifs) do
-		if maintenant - t <= ACTIF and cle ~= moi and not cle:find("#test", 1, true)
-			and not (ns.EnLigneMembre and ns.MembreGuilde and ns.MembreGuilde(cle) ~= nil and not ns.EnLigneMembre(cle)) then
-			n = n + 1
+	for cle in pairs(vus) do
+		if cle ~= moi and not cle:find("#test", 1, true) then
+			local membre = ns.MembreGuilde and ns.MembreGuilde(cle)
+			local compte
+			if membre == nil or not ns.EnLigneMembre then
+				compte = actifs[cle] and maintenant - actifs[cle] <= ACTIF
+			else
+				compte = membre and ns.EnLigneMembre(cle)
+			end
+			if compte then n = n + 1 end
 		end
 	end
 	return n
