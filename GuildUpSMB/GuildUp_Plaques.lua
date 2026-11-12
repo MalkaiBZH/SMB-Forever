@@ -1115,8 +1115,10 @@ local CVARS_ALLIES = {
 	-- cela, le nom passait d'un coup de tout petit à très grand en entrant dans la portée.
 	{ "nameplateMinScale", "0.2" },
 	{ "nameplateMaxScale", "1" },
-	{ "nameplateMaxScaleDistance", "10" }, -- jusqu'ici : taille normale
-	{ "nameplateMinScaleDistance", "41" }, -- à partir d'ici : taille minimale
+	{ "nameplateMaxScaleDistance", "10" }, -- distance (depuis la caméra) jusqu'à laquelle : taille normale
+	-- distance comptée DEPUIS LA PORTÉE MAXIMALE des barres de nom (en revenant vers soi) où la taille
+	-- minimale est atteinte : 0 = seulement tout au bout de la portée, là où se fait le relais
+	{ "nameplateMinScaleDistance", "0" },
 	{ "nameplateSelectedScale", "1" }, -- la cible n'est plus agrandie (1,2 par défaut)
 }
 
