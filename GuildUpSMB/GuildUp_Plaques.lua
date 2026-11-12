@@ -213,13 +213,11 @@ local function PoserBanniere(f, image, region, dxG, dxD, dyH, dyB, hauteurInt, m
 		return
 	end
 	-- Médaillon : rond, de la hauteur de la bannière, collé à gauche de l'intérieur (il ne passe pas
-	-- sous le nom ni la barre de vie). La mascotte (morceau gauche) disparaît ; la barre unie
-	-- s'allonge jusqu'au centre du médaillon, qui cache son extrémité coupée.
+	-- sous le nom ni la barre de vie). La bannière elle-même disparaît : il ne reste que le médaillon
+	-- à côté du nom et de la barre de vie (plus léger à l'écran).
 	local taille = (m.V_BAS - m.V_HAUT) * k
 	local yCentre = (yHaut + yBas) / 2
-	g:Hide()
-	a:SetPoint("TOPLEFT", region, "TOPLEFT", dxG - taille / 2, yHaut)
-	a:SetPoint("BOTTOMRIGHT", o, "BOTTOMLEFT", 0, 0)
+	for _, cle in ipairs(ORDRE) do f[cle]:Hide() end
 	if not f.medaillon then
 		-- juste au-dessus de la bannière, dans le même cadre
 		local couche, sous = f.couche or "BACKGROUND", (f.sousCouche or 0) + 1
