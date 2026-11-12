@@ -411,7 +411,7 @@ local function GarderPourPlusTard(cible, nom, objet, quand)
 	local r = Relais()
 	if not r then return end
 	r[cible] = r[cible] or {}
-	r[cible][Normaliser(nom) .. ":" .. objet .. ":" .. quand] = { nom = nom, objet = objet, quand = quand, t = time() }
+	r[cible][Normaliser(nom) .. ":" .. objet .. ":" .. quand] = { nom = nom, objet = objet, quand = quand, t = Maintenant() }
 end
 -- Le donneur vient de se connecter : on lui renvoie les demandes gardées (après un petit délai au
 -- hasard, pour qu'un seul membre le fasse ; les autres voient passer les « R » et oublient les leurs)
@@ -424,7 +424,7 @@ local function Transmettre(cible)
 		transmissionPrevue[cible] = nil
 		local liste = r[cible]
 		if not liste then return end
-		local maintenant = time()
+		local maintenant = Maintenant()
 		local limite = maintenant - GARDE_RELAIS
 		for k, d in pairs(liste) do
 			if (d.t or 0) < limite then
@@ -439,6 +439,39 @@ local function Transmettre(cible)
 	end)
 end
 -- Donneurs en ligne qui ont des demandes en attente (à ma connexion, quand la liste de guilde change)
+-- Purge à la connexion : listes de dons sans nouvelles depuis 30 jours, demandes gardées pour un
+-- absent depuis plus de 14 jours (toutes guildes)
+local function PurgerAnciennes()
+	local db = DB()
+	local limite = Maintenant() - OUBLI
+	if type(db.echanges) == "table" then
+		for _, g in pairs(db.echanges) do
+			if type(g) == "table" then
+				for cle, e in pairs(g) do
+					if type(e) ~= "table" or (e.vu or 0) < limite then g[cle] = nil end
+				end
+			end
+		end
+	end
+	if type(db.relaisDons) == "table" then
+		local limiteR = Maintenant() - GARDE_RELAIS
+		for nomG, r in pairs(db.relaisDons) do
+			if type(r) ~= "table" then
+				db.relaisDons[nomG] = nil
+			else
+				for cible, liste in pairs(r) do
+					if type(liste) == "table" then
+						for k, d in pairs(liste) do
+							if type(d) ~= "table" or (d.t or 0) < limiteR then liste[k] = nil end
+						end
+					end
+					if type(liste) ~= "table" or not next(liste) then r[cible] = nil end
+				end
+			end
+		end
+	end
+end
+
 local function TransmettreAuxConnectes()
 	local r = Relais()
 	if not r or not ns.EnLigneMembre then return end
@@ -477,6 +510,7 @@ local function RelayerListes(pour)
 		if not g then return end
 		for qui, e in pairs(g) do
 			if type(e) == "table" and qui ~= pour and not qui:find("#test", 1, true)
+				and (e.vu or 0) >= Maintenant() - OUBLI and not (ns.MembreGuilde and ns.MembreGuilde(qui) == false)
 				and not (relayees[qui] and GetTime() - relayees[qui] < 30) then
 				relayees[qui] = GetTime()
 				local mots = {}
@@ -670,7 +704,7 @@ end
 --------------------------------------------------------------------------------
 
 local function Depuis(t)
-	local s = time() - (t or time())
+	local s = Maintenant() - (t or Maintenant())
 	if s < 3600 then return math.max(1, math.floor(s / 60)) .. " min" end
 	if s < 86400 then return math.floor(s / 3600) .. " h" end
 	return math.floor(s / 86400) .. " j"
@@ -696,7 +730,7 @@ local function DonsGuilde()
 	local g = Guilde() or {}
 	local res = {}
 	wipe(comptes)
-	local limite = time() - OUBLI
+	local limite = Maintenant() - OUBLI
 	local cat = CATEGORIES[categorie]
 	for cle, e in pairs(g) do
 		if type(e) ~= "table" or (e.vu or 0) < limite then
@@ -1670,6 +1704,7 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 	elseif event == "PLAYER_ENTERING_WORLD" and premiere then
 		premiere = false
 		debut = GetTime()
+		pcall(PurgerAnciennes)
 		PhotoConnexion()
 		C_Timer.After(45, RecapConnexion)
 		C_Timer.After(18, function()

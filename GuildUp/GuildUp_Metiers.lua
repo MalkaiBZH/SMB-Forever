@@ -225,6 +225,36 @@ local function Base()
 	return b
 end
 
+-- Purge à la connexion : fiches non vues depuis 90 jours (toutes guildes), anciens membres de ma
+-- guilde (absents de la liste de guilde et non vus depuis 7 jours), restes de l'ancien système
+-- d'entraîneurs et des « recettes spéciales » (champ sp)
+local OUBLI_FICHE, OUBLI_ANCIEN_MEMBRE = 90 * 86400, 7 * 86400
+local function PurgerFiches()
+	local b = Base()
+	b.entraineur = nil
+	for _, e in pairs(b.moi) do
+		if type(e) == "table" and type(e.profs) == "table" then
+			for _, p in pairs(e.profs) do if type(p) == "table" then p.sp = nil end end
+		end
+	end
+	local maintenant = time()
+	local maGuilde = IsInGuild() and GetGuildInfo("player") or nil
+	for nomG, g in pairs(b.guildes) do
+		if type(g) ~= "table" then
+			b.guildes[nomG] = nil
+		else
+			for cle, e in pairs(g) do
+				local age = maintenant - (type(e) == "table" and e.vu or 0)
+				if type(e) ~= "table" or age > OUBLI_FICHE
+					or (nomG == maGuilde and age > OUBLI_ANCIEN_MEMBRE and ns.MembreGuilde and ns.MembreGuilde(cle) == false) then
+					g[cle] = nil
+				end
+			end
+			if not next(g) then b.guildes[nomG] = nil end
+		end
+	end
+end
+
 local function Guilde()
 	if not IsInGuild() then return nil end
 	local nom = GetGuildInfo("player")
@@ -509,22 +539,6 @@ local function ObjetFabrique(idRecette)
 		or essai(T.GetRecipeSchematic, idRecette, false)
 end
 
--- Recette « spéciale » : apprise ailleurs que chez l'entraîneur (plan trouvé, vendeur, quête…).
--- D'après le texte « source » de la recette dans le jeu (rien ou « Entraîneur » = recette normale).
-local exemplesSources = {}    -- quelques textes lus, pour /smb diag
-local function RecetteSpeciale(T, id)
-	if not T.GetRecipeSourceText then return false end
-	local ok, s = pcall(T.GetRecipeSourceText, id)
-	if not ok or type(s) ~= "string" or s == "" then return false end
-	local propre = s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|n", " ")
-	if #exemplesSources < 4 then exemplesSources[#exemplesSources + 1] = id .. "=" .. propre:sub(1, 60) end
-	local simple = Simplifier(propre)
-	if simple:find("entraineur", 1, true) or simple:find("trainer", 1, true) or simple:find("formateur", 1, true) then
-		return false
-	end
-	return true
-end
-
 local function LireMetierModerne()
 	local T = C_TradeSkillUI
 	if T.IsTradeSkillLinked and T.IsTradeSkillLinked() then return end
@@ -536,7 +550,7 @@ local function LireMetierModerne()
 		derniereLecture = "fenêtre de métier « " .. tostring(nom) .. " » : métier non reconnu"
 		return
 	end
-	local liste, speciales = {}, {}
+	local liste = {}
 	for _, id in ipairs(T.GetAllRecipeIDs() or {}) do
 		local r = T.GetRecipeInfo(id)
 		if r and r.learned then
@@ -544,12 +558,10 @@ local function LireMetierModerne()
 			local objet = ObjetFabrique(id)
 			local code = objet and ("i" .. objet) or ("s" .. id)
 			liste[#liste + 1] = code
-			if RecetteSpeciale(T, id) then speciales[code] = true end
 		end
 	end
 	-- cette API donne toutes les recettes apprises d'un coup : la liste remplace l'ancienne
 	Fusionner(m, info.skillLevel, info.maxSkillLevel, liste, "C_TradeSkillUI", true)
-	if #liste > 0 then Profession(m.code).sp = speciales end
 end
 
 local function LireMetierOuvert()
@@ -618,26 +630,6 @@ local function DiffuserRecettes(code)
 	for i, txt in ipairs(morceaux) do
 		Envoyer(("R~%s~%s~%d~%d~%s"):format(code, p.h or "0", i, #morceaux, txt))
 	end
-	-- (message P désactivé : Forever ne donne pas la source des recettes apprises)
-	if false then
-		local sp, cour, t = {}, {}, 0
-		for c in pairs(p.sp) do
-			local id = tonumber(c:sub(2))
-			if id then
-				local mot = c:sub(1, 1) .. Base36(id)
-				if t + #mot + 1 > TAILLE_MORCEAU and #cour > 0 then
-					sp[#sp + 1] = table.concat(cour, ",")
-					cour, t = {}, 0
-				end
-				cour[#cour + 1] = mot
-				t = t + #mot + 1
-			end
-		end
-		if #cour > 0 or #sp == 0 then sp[#sp + 1] = table.concat(cour, ",") end
-		for i, txt in ipairs(sp) do
-			Envoyer(("P~%s~%d~%d~%s"):format(code, i, #sp, txt))
-		end
-	end
 end
 
 local function Demander(g, cle, code, force)
@@ -652,144 +644,6 @@ local function Demander(g, cle, code, force)
 			Envoyer(("D~%s~%s"):format(code, cle))
 		end
 	end)
-end
-
---------------------------------------------------------------------------------
--- Recettes d'entraîneur (filtre « recettes spéciales ») : lues dans la fenêtre d'un maître de
--- métier et mises en commun dans la guilde. Une recette absente de ces listes = recette spéciale
--- (plan trouvé, vendeur, quête…).
---   Base().entraineur[métier] = { o = { [objet fabriqué] = true }, n = { [nom simplifié] = true } }
---   « T~métier~part~total~mots »  la liste (mots : i<objet en base 36> ou n<nom>)
---   « U~métier »                  qui a la liste de ce métier ? (le premier qui l'a répond)
---------------------------------------------------------------------------------
-
-local function Entraineur(code, creer)
-	local b = Base()
-	if type(b.entraineur) ~= "table" then b.entraineur = {} end
-	local t = b.entraineur[code]
-	if type(t) ~= "table" and creer then
-		t = { o = {}, n = {} }
-		b.entraineur[code] = t
-	end
-	return type(t) == "table" and t or nil
-end
-ns.EntraineurConnu = function(code) return Entraineur(code) ~= nil end
-
-local dernierT = {}            -- [métier] = moment de la dernière liste vue passer (envoyée ou reçue)
-local derniereLectureEntraineur
-
-local function DiffuserEntraineur(code)
-	local t = Entraineur(code)
-	if not t then return end
-	if dernierT[code] and GetTime() - dernierT[code] < 15 then return end
-	dernierT[code] = GetTime()
-	local mots = {}
-	for o in pairs(t.o) do mots[#mots + 1] = "i" .. Base36(o) end
-	for n in pairs(t.n) do mots[#mots + 1] = "n" .. n end
-	local morceaux, cour, taille = {}, {}, 0
-	for _, mot in ipairs(mots) do
-		if taille + #mot + 1 > TAILLE_MORCEAU and #cour > 0 then
-			morceaux[#morceaux + 1] = table.concat(cour, ",")
-			cour, taille = {}, 0
-		end
-		cour[#cour + 1] = mot
-		taille = taille + #mot + 1
-	end
-	if #cour > 0 then morceaux[#morceaux + 1] = table.concat(cour, ",") end
-	for i, txt in ipairs(morceaux) do
-		Envoyer(("T~%s~%d~%d~%s"):format(code, i, #morceaux, txt))
-	end
-end
-
-local function NomPropre(nom) return (Simplifier(nom or ""):gsub("[,~|]", "")) end
-
-local lectureEntraineur = false
-local function LireEntraineur()
-	if lectureEntraineur or not (GetNumTrainerServices and GetTrainerServiceInfo) then return end
-	lectureEntraineur = true
-	-- tout afficher le temps de la lecture (appris, disponibles, pas encore disponibles)
-	local avant = {}
-	if GetTrainerServiceTypeFilter and SetTrainerServiceTypeFilter then
-		for _, f in ipairs({ "available", "unavailable", "used" }) do
-			local ok, v = pcall(GetTrainerServiceTypeFilter, f)
-			avant[f] = ok and v
-			if ok and not v then pcall(SetTrainerServiceTypeFilter, f, 1) end
-		end
-	end
-	local ajouts, lus, metierLu = {}, 0, nil
-	for i = 1, GetNumTrainerServices() or 0 do
-		local nom, _, genre = GetTrainerServiceInfo(i)
-		if nom and genre ~= "header" then
-			local ligne = GetTrainerServiceSkillLine and GetTrainerServiceSkillLine(i)
-			local m = ligne and MetierParNom(ligne)
-			if m and not m.recolte then
-				metierLu = m
-				local t = Entraineur(m.code, true)
-				local lien = GetTrainerServiceItemLink and GetTrainerServiceItemLink(i)
-				local o = lien and tonumber(lien:match("item:(%d+)"))
-				lus = lus + 1
-				if o then
-					if not t.o[o] then t.o[o] = true; ajouts[m.code] = true end
-				else
-					local s = NomPropre(nom)
-					if s ~= "" and not t.n[s] then t.n[s] = true; ajouts[m.code] = true end
-				end
-			end
-		end
-	end
-	for f, v in pairs(avant) do
-		if not v then pcall(SetTrainerServiceTypeFilter, f, 0) end
-	end
-	derniereLectureEntraineur = ("entraîneur : %d recette(s) lue(s)%s, SkillLine=%s"):format(lus,
-		metierLu and (" en " .. NomMetier(metierLu)) or "", tostring(GetTrainerServiceSkillLine ~= nil))
-	if PlanifierMaj then PlanifierMaj() end
-	C_Timer.After(1, function() lectureEntraineur = false end)
-end
-
--- Une recette est-elle apprise chez l'entraîneur ? (nil = liste de ce métier encore inconnue)
-local function DeLEntraineur(metier, code)
-	local t = Entraineur(metier)
-	if not t then return nil end
-	local id = tonumber(code:sub(2))
-	if code:sub(1, 1) == "i" and id and t.o[id] then return true end
-	local s = NomRecetteSimplifie(code)
-	if s and t.n[(s:gsub("[,~|]", ""))] then return true end
-	return false
-end
-
-local function RecevoirEntraineur(genre, reste)
-	if genre == "U" then
-		local code = reste
-		if not PAR_CODE[code] or not Entraineur(code) then return end
-		local demande = GetTime()
-		-- le premier qui a la liste répond ; les autres voient passer sa réponse et se taisent
-		C_Timer.After(1 + math.random() * 5, function()
-			if not (dernierT[code] and dernierT[code] >= demande) then DiffuserEntraineur(code) end
-		end)
-	elseif genre == "T" then
-		local code, part, total, mots = strsplit("~", reste)
-		part, total = tonumber(part), tonumber(total)
-		if not PAR_CODE[code] or not part or not total or part > total or total > 40 then return end
-		dernierT[code] = GetTime()
-		local t = Entraineur(code, true)
-		for mot in (mots or ""):gmatch("[^,]+") do
-			local g, v = mot:sub(1, 1), mot:sub(2)
-			if g == "i" then
-				local o = tonumber(v, 36)
-				if o then t.o[o] = true end
-			elseif g == "n" and v ~= "" then
-				t.n[v] = true
-			end
-		end
-		if PlanifierMaj then PlanifierMaj() end
-	end
-end
-
--- À la connexion : demande les listes d'entraîneur qui me manquent (une fois par session)
-local function DemanderEntraineurs()
-	for _, m in ipairs(METIERS) do
-		if not m.recolte and not Entraineur(m.code) then Envoyer("U~" .. m.code) end
-	end
 end
 
 local function Fiche(g, cle, nom)
@@ -865,9 +719,6 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	if genre == "C" or genre == "K" then
 		RecevoirCommande(genre, reste, cle, nom)
 
-	elseif genre == "T" or genre == "U" then
-		RecevoirEntraineur(genre, reste)
-
 	elseif genre == "Q" then
 		RepondreQ()
 
@@ -894,20 +745,6 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		end
 		for code in pairs(e.profs) do
 			if not vus[code] then e.profs[code] = nil end
-		end
-		if PlanifierMaj then PlanifierMaj() end
-
-	elseif genre == "P" then
-		local code, part, total, ids = strsplit("~", reste)
-		part, total = tonumber(part), tonumber(total)
-		if not PAR_CODE[code] or not part or not total or part > total or total > 20 then return end
-		local e = Fiche(g, cle, nom)
-		local p = e.profs[code]
-		if type(p) ~= "table" then p = { r = {} }; e.profs[code] = p end
-		if part == 1 or type(p.sp) ~= "table" then p.sp = {} end
-		for mot in (ids or ""):gmatch("[^,]+") do
-			local genreR, id = mot:sub(1, 1), tonumber(mot:sub(2), 36)
-			if id and (genreR == "s" or genreR == "i") then p.sp[genreR .. id] = true end
 		end
 		if PlanifierMaj then PlanifierMaj() end
 
@@ -1892,30 +1729,6 @@ ns.DiagMetiers = function(L)
 	end
 	L("  exemples de recettes : " .. (#ex > 0 and table.concat(ex, ", ") or "aucune"))
 	L("  dernière lecture de recettes : " .. (derniereLecture or "aucune (ouvre une fenêtre de métier)"))
-	do
-		local sp = {}
-		for code, pr in pairs(MesDonnees().profs) do
-			if type(pr) == "table" then
-				local n = 0
-				for _ in pairs(type(pr.sp) == "table" and pr.sp or {}) do n = n + 1 end
-				sp[#sp + 1] = code .. "=" .. (type(pr.sp) == "table" and n or "?")
-			end
-		end
-		L("  recettes spéciales (mes métiers) : " .. table.concat(sp, ", ") .. " ; GetRecipeSourceText="
-			.. tostring(C_TradeSkillUI and C_TradeSkillUI.GetRecipeSourceText ~= nil))
-		local ent = {}
-		for _, m in ipairs(METIERS) do
-			local t = Entraineur(m.code)
-			if t then
-				local a, b = 0, 0
-				for _ in pairs(t.o) do a = a + 1 end
-				for _ in pairs(t.n) do b = b + 1 end
-				ent[#ent + 1] = ("%s=%d+%d"):format(m.code, a, b)
-			end
-		end
-		L("  listes d'entraîneur : " .. (#ent > 0 and table.concat(ent, ", ") or "aucune (ouvre un maître de métier)")
-			.. " ; " .. (derniereLectureEntraineur or "pas de lecture cette session"))
-	end
 	local inconnus = {}
 	for _, m in ipairs(METIERS) do if not m.existe then inconnus[#inconnus + 1] = m.code end end
 	L("  métiers absents du jeu : " .. (#inconnus > 0 and table.concat(inconnus, " ") or "aucun"))
@@ -1947,7 +1760,7 @@ for _, nom in ipairs({
 	"PLAYER_ENTERING_WORLD", "CHAT_MSG_ADDON", "SKILL_LINES_CHANGED",
 	"TRADE_SKILL_SHOW", "TRADE_SKILL_UPDATE", "TRADE_SKILL_LIST_UPDATE",
 	"CRAFT_SHOW", "CRAFT_UPDATE", "GUILD_ROSTER_UPDATE", "PLAYER_GUILD_UPDATE",
-	"GET_ITEM_INFO_RECEIVED", "TRAINER_SHOW", "TRAINER_UPDATE",
+	"GET_ITEM_INFO_RECEIVED",
 }) do
 	pcall(ev.RegisterEvent, ev, nom) -- certains évènements n'existent pas selon la version du jeu
 end
@@ -1972,8 +1785,6 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 		Plus_tard("metier", 0.5, LireMetierOuvert)
 	elseif event == "CRAFT_SHOW" or event == "CRAFT_UPDATE" then
 		Plus_tard("craft", 0.5, LireArtisanatOuvert)
-	elseif event == "TRAINER_SHOW" or event == "TRAINER_UPDATE" then
-		if not lectureEntraineur then Plus_tard("entraineur", 0.5, LireEntraineur) end
 	elseif event == "SKILL_LINES_CHANGED" then
 		Plus_tard("niveaux", 2, LireNiveaux)
 	elseif event == "GUILD_ROSTER_UPDATE" or event == "PLAYER_GUILD_UPDATE" then
@@ -1997,7 +1808,8 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 			DemanderRoster()
 			EnvoyerResume()
 			Envoyer("Q")
-
 		end)
+		-- la liste de guilde a eu le temps d'arriver : on sait qui est encore membre
+		C_Timer.After(40, function() pcall(PurgerFiches) end)
 	end
 end)

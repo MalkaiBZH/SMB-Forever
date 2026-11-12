@@ -22,6 +22,24 @@ local function Propre(t) return strtrim(((t or ""):gsub("[~|,\n]", ""))) end
 -- Mes personnages (dans ma guilde actuelle)
 --------------------------------------------------------------------------------
 
+-- Purge à la connexion : identités sans nouvelles depuis 90 jours, mes personnages non connectés
+-- depuis un an (supprimés ou abandonnés)
+local function Purger()
+	local db = DB()
+	if not db then return end
+	local maintenant = time()
+	if type(db.identites) == "table" then
+		for cle, id in pairs(db.identites) do
+			if type(id) ~= "table" or maintenant - (id.maj or 0) > 90 * 86400 then db.identites[cle] = nil end
+		end
+	end
+	if type(db.mesPersos) == "table" then
+		for cle, p in pairs(db.mesPersos) do
+			if type(p) ~= "table" or maintenant - (p.vu or 0) > 365 * 86400 then db.mesPersos[cle] = nil end
+		end
+	end
+end
+
 local function NoterMonPerso()
 	local db = DB()
 	if not db then return end
@@ -279,6 +297,7 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 	elseif event == "PLAYER_ENTERING_WORLD" and premiere then
 		premiere = false
 		C_Timer.After(15, function()
+			pcall(Purger)
 			NoterMonPerso()
 			pret = true
 			EnvoyerMoi()
