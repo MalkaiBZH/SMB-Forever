@@ -45,6 +45,79 @@ local function ModeleVoulu(unit)
 	return MODELES.V2
 end
 
+--------------------------------------------------------------------------------
+-- Médaillons : portrait du joueur (race, classe, sexe) à la place de la mascotte de la bannière
+-- Fichiers : media/portraits/<race>-<classe>-<sexe>.tga (256 x 256, rond, fond transparent).
+-- Sans portrait pour cette combinaison (Horde, classe absente…) : la mascotte reste.
+--------------------------------------------------------------------------------
+
+-- portraits disponibles : [race] = { classes } (chacune en homme et en femme)
+local PORTRAITS_DISPONIBLES = {
+	["humain"] = { "chasseur", "demoniste", "guerrier", "mage", "paladin", "pretre", "voleur" },
+	["nain"] = { "chaman", "chasseur", "guerrier", "paladin", "pretre", "voleur" },
+	["elfe-de-la-nuit"] = { "chasseur", "druide", "guerrier", "pretre", "voleur" },
+	["gnome"] = { "demoniste", "guerrier", "mage", "pretre", "voleur" },
+	["skyborne"] = { "chasseur", "druide", "guerrier", "mage", "voleur" },
+}
+local PORTRAITS = {}
+for race, classes in pairs(PORTRAITS_DISPONIBLES) do
+	for _, classe in ipairs(classes) do
+		PORTRAITS[race .. "-" .. classe .. "-homme"] = true
+		PORTRAITS[race .. "-" .. classe .. "-femme"] = true
+	end
+end
+
+-- race du jeu (nom de fichier anglais de UnitRace) -> nom du portrait
+local RACES = { Human = "humain", Dwarf = "nain", NightElf = "elfe-de-la-nuit", Gnome = "gnome" }
+-- classe du jeu (UnitClass) -> nom du portrait
+local CLASSES = {
+	WARRIOR = "guerrier", PALADIN = "paladin", HUNTER = "chasseur", ROGUE = "voleur", PRIEST = "pretre",
+	SHAMAN = "chaman", MAGE = "mage", WARLOCK = "demoniste", DRUID = "druide",
+}
+
+-- race d'une unité ; la race propre à Forever (skyborne du Haut Ordre) est reconnue à son nom,
+-- quel que soit l'identifiant que lui donne le client
+local function RaceUnite(unit)
+	local ok, nom, fichier = pcall(UnitRace, unit)
+	if not ok then return nil end
+	local r = fichier and RACES[fichier]
+	if r then return r end
+	local texte = ((fichier or "") .. " " .. (nom or "")):lower()
+	if texte:find("sky", 1, true) then return "skyborne" end
+	-- noms localisés (au cas où le client ne donnerait pas l'identifiant anglais)
+	local simple = ns.Simplifier and ns.Simplifier(nom or "") or (nom or ""):lower()
+	if simple:find("humain", 1, true) then return "humain" end
+	if simple:find("nain", 1, true) then return "nain" end
+	if simple:find("elfe de la nuit", 1, true) then return "elfe-de-la-nuit" end
+	if simple:find("gnome", 1, true) then return "gnome" end
+end
+
+-- nom du portrait d'une unité (« nain-chaman-femme »), ou nil si le joueur n'en a pas
+local cachePortraits = {} -- [nom normalisé du joueur] = portrait (la race, la classe et le sexe ne changent pas)
+local function PortraitUnite(unit)
+	if not (unit and UnitExists(unit) and UnitIsPlayer(unit)) then return nil end
+	local cle = NomComplet(unit)
+	if cle and cachePortraits[cle] ~= nil then return cachePortraits[cle] or nil end
+	local race = RaceUnite(unit)
+	local _, fichierClasse = UnitClass(unit)
+	local classe = fichierClasse and CLASSES[fichierClasse]
+	local sexe = UnitSex and UnitSex(unit)
+	sexe = (sexe == 2 and "homme") or (sexe == 3 and "femme") or nil
+	local nom = race and classe and sexe and (race .. "-" .. classe .. "-" .. sexe) or nil
+	if nom and not PORTRAITS[nom] then nom = nil end
+	-- (inconnu si le jeu n'a pas encore les informations : on ne garde pas, on redemandera)
+	if cle and race and classe and sexe then cachePortraits[cle] = nom or false end
+	return nom
+end
+
+-- chemin du médaillon à afficher pour une unité, ou nil (réglage coupé, pas de portrait)
+local function MedaillonUnite(unit)
+	if db.medaillons == false then return nil end
+	local nom = PortraitUnite(unit)
+	return nom and (MEDIA .. "portraits\\" .. nom .. ".tga") or nil
+end
+ns.PortraitUnite = PortraitUnite
+
 -- image de la bannière d'un état (tank, heal, dps, horscombat) dans un modèle
 local function ImageBanniere(etat, m) return MEDIA .. "M_DC_Banner_" .. etat .. m.suffixe .. ".tga" end
 
@@ -68,7 +141,7 @@ local TEX_L, TEX_H = 512, 256
 local ORDRE = { "g", "a", "o", "b", "d" }
 
 local function CreerFond(parent, couche, sousCouche)
-	local f = {}
+	local f = { parent = parent, couche = couche, sousCouche = sousCouche }
 	for _, cle in ipairs(ORDRE) do
 		f[cle] = parent:CreateTexture(nil, couche, nil, sousCouche)
 	end
@@ -77,6 +150,7 @@ end
 
 local function Masquer(f)
 	for _, cle in ipairs(ORDRE) do f[cle]:Hide() end
+	if f.medaillon then f.medaillon:Hide() end
 	if f.lueur then for _, t in ipairs(f.lueur) do t:Hide() end end
 end
 
@@ -97,7 +171,8 @@ local function Degrade(tex, a1, a2) DegradeCouleur(tex, db.r, db.g, db.b, a1, a2
 -- d'une région : gauche = bord gauche + dxG, droite = bord droit + dxD, haut = bord haut + dyH,
 -- bas = bord bas + dyB. Uniquement des points d'ancrage (aucune mesure) : utilisable sur les
 -- barres de nom restreintes. hauteurInt = hauteur de cette zone (fixe l'échelle de l'image).
-local function PoserBanniere(f, image, region, dxG, dxD, dyH, dyB, hauteurInt, m)
+-- medaillon (facultatif) : portrait du joueur à la place de la mascotte (morceau gauche)
+local function PoserBanniere(f, image, region, dxG, dxD, dyH, dyB, hauteurInt, m, medaillon)
 	local k = hauteurInt / (m.INT_BAS - m.INT_HAUT)
 	local yHaut = dyH + (m.INT_HAUT - m.V_HAUT) * k
 	local yBas = dyB - (m.V_BAS - m.INT_BAS) * k
@@ -127,17 +202,42 @@ local function PoserBanniere(f, image, region, dxG, dxD, dyH, dyB, hauteurInt, m
 	o:SetPoint("BOTTOM", region, "BOTTOM", xO, yBas)
 	o:SetWidth(Largeur("o"))
 	-- parties unies : elles comblent l'espace restant de chaque côté de l'ornement
-	a:SetPoint("TOPLEFT", g, "TOPRIGHT", 0, 0)
-	a:SetPoint("BOTTOMRIGHT", o, "BOTTOMLEFT", 0, 0)
 	b:SetPoint("TOPLEFT", o, "TOPRIGHT", 0, 0)
 	b:SetPoint("BOTTOMRIGHT", d, "BOTTOMLEFT", 0, 0)
-
 	for _, cle in ipairs(ORDRE) do f[cle]:Show() end
+
+	if not medaillon then
+		a:SetPoint("TOPLEFT", g, "TOPRIGHT", 0, 0)
+		a:SetPoint("BOTTOMRIGHT", o, "BOTTOMLEFT", 0, 0)
+		if f.medaillon then f.medaillon:Hide() end
+		return
+	end
+	-- Médaillon : rond, de la hauteur de la bannière, collé à gauche de l'intérieur (il ne passe pas
+	-- sous le nom ni la barre de vie). La mascotte (morceau gauche) disparaît ; la barre unie
+	-- s'allonge jusqu'au centre du médaillon, qui cache son extrémité coupée.
+	local taille = (m.V_BAS - m.V_HAUT) * k
+	local yCentre = (yHaut + yBas) / 2
+	g:Hide()
+	a:SetPoint("TOPLEFT", region, "TOPLEFT", dxG - taille / 2, yHaut)
+	a:SetPoint("BOTTOMRIGHT", o, "BOTTOMLEFT", 0, 0)
+	if not f.medaillon then
+		-- juste au-dessus de la bannière, dans le même cadre
+		local couche, sous = f.couche or "BACKGROUND", (f.sousCouche or 0) + 1
+		if sous > 7 then couche, sous = "BORDER", -8 end
+		f.medaillon = f.parent:CreateTexture(nil, couche, nil, sous)
+	end
+	local t = f.medaillon
+	t:ClearAllPoints()
+	t:SetTexture(medaillon)
+	t:SetSize(taille, taille)
+	t:SetPoint("RIGHT", region, "LEFT", dxG, yCentre)
+	t:Show()
 end
 
 -- Dégradé (style alternatif) : deux moitiés a / b, le reste caché
 local function PoserDegrade(f, region, dxG, dxD, dyH, dyB, fortAuCentre)
 	for _, cle in ipairs(ORDRE) do f[cle]:ClearAllPoints(); f[cle]:Hide() end
+	if f.medaillon then f.medaillon:Hide() end
 	local a, b = f.a, f.b
 	a:SetPoint("BOTTOMLEFT", region, "BOTTOMLEFT", dxG, dyB)
 	a:SetPoint("TOPRIGHT", region, "TOP", 0, dyH)
@@ -160,13 +260,13 @@ local function Afficher(f, unit, region, mode)
 		if db.style == "degrade" then
 			PoserDegrade(f, region, -14, 14, 3, -3, true)
 		else
-			PoserBanniere(f, ImageBanniere(Etat(unit), m), region, -4, 4, 2, -2, region:GetHeight() + 4, m)
+			PoserBanniere(f, ImageBanniere(Etat(unit), m), region, -4, 4, 2, -2, region:GetHeight() + 4, m, MedaillonUnite(unit))
 		end
 	else
 		if db.style == "degrade" then
 			PoserDegrade(f, region, 0, 0, 0, 0, false)
 		else
-			PoserBanniere(f, ImageBanniere(Etat(unit), m), region, 0, 0, 0, 0, region:GetHeight(), m)
+			PoserBanniere(f, ImageBanniere(Etat(unit), m), region, 0, 0, 0, 0, region:GetHeight(), m, MedaillonUnite(unit))
 		end
 	end
 end
@@ -284,7 +384,7 @@ local function AfficherPlaque(f, unit, barre, tailleNom, niveauVisible)
 		PoserDegrade(f, barre, -margeX - 20, droite + 20, haut, bas, true)
 		return
 	end
-	PoserBanniere(f, ImageBanniere(Etat(unit), m), barre, -margeX, droite, haut, bas, hauteur, m)
+	PoserBanniere(f, ImageBanniere(Etat(unit), m), barre, -margeX, droite, haut, bas, hauteur, m, MedaillonUnite(unit))
 	LueurBanniere(f, unit, barre, -margeX, droite, haut, bas, hauteur, niveauVisible, m)
 end
 
