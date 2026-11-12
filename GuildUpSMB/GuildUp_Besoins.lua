@@ -9,10 +9,13 @@
 -- besoin de cette ressource » ajoutée aux infobulles d'objets du jeu.
 -- Interface (kit ns.UI) : ns.CreerPageBesoins(parent) fabrique le contenu de l'onglet (appelé par
 -- GuildUp_Echanges.lua, qui le rafraîchit) : carte « Mes besoins » (case où glisser un objet ou
--- recherche dans tous les objets du jeu, quantité ou « sans limite », Ajouter ; liste avec Retirer) et
--- carte « Besoins de la guilde » (ce que je sais fabriquer d'abord, Chuchoter). Fournit aussi aux
--- autres onglets ns.IconeObjet (icône bordée à la couleur de qualité), ns.InfobulleObjet,
--- ns.EcrireNomObjet et ns.NomMembreColore.
+-- recherche dans tous les objets du jeu, quantité ou « sans limite », Ajouter ; liste avec Retirer ;
+-- un besoin qu'un membre met en don affiche « donné par X » et un bouton Demander, le même que celui
+-- de l'onglet Dons : ns.DonneursParObjet et ns.DemanderDon de GuildUp_Echanges.lua) et carte « Besoins
+-- de la guilde » (ce que j'ai dans mes sacs ou ma banque, ns.ObjetDonnable, puis ce que je sais
+-- fabriquer d'abord, Chuchoter). Fournit aussi aux autres onglets ns.IconeObjet (icône bordée à la
+-- couleur de qualité), ns.InfobulleObjet, ns.EcrireNomObjet et ns.NomMembreColore, et aux dons
+-- ns.MonBesoin(objet) / ns.MesBesoinsListe() (croisement des dons et de mes besoins).
 
 local NOM_ADDON, ns = ...
 
@@ -115,6 +118,10 @@ end
 
 -- Pour la fiche encyclopédie du carnet
 ns.AjouterBesoin = function(objet, qte) return Ajouter(objet, qte) end
+-- Pour les dons (GuildUp_Echanges.lua) : quantité de mon besoin pour cet objet (0 = sans limite), nil
+-- si ce n'est pas un de mes besoins ; et toute la liste { [objet] = quantité } (ne pas la modifier)
+ns.MonBesoin = function(objet) return objet and MesBesoins()[objet] or nil end
+ns.MesBesoinsListe = function() return MesBesoins() end
 
 local function Retirer(objet)
 	MesBesoins()[objet] = nil
@@ -306,7 +313,7 @@ local C = UI.C
 local BLANC = "Interface\\Buttons\\WHITE8X8"
 local ICONE_INCONNUE = "Interface\\Icons\\INV_Misc_QuestionMark"
 local CASE_VIDE = "Interface\\PaperDoll\\UI-Backpack-EmptySlot"
-local VERT = "|cff6fd08c"
+local VERT, OR = "|cff6fd08c", "|cfff1cf6b"
 local MARGE = 16
 
 -- Icône d'objet dans un cadre bordé (2 pixels) à la couleur de sa qualité ; genre "Button" pour une
@@ -402,6 +409,55 @@ local function CreerLigne(parent, texteBouton, style, plus)
 	return r
 end
 
+-- Ligne de « Mes besoins » : Retirer, et Demander quand un membre donne l'objet (r.d.donneurs)
+local function InfobulleDemander(self)
+	local d = self:GetParent().d
+	local premier = d and d.donneurs and d.donneurs[1]
+	if not premier then return end
+	local nom = NomCourt(premier.e.nom)
+	GameTooltip:SetOwner(self, "ANCHOR_TOP")
+	if premier.demande then
+		GameTooltip:SetText("Déjà demandé")
+		GameTooltip:AddLine("Tu as déjà demandé ce don à " .. nom .. ". Tu peux le remercier depuis l'onglet Dons.", 1, 1, 1, true)
+	else
+		GameTooltip:SetText("Demander ce don à " .. nom)
+		GameTooltip:AddLine(premier.enLigne and ("Un message privé part vers " .. nom .. ".")
+			or (nom .. " est hors ligne : ta demande lui sera transmise dès que possible, par un membre de la guilde connecté avec SMB Forever, ou quand vous serez connectés en même temps."),
+			1, 1, 1, true)
+	end
+	if #d.donneurs > 1 then
+		local noms = {}
+		for i, x in ipairs(d.donneurs) do
+			noms[#noms + 1] = NomCourt(x.e.nom) .. (x.enLigne and (" " .. VERT .. "(en ligne)|r") or "")
+			if i >= 6 then break end
+		end
+		GameTooltip:AddLine("Donné par : " .. table.concat(noms, ", "), C.gris[1], C.gris[2], C.gris[3], true)
+	end
+	GameTooltip:Show()
+end
+
+local function CreerLigneMienne(parent)
+	local r = CreerLigne(parent, "Retirer", "fantome", function(self, bulle)
+		local premier = self.d and self.d.donneurs and self.d.donneurs[1]
+		if premier then
+			bulle:AddLine("Donné par " .. NomCourt(premier.e.nom) .. (#self.d.donneurs > 1 and (" et " .. (#self.d.donneurs - 1) .. " autre(s)") or ""),
+				C.vert[1], C.vert[2], C.vert[3])
+		end
+	end)
+	r.bouton:SetScript("OnClick", function() if r.d then Retirer(r.d.objet) end end)
+	r.demander = UI.Bouton(r, "Demander", "or", 80, 24)
+	r.demander:SetPoint("RIGHT", r.bouton, "LEFT", -6, 0)
+	if r.demander.SetMotionScriptsWhileDisabled then r.demander:SetMotionScriptsWhileDisabled(true) end
+	r.demander:SetScript("OnClick", function()
+		local premier = r.d and r.d.donneurs and r.d.donneurs[1]
+		if premier and not premier.demande and ns.DemanderDon then ns.DemanderDon(premier) end
+	end)
+	r.demander:SetScript("OnEnter", InfobulleDemander)
+	r.demander:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	r.demander:Hide()
+	return r
+end
+
 local function Remplir(r, objet)
 	local nom, _, qualite, icone = InfoObjet(objet)
 	if not nom then
@@ -442,27 +498,44 @@ local function MajPage()
 	if not page then return end
 	MajChoix()
 
-	-- mes besoins
+	-- mes besoins (ceux qu'un membre donne d'abord)
+	local donneurs = ns.DonneursParObjet and ns.DonneursParObjet() or {}
 	local liste = {}
 	for objet, qte in pairs(MesBesoins()) do
-		liste[#liste + 1] = { objet = objet, qte = qte, nom = (InfoObjet(objet)) or "" }
+		liste[#liste + 1] = { objet = objet, qte = qte, nom = (InfoObjet(objet)) or "", donneurs = donneurs[objet] or {} }
 	end
-	table.sort(liste, function(x, y) return x.nom < y.nom end)
+	table.sort(liste, function(x, y)
+		local dx, dy = #x.donneurs > 0, #y.donneurs > 0
+		if dx ~= dy then return dx end
+		return x.nom < y.nom
+	end)
 	local mes = page.mes
 	local y = 0
 	for i, d in ipairs(liste) do
 		local r = mes.lignes[i]
-		if not r then
-			r = CreerLigne(mes.liste.contenu, "Retirer", "fantome")
-			r.bouton:SetScript("OnClick", function() if r.d then Retirer(r.d.objet) end end)
-			mes.lignes[i] = r
-		end
+		if not r then r = CreerLigneMienne(mes.liste.contenu); mes.lignes[i] = r end
 		r.d = d
 		r:ClearAllPoints()
 		r:SetPoint("TOPLEFT", mes.liste.contenu, "TOPLEFT", 0, -y)
 		r:SetPoint("RIGHT", mes.liste.contenu, "RIGHT", 0, 0)
 		Remplir(r, d.objet)
-		r.sous:SetText(d.qte == 0 and "Quantité : sans limite" or ("Quantité : " .. d.qte))
+		-- donné par un membre : « donné par X » et Demander (au premier à qui je ne l'ai pas demandé)
+		local premier = d.donneurs[1]
+		if premier then
+			local autres = #d.donneurs - 1
+			r.sous:SetText(TexteQte(d.qte, true) .. " · " .. VERT .. "donné par " .. NomCourt(premier.e.nom)
+				.. (autres > 0 and (" +" .. autres) or "") .. "|r")
+			r.demander:Ecrire(premier.demande and "Demandé" or "Demander")
+			r.demander:Activer(not premier.demande)
+		else
+			r.sous:SetText(d.qte == 0 and "Quantité : sans limite" or ("Quantité : " .. d.qte))
+		end
+		r.demander:SetShown(premier ~= nil)
+		local droite = premier and r.demander or r.bouton
+		r.nom:SetPoint("RIGHT", droite, "LEFT", -8, 0)
+		r.sous:SetPoint("RIGHT", droite, "LEFT", -8, 0)
+		r:Fort(premier ~= nil)
+		if premier then r:SetBackdropBorderColor(C.vert[1], C.vert[2], C.vert[3], 0.55) end
 		r:Show()
 		y = y + HAUTEUR_LIGNE + ECART_LIGNE
 	end
@@ -471,7 +544,8 @@ local function MajPage()
 	mes.vide:SetShown(#liste == 0)
 	mes.compte:SetText(#liste .. " / " .. MAX_BESOINS)
 
-	-- besoins de la guilde : ce que je sais fabriquer d'abord, puis les membres en ligne
+	-- besoins de la guilde : ce que j'ai dans mes sacs ou ma banque (je peux le donner), puis ce que je
+	-- sais fabriquer, puis les membres en ligne
 	local g = Guilde() or {}
 	local tous = {}
 	local limite = Maintenant() - OUBLI
@@ -481,14 +555,17 @@ local function MajPage()
 		elseif DansLaGuilde(cle) and (TestSolo() or not cle:find("#test", 1, true)) then
 			local enLigne = ns.EnLigneMembre and ns.EnLigneMembre(cle) or false
 			for objet, qte in pairs(e.liste or {}) do
+				local jai, lieu, donne
+				if ns.ObjetDonnable then jai, lieu, donne = ns.ObjetDonnable(objet) end
+				local fabrique = ns.JeSaisFabriquer and ns.JeSaisFabriquer(objet) or false
 				tous[#tous + 1] = { cle = cle, e = e, objet = objet, qte = qte, enLigne = enLigne,
-					fabrique = ns.JeSaisFabriquer and ns.JeSaisFabriquer(objet) or false,
-					nomO = (InfoObjet(objet)) or "" }
+					fabrique = fabrique, jai = jai, lieu = lieu, donne = donne,
+					rang = jai and 1 or fabrique and 2 or 3, nomO = (InfoObjet(objet)) or "" }
 			end
 		end
 	end
 	table.sort(tous, function(a, b)
-		if a.fabrique ~= b.fabrique then return a.fabrique end
+		if a.rang ~= b.rang then return a.rang < b.rang end
 		if a.enLigne ~= b.enLigne then return a.enLigne end
 		if a.nomO ~= b.nomO then return a.nomO < b.nomO end
 		return (a.e.nom or "") < (b.e.nom or "")
@@ -499,6 +576,10 @@ local function MajPage()
 		local r = gu.lignes[i]
 		if not r then
 			r = CreerLigne(gu.liste.contenu, "Chuchoter", "or", function(self, bulle)
+				if self.d and self.d.jai then
+					bulle:AddLine(("Tu en as %d (%s)%s"):format(self.d.jai, self.d.lieu or "sacs",
+						self.d.donne and " : déjà dans tes dons" or " : tu peux le donner"), C.ors[1], C.ors[2], C.ors[3])
+				end
 				if self.d and self.d.fabrique then bulle:AddLine("Tu sais le fabriquer", C.vert[1], C.vert[2], C.vert[3]) end
 			end)
 			r.bouton:SetScript("OnClick", function() if r.d then UI.Chuchoter(r.d.cle, r.d.e.nom) end end)
@@ -510,10 +591,11 @@ local function MajPage()
 		r:SetPoint("RIGHT", gu.liste.contenu, "RIGHT", 0, 0)
 		Remplir(r, d.objet)
 		local etat = d.enLigne and (VERT .. "en ligne|r") or ("hors ligne · il y a " .. Depuis(d.e.vu))
-		r.sous:SetText(("%s%s · %s%s"):format(NomMembreColore(d.cle, d.e.nom), TexteQte(d.qte) and (" (" .. TexteQte(d.qte) .. ")") or "",
-			etat, d.fabrique and (" · " .. VERT .. "tu sais le fabriquer|r") or ""))
+		r.sous:SetText(("%s%s · %s%s%s"):format(NomMembreColore(d.cle, d.e.nom), TexteQte(d.qte) and (" (" .. TexteQte(d.qte) .. ")") or "",
+			etat, d.jai and (" · " .. OR .. "tu en as " .. d.jai .. "|r") or "",
+			d.fabrique and (" · " .. VERT .. "tu sais le fabriquer|r") or ""))
 		r.bouton:Activer(d.enLigne)
-		r:Fort(d.fabrique)
+		r:Fort(d.fabrique or d.jai ~= nil)
 		r:Show()
 		y = y + HAUTEUR_LIGNE + ECART_LIGNE
 	end
@@ -678,7 +760,7 @@ ns.CreerPageBesoins = function(parent)
 	aide:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -56)
 	aide:SetPoint("RIGHT", p, "RIGHT", -MARGE, 0)
 	aide:SetWordWrap(true)
-	aide:SetText("Liste les objets dont tu as besoin : la guilde les voit, même quand tu es hors ligne. Ceux qui savent les fabriquer sont prévenus.")
+	aide:SetText("Liste les objets dont tu as besoin : la guilde les voit, même quand tu es hors ligne. Ceux qui savent les fabriquer sont prévenus, et toi quand un membre en met un en don.")
 
 	-- gauche : mes besoins (zone d'ajout puis liste)
 	local mes = UI.Carte(p, "Mes besoins")

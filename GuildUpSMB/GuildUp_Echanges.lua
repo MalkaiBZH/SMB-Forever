@@ -21,6 +21,13 @@
 -- Les listes sont gardées (GuildUpDB) : visibles même quand le donneur est hors ligne.
 -- Plans : bulle tout de suite pour ceux qui ont le métier au niveau requis, 10 s plus tard pour
 -- ceux qui ont le métier sans le niveau, rien pour les autres ni si la recette est déjà apprise.
+-- Dons et besoins croisés (mes besoins : ns.MonBesoin de GuildUp_Besoins.lua) : bulle « X donne <objet> :
+-- il est dans tes besoins » quand un don nouveau correspond à un de mes besoins (pas pendant le calme de
+-- connexion : le récapitulatif les compte ; une seule bulle par donneur et par objet, gardée dans
+-- db.donsSignales et oubliée quand le don disparaît) ; dans l'onglet Dons, ces dons portent la marque
+-- « Dans tes besoins », passent en tête et ont leur filtre (case « Mes besoins »). Pour l'onglet Besoins :
+-- ns.DonneursParObjet() (qui donne quoi), ns.DemanderDon(d) (même demande que le bouton Demander) et
+-- ns.ObjetDonnable(objet) (ce que j'ai dans mes sacs et ma banque, non lié).
 
 local NOM_ADDON, ns = ...
 
@@ -66,12 +73,15 @@ local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg
 local Erreur = ns.Erreur
 local PoserAtlas = ns.PoserAtlas
 local Simplifier = ns.Simplifier
+-- quantité de mon besoin pour cet objet (0 = sans limite), nil si ce n'est pas un de mes besoins
+local function MonBesoin(objet) return ns.MonBesoin and ns.MonBesoin(objet) or nil end
 
 --------------------------------------------------------------------------------
 -- Données
 --   db.donsPerso[perso][objet] = quantité          ce que je donne, par personnage (voir Dons())
 --   db.donsBanque[perso] = { [objet] = nombre }    objets échangeables de ma banque (dernière visite)
 --   db.echanges[guilde][cle] = { nom, vu, liste = { [objet] = { q, c, n } } }
+--   db.donsSignales[perso][cle .. ":" .. objet] = quand   dons déjà signalés « dans tes besoins »
 --------------------------------------------------------------------------------
 
 local function DB() return ns.DB and ns.DB() or {} end
@@ -104,6 +114,15 @@ local function Guilde()
 	if type(db.echanges) ~= "table" then db.echanges = {} end
 	if type(db.echanges[nom]) ~= "table" then db.echanges[nom] = {} end
 	return db.echanges[nom]
+end
+-- Dons déjà signalés par une bulle « dans tes besoins », par personnage (une seule bulle par donneur
+-- et par objet, même si sa liste repasse) ; un don qui disparaît de la liste de son donneur est oublié
+local function Signales()
+	local db = DB()
+	if type(db.donsSignales) ~= "table" then db.donsSignales = {} end
+	local moi = MaCle()
+	if type(db.donsSignales[moi]) ~= "table" then db.donsSignales[moi] = {} end
+	return db.donsSignales[moi]
 end
 
 -- ici : nom, lien, qualité, niveau minimum, icône
@@ -299,6 +318,16 @@ local function AlerteDon(cle, nom, objet, d)
 		TexteMetier(d.c, d.n)), nil, function() if ns.OuvrirEchanges then ns.OuvrirEchanges(2, DONS) end end)
 end
 
+-- Un membre donne un objet de mes besoins : bulle ; clic = onglet Dons, recherche sur cet objet
+local function AlerteBesoin(qui, nom, objet)
+	local g = Guilde()
+	if not (g and g[qui] and g[qui].liste and g[qui].liste[objet]) or not ns.Notifier then return end -- retiré entre-temps
+	if MonBesoin(objet) == nil then return end
+	local nomO, lien = InfoObjet(objet)
+	ns.Notifier("plans", "Dans tes besoins", ("%s donne %s : il est dans tes besoins"):format(NomCourt(nom),
+		lien or nomO or ("l'objet " .. objet)), nil, function() if ns.OuvrirEchanges then ns.OuvrirEchanges(1, DONS, objet) end end)
+end
+
 local reassembleur = ns.Reassembleur(30) -- listes de dons en cours de réception
 -- Mes demandes de dons (gardées 30 jours) : db.mesDemandesDons[perso][cle .. objet] = { quand, merci }
 local function MesDemandes()
@@ -459,6 +488,16 @@ local function PurgerAnciennes()
 			end
 		end
 	end
+	if type(db.donsSignales) == "table" then
+		for perso, t in pairs(db.donsSignales) do
+			if type(t) == "table" then
+				for k, quand in pairs(t) do
+					if type(quand) ~= "number" or quand < limite then t[k] = nil end
+				end
+			end
+			if type(t) ~= "table" or not next(t) then db.donsSignales[perso] = nil end
+		end
+	end
 	if type(db.relaisDons) == "table" then
 		local limiteR = Maintenant() - GARDE_RELAIS
 		for nomG, r in pairs(db.relaisDons) do
@@ -585,10 +624,29 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		if e and (e.maj or e.vu or 0) > date then return end
 		local ancienne = e and e.liste or {}
 		g[qui] = { nom = (genre == "L") and nom or (e and e.nom) or qui, vu = date, maj = date, liste = liste }
+		local nomQui = g[qui].nom
+		-- dons retirés de cette liste : leurs signalements « dans tes besoins » sont oubliés
+		local signales = Signales()
+		for k in pairs(signales) do
+			local q, o = k:match("^(.*):(%d+)$")
+			if q == qui and not liste[tonumber(o)] then signales[k] = nil end
+		end
+		local calme = GetTime() - debut <= CALME
+		-- (liste relayée : seulement pour un membre encore dans la guilde)
+		local membre = genre == "L" or not (ns.MembreGuilde and ns.MembreGuilde(qui) == false)
 		for objet, d in pairs(liste) do
 			Precharger(objet)
+			local cleS = qui .. ":" .. objet
+			-- nouveau don d'un objet de mes besoins : une bulle, une seule fois par donneur et par objet
+			-- (pas pendant le calme de connexion : le récapitulatif les compte)
+			-- (un plan de mes besoins n'a que cette bulle-là)
+			if MonBesoin(objet) ~= nil then
+				if not ancienne[objet] and not calme and membre and not signales[cleS] then
+					signales[cleS] = Maintenant()
+					C_Timer.After(1, function() AlerteBesoin(qui, nomQui, objet) end)
+				end
 			-- nouveau plan proposé : bulle selon mon métier (pas pendant le calme de connexion)
-			if genre == "L" and not ancienne[objet] and d.c and GetTime() - debut > CALME then
+			elseif genre == "L" and not ancienne[objet] and d.c and not calme then
 				local place = MaPlace(d.c, d.n)
 				if place == "ok" then
 					C_Timer.After(1, function() AlerteDon(cle, nom, objet, d) end)
@@ -710,8 +768,10 @@ local function DansLaGuilde(cle)
 	return true
 end
 
--- Tous les dons de la guilde (hors les miens), filtrés par catégorie et recherche
+-- Tous les dons de la guilde (hors les miens), filtrés par catégorie et recherche (et, case « Mes
+-- besoins » cochée, seulement les objets de mes besoins)
 local categorie, recherche = 1, ""
+local filtreBesoins = false
 -- L'objet (classe donnée) entre-t-il dans cette catégorie ?
 local function Classee(cat, classe)
 	if cat.autres then return not CLASSES_RANGEES[classe or -1] end
@@ -748,8 +808,10 @@ local function DonsGuilde()
 			for objet, d in pairs(e.liste or {}) do
 				local classe, _, iconeI, sousType = ClasseObjet(objet)
 				local nomO, _, qualite, niveau, icone = InfoObjet(objet)
-				local trouve = recherche == "" or Simplifier(nomO):find(recherche, 1, true) ~= nil
-				-- compteurs des catégories (avec la recherche en cours)
+				local besoin = MonBesoin(objet)
+				local trouve = (recherche == "" or Simplifier(nomO):find(recherche, 1, true) ~= nil)
+					and (not filtreBesoins or besoin ~= nil)
+				-- compteurs des catégories (avec la recherche et le filtre en cours)
 				if trouve then
 					for i, c in ipairs(CATEGORIES) do
 						if Classee(c, classe) then comptes[i] = (comptes[i] or 0) + 1 end
@@ -758,13 +820,17 @@ local function DonsGuilde()
 				if trouve and Classee(cat, classe) then
 					res[#res + 1] = { cle = cle, e = e, objet = objet, d = d, enLigne = enLigne, nomO = nomO or "",
 						qualite = qualite, niveau = niveau, icone = icone or iconeI, classe = classe, sousType = sousType,
-						place = d.c and MaPlace(d.c, d.n) or nil }
+						place = d.c and MaPlace(d.c, d.n) or nil, besoin = besoin }
 				end
 			end
 		end
 	end
+	-- d'abord ce qui est dans mes besoins (je l'ai demandé moi-même), puis les plans que je peux
+	-- apprendre, puis ceux qu'il me manque le niveau pour apprendre ; ensuite les donneurs en ligne
 	local rangPlace = { ok = 1, bas = 2 }
 	table.sort(res, function(a, b)
+		local ba, bb = a.besoin ~= nil, b.besoin ~= nil
+		if ba ~= bb then return ba end
 		local pa, pb = rangPlace[a.place or ""] or 3, rangPlace[b.place or ""] or 3
 		if pa ~= pb then return pa < pb end
 		if a.enLigne ~= b.enLigne then return a.enLigne end
@@ -782,6 +848,45 @@ local function NombreDons()
 	return n
 end
 
+-- Dons de la guilde qui sont dans mes besoins (case « Mes besoins » de l'onglet Dons)
+local function NombreDonsBesoins()
+	local n = 0
+	local limite = Maintenant() - OUBLI
+	for cle, e in pairs(Guilde() or {}) do
+		if type(e) == "table" and (e.vu or 0) >= limite and DansLaGuilde(cle) then
+			for objet in pairs(e.liste or {}) do if MonBesoin(objet) ~= nil then n = n + 1 end end
+		end
+	end
+	return n
+end
+
+-- Pour l'onglet « Besoins » : qui donne quoi, { [objet] = { { cle, e, objet, d, enLigne, demande }, … } },
+-- pour chaque objet les donneurs à qui je ne l'ai pas encore demandé d'abord, puis ceux en ligne
+ns.DonneursParObjet = function()
+	local res = {}
+	local limite = Maintenant() - OUBLI
+	for cle, e in pairs(Guilde() or {}) do
+		if type(e) == "table" and (e.vu or 0) >= limite and DansLaGuilde(cle) then
+			local enLigne = ns.EnLigneMembre and ns.EnLigneMembre(cle) or false
+			for objet, d in pairs(e.liste or {}) do
+				res[objet] = res[objet] or {}
+				table.insert(res[objet], { cle = cle, e = e, objet = objet, d = d, enLigne = enLigne,
+					demande = mesDemandes[cle .. objet] ~= nil })
+			end
+		end
+	end
+	for _, l in pairs(res) do
+		table.sort(l, function(a, b)
+			if a.demande ~= b.demande then return b.demande end
+			if a.enLigne ~= b.enLigne then return a.enLigne end
+			return (a.e.nom or "") < (b.e.nom or "")
+		end)
+	end
+	return res
+end
+-- Demande un don (d : une entrée de ns.DonneursParObjet) : comme le bouton « Demander » de l'onglet Dons
+ns.DemanderDon = function(d) if d and d.cle and d.objet and d.e then Demander(d) end end
+
 --------------------------------------------------------------------------------
 -- Mes dons : ajout, retrait
 --------------------------------------------------------------------------------
@@ -795,6 +900,13 @@ local function QteDonnee(objet)
 	return o.nombre
 end
 ns.QteDonnee = QteDonnee
+-- Pour les besoins de la guilde : nombre de cet objet dans mes sacs et ma banque (non lié, dernière
+-- lecture), son lieu, et s'il est déjà dans mes dons ; nil si je n'en ai pas
+ns.ObjetDonnable = function(objet)
+	local o = objet and mesObjets[objet]
+	if not o then return nil end
+	return o.nombre, o.lieu, Dons()[objet] ~= nil
+end
 
 local function AjouterDon(objet, qte)
 	if not objet then Erreur("Choisis d'abord un objet (glisse-le dans la case)"); return false end
@@ -964,7 +1076,25 @@ local function CreerRangeeDon(parent)
 	r.sous = UI.Texte(r, "GameFontHighlightSmall", C.gris)
 	r.sous:SetPoint("BOTTOMLEFT", r.icone, "BOTTOMRIGHT", 12, 2)
 	r.sous:SetPoint("RIGHT", r.qte, "LEFT", -10, 0)
-	InfobulleObjet(r)
+	-- don qui est dans mes besoins : trait vert à gauche et étiquette « Dans tes besoins » sur la ligne du nom
+	r.marque = r:CreateTexture(nil, "OVERLAY")
+	r.marque:SetColorTexture(C.vert[1], C.vert[2], C.vert[3], 0.9)
+	r.marque:SetPoint("TOPLEFT", r, "TOPLEFT", 1, -1)
+	r.marque:SetPoint("BOTTOMLEFT", r, "BOTTOMLEFT", 1, 1)
+	r.marque:SetWidth(3)
+	r.etiquette = UI.Cadre(r, { 0.09, 0.2, 0.12, 1 }, { C.vert[1], C.vert[2], C.vert[3], 0.8 })
+	r.etiquette.texte = UI.Texte(r.etiquette, "GameFontHighlightSmall", C.vert)
+	r.etiquette.texte:SetPoint("CENTER", 0, 0)
+	r.etiquette.texte:SetText("Dans tes besoins")
+	r.etiquette:SetSize(r.etiquette.texte:GetStringWidth() + 14, 16)
+	r.etiquette:SetPoint("BOTTOMRIGHT", r.qte, "LEFT", -8, 2)
+	InfobulleObjet(r, function(self, bulle)
+		local besoin = self.d and self.d.besoin
+		if besoin then
+			bulle:AddLine("Dans tes besoins" .. (besoin == 0 and " (sans limite)" or (" (x" .. besoin .. ")")),
+				C.vert[1], C.vert[2], C.vert[3])
+		end
+	end)
 	return r
 end
 
@@ -990,7 +1120,12 @@ local function MajRangeeDon(r, d)
 		r.merci:Ecrire(demande.merci and "Remercié" or "Merci !")
 		r.merci:Activer(not demande.merci)
 	end
+	local besoin = d.besoin ~= nil
+	r.marque:SetShown(besoin)
+	r.etiquette:SetShown(besoin)
+	r.nom:SetPoint("RIGHT", besoin and r.etiquette or r.qte, "LEFT", besoin and -6 or -10, 0)
 	r:Fort(d.place == "ok")
+	if besoin then r:SetBackdropBorderColor(C.vert[1], C.vert[2], C.vert[3], 0.55) end
 end
 
 local function CreerOngletDons(parent)
@@ -1011,9 +1146,18 @@ local function CreerOngletDons(parent)
 		p.liste:Haut()
 		p.Maj()
 	end
+	-- case « Mes besoins » : seulement les dons qui sont dans mes besoins (onglet Besoins)
+	p.filtre = UI.Case(p, "Mes besoins", function(oui)
+		filtreBesoins = oui
+		p.liste:Haut()
+		p.Maj()
+	end)
+	p.filtre:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -90)
+	UI.Infobulle(p.filtre, "Mes besoins", "Ne montrer que les dons des objets que tu as listés dans l'onglet Besoins.")
 	local aide = UI.Texte(p, "GameFontHighlightSmall", C.gris)
 	aide:SetPoint("TOPLEFT", p, "TOPLEFT", X_DROITE + 2, -94)
-	aide:SetText("Les plans que tu peux apprendre passent en premier.")
+	aide:SetPoint("RIGHT", p.filtre, "LEFT", -10, 0)
+	aide:SetText("Ce qui est dans tes besoins passe en premier, puis les plans que tu peux apprendre.")
 	p.liste = UI.Liste(p)
 	p.liste:SetPoint("TOPLEFT", p, "TOPLEFT", X_DROITE, -112)
 	p.liste:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE + 6, 12)
@@ -1022,6 +1166,11 @@ local function CreerOngletDons(parent)
 	p.Maj = function()
 		local liste = DonsGuilde()
 		p.cats:Poser(categorie, comptes)
+		-- case « Mes besoins (n) » : son texte suit le nombre de dons qui y correspondent
+		local nB = NombreDonsBesoins()
+		p.filtre.texte:SetText("Mes besoins" .. (nB > 0 and (" " .. VERT .. "(" .. nB .. ")|r") or ""))
+		p.filtre:SetWidth(24 + p.filtre.texte:GetStringWidth())
+		p.filtre:Poser(filtreBesoins)
 		for i, d in ipairs(liste) do
 			local r = p.lignes[i]
 			if not r then r = CreerRangeeDon(p.liste.contenu); p.lignes[i] = r end
@@ -1029,7 +1178,10 @@ local function CreerOngletDons(parent)
 		end
 		Empiler(p.liste, p.lignes, #liste, HAUTEUR_DON + ECART)
 		p.vide:SetShown(#liste == 0)
+		local aucunBesoin = not (ns.MesBesoinsListe and next(ns.MesBesoinsListe()))
 		p.vide:SetText(recherche ~= "" and "Aucun don ne correspond à ta recherche."
+			or (filtreBesoins and aucunBesoin) and "Tu n'as listé aucun besoin : ajoute-les dans l'onglet Besoins."
+			or (filtreBesoins and nB == 0) and "Personne ne donne pour l'instant un objet de tes besoins."
 			or categorie > 1 and "Aucun don dans cette catégorie." or "Personne ne donne rien pour l'instant.")
 	end
 	return p
@@ -1366,9 +1518,25 @@ local function CreerPage(parent)
 		local sp = p.pages[p.onglet]
 		if sp and sp.Maj then sp.Maj() end
 	end
-	-- ns.OuvrirInterface("dons", onglet, catégorie)
-	p.Ouvrir = function(onglet, cat)
+	-- ns.OuvrirInterface("dons", onglet, catégorie, objet) ; objet : recherche sur ce nom d'objet (filtre
+	-- « Mes besoins » si son nom n'est pas encore connu), ou "besoins" : filtre « Mes besoins » seul
+	p.Ouvrir = function(onglet, cat, objet)
 		if cat and CATEGORIES[cat] then categorie = cat end
+		local dons = p.pages[DONS]
+		if objet == "besoins" then
+			filtreBesoins = true
+			recherche = ""
+			dons.champ:Ecrire("")
+		elseif type(objet) == "number" then
+			local nom = InfoObjet(objet) or (ns.NomObjetListe and ns.NomObjetListe(objet))
+			if nom then
+				recherche = Simplifier(nom)
+				dons.champ:Ecrire(nom)
+			else
+				filtreBesoins = true
+			end
+		end
+		if objet then dons.liste:Haut() end
 		Choisir(onglet or DONS)
 	end
 	p:SetScript("OnShow", function() if p.onglet == DEMANDES then PrevoirVues() end end)
@@ -1381,12 +1549,13 @@ if ns.AjouterPage then ns.AjouterPage("dons", CreerPage) end
 -- Ouverture (volet, bulles, accueil, /smb)
 --------------------------------------------------------------------------------
 
--- ns.OuvrirEchanges(catégorie, onglet) : ouvre la page « Dons » sur un onglet (1 Dons, 2 Mes dons,
--- 3 Demandes, 4 Besoins ; défaut : Dons) et une catégorie des dons (indice dans CATEGORIES, 2 = Recettes)
-ns.OuvrirEchanges = function(cat, onglet)
+-- ns.OuvrirEchanges(catégorie, onglet, objet) : ouvre la page « Dons » sur un onglet (1 Dons, 2 Mes dons,
+-- 3 Demandes, 4 Besoins ; défaut : Dons) et une catégorie des dons (indice dans CATEGORIES, 2 = Recettes) ;
+-- objet (facultatif) : recherche sur cet objet dans les dons, ou "besoins" pour le filtre « Mes besoins »
+ns.OuvrirEchanges = function(cat, onglet, objet)
 	-- qui est en ligne : la liste de guilde n'est sinon relue qu'à la connexion
 	if ns.DemanderRoster then ns.DemanderRoster() end
-	if ns.OuvrirInterface then ns.OuvrirInterface("dons", onglet or DONS, cat) end
+	if ns.OuvrirInterface then ns.OuvrirInterface("dons", onglet or DONS, cat, objet) end
 	LireMesObjets()
 end
 -- Bouton « Dons » du volet : ferme la fenêtre si elle montre déjà la page « Dons », sinon l'ouvre
@@ -1434,21 +1603,31 @@ end
 RecapConnexion = function()
 	if not photo or not ns.Notifier or not IsInGuild() then return end
 	local morceaux = {}
-	-- nouveaux dons (et plans que je peux apprendre)
-	local nDons, nPlans = 0, 0
+	-- nouveaux dons (et plans que je peux apprendre, objets de mes besoins : ceux-là sont notés comme
+	-- signalés, ils n'auront pas de bulle à eux)
+	local nDons, nPlans, nPourMoi = 0, 0, 0
+	local signales = Signales()
 	for qui, e in pairs(Guilde() or {}) do
 		if type(e) == "table" then
 			for o, d in pairs(e.liste or {}) do
 				if not photo.dons[qui .. ":" .. o] then
 					nDons = nDons + 1
-					if d.c and MaPlace(d.c, d.n) == "ok" and not DejaConnu(o) then nPlans = nPlans + 1 end
+					if MonBesoin(o) ~= nil and DansLaGuilde(qui) then
+						nPourMoi = nPourMoi + 1
+						signales[qui .. ":" .. o] = signales[qui .. ":" .. o] or Maintenant()
+					elseif d.c and MaPlace(d.c, d.n) == "ok" and not DejaConnu(o) then
+						nPlans = nPlans + 1
+					end
 				end
 			end
 		end
 	end
 	if nDons > 0 then
+		local pour = {}
+		if nPourMoi > 0 then pour[#pour + 1] = ("%d dans tes besoins"):format(nPourMoi) end
+		if nPlans > 0 then pour[#pour + 1] = ("%d plan%s pour toi"):format(nPlans, nPlans > 1 and "s" or "") end
 		morceaux[#morceaux + 1] = ("%d nouveau%s don%s%s"):format(nDons, nDons > 1 and "x" or "", nDons > 1 and "s" or "",
-			nPlans > 0 and (" (|cff33dd55%d plan%s pour toi|r)"):format(nPlans, nPlans > 1 and "s" or "") or "")
+			#pour > 0 and (" (|cff33dd55" .. table.concat(pour, ", ") .. "|r)") or "")
 	end
 	-- nouveaux besoins que je sais fabriquer
 	local nBesoins = 0
@@ -1470,6 +1649,8 @@ RecapConnexion = function()
 	ns.Notifier(nil, "Pendant ton absence", table.concat(morceaux, " · "), nil, function()
 		if nDem > 0 then
 			if ns.OuvrirEchanges then ns.OuvrirEchanges(nil, DEMANDES) end
+		elseif nPourMoi > 0 then
+			if ns.OuvrirEchanges then ns.OuvrirEchanges(1, DONS, "besoins") end
 		elseif nPlans > 0 then
 			if ns.OuvrirEchanges then ns.OuvrirEchanges(2, DONS) end
 		elseif nDons > 0 then

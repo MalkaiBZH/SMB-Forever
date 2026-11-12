@@ -91,8 +91,11 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.9.0"] = {
+		"|cffffd100Dons × Besoins|r : une bulle quand un membre donne un objet de tes besoins ; marque « Dans tes besoins », tri en tête et filtre « Mes besoins » dans les Dons ; « donné par X » et bouton Demander dans tes besoins ; « tu en as N » sur les besoins de la guilde que tu peux donner.",
+	},
 	["2.8.0"] = {
 		"|cffffd100Artisanat > Items|r : un clic sur un objet l'affiche à droite avec |cffffd100les membres de la guilde qui savent le fabriquer|r (en ligne d'abord, avec leur métier et leur niveau) : clic pour chuchoter, « Commander » pour lui demander. Les boutons Ajouter, Besoin et Encyclopédie sont dans ce panneau.",
 	},
