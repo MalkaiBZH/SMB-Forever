@@ -458,6 +458,7 @@ end
 --------------------------------------------------------------------------------
 
 local dernierEnvoi, derniereSignature = 0, nil
+local rediffusionPrevue = false
 
 local function SignatureComposition()
 	if not monAnnonce then return "" end
@@ -695,7 +696,14 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		end
 
 	elseif type_ == "Q" then
-		if monAnnonce then C_Timer.After(math.random() * 4, DiffuserMonAnnonce) end
+		-- au plus une rediffusion toutes les 5 s, quel que soit le nombre de « Q »
+		if monAnnonce and GetTime() - dernierEnvoi > 5 and not rediffusionPrevue then
+			rediffusionPrevue = true
+			C_Timer.After(math.random() * 4, function()
+				rediffusionPrevue = false
+				DiffuserMonAnnonce()
+			end)
+		end
 
 	elseif type_ == "P" then
 		if not monAnnonce or p[2] ~= monAnnonce.id then return end
@@ -1231,7 +1239,14 @@ local function CreerPageParcourir(f, AllerVersMonGroupe)
 	-- bande du bas
 	local actualiser = NouveauBouton(p, "Actualiser", 111, 28)
 	actualiser:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 21, 16)
+	local dernierQ = 0
 	actualiser:SetScript("OnClick", function()
+		-- au plus une demande toutes les 10 s
+		if GetTime() - dernierQ < 10 then
+			if Rafraichir then Rafraichir() end
+			return
+		end
+		dernierQ = GetTime()
 		Envoyer("Q", "GUILD")
 	end)
 	local creer = NouveauBouton(p, "Créer un groupe", 130, 28)

@@ -148,9 +148,12 @@ local function Relayer(pour)
 	C_Timer.After(3 + math.random() * 7, function()
 		local g = Guilde()
 		if not g then return end
+		-- un seul relais pour toute la guilde
+		if ns.EstLeRelais and not ns.EstLeRelais(pour) then return end
 		for cle, e in pairs(g) do
 			if type(e) == "table" and cle ~= pour and not cle:find("#test", 1, true)
 				and (e.vu or 0) >= Maintenant() - OUBLI and not (ns.MembreGuilde and ns.MembreGuilde(cle) == false)
+				and not (ns.EnLigneMembre and ns.EnLigneMembre(cle)) -- connecté : il répond lui-même
 				and not (relayees[cle] and GetTime() - relayees[cle] < 30) then
 				local mots = {}
 				for objet, qte in pairs(e.liste or {}) do mots[#mots + 1] = B36(objet) .. ":" .. qte end
@@ -171,7 +174,8 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	local genre, reste = msg:match("^(%a)~?(.*)$")
 	if genre == "Q" then
 		if pret then
-			C_Timer.After(1 + math.random() * 4, EnvoyerMaListe)
+			-- liste vide : rien à dire (une liste vidée part tout de suite, à la modification)
+			if next(MesBesoins()) then C_Timer.After(1 + math.random() * 4, EnvoyerMaListe) end
 			Relayer(cle) -- il vient de se connecter : les listes des absents lui partent aussi
 		end
 	elseif genre == "B" then

@@ -209,9 +209,26 @@ local function EnvoyerTache(p, objet, relais)
 		Envoyer(("T~%s~%d~%s~%d~%d%s"):format(p.id, objet, t.qui or "", t.etat or LIBRE, t.maj or 0, relais and "~r" or ""))
 	end
 end
+-- Relais : toutes les tâches du projet en lot (« U~id~objet:qui:état:date,… », par morceaux), sans
+-- les tâches faites depuis plus de 7 jours
+local function EnvoyerTachesEnLot(p)
+	local mots, limite = {}, Maintenant() - 7 * 86400
+	for objet, t in pairs(p.taches) do
+		if not (t.etat == FAITE and (t.maj or 0) < limite) then
+			mots[#mots + 1] = ("%d:%s:%d:%d"):format(objet, t.qui or "", t.etat or LIBRE, t.maj or 0)
+		end
+	end
+	if #mots == 0 then return end
+	for _, m in ipairs(ns.Morceaux(mots, TAILLE_MORCEAU)) do Envoyer(("U~%s~%s"):format(p.id, m)) end
+end
 local function EnvoyerTout(p, relais)
 	EnvoyerProjet(p, relais)
-	if not p.supprime then for objet in pairs(p.taches) do EnvoyerTache(p, objet, relais) end end
+	if p.supprime then return end
+	if relais then
+		EnvoyerTachesEnLot(p)
+	else
+		for objet in pairs(p.taches) do EnvoyerTache(p, objet) end
+	end
 end
 
 --------------------------------------------------------------------------------
@@ -290,6 +307,37 @@ local function Alerte(texte, id)
 	end
 end
 
+-- Une tâche reçue (message T direct ou relais, ou une ligne d'un lot U)
+local function AppliquerTache(cle, id, objet, qui, etat, maj, estRelais)
+	if not (objet and etat and maj) or etat > FAITE or maj > Maintenant() + 3600 then return end
+	local nouv = { qui = qui ~= "" and qui or nil, etat = etat, maj = maj }
+	local p = Projet(id)
+	if not (p and p.nom) then
+		-- projet pas encore reçu : la tâche attend (sans créer de coquille)
+		if p and p.supprime then return end
+		orphelines[id] = orphelines[id] or {}
+		if Gagne(nouv, orphelines[id][objet]) then orphelines[id][objet] = nouv end
+		return
+	end
+	local t = p.taches[objet]
+	-- envoi direct : prendre ou finir une tâche pour soi, libérer la sienne ; l'auteur du projet
+	-- peut tout (les relais renvoient l'état connu d'un absent)
+	if not estRelais and cle ~= p.auteur then
+		local permis = (etat ~= LIBRE and qui == cle) or (etat == LIBRE and t and t.qui == cle)
+		if not permis then return end
+	end
+	if not Gagne(nouv, t) then return end
+	local avant = t and t.etat
+	if etat ~= LIBRE then nouv.qte = QteTache(p, objet) end
+	p.taches[objet] = nouv
+	-- quelqu'un prend une tâche de mon projet : je le sais
+	if EstAuteur(p) and etat == PRISE and avant ~= PRISE and qui ~= MaCle() and p.nom and not estRelais then
+		local O = Outils()
+		Alerte(("%s s'occupe de %s (%s)."):format(NomCourt(qui), (O.InfoObjet and O.InfoObjet(objet)) or "un objet", p.nom), id)
+	end
+	return true
+end
+
 local function Recevoir(prefixe, msg, canal, expediteur)
 	if prefixe ~= PREFIXE or canal ~= "GUILD" or not msg or not expediteur then return end
 	local cle = Normaliser(expediteur)
@@ -299,11 +347,31 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		if pret and not reponsePrevue then
 			reponsePrevue = true
 			wipe(annules)
+			local nouveau = cle
 			C_Timer.After(2 + math.random() * 6, function()
 				reponsePrevue = false
+				-- mes projets : toujours (j'en suis l'auteur) ; ceux des autres : seulement si je suis le
+				-- relais élu et que leur auteur n'est pas connecté (il répond lui-même)
+				local relais = not ns.EstLeRelais or ns.EstLeRelais(nouveau)
+				local aEnvoyer = {}
 				for id, p in pairs(Projets()) do
-					if not annules[id] and (p.nom or p.supprime) then EnvoyerTout(p, true) end
+					if p.nom or p.supprime then
+						local mien = EstAuteur(p)
+						local auteurLa = p.auteur and ns.EnLigneMembre and ns.EnLigneMembre(p.auteur)
+						if mien or (relais and not auteurLa) then aEnvoyer[#aEnvoyer + 1] = { id = id, mien = mien } end
+					end
 				end
+				-- un projet à la fois : celui qu'un autre a déjà renvoyé entre-temps est sauté
+				local i = 0
+				local function Suivant()
+					i = i + 1
+					local e = aEnvoyer[i]
+					if not e then return end
+					local p = Projets()[e.id]
+					if p and (e.mien or not annules[e.id]) then EnvoyerTout(p, not e.mien) end
+					C_Timer.After(1, Suivant)
+				end
+				Suivant()
 			end)
 		end
 	elseif genre == "P" then
@@ -364,34 +432,16 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	elseif genre == "T" then
 		local id, objet, qui, etat, maj, relaisT = reste:match("^([^~]+)~(%d+)~([^~]*)~(%d)~(%d+)(~?r?)$")
 		if not id then return end
-		objet, etat, maj = tonumber(objet), tonumber(etat), tonumber(maj)
-		if not (objet and etat and maj) or etat > FAITE or maj > Maintenant() + 3600 then return end
-		local nouv = { qui = qui ~= "" and qui or nil, etat = etat, maj = maj }
-		local p = Projet(id)
-		if not (p and p.nom) then
-			-- projet pas encore reçu : la tâche attend (sans créer de coquille)
-			if p and p.supprime then return end
-			orphelines[id] = orphelines[id] or {}
-			if Gagne(nouv, orphelines[id][objet]) then orphelines[id][objet] = nouv end
-			return
+		if AppliquerTache(cle, id, tonumber(objet), qui, tonumber(etat), tonumber(maj), relaisT ~= "") then Maj() end
+	elseif genre == "U" then
+		-- lot de tâches relayées : « U~id~objet:qui:état:date,… »
+		local id, lot = reste:match("^([^~]+)~(.*)$")
+		if not id then return end
+		local change = false
+		for objet, qui, etat, maj in (lot or ""):gmatch("(%d+):([^:,]*):(%d):(%d+)") do
+			if AppliquerTache(cle, id, tonumber(objet), qui, tonumber(etat), tonumber(maj), true) then change = true end
 		end
-		local t = p.taches[objet]
-		-- envoi direct : prendre ou finir une tâche pour soi, libérer la sienne ; l'auteur du projet
-		-- peut tout (les relais « ~r » renvoient l'état connu d'un absent)
-		if relaisT == "" and cle ~= p.auteur then
-			local permis = (etat ~= LIBRE and qui == cle) or (etat == LIBRE and t and t.qui == cle)
-			if not permis then return end
-		end
-		if not Gagne(nouv, t) then return end
-		local avant = t and t.etat
-		if etat ~= LIBRE then nouv.qte = QteTache(p, objet) end
-		p.taches[objet] = nouv
-		-- quelqu'un prend une tâche de mon projet : je le sais
-		if EstAuteur(p) and etat == PRISE and avant ~= PRISE and qui ~= MaCle() and p.nom then
-			local O = Outils()
-			Alerte(("%s s'occupe de %s (%s)."):format(NomCourt(qui), (O.InfoObjet and O.InfoObjet(objet)) or "un objet", p.nom), id)
-		end
-		Maj()
+		if change then Maj() end
 	elseif genre == "X" then
 		local id, maj, relaisX = reste:match("^([^~]+)~(%d+)(~?r?)$")
 		if not id then return end

@@ -550,9 +550,12 @@ end
 local function Demander(g, cle, code, force)
 	local k = cle .. code
 	if demandes[k] and GetTime() - demandes[k] < 60 then return end
-	demandes[k] = GetTime()
-	-- petit délai au hasard : si un autre membre demande la même liste, elle arrive pour tout le monde
+	local prevue = GetTime()
+	demandes[k] = prevue
+	-- petit délai au hasard : si un autre membre demande la même liste entre-temps (demandes[k]
+	-- mis à jour à la réception de son « D »), elle arrive pour tout le monde : on se tait
 	C_Timer.After(0.5 + math.random() * 2.5, function()
+		if demandes[k] ~= prevue then return end
 		local e = g[cle]
 		local p = e and e.profs and e.profs[code]
 		if p and (force or (p.attendu and p.h ~= p.attendu)) then
@@ -667,6 +670,8 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		local moi = MaCle()
 		if PAR_CODE[code] and (cible == moi or (TestSolo() and cible == moi .. "#test")) then
 			DiffuserRecettes(code)
+		elseif code and cible then
+			demandes[cible .. code] = GetTime() -- un autre l'a demandée : la réponse viendra pour tous
 		end
 
 	elseif genre == "R" then
