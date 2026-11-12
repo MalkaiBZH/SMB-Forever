@@ -1,0 +1,27 @@
+## Interface: 16001
+## Title: GuildUp
+## Notes: Outils de guilde : bannières par rôle, groupes et quêtes, artisanat et dons, calendrier, carte.|n|n/gup pour les options
+## Author: Miko
+## Version: 1.6.0
+## SavedVariables: GuildUpDB, GuildUpMetiersDB
+
+GuildUp.lua
+GuildUp_Identite.lua
+GuildUp_Groupes.lua
+GuildUp_Carte.lua
+GuildUp_Recettes.lua
+GuildUp_Metiers.lua
+GuildUp_Version.lua
+GuildUp_Quetes.lua
+GuildUp_Evenements.lua
+GuildUp_Annonces.lua
+GuildUp_GU.lua
+GuildUp_Recherche.lua
+GuildUp_Objets.lua
+GuildUp_Besoins.lua
+GuildUp_Echanges.lua
+GuildUp_Aide.lua
+GuildUp_Craft.lua
+GuildUp_Sources.lua
+GuildUp_Carnet.lua
+GuildUp_Projets.lua
