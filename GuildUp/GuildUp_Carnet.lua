@@ -1,4 +1,4 @@
--- GuildUp : fenêtre « Artisanat » (onglets Registre et Carnet) et carnet de craft.
+-- GuildUp : fenêtre « Artisanat » (onglets Registre, Items et Projets) et carnet de craft.
 -- Le carnet : on choisit des recettes et des quantités ; la « Liste de courses » (fenêtre à part)
 -- calcule tout ce qu'il faut, sous-recettes comprises, compare avec les sacs et la banque, et dit
 -- d'où viennent les composants et qui, dans la guilde, sait les fabriquer.
@@ -129,14 +129,6 @@ end
 local function UtilisationsDe(objet) Recettes(); return parCompo[objet] end
 -- recette apprise par une formule (objet), ou nil
 local function RecetteDeFormule(objet) Recettes(); return formuleSort[objet] end
--- toutes les formules (pour l'export des sources)
-ns.ListeFormules = function()
-	Recettes()
-	local l = {}
-	for o in pairs(formuleSort) do l[#l + 1] = o end
-	table.sort(l)
-	return l
-end
 
 local sources         -- { objets = { [id] = {...} }, pnj = {}, recolte = {}, zones = {}, quetes = {} }
 -- Table lue à la demande : chaque entrée n'est analysée qu'au premier accès (sources[id]), en
@@ -307,80 +299,6 @@ local function IndicationType(objet)
 	return nil
 end
 
--- Lignes « d'où ça vient » (infobulles et fiche)
-local function LignesSources(objet, ajouter)
-	local s = Sources().objets[objet]
-	local recs = RecettesDe(objet)
-	if recs then
-		local r = recs[1]
-		ajouter(("|cffffd100Fabriqué|r : %s %d"):format(NomMetier(r.metier), r.niveau))
-	end
-	if s then
-		local function Pnj(id)
-			local p = Sources().pnj[id]
-			if not p then return nil end
-			local niv = TexteNiveaux(p)
-			local zone = NomZone(p.zone)
-			return p.nom .. niv .. (zone and (" · " .. zone) or "")
-		end
-		-- liste de PNJ regroupée par zone, classée par niveau (zones aussi : la plus basse d'abord)
-		local function ParZone(ids, max)
-			local zones, ordre = {}, {}
-			for i = 1, math.min(max, #ids) do
-				local p = Sources().pnj[ids[i]]
-				if p then
-					local z = NomZone(p.zone) or "Zone inconnue"
-					if not zones[z] then zones[z] = {}; ordre[#ordre + 1] = z end
-					table.insert(zones[z], p)
-				end
-			end
-			local function Niv(p) return p.min or 0 end
-			for _, l in pairs(zones) do table.sort(l, function(a, b) return Niv(a) < Niv(b) end) end
-			table.sort(ordre, function(a, b) return Niv(zones[a][1]) < Niv(zones[b][1]) end)
-			for _, z in ipairs(ordre) do
-				ajouter("  - " .. z .. " :")
-				for _, p in ipairs(zones[z]) do
-					local niv = TexteNiveaux(p)
-					ajouter("      - " .. p.nom .. niv)
-				end
-			end
-		end
-		if #s.marchands > 0 then
-			ajouter(("|cffffd100Marchands|r (%d) :"):format(#s.marchands))
-			ParZone(s.marchands, 6)
-		end
-		if #s.recolte > 0 then
-			local l = {}
-			for i = 1, math.min(3, #s.recolte) do
-				local r = Sources().recolte[s.recolte[i]]
-				if r then
-					local z = r.zones[1] and NomZone(r.zones[1])
-					l[#l + 1] = r.nom .. (z and (" · " .. z) or "")
-				end
-			end
-			ajouter("|cffffd100Récolte|r :")
-			for _, t in ipairs(l) do ajouter("  - " .. t) end
-		end
-		if #s.butin > 0 then
-			ajouter(("|cffffd100Butin|r (%d monstres) :"):format(math.max(s.nbButin, #s.butin)))
-			ParZone(s.butin, 12)
-		end
-		if #s.contenants > 0 then
-			local l = {}
-			for i = 1, math.min(2, #s.contenants) do l[#l + 1] = (InfoObjet(s.contenants[i])) or ("objet " .. s.contenants[i]) end
-			ajouter("|cffffd100Dans|r :")
-			for _, t in ipairs(l) do ajouter("  - " .. t) end
-		end
-		if #s.quetes > 0 then
-			ajouter("|cffffd100Quête|r : " .. (Sources().quetes[s.quetes[1]] or "?"))
-		end
-	end
-	if not s or (#s.marchands + #s.recolte + #s.butin + #s.contenants + #s.quetes == 0) then
-		local ind = IndicationType(objet)
-		if ind then ajouter("|cffffd100Source|r : " .. ind) end
-	end
-end
-ns.LignesSources = LignesSources
 
 --------------------------------------------------------------------------------
 -- Listes (sauvegardées) : db.carnets = { [nom] = { entrees = { {objet, qte} ou {sort, qte} },
@@ -420,7 +338,6 @@ local function AjouterObjet(objet, qte, nomListe)
 	MajCarnet()
 	MajCourses()
 end
-ns.AjouterAListe = AjouterObjet
 local function AjouterRecette(sort, qte)
 	local r = Recettes()[sort]
 	if r and r.objet > 0 then return AjouterObjet(r.objet, qte) end
@@ -683,10 +600,6 @@ local function CreerLigne(parent)
 	l.liseret:SetWidth(3)
 	l.liseret:SetColorTexture(1, 0.82, 0, 0.9)
 	l.liseret:Hide()
-	l.guide = l:CreateTexture(nil, "BORDER")
-	l.guide:SetWidth(1)
-	l.guide:SetColorTexture(1, 0.82, 0, 0.30)
-	l.guide:Hide()
 	l.texte = l:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	l.texte:SetJustifyH("LEFT")
 	l.texte:SetWordWrap(false)
@@ -709,7 +622,6 @@ local function CreerLigne(parent)
 	l.qte:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 	l.qte:Hide()
 	l.texte:SetPoint("RIGHT", l.compte, "LEFT", -6, 0)
-	l.artisans = {}
 	l:SetScript("OnEnter", InfobulleObjet)
 	l:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	l:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -733,30 +645,6 @@ local function CreerLigne(parent)
 	return l
 end
 
--- petit bouton « nom d'artisan » : ouvre la commande avec la quantité du carnet
-local function BoutonArtisan(l, i)
-	local b = l.artisans[i]
-	if b then return b end
-	b = CreateFrame("Button", nil, l:GetParent())
-	b:SetHeight(16)
-	b.texte = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	b.texte:SetPoint("LEFT", b, "LEFT", 2, 0)
-	b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
-	b:SetScript("OnClick", function(self)
-		if self.artisan and ns.CommanderObjet then
-			ns.CommanderObjet(self.artisan.cle, self.artisan.nom, self.objet, self.qte)
-		end
-	end)
-	b:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText("Commander à " .. NomCourt(self.artisan.nom))
-		GameTooltip:AddLine(("Quantité proposée : %d (modifiable)"):format(self.qte or 1), 1, 1, 1)
-		GameTooltip:Show()
-	end)
-	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-	l.artisans[i] = b
-	return b
-end
 
 MajCourses = function()
 	if ns.MajMini then ns.MajMini() end
@@ -787,7 +675,6 @@ MajCourses = function()
 		i = i + 1
 		local l = lignes[i] or CreerLigne(contenu)
 		lignes[i] = l
-		for _, b in ipairs(l.artisans) do b:Hide() end
 		l:SetFrameLevel(contenu:GetFrameLevel() + 3)
 		l:ClearAllPoints()
 		l:SetPoint("TOPLEFT", contenu, "TOPLEFT", 4 + retraitCadre, -y)
@@ -796,7 +683,6 @@ MajCourses = function()
 		l.qte:Hide()
 		l.retirer:Hide()
 		l.liseret:Hide()
-		l.guide:Hide()
 		l.texte:SetAlpha(1)
 		l:Show()
 		y = y + h
@@ -850,13 +736,6 @@ MajCourses = function()
 		l.compte:SetFontObject(st.compte)
 		l.texte:SetAlpha(st.alpha or 1)
 		local x = 4 + prof * 16
-		-- guide vertical : relie les sous-niveaux à leur parent
-		if false then -- (plus de guide vertical : seulement le décalage par niveau)
-			l.guide:ClearAllPoints()
-			l.guide:SetPoint("TOPLEFT", l, "TOPLEFT", x - 8, 0)
-			l.guide:SetPoint("BOTTOMLEFT", l, "BOTTOMLEFT", x - 8, 0)
-			l.guide:Show()
-		end
 		l.fleche:ClearAllPoints()
 		l.fleche:SetPoint("LEFT", l, "LEFT", x, 0)
 		local deplie = n.enfants and #n.enfants > 0 and not replies[chemin]
@@ -927,38 +806,6 @@ MajCourses = function()
 			local ok = n.jai >= n.besoin
 			l.compte:SetText(("%s%d / %d|r"):format(ok and "|cff33dd55" or "|cffff9933", math.min(n.jai, n.besoin), n.besoin))
 		end
-		-- artisans en ligne pour un composant fabriqué qui manque (ou pour la recette elle-même)
-		if false then -- (« En ligne : » retiré de la liste : il reste dans l'encyclopédie)
-			local enLigne = {}
-			for _, a in ipairs(ns.ArtisansDe(n.objet)) do
-				if a.enLigne and not a.moi then enLigne[#enLigne + 1] = a end
-			end
-			if #enLigne > 0 then
-				local la = Ligne(20)
-				StylerTitre(la, false)
-				la.texte:SetFontObject("GameFontHighlightSmall")
-				la.noeud, la.objet = nil, nil
-				la.fleche:Hide(); la.basculer:Hide()
-				la.icone:Hide()
-				la.fond:SetColorTexture(0, 0, 0, 0)
-				la.texte:ClearAllPoints()
-				la.texte:SetPoint("LEFT", la, "LEFT", x + 32, 0)
-				la.texte:SetText("|cff33dd55En ligne :|r")
-				la.compte:SetText("")
-				local ax = x + 32 + 60
-				for j = 1, math.min(4, #enLigne) do
-					local b = BoutonArtisan(la, j)
-					b.artisan, b.objet = enLigne[j], n.objet
-					b.qte = n.racine and n.besoin or n.manque
-					b.texte:SetText("[" .. NomCourt(enLigne[j].nom) .. "]")
-					b:SetWidth(b.texte:GetStringWidth() + 6)
-					b:ClearAllPoints()
-					b:SetPoint("LEFT", la, "LEFT", ax, 0)
-					b:Show()
-					ax = ax + b:GetWidth() + 4
-				end
-			end
-		end
 		if deplie or n.racine then
 			for j, c in ipairs(n.enfants or {}) do Noeud(c, prof + 1, chemin .. ">" .. j) end
 		end
@@ -1020,7 +867,6 @@ MajCourses = function()
 	for j = nCadresR + 1, #courses.cadresRecette do courses.cadresRecette[j]:Hide() end
 	for j = i + 1, #lignes do
 		lignes[j]:Hide()
-		for _, b in ipairs(lignes[j].artisans) do b:Hide() end
 	end
 	contenu:SetHeight(math.max(10, y))
 end
@@ -1030,15 +876,16 @@ local ouvertsFiche = {}   -- [clé] = true : sections / sous-catégories dépli�
 local PLUS = "|TInterface\\Buttons\\UI-PlusButton-Up:14:14:0:0|t "
 local MOINS = "|TInterface\\Buttons\\UI-MinusButton-Up:14:14:0:0|t "
 
-local function AppliquerCompact(f)
-	local compact = false -- (réduire montre maintenant la mini-liste transparente, voir MontrerMini)
-	f.defile:SetShown(not compact)
-	f.fond:SetShown(not compact)
-	f.filet:SetShown(not compact)
-	f:SetHeight(compact and 96 or HAUTEUR_LISTE_COURSES)
-	f.reduire:SetText(compact and "+" or "-")
-	f.encyclo:SetShown(not compact)
-	if ns.CarnetsCadre and ns.CarnetsCadre() then ns.CarnetsCadre().defile:SetShown(not compact) end
+
+-- Affichage complet de la liste de courses (la version réduite est la mini-liste, voir MontrerMini)
+local function AffichageComplet(f)
+	f.defile:Show()
+	f.fond:Show()
+	f.filet:Show()
+	f:SetHeight(HAUTEUR_LISTE_COURSES)
+	f.reduire:SetText("-")
+	f.encyclo:Show()
+	if ns.CarnetsCadre and ns.CarnetsCadre() then ns.CarnetsCadre().defile:Show() end
 end
 
 -- menu du nom de la liste : changer de liste, en créer une, supprimer celle-ci
@@ -1158,7 +1005,7 @@ local function CreerCourses()
 		local db = ns.DB and ns.DB() or {}
 		db.coursesCompact = nil
 		if ns.CacherMini then ns.CacherMini() end
-		AppliquerCompact(f)
+		AffichageComplet(f)
 		MajCourses()
 	end)
 	courses = f
@@ -1476,7 +1323,6 @@ end
 
 local fiche
 local lignesFiche = {}
-local historique = {}     -- objets ouverts avant (bouton « Retour »)
 
 -- Repère sur la carte du monde (zone Questie + position 0-100)
 local function PoserRepere(zone, x, y)
@@ -1537,7 +1383,6 @@ MajFiche = function()
 		fiche.nom:SetTextColor(1, 0.82, 0)
 		fiche.jai:SetText("Alt + clic sur un objet du jeu pour voir sa fiche.")
 		fiche.ajouter:Hide()
-		fiche.retour:SetEnabled(#historique > 0)
 		for _, l in ipairs(lignesFiche) do l:Hide() end
 		for _, c in ipairs(fiche.cadres or {}) do c:Hide() end
 		fiche.contenu:SetHeight(10)
@@ -1555,7 +1400,6 @@ MajFiche = function()
 	fiche.jai:SetText(banque and ("Tu en as %d dans tes sacs · %d à la banque"):format(sacs, banque)
 		or ("Tu en as %d dans tes sacs · banque inconnue (ouvre-la une fois)"):format(sacs))
 	fiche.ajouter:SetShown(RecettesDe(objet) ~= nil)
-	fiche.retour:SetEnabled(#historique > 0)
 
 	local y, i = 4, 0
 	local largeur = fiche.contenu:GetWidth()
@@ -1941,26 +1785,26 @@ ns.MontrerBullePnj = function(proprio, id, info, aide)
 	apercu.nom:SetText((rang == 1 or rang == 2) and ("|TInterface\\Tooltips\\EliteNameplateIcon:16:16:0:0|t" .. (info.nom or "?")) or (info.nom or "?"))
 	apercu.nom:SetTextColor(c[1], c[2], c[3])
 	apercu.sous:SetText(info.sous and ("<" .. info.sous .. ">") or "")
-	local lignes = {}
+	local texte = {}
 	local niveau = (info.min and info.min > 0) and ((info.max and info.max ~= info.min) and (info.min .. "-" .. info.max) or tostring(info.min)) or nil
 	local quoi = {}
 	if niveau then quoi[#quoi + 1] = "Niveau " .. niveau end
 	if NOMS_RANGS[rang] then quoi[#quoi + 1] = ("|cff%02x%02x%02x%s|r"):format(c[1] * 255, c[2] * 255, c[3] * 255, NOMS_RANGS[rang]) end
-	if #quoi > 0 then lignes[#lignes + 1] = table.concat(quoi, "  ·  ") end
-	if info.zone then lignes[#lignes + 1] = "|cff999999Zone :|r " .. info.zone end
+	if #quoi > 0 then texte[#texte + 1] = table.concat(quoi, "  ·  ") end
+	if info.zone then texte[#texte + 1] = "|cff999999Zone :|r " .. info.zone end
 	if info.faction then
 		local f = info.faction == "A" and "|cff4a9effAlliance|r" or info.faction == "H" and "|cffff4a4aHorde|r" or "neutre"
-		lignes[#lignes + 1] = "|cff999999Faction :|r " .. f
+		texte[#texte + 1] = "|cff999999Faction :|r " .. f
 	end
 	if info.objet then
 		local nomO, _, qualite = InfoObjet(info.objet)
 		local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
 		if nomO then
-			lignes[#lignes + 1] = (info.marchand and "|cff999999Vend :|r " or "|cff999999Butin :|r ")
+			texte[#texte + 1] = (info.marchand and "|cff999999Vend :|r " or "|cff999999Butin :|r ")
 				.. (qc and qc.hex or "|cffffffff") .. nomO .. "|r"
 		end
 	end
-	apercu.infos:SetText(table.concat(lignes, "\n"))
+	apercu.infos:SetText(table.concat(texte, "\n"))
 	apercu.aide:SetText(aide or "")
 	-- mise en page verticale
 	local y = -10
@@ -1994,7 +1838,6 @@ ns.MontrerBullePnj = function(proprio, id, info, aide)
 	apercu:Show()
 end
 -- (compatibilité : ancien appel modèle seul)
-ns.MontrerModele = function(id) ns.MontrerBullePnj(UIParent, id, {}, nil) end
 ns.CacherModele = function() if apercu then apercu:Hide() end end
 
 CreerFiche = function()
@@ -2023,15 +1866,6 @@ CreerFiche = function()
 	f.jai = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	f.jai:SetPoint("TOPLEFT", f.nom, "BOTTOMLEFT", 0, -3)
 	-- actions
-	f.retour = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-	f.retour:SetSize(64, 22)
-	f.retour:SetPoint("TOPLEFT", f, "TOPLEFT", 62, -64)
-	f.retour:SetText("Retour")
-	f.retour:Hide() -- (retiré : on navigue depuis la liste et les carnets)
-	f.retour:SetScript("OnClick", function()
-		local o = table.remove(historique)
-		if o then f.objet = o; MajFiche() end
-	end)
 	local besoin = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
 	besoin:SetSize(70, 22)
 	besoin:SetPoint("TOPLEFT", f, "TOPLEFT", 62, -64)
@@ -2109,8 +1943,6 @@ ns.OuvrirFiche = function(objet, qte, origine)
 		origine = origine or (courses and courses:IsShown() and courses) or (items and items:IsShown() and items) or nil
 		PlacerFiche(origine)
 	end
-	if objet and fiche:IsShown() and fiche.objet and fiche.objet ~= objet then table.insert(historique, fiche.objet) end
-	if not fiche:IsShown() and objet then wipe(historique) end
 	if objet then fiche.objet = objet end
 	fiche.qte = (qte and qte > 0) and qte or 1
 	fiche:Show()
@@ -2141,7 +1973,7 @@ local CATEGORIES_ITEMS = {
 }
 local RANGEES = {}
 for _, c in ipairs(CATEGORIES_ITEMS) do for k in pairs(c.classes or {}) do RANGEES[k] = true end end
--- tous les objets : la liste des objets échangeables + les objets fabriqués qui n'y sont pas
+-- catalogue : la liste des objets échangeables + les objets fabriqués qui n'y sont pas
 local catalogue   -- { { id, qualite, nom, simplifie, classe, niveau d'objet }, … }
 local triItems = 1 -- 1 = niveau d'objet décroissant (défaut), 2 = croissant, 3 = nom
 local TRIS = { "Niveau |TInterface\\Buttons\\Arrow-Down-Up:12:12:0:-2|t", "Niveau |TInterface\\Buttons\\Arrow-Up-Up:12:12:0:2|t", "Nom (A-Z)" }
@@ -2154,7 +1986,6 @@ local function Catalogue()
 		vus[o[1]] = true
 	end
 	-- objets liés quand ramassés (butin de boss, objets fabriqués…) : dans Items, pas dans les Besoins
-	local niveaux = {}
 	for id, q, classe, niv, nom in (ns.DONNEES_OBJETS_LIES or ""):gmatch("(%d+):(%d+):(%d+):(%d+):([^\n]+)") do
 		id = tonumber(id)
 		if not vus[id] then
@@ -2170,8 +2001,8 @@ local function Catalogue()
 			nom = nom or NomSort(r.sort)
 			if nom then
 				local classe = ClasseObjet(r.objet)
-				local niv = niveaux[r.objet]
-				if not niv and C_Item and C_Item.GetDetailedItemLevelInfo then
+				local niv
+				if C_Item and C_Item.GetDetailedItemLevelInfo then
 					local okN, n = pcall(C_Item.GetDetailedItemLevelInfo, r.objet)
 					niv = okN and n or nil
 				end
@@ -2400,8 +2231,7 @@ MajCarnet = function()
 	local res, total = {}, 0
 	for _, o in ipairs(Catalogue()) do
 		local garde
-		if cat.fabricables then garde = RecettesDe(o[1]) ~= nil
-		elseif cat.autres then garde = not RANGEES[o[5] or -1]
+		if cat.autres then garde = not RANGEES[o[5] or -1]
 		elseif cat.classes then garde = cat.classes[o[5] or -1] == true
 		else garde = true end
 		if garde and sousCategorie then garde = SousClasse(o[1]) == sousCategorie end
@@ -2678,7 +2508,7 @@ local function CreerFenetre()
 	if ns.AvecSons then ns.AvecSons(fen, "fenetre") end
 end
 
--- onglet 1 Registre, 2 Carnet ; déjà ouverte sur cet onglet : la ferme
+-- onglet 1 Registre, 2 Items, 3 Projets ; déjà ouverte sur cet onglet : la ferme
 ns.BasculerArtisanat = function(onglet)
 	CreerFenetre()
 	if not fen then return end

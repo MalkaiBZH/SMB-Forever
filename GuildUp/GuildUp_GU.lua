@@ -102,7 +102,6 @@ ns.EmoteGU = Emote
 ns.DiagGU = function(L)
 	local n = 0
 	for _, e in ipairs(pool) do if e:IsShown() then n = n + 1 end end
-	local db = ns.DB and ns.DB()
 	L(("GU! : %d détectés, %d affichés, %d à l'écran%s%s"):format(diag.detectees, diag.affichees, n,
 		diag.refus ~= "" and (", dernier refus : " .. diag.refus) or "", Coupee() and " (COUPÉE : notifications du volet ou /smb gu)" or ""))
 end
@@ -268,7 +267,6 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 		end
 		return
 	end
-	local db = ns.DB and ns.DB()
 	if not (DitGU(a1) and a2) then return end
 	local cle = Normaliser(a2)
 	-- c'est moi, hors du canal de guilde : je préviens la guilde (au plus une fois toutes les 3 s)

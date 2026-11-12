@@ -9,6 +9,8 @@
 --   "S~niveau~CLASSE~AL,225,300,40,empreinte;CU,..."  résumé : métier, niveau, max, nb de recettes, empreinte
 --   "D~AL~Nom-Royaume"                         demande les recettes d'un métier d'un membre
 --   "R~AL~empreinte~n~total~i1a2b,s3c4,..."    recettes (par morceaux), diffusées à toute la guilde
+--   "C~cible~recette~id~quantité"              commande d'artisanat (lue seulement par la cible)
+--   "K~cible~id~1|0~recette"                   réponse à une commande (acceptée / refusée)
 -- Une recette = "s<id de sort>" ou "i<id d'objet fabriqué>" ; sur le réseau, l'id est en base 36.
 -- L'empreinte change dès qu'une recette s'ajoute : les autres ne redemandent la liste qu'à ce moment.
 
@@ -230,7 +232,7 @@ local function MesDonnees()
 	return e
 end
 
--- Pour GuildUp_Plans.lua : mon niveau dans un métier (nil si je ne l'ai pas)
+-- Pour GuildUp_Echanges.lua : mon niveau dans un métier (nil si je ne l'ai pas)
 ns.MonNiveauMetier = function(code)
 	local p = MesDonnees().profs[code]
 	return p and p.n
@@ -1389,7 +1391,7 @@ MajFenetre = function()
 	fen.bas:SetText(("|cff33dd55%d en ligne|r"):format(enLigne))
 end
 
--- Page « Registre » de la fenêtre « Artisanat & Échanges » (GuildUp_Echanges.lua la crée et
+-- Page « Registre » de la fenêtre « Artisanat de la guilde » (GuildUp_Carnet.lua la crée et
 -- l'héberge ; même cadre à portrait, 720 de large)
 local function CreerPage(f)
 	fen = f

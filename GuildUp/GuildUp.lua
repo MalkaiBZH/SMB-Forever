@@ -16,11 +16,9 @@ local DEFAUT = {
 	lueur     = true,        -- lueur jaune autour de la barre de vie quand le joueur est ciblé
 	aurasSous = true,        -- icônes d'améliorations sous la barre de vie (barres de nom)
 	nomsAllies = true,       -- barres de nom alliées toujours affichées ; hors guilde et hors groupe : nom + <guilde> seuls
-	annoncesGroupes = true,  -- message dans le chat quand un membre de la guilde ouvre un groupe
 	partagePosition = true,  -- partager ma position sur la carte avec la guilde (activé de base, coupable dans le volet)
 	testSolo = false,        -- test seul : mes propres messages sont traités comme ceux d'un autre membre
 	testGroupe = false,      -- debug : bannières de groupe (_min) sur tout le monde
-	niveauCentre = true,     -- niveau centré sur la hauteur de la bannière (barres de nom)
 	nomGauche = true,        -- nom aligné à gauche au-dessus de la barre de vie (barres de nom)
 	incantationHaut = true,  -- barre d'incantation au-dessus du nom, sur le bord doré (barres de nom)
 	debugIncantation = false, -- affiche une fausse barre d'incantation pour régler sa position
@@ -435,8 +433,6 @@ local function ZoneIncantation(barre, tailleNom, niveauVisible, unit)
 	return gauche, fin, y
 end
 
--- Lueur portée derrière la bannière du joueur ciblé : une copie de la bannière, un peu plus
--- grande, dorée et en mode additif, posée sous la vraie (couche plus basse)
 -- Lueur derrière la bannière du joueur ciblé : un rectangle doré qui part du bol et va jusqu'au
 -- bout droit de la bannière, un peu plus haut et plus bas que la barre ; plein au milieu, avec
 -- un court fondu (transparence) à gauche et à droite
@@ -856,7 +852,6 @@ local AGRANDISSEMENT_ALLIE = 1.5 -- taille fixe des noms hors guilde (x1.5 la po
 
 -- police des noms flottants du jeu (Friz Quadrata), taille fixe
 local function PoliceAllie() return UNIT_NAME_FONT or STANDARD_TEXT_FONT end
-local function AgrandissementAllie() return AGRANDISSEMENT_ALLIE end
 
 -- police des noms flottants du jeu (au-dessus des personnages), sans ombre ni contour
 -- Couleur du nom selon le jeu : UnitSelectionColor (couleurs étendues) est la couleur de
@@ -960,7 +955,7 @@ local function MajNomSeul(uf, unit)
 			local ok, police, taille, contour = pcall(uf.name.GetFont, uf.name)
 			if ok and police then policesNoms[uf] = { police, taille or 10, contour or "" } end
 		end
-		local taille = (policesNoms[uf] and policesNoms[uf][2] or 10) * AgrandissementAllie()
+		local taille = (policesNoms[uf] and policesNoms[uf][2] or 10) * AGRANDISSEMENT_ALLIE
 		-- le nom de Blizzard ne suit pas le rendu « grand puis réduit » (le jeu remet sa propre
 		-- échelle) : on le rend invisible et on écrit le nôtre, centré au-dessus de la barre
 		pcall(uf.name.SetAlpha, uf.name, 0)
@@ -1116,9 +1111,9 @@ local function MajCible()
 		-- au-dessus du fond de nom de Blizzard, sous le texte et le cadre
 		if not fondCible then fondCible = CreerFond(TargetFrame, "BACKGROUND", 7) end
 		if zone then
-			Afficher(fondCible, "target", zone, "zone", zone:GetHeight())
+			Afficher(fondCible, "target", zone, "zone")
 		else
-			Afficher(fondCible, "target", nom, "texte", 18)
+			Afficher(fondCible, "target", nom, "texte")
 		end
 	elseif fondCible then
 		Masquer(fondCible)
@@ -1462,7 +1457,10 @@ local function Aide()
 	print("  /smb barre — afficher / cacher le bouton de la mini-carte")
 	print("  /smb noms — nom et guilde des autres joueurs (" .. OuiNon(db.nomsAllies) .. ")")
 	print("  /smb lueur — lueur derrière la bannière de ta cible (" .. OuiNon(db.lueur) .. ")")
+	print("  /smb annonces — annonces de la guilde en bulle (" .. OuiNon(db.annoncesGuilde ~= false) .. ")")
 	print("  /smb diag — informations techniques à copier (en cas de problème)")
+	print("  /smb debug — afficher / cacher la partie Debug de la fenêtre d'options")
+	print("  /smb entree <mot> — noter ma position comme entrée de ce donjon (ex. /smb entree mortemines)")
 	print("  /smb reset — réglages par défaut")
 end
 
@@ -1875,7 +1873,7 @@ end
 --------------------------------------------------------------------------------
 -- Bouton de mini-carte (comme les autres addons) :
 --   collé au bord de la mini-carte, on le fait glisser pour le faire tourner autour ;
---   icône = rôle actuel ; clic gauche = volet [Tank] [Heal] [DPS] [Groupes] ; clic droit = groupes.
+--   icône = rôle actuel ; clic gauche = volet (voir CreerVolet) ; clic droit = groupes.
 --------------------------------------------------------------------------------
 
 local ICONES_ROLE = {
@@ -1961,10 +1959,9 @@ local function PlacerVolet()
 	end
 end
 
--- Volet du bouton de mini-carte, en trois lignes :
---   1. Mon rôle : [Tank] [Heal] [DPS]
---   2. [Position] [Groupes] [Métiers]
---   3. [x] Activer GuildUp
+-- Volet du bouton de mini-carte : pseudo et personnages, mon rôle (Tank / Heal / DPS), boutons des
+-- fenêtres (groupes, artisanat, dons…), partage de position, activation de GuildUp et
+-- notifications (repliables)
 local LARGEUR_VOLET = 206
 
 local function CreerVolet()
@@ -2628,6 +2625,18 @@ SlashCmdList.GUILDUP = function(msg)
 		Message("bouton de la mini-carte : " .. OuiNon(r.visible))
 	elseif cmd == "diag" then
 		Diag(); return
+	elseif cmd == "debug" then
+		db.afficherDebug = not db.afficherDebug or nil
+		if not db.afficherDebug then db.test, db.testSolo, db.testGroupe = false, false, false end
+		Message("partie Debug de la fenêtre d'options : " .. OuiNon(db.afficherDebug))
+		if db.afficherDebug and ns.InstallerEspionRecherche then ns.InstallerEspionRecherche() end
+		if fenetre and fenetre:IsShown() then MajFenetre() end
+		return
+	elseif cmd == "entree" or cmd == "entrée" then
+		if not ns.EnregistrerEntree then return end
+		local ok, err = ns.EnregistrerEntree(reste)
+		Message(ok and ("entrée notée : " .. ok) or (err or "?"))
+		return
 	elseif cmd == "couleurs" then
 		db.couleurs = not db.couleurs; Message("couleurs selon le rôle : " .. OuiNon(db.couleurs))
 	elseif cmd == "noms" then

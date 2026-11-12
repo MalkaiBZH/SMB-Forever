@@ -27,3 +27,4 @@ GuildUp_Craft.lua
 GuildUp_Sources.lua
 GuildUp_Carnet.lua
 GuildUp_Projets.lua
+GuildUp_Diag.lua
