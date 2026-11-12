@@ -35,7 +35,8 @@ local function Envoyer(texte)
 	if not IsInGuild() then Erreur("Tu n'es pas dans une guilde"); return end
 	dernierAppel = GetTime()
 	local carte, x, y = MaPosition()
-	texte = (texte or ""):gsub("[~|]", " "):sub(1, 60)
+	texte = (texte or ""):gsub("[~|\r\n]", " ")
+	texte = ns.CouperUTF8 and ns.CouperUTF8(texte, nil, 60) or texte:sub(1, 60)
 	local zone = (GetZoneText and GetZoneText()) or ""
 	local msg = ("H~%d~%d~%d~%d~%s~%s"):format(carte or 0, math.floor((x or 0) * 10000),
 		math.floor((y or 0) * 10000), UnitLevel("player") or 0, zone:gsub("~", " "), texte)

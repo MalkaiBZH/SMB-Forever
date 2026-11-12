@@ -76,6 +76,35 @@ local function SonsSurBoutons(cadre, vus)
 end
 ns.SonsSurBoutons = SonsSurBoutons
 
+-- Coupe un texte à au plus maxOctets octets et/ou maxLettres caractères, sans jamais couper un
+-- caractère UTF-8 en deux (les zones de saisie comptent des lettres, les messages des octets)
+local function CouperUTF8(texte, maxOctets, maxLettres)
+	texte = texte or ""
+	local n, fin = 0, 0
+	for debut, car in texte:gmatch("()([%z\1-\127\194-\244][\128-\191]*)") do
+		n = n + 1
+		local f = debut + #car - 1
+		if (maxLettres and n > maxLettres) or (maxOctets and f > maxOctets) then break end
+		fin = f
+	end
+	return texte:sub(1, fin)
+end
+ns.CouperUTF8 = CouperUTF8
+
+-- Longueur maximale d'un message d'addon accepté par le jeu (octets)
+local LONGUEUR_MAX = 255
+ns.LONGUEUR_MAX = LONGUEUR_MAX
+
+-- Message d'addon qui n'a pas pu partir : prévenu à l'écran (au plus une fois toutes les 30 s)
+local dernierAvertissement = 0
+local function AvertirEchec(prefixe, raison)
+	if GetTime() - dernierAvertissement < 30 then return end
+	dernierAvertissement = GetTime()
+	if UIErrorsFrame and UIErrorsFrame.AddMessage then
+		UIErrorsFrame:AddMessage(("GuildUp : un message (%s) n'a pas pu partir : %s"):format(prefixe or "?", raison), 1, 0.82, 0)
+	end
+end
+
 -- File d'envoi des messages d'addon (le jeu limite leur nombre par seconde) : un toutes les 0,3 s,
 -- nouvel essai si le jeu refuse (trop de messages)
 do
@@ -95,12 +124,18 @@ do
 			m.essais = m.essais + 1
 			attente = 1.5
 		else
+			if not ok then AvertirEchec(m[1], tostring(res)) elseif bloque then AvertirEchec(m[1], "trop de messages") end
 			table.remove(file, 1)
 			attente = 0.3
 		end
 	end)
 	ns.EnvoyerAddon = function(prefixe, msg, canal, cible)
 		if (canal or "GUILD") == "GUILD" and not IsInGuild() then return end
+		if #msg > LONGUEUR_MAX then
+			-- le jeu le refuserait sans rien dire : on prévient au lieu de le perdre en silence
+			AvertirEchec(prefixe, ("trop long (%d octets)"):format(#msg))
+			return
+		end
 		file[#file + 1] = { prefixe, msg, canal, cible, essais = 0 }
 		pompe:Show()
 	end
