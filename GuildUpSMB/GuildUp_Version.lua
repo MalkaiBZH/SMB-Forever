@@ -134,8 +134,11 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.15.0"] = {
+		"|cffffd100Ennemis de quête|r : un « ! » à droite de la barre de nom des ennemis à tuer ou à dépouiller pour une quête : |cffffd100jaune|r pour toi, |cff66b3ffbleu|r pour un membre de ton groupe, |cff59f266vert|r pour les deux. Il disparaît quand l'objectif est terminé. Données de QuestieDB (merci à ses auteurs). /smb objectifs ou Options pour le couper.",
+	},
 	["2.14.2"] = {
 		"|cffffd100Quêtes en commun|r : si tu es déjà groupé avec les membres qui ont la quête, le bouton indique « Déjà groupés » au lieu de « Créer un groupe ». S'il en manque, « Inviter » les ajoute directement à ton groupe. « (groupe) » marque ceux qui y sont déjà.",
 	},

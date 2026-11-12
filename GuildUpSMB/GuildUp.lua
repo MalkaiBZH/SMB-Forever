@@ -19,6 +19,7 @@ local DEFAUT = {
 	nomsAllies = true,       -- barres de nom alliées toujours affichées ; hors guilde et hors groupe : nom + <guilde> seuls
 	partagePosition = true,  -- partager ma position sur la carte avec la guilde (activé de base, coupable dans le volet)
 	reperes = true,          -- repères des membres de ma zone à l'écran (GuildUp_Reperes.lua)
+	objectifsPlaques = true, -- « ! » sur les ennemis à tuer ou dépouiller pour une quête (GuildUp_Objectifs.lua)
 	testSolo = false,        -- test seul : mes propres messages sont traités comme ceux d'un autre membre
 	testGroupe = false,      -- debug : bannières de groupe (_min) sur tout le monde
 	nomGauche = true,        -- nom aligné à gauche au-dessus de la barre de vie (barres de nom)

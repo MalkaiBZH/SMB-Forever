@@ -53,6 +53,12 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
   en haut quand ils sont devant (dans leur direction exacte), sur les côtés quand ils sont à gauche ou à
   droite, en bas quand ils sont derrière, avec une flèche. Clic : chuchoter. Seulement les membres qui
   partagent leur position et ont un portrait. `/smb reperes` pour couper.
+- **Ennemis de quête** : un « ! » à droite de la barre de nom d'un ennemi à tuer ou à dépouiller pour une
+  quête en cours : **jaune** pour toi, **bleu** pour un membre de ton groupe, **vert** pour les deux. Il
+  disparaît quand l'objectif est terminé. Les monstres de chaque quête viennent de QuestieDB (version Forever),
+  croisés avec ton journal de quêtes ; les coéquipiers qui ont SMB Forever envoient au groupe la liste des
+  monstres dont ils ont besoin. L'infobulle du jeu complète quand elle le peut. `/smb objectifs` pour couper
+  (ou la case dans Options).
 - **Médaillon GuildUpSMB** : bouton rond à placer où l'on veut sur l'écran (glisser), anneau à la
   couleur de son rôle, pastille des nouveautés (groupes ouverts, appels à l'aide, demandes de dons).
   Halo doré quand des groupes sont ouverts, anneau vert quand on est en attente. Clic : la fenêtre
@@ -133,6 +139,7 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
 | `/smb on` / `off` | Activer / couper les bannières |
 | `/smb bouton` | Afficher / cacher le médaillon GuildUpSMB |
 | `/smb noms` | Nom et guilde des autres joueurs |
+| `/smb objectifs` | « ! » sur les ennemis de quête |
 | `/smb lueur` | Lueur derrière la bannière de la cible |
 | `/smb medaillons` | Portraits des joueurs sur les bannières |
 | `/smb reperes` | Membres de ta zone sur le tour de l'écran |
@@ -160,8 +167,9 @@ nouvelles depuis 30 jours sont oubliées.
 
 - Addon d'origine : **Miko**.
 - Données d'objets et de recettes générées depuis les tables du client WoW Forever (via wago.tools).
-- Provenance des composants (`GuildUp_Sources.lua`) tirée une fois de **QuestieDB** (version Forever,
-  GPL-3.0) : merci à ses auteurs. GuildUpSMB n'a pas besoin de Questie pour fonctionner.
+- Provenance des composants (`GuildUp_Sources.lua`) et objectifs des quêtes (`GuildUp_ObjectifsQuetes.lua`,
+  `python outils/generer_objectifs.py`) tirés de **QuestieDB** (version Forever, GPL-3.0) :
+  merci à ses auteurs. GuildUpSMB n'a pas besoin de Questie pour fonctionner.
 - Images (`GuildUpSMB/media/`) : bannières et anneau de Miko ; chopes du cri de guilde (`gu_emote.tga`,
   `emote_animee.tga`) dessinées pour cette version.
 - Portraits (`GuildUp/media/portraits/`) : 56 médaillons Alliance (race, classe, homme et femme), nommés

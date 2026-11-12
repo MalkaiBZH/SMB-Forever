@@ -60,6 +60,9 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
 - Groupes : `GuildUp_Catalogue.lua` (contenus de la recherche de groupe), `GuildUp_Groupes.lua` (protocole, état partagé `ns.Groupes.etat`, actions), `GuildUp_GroupesFenetre.lua` (page Groupes de la fenêtre GuildUpSMB).
 - `GuildUp_Reperes.lua` : repères des membres de la même carte à l'écran (HUD : au-dessus de la tête, en haut, ou au bord), calculés à partir des
   positions de `GuildUp_Carte.lua` (`ns.PositionsMembres`, `ns.MaPosition`, portrait dans le message `P`) ; pas de préfixe propre.
+- `GuildUp_Objectifs.lua` : « ! » sur les barres de nom des ennemis de quête (jaune moi, bleu groupe, vert les deux).
+  Croise `ns.OBJECTIFS_QUETES` (données générées) avec le journal de quêtes, par numéro de PNJ (GUID) ; complété par
+  l'infobulle du jeu (`C_TooltipInfo.GetUnit`) ; listes des coéquipiers reçues sur `PARTY` / `RAID` (`GuildUpObj`).
 - `GuildUp_Config.lua` : **réglages propres à la guilde** (`ns.Config` : nom public, cri de guilde, emote animée,
   membre vedette). Chargé en premier, sans dépendance ; les autres modules le lisent via `ns.Config`.
 - `GuildUp_Reseau.lua` : **tout le réseau passe par lui**.
@@ -72,6 +75,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   `GuildUpGrp` (groupes), `GuildUpPos` (carte), `GuildUpQst` (quêtes), `GuildUpMet` (métiers),
   `GuildUpEch` (dons), `GuildUpBes` (besoins), `GuildUpPrj` (projets), `GuildUpId` (identité),
   `GuildUpAnn` (annonces), `GuildUpAid` (aide), `GuildUpVer` (version), `GuildUpGU` (emote du cri de guilde).
+  Exception : `GuildUpObj` (`GuildUp_Objectifs.lua`, « ! » des ennemis de quête) passe par `PARTY` / `RAID`.
 - Protocoles texte : champs séparés par `~`, identifiants en base 36, **255 caractères maximum par
   message** (découpage en morceaux de 200 si besoin). Nettoyer `~` et `|` dans les textes saisis.
 - Message `Q` = « renvoyez-moi vos données » à la connexion. Les listes des absents sont gardées en
@@ -94,6 +98,10 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
 - `GuildUp_Recettes.lua` (recettes apprises avec un plan) et `GuildUp_Sources.lua` (tiré de QuestieDB,
   GPL-3.0) : générés par l'outil d'export de l'auteur d'origine (`ns.Exporter`, `/gup export`), absent de
   ce dépôt.
+- `GuildUp_ObjectifsQuetes.lua` (`ns.OBJECTIFS_QUETES` : pour chaque quête, monstres à tuer et monstres qui
+  lâchent les objets demandés, dans l'ordre des objectifs du jeu) : généré par `python outils/generer_objectifs.py`
+  depuis QuestieDB (`data/Forever` du dépôt Questie/QuestieDB, GPL-3.0 ; `--ref` pour une version précise,
+  cache dans `outils/cache/questiedb/`, même `--verifier`). Lu par `GuildUp_Objectifs.lua`.
 - Ces fichiers font plusieurs milliers de lignes : **ne pas les lire en entier**, utiliser Grep.
 
 ## Particularités de Forever

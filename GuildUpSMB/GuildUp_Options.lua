@@ -64,6 +64,7 @@ local function Aide()
 	print("  /smb lueur — lueur derrière la bannière de ta cible (" .. OuiNon(db.lueur) .. ")")
 	print("  /smb medaillons — portraits des joueurs sur les bannières (" .. OuiNon(db.medaillons ~= false) .. ")")
 	print("  /smb reperes — membres de ta zone à l'écran (" .. OuiNon(db.reperes ~= false) .. ")")
+	print("  /smb objectifs — « ! » sur les ennemis à tuer ou dépouiller pour une quête (" .. OuiNon(db.objectifsPlaques ~= false) .. ")")
 	print("  /smb annonces — annonces de la guilde en bulle (" .. OuiNon(db.annoncesGuilde ~= false) .. ")")
 	print("  /smb diag — informations techniques à copier (en cas de problème)")
 	print("  /smb debug — afficher / cacher la partie Debug de la page Options")
@@ -342,7 +343,7 @@ local function Diag()
 		local ok, err = pcall(ns.DiagCarte, L)
 		if not ok then L("carte : ERREUR " .. tostring(err)) end
 	end
-	for _, d in ipairs({ { "métiers", ns.DiagMetiers }, { "version", ns.DiagVersion }, { "quêtes", ns.DiagQuetes },
+	for _, d in ipairs({ { "métiers", ns.DiagMetiers }, { "version", ns.DiagVersion }, { "quêtes", ns.DiagQuetes }, { "objectifs", ns.DiagObjectifs },
 		{ "événements", ns.DiagEvenements }, { "recherche", ns.DiagRecherche }, { "besoins", ns.DiagBesoins }, { "échanges", ns.DiagEchanges }, { "discord", ns.DiagDiscord }, { "carnet", ns.DiagCarnet }, { "carnet2", ns.DiagCarnet2 }, { "projets", ns.DiagProjets }, { "identité", ns.DiagIdentite }, { "gu", ns.DiagGU } }) do
 		if d[2] then
 			local ok, err = pcall(d[2], L)
@@ -396,17 +397,20 @@ local function CreerPage(parent)
 	local affichage = UI.Carte(p, "Affichage")
 	affichage:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -MARGE)
 	affichage:SetSize(demi, HAUT_CARTE)
-	Case(affichage, 14, -40, "Activer les bannières",
+	Case(affichage, 14, -38, "Activer les bannières",
 		function() return db.actif end, function(v) db.actif = v; SurActivation() end)
-	Case(affichage, 14, -66, "Portraits des joueurs",
+	Case(affichage, 14, -62, "Portraits des joueurs",
 		function() return db.medaillons ~= false end, function(v) db.medaillons = v end)
-	Case(affichage, 14, -92, "Membres de ma zone sur le tour de l'écran",
+	Case(affichage, 14, -86, "Membres de ma zone sur le tour de l'écran",
 		function() return db.reperes ~= false end, function(v) db.reperes = v end)
-	Case(affichage, 14, -118, "Afficher le médaillon SMB Forever",
+	Case(affichage, 14, -110, "« ! » sur les ennemis de quête",
+		function() return db.objectifsPlaques ~= false end,
+		function(v) db.objectifsPlaques = v; if ns.MajObjectifsPlaques then ns.MajObjectifsPlaques() end end)
+	Case(affichage, 14, -134, "Afficher le médaillon SMB Forever",
 		function() return ns.BoutonVisible and ns.BoutonVisible() end,
 		function(v) if ns.BasculerBouton then ns.BasculerBouton(v) end end)
 	local tTaille = UI.Texte(affichage, "GameFontHighlight", C.texte)
-	tTaille:SetPoint("TOPLEFT", affichage, "TOPLEFT", 14, -154)
+	tTaille:SetPoint("TOPLEFT", affichage, "TOPLEFT", 14, -164)
 	tTaille:SetText("Taille de la fenêtre")
 	local taille = UI.Curseur(affichage, demi - 14 - 140 - 50, 0.7, 1.6, 0.05, function(v)
 		if ns.EchelleInterface then ns.EchelleInterface(v) end
@@ -646,6 +650,10 @@ SlashCmdList.GUILDUP = function(msg)
 		SurActivation()
 	elseif cmd == "auras" then
 		db.aurasSous = not db.aurasSous; Message("améliorations sous la barre : " .. OuiNon(db.aurasSous))
+	elseif cmd == "objectifs" or cmd == "quetes!" then
+		db.objectifsPlaques = (db.objectifsPlaques == false)
+		Message("« ! » sur les ennemis de quête : " .. OuiNon(db.objectifsPlaques))
+		if ns.MajObjectifsPlaques then ns.MajObjectifsPlaques() end
 	elseif cmd == "medaillons" or cmd == "médaillons" or cmd == "portraits" then
 		db.medaillons = (db.medaillons == false)
 		Message("portraits des joueurs sur les bannières : " .. OuiNon(db.medaillons))
