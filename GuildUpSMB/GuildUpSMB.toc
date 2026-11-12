@@ -3,7 +3,7 @@
 ## Notes: Outils de guilde : bannières par rôle, groupes et quêtes, artisanat et dons, calendrier, carte.|n|n/smb pour ouvrir la fenêtre SMB Forever
 ## Author: Miko
 ## IconTexture: Interface\AddOns\GuildUpSMB\media\gu_emote
-## Version: 2.6.2
+## Version: 2.7.0
 ## SavedVariables: GuildUpDB, GuildUpMetiersDB
 
 GuildUp_Config.lua
@@ -24,6 +24,7 @@ GuildUp_Reperes.lua
 GuildUp_Recettes.lua
 GuildUp_Metiers.lua
 GuildUp_Version.lua
+GuildUp_Membres.lua
 GuildUp_Quetes.lua
 GuildUp_Evenements.lua
 GuildUp_Annonces.lua

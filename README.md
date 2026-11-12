@@ -56,10 +56,20 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
   couleur de son rôle, pastille des nouveautés (groupes ouverts, appels à l'aide, demandes de dons).
   Halo doré quand des groupes sont ouverts, anneau vert quand on est en attente. Clic : la fenêtre
   GuildUpSMB ; clic droit : menu rapide (rôle, partage de position, groupes, appel à l'aide, options).
-- **Fenêtre GuildUpSMB** (style sombre et doré) : menu à gauche (Accueil, Groupes, Quêtes en commun,
-  Artisanat, Mes carnets, Dons, Événements, À l'aide !, Options) et choix du rôle en haut. L'accueil
+- **Fenêtre GuildUpSMB** (style sombre et doré) : menu à gauche (Accueil, Guilde, Groupes, Quêtes en
+  commun, Artisanat, Mes carnets, Dons, Événements, À l'aide !, Options) et choix du rôle en haut. L'accueil
   résume la guilde : membres sur ta carte, groupes ouverts (postuler en un clic), appels à l'aide,
   demandes de dons, besoins que tu sais fabriquer, avancement du dernier projet.
+- **Page Guilde** : tous les membres de la guilde, en ligne et hors ligne, avec tout ce que l'addon sait
+  d'eux : niveau, classe, rang, zone ou dernière connexion, pseudo et personnage principal, rôle,
+  SMB Forever (et sa version), métiers et niveaux, distance s'il est sur ta carte, note de guilde.
+  Recherche (nom, pseudo, zone, métier), filtres Tous / En ligne / Avec l'addon, tri (en ligne d'abord,
+  par niveau, par rang). Survol : la fiche complète ; clic : chuchoter ; clic droit : chuchoter ou
+  inviter dans le groupe.
+- **Profil** : tant que ton pseudo, ton personnage principal ou ton rôle (Tank, Heal ou DPS, choisi à la
+  main) manque, une alerte « Profil incomplet » s'affiche en haut de la fenêtre ; elle ouvre la fenêtre
+  « Complète ton profil » (qui s'ouvre aussi d'elle-même la première fois que tu ouvres la fenêtre dans
+  la session). Aussi par le bouton « Mon profil » de la page Guilde.
 - **Recherche de groupe de la guilde** : places Tank / Heal / DPS, groupes jusqu'à 40, et bouton
   « Rendre public » pour inscrire le groupe dans la recherche du jeu.
 - **Carte de la guilde** : position des membres sur la carte du monde (partage activé par défaut,

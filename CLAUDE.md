@@ -32,17 +32,26 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
 - `GuildUp_Plaques.lua` : bannières derrière le nom et la barre de vie (barres de nom et cadre de cible), modèles de bannière (passés en paramètre), mise en page des barres de nom, réglages du jeu imposés (CVars), événements des barres de nom. Exporte `ns.Plaques`.
 - `GuildUp_Bouton.lua` : médaillon flottant (`ns.MajBouton`), menu rapide, `ns.ChoisirRole`, bulles
   `ns.Notifier(catégorie, titre, texte, son, action)`.
-- `GuildUp_Style.lua` : **kit d'interface** `ns.UI` (couleurs `UI.C`, `Bouton`, `Carte`, `Rangee`, `Onglets`, `Puces`,
-  `Liste`, `Champ`, `Case`, `Choix`, `Places`, `Portrait`…). Toute nouvelle interface passe par lui (style sombre et
+- `GuildUp_Style.lua` : **kit d'interface** `ns.UI` (couleurs `UI.C`, `Bouton`, `BoutonAlerte`, `Carte`, `Rangee`,
+  `Onglets`, `Puces`, `Liste`, `Champ`, `Case`, `Choix`, `Places`, `Portrait`…). Toute nouvelle interface passe par lui (style sombre et
   doré des maquettes) : pas de modèle du jeu (`UIPanelButtonTemplate`, parchemins…) dans les pages.
 - `GuildUp_Interface.lua` : fenêtre principale (style sombre et doré : `Habiller`, `Bouton`, `CarteAccueil`…),
   menu des sections et page Accueil ; `ns.OuvrirInterface(page)`, `ns.MajInterface()`, `ns.NouveautesGuilde()`.
   Un module fournit sa page avec `ns.AjouterPage(id, creer)` (`creer(parent)` renvoie un cadre avec `Maj()` et
   `Ouvrir(...)`). Les sections pas encore refaites ouvrent leur ancienne fenêtre (`ouvrir` dans `SECTIONS`).
+  Dans le bandeau, l'alerte « Profil incomplet » (tant que `ns.ProfilComplet()` est faux) ouvre `ns.OuvrirProfil()`.
+- `GuildUp_Identite.lua` : pseudo, personnage principal et personnages (préfixe `GuildUpId`), et **profil** :
+  `ns.PoserPseudo(texte, differer)` (seule validation du pseudo, aussi pour la page Options), `ns.PoserPrincipal`,
+  `ns.ProfilComplet()` / `ns.ManquesProfil()` (pseudo, principal et rôle choisi à la main), fenêtre « Complète ton
+  profil » `ns.OuvrirProfil()` (ouverte seule à la première ouverture de la fenêtre de la session si incomplet).
+- `GuildUp_Membres.lua` : page **Guilde** (`ns.AjouterPage("guilde")`) : tous les membres de la liste de guilde
+  (`ns.RosterGuilde()` et `ns.FicheMetiers(cle)` de `GuildUp_Metiers.lua`) avec ce que l'addon sait d'eux (identité,
+  rôle, version `ns.VersionMembre` si fournie, métiers, distance `ns.DistanceMembre` de `GuildUp_Interface.lua`, note) ;
+  liste virtuelle (seules les rangées visibles existent). `ns.MajMembres()` la rafraîchit. Aucun message réseau.
 - `GuildUp_Options.lua` : fenêtre d'options, `/smb diag`, réinitialisation, commandes `/smb`.
 - Les fichiers découpés accèdent à `GuildUpDB` par un mandataire `db` (même nom qu'avant) et reprennent les fonctions partagées en tête de fichier (`local Message = ns.Coeur.Message`).
-- Pages de la fenêtre GuildUpSMB (chacune enregistrée par son module avec `ns.AjouterPage`) : Groupes
-  (`GuildUp_GroupesFenetre.lua`), Quêtes en commun (`GuildUp_Quetes.lua`), Dons (`GuildUp_Echanges.lua` +
+- Pages de la fenêtre GuildUpSMB (chacune enregistrée par son module avec `ns.AjouterPage`) : Guilde
+  (`GuildUp_Membres.lua`), Groupes (`GuildUp_GroupesFenetre.lua`), Quêtes en commun (`GuildUp_Quetes.lua`), Dons (`GuildUp_Echanges.lua` +
   `GuildUp_Besoins.lua`), Artisanat (`GuildUp_Carnet.lua` ; onglets Registre dans `GuildUp_Metiers.lua`, Items dans
   `GuildUp_Carnet.lua`, Projets dans `GuildUp_Projets.lua`), Mes carnets (`GuildUp_Carnet.lua`), Options
   (`GuildUp_Options.lua`). Les anciennes fonctions `ns.Ouvrir*` / `ns.Basculer*` ouvrent ces pages

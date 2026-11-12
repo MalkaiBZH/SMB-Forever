@@ -1,7 +1,8 @@
 -- GuildUpSMB : artisanat et carnet de craft, dans la fenêtre GuildUpSMB (kit ns.UI, GuildUp_Style.lua).
 -- Pages fournies ici (ns.AjouterPage) :
 --   « artisanat » : onglets Registre (GuildUp_Metiers.lua), Items (ici : tous les objets fabricables,
---     catégories et sous-catégories, recherche, filtres « Pour ma classe » et « Jusqu'à mon niveau », tri ; « Besoin », « Ajouter » à une liste ou à un projet)
+--     catégories et sous-catégories, recherche, filtres « Pour ma classe », « Jusqu'à mon niveau », niveau requis min / max et « Fabricable par la
+--     guilde », tri ; « Besoin », « Ajouter » à une liste ou à un projet)
 --     et Projets de guilde (GuildUp_Projets.lua).
 --   « carnets » (Mes carnets) : mes listes à gauche ; à droite la liste de courses de la liste choisie,
 --     qui calcule tout ce qu'il faut, sous-recettes comprises, compare avec les sacs et la banque, et
@@ -2223,14 +2224,22 @@ local function PourMaClasse(id)
 	end
 	return true -- consommables, artisanat, sacs… : pas concernés
 end
--- niveau requis connu (objet en cache) et plus haut que le mien ; inconnu : gardé (demandé au serveur)
-local function TropHaut(id)
+-- niveau requis hors de [min, max] (objet en cache) ; inconnu : gardé (demandé au serveur)
+local function HorsNiveaux(id, min, max)
 	local nom, _, _, _, requis = InfoObjet(id)
 	if not nom then
 		if ns.Precharger then ns.Precharger(id) end
 		return false
 	end
-	return (requis or 0) > (UnitLevel("player") or 1)
+	requis = requis or 0
+	return (min and requis < min) or (max and requis > max) or false
+end
+-- un autre membre de la guilde sait le fabriquer (registre des métiers)
+local function FabricableParLaGuilde(id)
+	for _, art in ipairs(ns.ArtisansDe and ns.ArtisansDe(id) or {}) do
+		if not art.moi then return true end
+	end
+	return false
 end
 
 -- Onglet Items : la liste (150 objets au plus) selon la catégorie, la recherche, les filtres et le tri
@@ -2248,7 +2257,12 @@ local function RendreItems()
 		if garde and rechercheItems ~= "" then garde = o[4]:find(rechercheItems, 1, true) ~= nil end
 		local db = ns.DB and ns.DB()
 		if garde and db and db.itemsClasse then garde = PourMaClasse(o[1]) end
-		if garde and db and db.itemsNiveau then garde = not TropHaut(o[1]) end
+		if garde and db and (db.itemsNiveau or db.itemsNivMin or db.itemsNivMax) then
+			local max = db.itemsNivMax
+			if db.itemsNiveau then max = math.min(max or 999, UnitLevel("player") or 1) end
+			garde = not HorsNiveaux(o[1], db.itemsNivMin, max)
+		end
+		if garde and db and db.itemsGuilde then garde = FabricableParLaGuilde(o[1]) end
 		if garde then
 			total = total + 1
 			res[#res + 1] = o
@@ -2480,7 +2494,7 @@ local function CreerPageItems(parent)
 		RendreItems()
 	end
 	p.compte = UI.Texte(p, "GameFontHighlightSmall", C.gris)
-	p.compte:SetPoint("TOPLEFT", p, "TOPLEFT", x0 + 2, -96)
+	p.compte:SetPoint("TOPLEFT", p, "TOPLEFT", x0 + 2, -130)
 	-- filtres pour moi : ma classe (armes et armures que je peux porter), mon niveau (mémorisés)
 	local function Filtre(cle)
 		return function(oui)
@@ -2490,20 +2504,53 @@ local function CreerPageItems(parent)
 			RendreItems()
 		end
 	end
-	p.niveau = UI.Case(p, "Jusqu'à mon niveau", Filtre("itemsNiveau"))
-	p.niveau:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -92)
-	UI.Infobulle(p.niveau, "Jusqu'à mon niveau", "Seulement les objets dont le niveau requis ne dépasse pas le tien.")
 	p.classe = UI.Case(p, "Pour ma classe", Filtre("itemsClasse"))
-	p.classe:SetPoint("RIGHT", p.niveau, "LEFT", -18, 0)
+	p.classe:SetPoint("TOPLEFT", p, "TOPLEFT", x0, -94)
+	p.niveau = UI.Case(p, "Jusqu'à mon niveau", Filtre("itemsNiveau"))
+	p.niveau:SetPoint("LEFT", p.classe, "RIGHT", 22, 0)
+	UI.Infobulle(p.niveau, "Jusqu'à mon niveau", "Seulement les objets dont le niveau requis ne dépasse pas le tien.")
+	p.guilde = UI.Case(p, "Fabricable par la guilde", Filtre("itemsGuilde"))
+	p.guilde:SetPoint("LEFT", p.niveau, "RIGHT", 22, 0)
+	UI.Infobulle(p.guilde, "Fabricable par la guilde",
+		"Seulement les objets qu'un autre membre de la guilde sait fabriquer (d'après le registre des métiers : ils doivent avoir ouvert leur fenêtre de métier avec l'addon).")
+	-- fourchette de niveau requis : deux cases (vides = pas de limite)
+	local function Borne(cle)
+		local champ = UI.Champ(p, 44, "", 26)
+		champ.saisie:SetNumeric(true)
+		champ.saisie:SetMaxLetters(2)
+		champ.saisie:SetJustifyH("CENTER")
+		champ.SurTexte = function(t)
+			local db = ns.DB and ns.DB()
+			if db then db[cle] = tonumber(t) end
+			p.liste:Haut()
+			RendreItems()
+		end
+		return champ
+	end
+	p.nivMax = Borne("itemsNivMax")
+	p.nivMax:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -124)
+	local tA = UI.Texte(p, "GameFontHighlightSmall", C.gris)
+	tA:SetPoint("RIGHT", p.nivMax, "LEFT", -6, 0)
+	tA:SetText("à")
+	p.nivMin = Borne("itemsNivMin")
+	p.nivMin:SetPoint("RIGHT", tA, "LEFT", -6, 0)
+	local tNiv = UI.Texte(p, "GameFontHighlightSmall", C.texte)
+	tNiv:SetPoint("RIGHT", p.nivMin, "LEFT", -8, 0)
+	tNiv:SetText("Niveau requis")
+	UI.Infobulle(p.nivMin, "Niveau requis minimum", "Laisse vide pour ne pas limiter.")
+	UI.Infobulle(p.nivMax, "Niveau requis maximum", "Laisse vide pour ne pas limiter. Avec « Jusqu'à mon niveau », la plus petite des deux limites compte.")
 	UI.Infobulle(p.classe, "Pour ma classe",
 		"Armes : celles que ta classe sait manier. Armures : ton type d'armure (plaques ou mailles à partir du niveau 40 pour les classes concernées), plus les capes, bijoux, boucliers et reliques de ta classe. Les autres objets ne sont pas filtrés.")
 	do
 		local db = ns.DB and ns.DB()
 		p.classe:Poser(db and db.itemsClasse)
 		p.niveau:Poser(db and db.itemsNiveau)
+		p.guilde:Poser(db and db.itemsGuilde)
+		p.nivMin:Ecrire(db and db.itemsNivMin and tostring(db.itemsNivMin) or "")
+		p.nivMax:Ecrire(db and db.itemsNivMax and tostring(db.itemsNivMax) or "")
 	end
 	p.liste = UI.Liste(p)
-	p.liste:SetPoint("TOPLEFT", p, "TOPLEFT", x0, -116)
+	p.liste:SetPoint("TOPLEFT", p, "TOPLEFT", x0, -152)
 	p.liste:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE + 6, MARGE)
 	p.vide = UI.Texte(p, "GameFontHighlight", C.gris)
 	p.vide:SetPoint("TOPLEFT", p.liste, "TOPLEFT", 4, -8)

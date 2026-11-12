@@ -6,6 +6,14 @@
 -- GuildUpDB est commun au compte : chaque personnage connecté s'y note (db.mesPersos), le joueur
 -- choisit son pseudo (db.pseudo) et son principal (db.persoPrincipal). Synchro (préfixe GuildUpId) :
 --   I~pseudo~principal~perso1,perso2,…     mon identité          Q    « envoyez-moi les vôtres »
+--
+-- Profil : pseudo, personnage principal et rôle choisi à la main (Tank / Heal / DPS, par personnage).
+-- Une seule validation du pseudo (ns.PoserPseudo, aussi pour la page Options) et du principal
+-- (ns.PoserPrincipal, aussi pour le menu « Persos »). ns.ProfilComplet() / ns.ManquesProfil() :
+-- l'alerte « Profil incomplet » du bandeau de la fenêtre SMB Forever (GuildUp_Interface.lua).
+-- Fenêtre « Complète ton profil » (ns.OuvrirProfil, kit ns.UI) : pseudo, principal, rôle ; elle
+-- s'ouvre seule à la première ouverture de la fenêtre SMB Forever de la session si le profil est
+-- incomplet. Rien n'est enregistré avant « Enregistrer ».
 
 local NOM_ADDON, ns = ...
 local PREFIXE = "GuildUpId"
@@ -188,6 +196,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		end
 	end
 	index = nil
+	if ns.MajMembres then ns.MajMembres() end
 end
 
 --------------------------------------------------------------------------------
@@ -258,8 +267,8 @@ ns.MenuPersos = function(ancre)
 			.. (couleur and ("|c" .. (couleur.colorStr or "ffffffff")) or "|cffffffff") .. NomCourt(c) .. "|r"
 			.. (p.niveau and ("  |cff999999niv. " .. p.niveau .. "|r") or "") .. (c == MaCle() and "  |cff999999(connecté)|r" or ""))
 		b:SetScript("OnClick", function()
-			db.persoPrincipal = (db.persoPrincipal ~= c) and c or nil
-			ns.AnnoncerIdentite()
+			-- re-clic sur le principal : plus de principal
+			ns.PoserPrincipal((db.persoPrincipal ~= c) and c or nil)
 			ns.MenuPersos(ancre)
 		end)
 		b:Show()
@@ -274,6 +283,262 @@ ns.MenuPersos = function(ancre)
 	menu:ClearAllPoints()
 	menu:SetPoint("TOPLEFT", ancre, "BOTTOMLEFT", 0, -2)
 	menu:Show()
+end
+
+--------------------------------------------------------------------------------
+-- Profil : pseudo, personnage principal, rôle
+--------------------------------------------------------------------------------
+
+local LETTRES_PSEUDO = 16
+ns.LETTRES_PSEUDO = LETTRES_PSEUDO
+
+-- le profil a changé : alerte du bandeau, page Guilde
+local function ProfilChange()
+	if ns.MajInterface then ns.MajInterface() end
+	if ns.MajMembres then ns.MajMembres() end
+end
+
+-- Pseudo saisi (page Options, fenêtre « Complète ton profil ») : sans ~ | , ni retour à la ligne,
+-- 16 lettres au plus ; vide = pas de pseudo. Renvoie le pseudo retenu (ou nil) et vrai s'il a changé.
+-- Annoncé à la guilde s'il change, sauf avec differer (l'appelant annonce une seule fois pour tout).
+ns.PoserPseudo = function(texte, differer)
+	local db = DB()
+	if not db then return nil, false end
+	local t = strtrim(((texte or ""):gsub("[~|,\r\n]", "")))
+	t = strtrim(ns.CouperUTF8(t, nil, LETTRES_PSEUDO))
+	local nouveau = (t ~= "") and t or nil
+	if nouveau == db.pseudo then return nouveau, false end
+	db.pseudo = nouveau
+	if not differer then ns.AnnoncerIdentite() end
+	ProfilChange()
+	return nouveau, true
+end
+
+-- Personnage principal (un de mes personnages de cette guilde, ou nil = aucun). Renvoie vrai s'il a
+-- changé ; annoncé à la guilde, sauf avec differer.
+ns.PoserPrincipal = function(cle, differer)
+	local db = DB()
+	if not db then return false end
+	if cle then
+		local connu = false
+		for _, c in ipairs(MesPersos()) do if c == cle then connu = true end end
+		if not connu then return false end
+	end
+	if db.persoPrincipal == cle then return false end
+	db.persoPrincipal = cle
+	if not differer then ns.AnnoncerIdentite() end
+	ProfilChange()
+	return true
+end
+
+local ROLE_VALIDE = { tank = true, heal = true, dps = true }
+local function RoleALaMain()
+	local r = ns.RoleChoisiALaMain and ns.RoleChoisiALaMain()
+	return ROLE_VALIDE[r] and r or nil
+end
+
+-- Ce qui manque au profil (textes pour l'infobulle de l'alerte), liste vide s'il est complet
+ns.ManquesProfil = function()
+	local db = DB()
+	local m = {}
+	if not db then return m end
+	if not (db.pseudo and db.pseudo ~= "") then m[#m + 1] = "ton pseudo" end
+	if not MonIdentite().principal then m[#m + 1] = "ton personnage principal" end
+	if not RoleALaMain() then m[#m + 1] = "ton rôle (Tank, Heal ou DPS) sur ce personnage" end
+	return m
+end
+-- Profil complet : pseudo, principal et rôle choisi à la main (pas « Auto ») ; vrai tant que la
+-- base n'est pas chargée (rien à signaler)
+ns.ProfilComplet = function()
+	if not DB() then return true end
+	return #ns.ManquesProfil() == 0
+end
+
+-- Fenêtre « Complète ton profil »
+local LARGEUR_PROFIL, HAUTEUR_PROFIL, HAUTEUR_TETE_PROFIL = 470, 396, 52
+local X_CHAMP = 170 -- colonne des champs (les libellés sont à gauche)
+local ROLES_PROFIL = { "tank", "heal", "dps" }
+local fenProfil
+
+local function CreerProfil()
+	local UI = ns.UI
+	local C = UI.C
+	local MEDIA = "Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\"
+	local f = CreateFrame("Frame", "GuildUpProfil", UIParent, "BackdropTemplate")
+	UI.Habiller(f, C.fond, { C.orFonce[1], C.orFonce[2], C.orFonce[3], 1 })
+	f:SetSize(LARGEUR_PROFIL, HAUTEUR_PROFIL)
+	f:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
+	f:SetFrameStrata("DIALOG") -- au-dessus de la fenêtre SMB Forever (HIGH)
+	f:SetToplevel(true)
+	f:SetClampedToScreen(true)
+	f:SetMovable(true)
+	f:EnableMouse(true)
+	f:Hide()
+	tinsert(UISpecialFrames, "GuildUpProfil") -- Échap ferme
+	f:SetScript("OnShow", function() if ns.Son then ns.Son("IG_MAINMENU_OPEN") end end)
+	f:SetScript("OnHide", function() if ns.Son then ns.Son("IG_MAINMENU_CLOSE") end end)
+
+	-- bandeau : emblème, titre, sous-titre, fermeture ; on le glisse pour déplacer
+	local tete = UI.Cadre(f, C.bandeau)
+	tete:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -1)
+	tete:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -1)
+	tete:SetHeight(HAUTEUR_TETE_PROFIL)
+	tete:EnableMouse(true)
+	tete:RegisterForDrag("LeftButton")
+	tete:SetScript("OnDragStart", function() f:StartMoving() end)
+	tete:SetScript("OnDragStop", function() f:StopMovingOrSizing() end)
+	local filet = UI.Filet(tete)
+	filet:SetPoint("BOTTOMLEFT", tete, "BOTTOMLEFT", 0, 0)
+	filet:SetPoint("BOTTOMRIGHT", tete, "BOTTOMRIGHT", 0, 0)
+	local embleme = tete:CreateTexture(nil, "ARTWORK")
+	embleme:SetTexture(MEDIA .. "gu_emote")
+	embleme:SetSize(36, 36)
+	embleme:SetPoint("LEFT", tete, "LEFT", 12, 0)
+	local titre = UI.Texte(tete, "GameFontNormalLarge", C.ors)
+	titre:SetPoint("TOPLEFT", embleme, "TOPRIGHT", 10, -2)
+	titre:SetText("Complète ton profil")
+	local sousTitre = UI.Texte(tete, "GameFontHighlightSmall", C.gris)
+	sousTitre:SetPoint("TOPLEFT", titre, "BOTTOMLEFT", 0, -3)
+	sousTitre:SetText("Pour que la guilde sache qui tu es")
+	local fermer = UI.Fermer(tete, function() f:Hide() end, 26)
+	fermer:SetPoint("RIGHT", tete, "RIGHT", -10, 0)
+
+	-- explication
+	local expl = UI.Texte(f, "GameFontHighlight", C.texte)
+	expl:SetPoint("TOPLEFT", tete, "BOTTOMLEFT", 15, -14)
+	expl:SetWidth(LARGEUR_PROFIL - 32)
+	expl:SetWordWrap(true)
+	expl:SetSpacing(2)
+	expl:SetText("La guilde voit ton |cfff1cf6bpseudo|r et ton |cfff1cf6bpersonnage principal|r au survol de ton nom. "
+		.. "Ton |cfff1cf6brôle|r sert aux groupes et aux bannières derrière ton nom.")
+
+	-- une ligne : libellé (et précision grisée en dessous) à gauche, champ à droite
+	local function Libelle(y, texte, precision)
+		local t = UI.Texte(f, "GameFontNormal", C.ors)
+		t:SetPoint("TOPLEFT", f, "TOPLEFT", 16, y)
+		t:SetText(texte)
+		local p = UI.Texte(f, "GameFontHighlightSmall", C.gris)
+		p:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -3)
+		p:SetWidth(X_CHAMP - 26)
+		p:SetWordWrap(true)
+		p:SetText(precision or "")
+		return t, p
+	end
+	local largeurChamp = LARGEUR_PROFIL - X_CHAMP - 16
+
+	-- pseudo
+	Libelle(-124, "Pseudo", "Ton nom habituel, commun à tes persos")
+	f.pseudo = UI.Champ(f, largeurChamp, "Par exemple « Miko »")
+	f.pseudo:SetPoint("TOPLEFT", f, "TOPLEFT", X_CHAMP, -118)
+	f.pseudo.saisie:SetMaxLetters(LETTRES_PSEUDO)
+
+	-- personnage principal
+	Libelle(-180, "Personnage principal", "Parmi tes persos de cette guilde")
+	f.principal = UI.Choix(f, largeurChamp, {}, function(v)
+		f.choixPrincipal = v
+		if f.MajEtat then f.MajEtat() end
+	end)
+	f.principal:SetPoint("TOPLEFT", f, "TOPLEFT", X_CHAMP, -174)
+
+	-- rôle (du personnage connecté)
+	local _, precisionRole = Libelle(-236, "Rôle principal", "")
+	f.precisionRole = precisionRole
+	local noms = {}
+	for i, r in ipairs(ROLES_PROFIL) do noms[i] = UI.TexteRole(r) end
+	f.roles = UI.Puces(f, noms, function(i)
+		f.choixRole = ROLES_PROFIL[i]
+		f.roles:Choisir(i)
+		if f.MajEtat then f.MajEtat() end
+	end)
+	f.roles:SetPoint("TOPLEFT", f, "TOPLEFT", X_CHAMP, -231)
+
+	-- ce qui manque encore (d'après les choix en cours)
+	f.etat = UI.Texte(f, "GameFontHighlightSmall", C.aide)
+	f.etat:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -292)
+	f.etat:SetWidth(LARGEUR_PROFIL - 32)
+	f.etat:SetWordWrap(true)
+
+	-- pied : filet, « Plus tard » et « Enregistrer »
+	local filetBas = UI.Filet(f)
+	filetBas:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 1, 50)
+	filetBas:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1, 50)
+	f.enregistrer = UI.Bouton(f, "Enregistrer", "or", 130, 28)
+	f.enregistrer:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 12)
+	f.plusTard = UI.Bouton(f, "Plus tard", "fantome", 110, 28)
+	f.plusTard:SetPoint("RIGHT", f.enregistrer, "LEFT", -10, 0)
+	f.plusTard:SetScript("OnClick", function() f:Hide() end)
+	UI.Infobulle(f.plusTard, "Plus tard", "Ferme sans rien changer. L'alerte « Profil incomplet » du bandeau rouvre cette fenêtre.")
+
+	f.MajEtat = function()
+		local manque = {}
+		local pseudo = strtrim(((f.pseudo:Lire() or ""):gsub("[~|,\r\n]", "")))
+		if pseudo == "" then manque[#manque + 1] = "ton pseudo" end
+		if not f.choixPrincipal then manque[#manque + 1] = "ton personnage principal" end
+		if not f.choixRole then manque[#manque + 1] = "ton rôle" end
+		if #manque == 0 then
+			f.etat:SetTextColor(unpack(C.vert))
+			f.etat:SetText("Tout est rempli : clique sur « Enregistrer ».")
+		else
+			f.etat:SetTextColor(unpack(C.aide))
+			f.etat:SetText("Il manque encore " .. table.concat(manque, ", ") .. ".")
+		end
+	end
+	f.pseudo.SurTexte = function() f.MajEtat() end
+
+	f.enregistrer:SetScript("OnClick", function()
+		local _, pseudoChange = ns.PoserPseudo(f.pseudo:Lire(), true)
+		local principalChange = f.choixPrincipal and ns.PoserPrincipal(f.choixPrincipal, true) or false
+		if pseudoChange or principalChange then ns.AnnoncerIdentite() end
+		-- (ChoisirRole bascule en « Auto » si on redonne le rôle déjà choisi : seulement s'il change)
+		if f.choixRole and RoleALaMain() ~= f.choixRole and ns.ChoisirRole then ns.ChoisirRole(f.choixRole) end
+		f:Hide()
+		ProfilChange()
+	end)
+	return f
+end
+
+-- Remplit la fenêtre avec le profil enregistré
+local function RemplirProfil(f)
+	local db = DB() or {}
+	NoterMonPerso()
+	f.pseudo:Ecrire(db.pseudo or "")
+	-- mes personnages de cette guilde : nom à la couleur de la classe, niveau, « connecté »
+	local options = {}
+	local persos = MesPersos()
+	for _, c in ipairs(persos) do
+		local p = db.mesPersos and db.mesPersos[c] or {}
+		local couleur = ns.CouleurClasseTexte and ns.CouleurClasseTexte(p.classe) or "|cffffffff"
+		options[#options + 1] = { c, couleur .. NomCourt(c) .. "|r"
+			.. (p.niveau and ("  |cff9c9380niv. " .. p.niveau .. "|r") or "")
+			.. (c == MaCle() and "  |cff9c9380(connecté)|r" or "") }
+	end
+	f.principal.options = options
+	f.choixPrincipal = MonIdentite().principal or (#persos == 1 and persos[1]) or nil
+	if f.choixPrincipal then
+		f.principal:Poser(f.choixPrincipal)
+	else
+		f.principal.valeur = nil
+		f.principal.texte:SetText("|cff9c9380Choisir…|r")
+	end
+	f.choixRole = RoleALaMain()
+	local index = 0
+	for i, r in ipairs(ROLES_PROFIL) do if r == f.choixRole then index = i end end
+	f.roles:Choisir(index)
+	local _, classe = UnitClass("player")
+	f.precisionRole:SetText("Pour " .. (ns.CouleurClasseTexte and ns.CouleurClasseTexte(classe) or "")
+		.. NomCourt(MaCle()) .. "|r (chaque perso a le sien)")
+	f.MajEtat()
+	f.pseudo.saisie:ClearFocus()
+end
+
+ns.OuvrirProfil = function()
+	if not (DB() and ns.UI) then return end
+	if not fenProfil then fenProfil = CreerProfil() end
+	RemplirProfil(fenProfil)
+	-- même taille que la fenêtre SMB Forever (/smb taille)
+	if ns.EchelleInterface then fenProfil:SetScale(ns.EchelleInterface() or 1) end
+	fenProfil:Show()
+	fenProfil:Raise()
 end
 
 ns.DiagIdentite = function(L)

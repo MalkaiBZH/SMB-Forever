@@ -6,7 +6,8 @@
 -- /smb debug) et bouton « Réinitialiser les réglages ».
 -- Fournit ns.OuvrirOptions(), ns.BasculerOptions() (ferme la fenêtre si elle est déjà sur cette page) et
 -- ns.MajOptions() (rafraîchit la page si elle est affichée). Aucun message réseau ici : le pseudo et le
--- rôle partent par ns.AnnoncerIdentite / ns.ChoisirRole.
+-- rôle partent par ns.PoserPseudo (GuildUp_Identite.lua, validation commune avec la fenêtre « Complète
+-- ton profil ») / ns.ChoisirRole.
 
 local NOM_ADDON, ns = ...
 
@@ -23,7 +24,7 @@ local ToutRafraichir, SurActivation, MajBarre, Bordures, DeplacerAuras, PlacerIn
 -- besoins, projets, identité, cvarsAvant… sont gardées)
 local REGLAGES_HORS_DEFAUT = {
 	"notifs", "bouton", "barre", "interface", "annoncesGuilde", "emoteGU", "voletNotifs", "coursesCompact",
-	"afficherDebug", "tousNiveaux", "itemsClasse", "itemsNiveau", "styleJeu", "rappelGroupe", "portee", "rolesPerso",
+	"afficherDebug", "tousNiveaux", "itemsClasse", "itemsNiveau", "itemsGuilde", "itemsNivMin", "itemsNivMax", "styleJeu", "rappelGroupe", "portee", "rolesPerso",
 }
 
 -- Bouton « Réinitialiser » et /smb reset : seulement les réglages
@@ -426,16 +427,14 @@ local function CreerPage(parent)
 	UI.Infobulle(persos, "Mes personnages", "Choisir ton personnage principal parmi tes personnages.")
 	local pseudo = UI.Champ(moi, demi - 78 - 70 - 8 - 14, "Nom commun à tes persos")
 	pseudo:SetPoint("TOPLEFT", moi, "TOPLEFT", 78, -38)
-	pseudo.saisie:SetMaxLetters(16)
+	pseudo.saisie:SetMaxLetters(ns.LETTRES_PSEUDO or 16)
 	pseudo.saisie:SetScript("OnEscapePressed", function(self) self:SetText(db.pseudo or ""); self:ClearFocus() end)
-	-- validé à la perte du focus (Entrée, clic ailleurs) ; annoncé à la guilde s'il change
+	-- validé à la perte du focus (Entrée, clic ailleurs) par ns.PoserPseudo (GuildUp_Identite.lua, même
+	-- validation que la fenêtre « Complète ton profil ») ; annoncé à la guilde s'il change
 	pseudo.SurValider = function(texte)
-		local t = strtrim((texte:gsub("[~|,\r\n]", "")))
-		local nouveau = (t ~= "") and t or nil
+		if not ns.PoserPseudo then return end
+		local nouveau = ns.PoserPseudo(texte)
 		pseudo:Ecrire(nouveau or "")
-		if nouveau == db.pseudo then return end
-		db.pseudo = nouveau
-		if ns.AnnoncerIdentite then ns.AnnoncerIdentite() end
 	end
 	pseudo.saisie:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")

@@ -1,6 +1,6 @@
 -- GuildUpSMB : kit d'interface de la fenêtre GuildUpSMB (style sombre et doré des maquettes).
 -- Tous les éléments graphiques des pages viennent d'ici (ns.UI) : couleurs, cadres plats, textes,
--- boutons (or, fantôme, aide), pastilles, cartes, rangées, onglets soulignés, puces de filtre, liste
+-- boutons (or, fantôme, aide, alerte avec icône), pastilles, cartes, rangées, onglets soulignés, puces de filtre, liste
 -- défilante, champ de saisie, case à cocher, liste de choix, curseur, places par rôle, portrait de joueur.
 -- Les pages ne créent pas de modèle du jeu (UIPanelButtonTemplate…) : elles passent par ces fonctions,
 -- pour garder une seule apparence. Aucun message réseau.
@@ -145,6 +145,34 @@ function UI.Bouton(parent, texte, style, largeur, hauteur)
 		self:SetEnabled(oui and true or false)
 		self:SetAlpha(oui and 1 or 0.45)
 	end
+	return b
+end
+
+-- Bouton d'alerte (style « aide » : fond rouge sombre, bordure) avec l'icône d'alerte du jeu à gauche du
+-- texte ; l'icône pulse doucement tant que le bouton est affiché (repli : un « ! » si l'icône manque)
+function UI.BoutonAlerte(parent, texte, largeur, hauteur)
+	local b = UI.Bouton(parent, texte, "aide", largeur or 150, hauteur or 30)
+	b.icone = b:CreateTexture(nil, "OVERLAY")
+	b.icone:SetSize(22, 22)
+	b.icone:SetPoint("LEFT", b, "LEFT", 8, 0)
+	local ok, pose = pcall(b.icone.SetTexture, b.icone, "Interface\\DialogFrame\\UI-Dialog-Icon-AlertNew")
+	if not ok or pose == false then
+		-- (SetTexture renvoie false si le fichier n'existe pas sur ce client)
+		b.icone:SetTexture(nil)
+		local point = b:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+		point:SetPoint("CENTER", b.icone, "CENTER", 0, 0)
+		point:SetText("!")
+		point:SetTextColor(unpack(C.aide))
+	end
+	b.texte:ClearAllPoints()
+	b.texte:SetPoint("LEFT", b.icone, "RIGHT", 6, 0)
+	b.texte:SetPoint("RIGHT", b, "RIGHT", -8, 0)
+	b.texte:SetJustifyH("LEFT")
+	local t = 0
+	b:SetScript("OnUpdate", function(self, ecoule)
+		t = (t + (ecoule or 0)) % 2
+		self.icone:SetAlpha(0.55 + 0.45 * math.abs(1 - t))
+	end)
 	return b
 end
 

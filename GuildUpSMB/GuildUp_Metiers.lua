@@ -5,6 +5,8 @@
 -- (GuildUpMetiersDB) : on voit aussi les membres hors ligne.
 -- Interface : onglet « Registre » de la page Artisanat de la fenêtre GuildUpSMB (kit ns.UI ; la page
 -- et ses onglets sont dans GuildUp_Carnet.lua) : filtres par métier, recherche, membres, fiche.
+-- Lit aussi la liste de guilde (en ligne, zone, rang, note…) : ns.RosterGuilde() et ns.FicheMetiers(cle)
+-- servent la page Guilde (GuildUp_Membres.lua).
 --
 -- Messages d'addon sur le canal de guilde (préfixe "GuildUpMet") :
 --   "Q"                                        demande : « envoyez vos résumés »
@@ -231,6 +233,16 @@ end
 ns.MonNiveauMetier = function(code)
 	local p = MesDonnees().profs[code]
 	return p and p.n
+end
+
+-- Pour la page Guilde (GuildUp_Membres.lua) : fiche métiers d'un membre (la mienne pour moi), nil
+-- s'il n'en a pas envoyé ; fiche = { nom, classe, niveau, vu, profs = { AL = { n, max, nr, … } } }
+ns.FicheMetiers = function(cle)
+	if not cle then return nil end
+	if cle == MaCle() then return MesDonnees() end
+	local g = Guilde()
+	local e = g and g[cle]
+	return type(e) == "table" and e or nil
 end
 
 --------------------------------------------------------------------------------
@@ -710,18 +722,44 @@ local function DemanderRoster()
 	elseif GuildRoster then pcall(GuildRoster) end
 end
 
+-- Une entrée par membre : nom, enLigne, zone, classe, niveau (lus par les autres modules) ; pour la
+-- page Guilde (GuildUp_Membres.lua) aussi : cle, rang, rangIndex, classeNom, note (note publique),
+-- statut (« ABS », « NPD » ou nil) et absence = { ans, mois, jours, heures } depuis la dernière
+-- connexion (hors ligne seulement, GetGuildRosterLastOnline si le client l'a)
+local rosterLuA = 0
 local function LireRoster()
 	if not IsInGuild() or not GetNumGuildMembers then return end
 	wipe(roster)
-	local n = GetNumGuildMembers() or 0
+	local n = tonumber((GetNumGuildMembers())) or 0
 	for i = 1, n do
-		local nom, _, _, niveau, _, zone, _, _, enLigne, _, classe = GetGuildRosterInfo(i)
+		local nom, rang, rangIndex, niveau, classeNom, zone, note, _, enLigne, statut, classe = GetGuildRosterInfo(i)
 		local cle = nom and Normaliser(nom)
 		if cle then
-			roster[cle] = { nom = nom, enLigne = enLigne and true or false, zone = zone, classe = classe, niveau = niveau }
+			local e = { nom = nom, enLigne = enLigne and true or false, zone = zone, classe = classe, niveau = niveau,
+				cle = cle, rang = rang, rangIndex = tonumber(rangIndex), classeNom = classeNom, note = note }
+			if statut == 1 or statut == "<AFK>" or statut == "<Absent>" then e.statut = "ABS"
+			elseif statut == 2 or statut == "<DND>" or statut == "<Ne pas déranger>" then e.statut = "NPD" end
+			if not e.enLigne and GetGuildRosterLastOnline then
+				local ok, a, m, j, h = pcall(GetGuildRosterLastOnline, i)
+				if ok and (tonumber(a) or tonumber(m) or tonumber(j) or tonumber(h)) then
+					e.absence = { ans = tonumber(a) or 0, mois = tonumber(m) or 0, jours = tonumber(j) or 0, heures = tonumber(h) or 0 }
+				end
+			end
+			roster[cle] = e
 		end
 	end
 	rosterLu = n > 0
+	rosterLuA = GetTime()
+end
+
+-- Pour la page Guilde (GuildUp_Membres.lua) : tous les membres de la liste de guilde (en ligne et hors
+-- ligne), dans une nouvelle liste (entrées décrites au-dessus de LireRoster, à ne pas modifier) ;
+-- relire = relire la liste du jeu d'abord (au plus une fois par seconde)
+ns.RosterGuilde = function(relire)
+	if relire and GetTime() - rosterLuA >= 1 then LireRoster() end
+	local l = {}
+	for _, e in pairs(roster) do l[#l + 1] = e end
+	return l
 end
 
 local EnLigne
@@ -1375,7 +1413,24 @@ MajFenetre = function()
 		or filtre and "Personne n'a ce métier (parmi les membres qui ont SMB Forever)."
 		or "Personne pour l'instant.")
 	MajDetail(choisie)
-	fen.bas:SetText(("|cff6fd08c%d en ligne|r · ouvre chacun de tes métiers une fois pour partager tes recettes"):format(enLigne))
+	-- conseil seulement s'il reste un de mes métiers d'artisanat dont aucune recette n'a été lue (sa
+	-- fenêtre de métier n'a jamais été ouverte avec l'addon) ; les métiers de récolte n'en ont pas
+	local aOuvrir = {}
+	local mesProfs = MesDonnees().profs or {}
+	for _, m in ipairs(METIERS) do
+		local pr = mesProfs[m.code]
+		if pr and not m.recolte and (type(pr.r) ~= "table" or next(pr.r) == nil) then
+			aOuvrir[#aOuvrir + 1] = m.noms[1]
+		end
+	end
+	local conseil = ""
+	if #aOuvrir > 0 then
+		local noms = #aOuvrir == 1 and aOuvrir[1]
+			or (table.concat(aOuvrir, ", ", 1, #aOuvrir - 1) .. " et " .. aOuvrir[#aOuvrir])
+		conseil = " · ouvre " .. (#aOuvrir == 1 and "ta fenêtre" or "tes fenêtres") .. " de " .. noms
+			.. " une fois pour partager tes recettes"
+	end
+	fen.bas:SetText(("|cff6fd08c%d en ligne|r"):format(enLigne) .. conseil)
 end
 
 -- Onglet « Registre » : créé par la page Artisanat (GuildUp_Carnet.lua) dans son cadre, sous les onglets

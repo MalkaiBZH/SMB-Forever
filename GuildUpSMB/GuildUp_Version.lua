@@ -35,6 +35,8 @@ end
 local NomCourt = ns.NomCourt
 
 local versions = {}       -- [nom normalisé] = { nom, v }
+-- version de l'addon d'un membre (annonce reçue), pour la page Guilde (GuildUp_Membres.lua)
+ns.VersionMembre = function(cle) local e = cle and versions[cle]; return e and e.v end
 local plusRecenteVue      -- plus haute version déjà signalée (une seule bulle par version)
 local dernierEnvoi = 0
 
@@ -89,8 +91,14 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.7.0"] = {
+		"|cffffd100Page Guilde|r : tous les membres, en ligne et hors ligne, avec ce que l'addon sait d'eux (niveau, rang, zone ou dernière connexion, pseudo et personnage principal, rôle, métiers, version de l'addon, distance, note). Recherche, filtres, clic pour chuchoter, clic droit pour inviter.",
+		"|cffffd100Ton profil|r : une fenêtre te propose de renseigner ton pseudo, ton personnage principal et ton rôle ; tant qu'il manque quelque chose, un panneau « Profil incomplet » dans le bandeau la rouvre.",
+		"|cffffd100Artisanat > Items|r : niveau requis minimum et maximum, et « Fabricable par la guilde » (ce qu'un autre membre sait fabriquer).",
+		"Registre : le conseil « ouvre ta fenêtre de métier » ne s'affiche plus que pour les métiers pas encore partagés.",
+	},
 	["2.6.2"] = {
 		"Le programme de mise à jour s'appelle désormais |cffffd100SMB Forever Updater|r.",
 	},

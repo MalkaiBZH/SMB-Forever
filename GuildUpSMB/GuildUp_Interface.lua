@@ -1,15 +1,20 @@
 -- GuildUpSMB : fenêtre principale (style sombre et doré), ouverte par le médaillon (GuildUp_Bouton.lua)
--- ou /smb. Bandeau (titre, membres actifs, choix du rôle), menu à gauche, page à droite.
+-- ou /smb. Bandeau (titre, membres actifs, choix du rôle, alerte « Profil incomplet » tant que
+-- ns.ProfilComplet() est faux, croix), menu à gauche, page à droite. À la première ouverture de la
+-- session, la fenêtre « Complète ton profil » (ns.OuvrirProfil, GuildUp_Identite.lua) s'ouvre si le
+-- profil est incomplet.
 -- Pages :
 --   Accueil : ce qui se passe dans la guilde (membres sur ma carte, groupes ouverts, appels à l'aide,
 --             demandes de dons, besoins que je sais fabriquer, avancement d'un projet).
 --   Les autres sections sont des pages fournies par leur module (ns.AjouterPage), avec le kit
---   d'interface ns.UI (GuildUp_Style.lua) : Groupes (GuildUp_GroupesFenetre.lua), Quêtes en commun
---   (GuildUp_Quetes.lua), Artisanat (GuildUp_Carnet.lua, onglets Registre de GuildUp_Metiers.lua, Items,
---   Projets de GuildUp_Projets.lua), Mes carnets (GuildUp_Carnet.lua), Dons (GuildUp_Echanges.lua +
---   GuildUp_Besoins.lua), Options (GuildUp_Options.lua). Événements ouvre le calendrier du jeu.
+--   d'interface ns.UI (GuildUp_Style.lua) : Guilde (GuildUp_Membres.lua), Groupes
+--   (GuildUp_GroupesFenetre.lua), Quêtes en commun (GuildUp_Quetes.lua), Artisanat (GuildUp_Carnet.lua,
+--   onglets Registre de GuildUp_Metiers.lua, Items, Projets de GuildUp_Projets.lua), Mes carnets
+--   (GuildUp_Carnet.lua), Dons (GuildUp_Echanges.lua + GuildUp_Besoins.lua), Options
+--   (GuildUp_Options.lua). Événements ouvre le calendrier du jeu.
 -- Fournit ns.NouveautesGuilde() (pastille du médaillon), ns.BasculerInterface(), ns.OuvrirInterface(page),
--- ns.MajInterface(). Réglages : db.interface = { x, y } (position). Aucun message réseau.
+-- ns.MajInterface(), ns.DistanceMembre(cle) (distance d'un membre sur ma carte). Réglages :
+-- db.interface = { x, y } (position). Aucun message réseau.
 
 local NOM_ADDON, ns = ...
 local MEDIA = "Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\"
@@ -53,6 +58,7 @@ local Aller -- (défini plus bas)
 
 local SECTIONS = {
 	{ id = "accueil", nom = "Accueil", icone = "Interface\\Icons\\INV_Misc_Book_09" },
+	{ id = "guilde", nom = "Guilde", icone = "Interface\\Icons\\INV_Shirt_GuildTabard_01" },
 	{ id = "groupes", nom = "Groupes", icone = "Interface\\Icons\\INV_Sword_04",
 		ouvrir = function() if ns.OuvrirGroupes then ns.OuvrirGroupes() end end,
 		badge = function() return ns.NombreGroupes and ns.NombreGroupes() or 0 end },
@@ -150,6 +156,21 @@ local function Monde(carte, x, y)
 end
 
 local UNITE = (GetLocale() == "enUS" or GetLocale() == "enGB") and "yd" or "m"
+
+-- Pour la page Guilde (GuildUp_Membres.lua) : distance jusqu'à un membre qui partage sa position sur
+-- ma carte (nombre, unité « m » ou « yd »), nil s'il n'est pas sur ma carte ou si on ne sait pas
+ns.DistanceMembre = function(cle)
+	local positions = ns.PositionsMembres and ns.PositionsMembres()
+	local p = positions and cle and positions[cle]
+	if not (p and p.carte and not p.instance and GetTime() - (p.vu or 0) < 45) then return nil end
+	local carte, x, y
+	if ns.MaPosition then carte, x, y = ns.MaPosition() end
+	if not carte or carte ~= p.carte then return nil end
+	local n0, o0 = Monde(carte, x, y)
+	local n1, o1 = Monde(p.carte, p.x, p.y)
+	if not (n0 and n1) then return nil end
+	return math.sqrt((n1 - n0) ^ 2 + (o1 - o0) ^ 2), UNITE
+end
 
 -- membres sur ma carte (positions partagées, avec un portrait), du plus proche au plus loin
 local function MembresDeMaCarte()
@@ -491,6 +512,18 @@ local function MajEntete()
 	local n = ns.MembresActifs and ns.MembresActifs() or 1
 	fenetre.sousTitre:SetText((guilde and (guilde .. " · ") or "")
 		.. n .. " membre" .. (n > 1 and "s" or "") .. " en ligne avec l'addon")
+	-- alerte « Profil incomplet » ; le choix du rôle se range à sa gauche (ou à gauche de la croix)
+	local incomplet = ns.ProfilComplet and not ns.ProfilComplet() or false
+	if fenetre.alerte:IsShown() ~= incomplet or not fenetre.rolePlace then
+		fenetre.rolePlace = true
+		fenetre.alerte:SetShown(incomplet)
+		fenetre.zoneRole:ClearAllPoints()
+		if incomplet then
+			fenetre.zoneRole:SetPoint("RIGHT", fenetre.alerte, "LEFT", -14, 0)
+		else
+			fenetre.zoneRole:SetPoint("RIGHT", fenetre.alerte:GetParent(), "RIGHT", -50, 0)
+		end
+	end
 	local actuel = ns.MonRole and ns.MonRole()
 	local manuel = ns.RoleChoisiALaMain and ns.RoleChoisiALaMain()
 	for role, b in pairs(boutonsRole) do
@@ -616,14 +649,37 @@ local function CreerFenetre()
 
 	local fermer = UI.Fermer(tete, function() f:Hide() end, 30)
 	fermer:SetPoint("RIGHT", tete, "RIGHT", -10, 0)
-	-- choix du rôle : trois boutons collés
-	local x = -50
+	-- alerte « Profil incomplet » à gauche de la croix, tant que le profil n'est pas complet
+	-- (pseudo, personnage principal, rôle choisi à la main : GuildUp_Identite.lua) ; clic = la fenêtre
+	-- « Complète ton profil »
+	f.alerte = UI.BoutonAlerte(tete, "Profil incomplet", 162, 30)
+	f.alerte:SetPoint("RIGHT", fermer, "LEFT", -12, 0)
+	f.alerte:SetScript("OnClick", function() if ns.OuvrirProfil then ns.OuvrirProfil() end end)
+	f.alerte:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+		GameTooltip:SetText("Complète ton profil")
+		local manque = ns.ManquesProfil and ns.ManquesProfil() or {}
+		if #manque > 0 then
+			GameTooltip:AddLine("Il manque :", 1, 1, 1)
+			for _, m in ipairs(manque) do GameTooltip:AddLine("  • " .. m, C.aide[1], C.aide[2], C.aide[3]) end
+		end
+		GameTooltip:AddLine("La guilde voit ton pseudo et ton personnage principal au survol de ton nom ; ton rôle sert aux groupes et aux bannières.", 0.7, 0.7, 0.7, true)
+		GameTooltip:AddLine("Clic : compléter", 0.6, 0.6, 0.6)
+		GameTooltip:Show()
+	end)
+	f.alerte:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	f.alerte:Hide()
+	-- choix du rôle : trois boutons collés, dans un cadre placé à gauche de l'alerte (ou de la croix)
+	f.zoneRole = CreateFrame("Frame", nil, tete)
+	f.zoneRole:SetSize(3 * 55 + 1, 26)
+	f.zoneRole:SetPoint("RIGHT", tete, "RIGHT", -50, 0)
+	local x = 0
 	for i = 3, 1, -1 do
 		local role = ({ "tank", "heal", "dps" })[i]
-		local b = CreateFrame("Button", nil, tete, "BackdropTemplate")
+		local b = CreateFrame("Button", nil, f.zoneRole, "BackdropTemplate")
 		Habiller(b, { 0, 0, 0, 0 }, C.bord)
 		b:SetSize(56, 26)
-		b:SetPoint("RIGHT", tete, "RIGHT", x, 0)
+		b:SetPoint("RIGHT", f.zoneRole, "RIGHT", x, 0)
 		x = x - 55
 		b.texte = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 		b.texte:SetPoint("CENTER")
@@ -640,8 +696,8 @@ local function CreerFenetre()
 		Infobulle(b, NOMS_ROLES[role], "Clic : annoncer ce rôle à la guilde.\nRe-clic : revenir en automatique (rôle de groupe ou spécialisation).")
 		boutonsRole[role] = b
 	end
-	local tRole = Texte(tete, "GameFontHighlightSmall", C.gris)
-	tRole:SetPoint("RIGHT", tete, "RIGHT", x - 6, 0)
+	local tRole = Texte(f.zoneRole, "GameFontHighlightSmall", C.gris)
+	tRole:SetPoint("RIGHT", f.zoneRole, "LEFT", -6, 0)
 	tRole:SetText("Mon rôle")
 
 	-- menu à gauche
@@ -680,7 +736,15 @@ local function CreerFenetre()
 		local p = pages[pageActive]
 		if p and p.Maj and p.rafraichirAuto ~= false then p.Maj() end
 	end)
-	f:SetScript("OnShow", function() ns.MajInterface() end)
+	-- première ouverture de la session : la fenêtre « Complète ton profil » si le profil est incomplet
+	-- (une seule fois : ensuite, l'alerte du bandeau suffit)
+	local profilPropose = false
+	f:SetScript("OnShow", function()
+		ns.MajInterface()
+		if profilPropose then return end
+		profilPropose = true
+		if ns.ProfilComplet and not ns.ProfilComplet() and ns.OuvrirProfil then ns.OuvrirProfil() end
+	end)
 	f:Hide()
 	return f
 end
