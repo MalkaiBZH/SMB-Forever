@@ -86,19 +86,14 @@ local function DB() return ns.DB and ns.DB() end
 -- Sur Forever, les noms arrivent sous la forme « Miko Banko » (nom + royaume séparés par un
 -- espace). On garde le nom tel que reçu pour chuchoter / inviter, et on compare des noms
 -- normalisés « Nom-Royaume » (ns.Normaliser, défini dans GuildUp.lua).
-local function Normaliser(nom)
-	if ns.Normaliser then return ns.Normaliser(nom) end
-	return nom
-end
+local Normaliser = ns.Normaliser
 
 local function MonNom()
 	return Normaliser(UnitName("player"))
 end
 
 -- Nom affiché : complet, « Prénom Famille » (« Miko-Banko » devient « Miko Banko »)
-local function NomCourt(nom)
-	return ((nom or "?"):gsub("%-", " "))
-end
+local NomCourt = ns.NomCourt
 
 -- Nom complet « Prénom Famille » (sur Forever, le nom de famille est à la place du royaume)
 local function NomCompletUnite(u)
@@ -136,13 +131,9 @@ local function Envoyer(msg, canal, cible)
 	if envoi then pcall(envoi, PREFIXE, msg, canal, cible) end
 end
 
-local function CouleurClasse(classe)
-	local c = classe and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classe]
-	if c and c.colorStr then return "|c" .. c.colorStr end
-	return "|cffffffff"
-end
+local CouleurClasse = ns.CouleurClasseTexte
 
-local NOMS_ROLES = { tank = "|cff3399ffTank|r", heal = "|cff33dd55Heal|r", dps = "|cffff4444DPS|r" }
+local NOMS_ROLES = ns.NOMS_ROLES
 local LETTRES_ROLES = { tank = "t", heal = "h", dps = "d" }
 local ROLES_LETTRES = { t = "tank", h = "heal", d = "dps" }
 
@@ -159,20 +150,9 @@ local function PeutAnnoncer()
 	return not IsInGroup() or UnitIsGroupLeader("player")
 end
 
-local function AtlasExiste(nom)
-	return nom and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(nom) ~= nil
-end
+local AtlasExiste = ns.AtlasExiste
 
-local function PoserAtlas(tex, atlas, secours)
-	tex:SetTexCoord(0, 1, 0, 1)
-	if AtlasExiste(atlas) then
-		tex:SetAtlas(atlas)
-		return true
-	elseif secours then
-		tex:SetColorTexture(unpack(secours))
-	end
-	return false
-end
+local PoserAtlas = ns.PoserAtlas
 
 -- Pose une icône de contenu : fichier, ou atlas, ou point d'interrogation
 local function PoserIcone(tex, icone)

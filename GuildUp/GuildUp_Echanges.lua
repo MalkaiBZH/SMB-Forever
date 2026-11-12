@@ -59,21 +59,15 @@ local PhotoConnexion, RecapConnexion
 local fen
 local MajTout
 
-local function Normaliser(nom) return ns.Normaliser and ns.Normaliser(nom) or nom end
-local function MaCle() return Normaliser(UnitName("player")) end
-local function TestSolo() return ns.TestSolo and ns.TestSolo() end
-local function NomCourt(nom) return ((nom or "?"):gsub("%-", " "):gsub(" %(test%)$", "")) end
+local Normaliser = ns.Normaliser
+local MaCle = ns.MaCle
+local TestSolo = ns.TestSolo
+local NomCourt = ns.NomCourt
 local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end end
-local function Erreur(t) if ns.Erreur then ns.Erreur(t) end end
-local function AtlasExiste(a) return C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(a) ~= nil end
-local function PoserAtlas(tex, atlas, couleur)
-	if AtlasExiste(atlas) then tex:SetAtlas(atlas); return true end
-	if couleur then tex:SetColorTexture(unpack(couleur)) end
-	return false
-end
-local ACCENTS = { ["à"] = "a", ["â"] = "a", ["ç"] = "c", ["é"] = "e", ["è"] = "e", ["ê"] = "e", ["ë"] = "e",
-	["î"] = "i", ["ï"] = "i", ["ô"] = "o", ["ù"] = "u", ["û"] = "u", ["É"] = "e", ["È"] = "e", ["À"] = "a" }
-local function Simplifier(s) return ((s or ""):gsub("[\195][\128-\191]", ACCENTS):lower()) end
+local Erreur = ns.Erreur
+local AtlasExiste = ns.AtlasExiste
+local PoserAtlas = ns.PoserAtlas
+local Simplifier = ns.Simplifier
 
 --------------------------------------------------------------------------------
 -- Données
@@ -114,13 +108,9 @@ local function Guilde()
 	return db.echanges[nom]
 end
 
+-- ici : nom, lien, qualité, niveau minimum, icône
 local function InfoObjet(objet)
-	local f = GetItemInfo or (C_Item and C_Item.GetItemInfo)
-	local nom, lien, qualite, niveau, icone
-	if f then
-		local ok, n, l, q, _, nmin, _, _, _, _, i = pcall(f, objet)
-		if ok then nom, lien, qualite, niveau, icone = n, l, q, nmin, i end
-	end
+	local nom, lien, qualite, icone, niveau = ns.InfoObjet(objet)
 	return nom, lien, qualite, niveau, icone
 end
 local function ClasseObjet(objet)
@@ -129,9 +119,7 @@ local function ClasseObjet(objet)
 	local ok, _, _, _, _, icone, classe, sousClasse = pcall(f, objet)
 	if ok then return classe, sousClasse, icone end
 end
-local function Precharger(objet)
-	if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, objet) end
-end
+local Precharger = ns.Precharger
 
 -- Infobulle d'un objet (lignes de texte), pour lire « Requiert Forge (125) » et « Déjà connu »
 local bulleCachee
@@ -362,7 +350,7 @@ local function DonateursDuMois()
 end
 local MajDemandes          -- rafraîchit l'onglet « Demandes »
 
-local function Maintenant() return GetServerTime and GetServerTime() or time() end
+local Maintenant = ns.Maintenant
 
 -- Demandes reçues (historique) : db.demandesDons[perso] = { { nom, objet, quand, vu }, … }
 local function Historique()
@@ -703,12 +691,7 @@ end
 -- Fenêtre
 --------------------------------------------------------------------------------
 
-local function Depuis(t)
-	local s = Maintenant() - (t or Maintenant())
-	if s < 3600 then return math.max(1, math.floor(s / 60)) .. " min" end
-	if s < 86400 then return math.floor(s / 3600) .. " h" end
-	return math.floor(s / 86400) .. " j"
-end
+local Depuis = ns.Depuis
 
 local function DansLaGuilde(cle)
 	if cle:find("#test", 1, true) then return TestSolo() end
@@ -955,22 +938,8 @@ local function MajParcourir()
 		or categorie > 1 and "Aucun don dans cette catégorie." or "Personne ne donne rien pour l'instant.")
 end
 
-local function CreerParcourir(f)
-	local p = CreateFrame("Frame", nil, f)
-	p:SetAllPoints(f)
-	local titre = p:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	titre:SetPoint("TOPLEFT", f, "TOPLEFT", 70, -32)
-	titre:SetText("Dons de la guilde")
-	BoiteRecherche(p, "GuildUpEchangesRecherche", 76, -58, 220, "Chercher un objet", function(t)
-		recherche = t
-		MajParcourir()
-	end)
-	local aide = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	aide:SetPoint("TOPLEFT", f, "TOPLEFT", 310, -62)
-	aide:SetText("Les plans que tu peux apprendre passent en premier.")
-	p.donateurs = aide
-
-	-- catégories (colonne de gauche)
+-- Colonne des catégories (dons de la guilde et mes dons)
+local function CreerCategories(p, f, boutons, Choisir)
 	local fondC = p:CreateTexture(nil, "BACKGROUND")
 	fondC:SetPoint("TOPLEFT", f, "TOPLEFT", 8, HAUT_ENCART - 4)
 	fondC:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 8, 10)
@@ -987,13 +956,32 @@ local function CreerParcourir(f)
 		bt.texte = bt:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 		bt.texte:SetPoint("LEFT", bt, "LEFT", 8, 0)
 		bt.texte:SetText(c.nom)
-		bt:SetScript("OnClick", function()
-			categorie = i
-			p.defile:SetVerticalScroll(0)
-			MajParcourir()
-		end)
-		boutonsCats[i] = bt
+		bt:SetScript("OnClick", function() Choisir(i) end)
+		boutons[i] = bt
 	end
+end
+
+local function CreerParcourir(f)
+	local p = CreateFrame("Frame", nil, f)
+	p:SetAllPoints(f)
+	local titre = p:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	titre:SetPoint("TOPLEFT", f, "TOPLEFT", 70, -32)
+	titre:SetText("Dons de la guilde")
+	BoiteRecherche(p, "GuildUpEchangesRecherche", 76, -58, 220, "Chercher un objet", function(t)
+		recherche = t
+		MajParcourir()
+	end)
+	local aide = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	aide:SetPoint("TOPLEFT", f, "TOPLEFT", 310, -62)
+	aide:SetText("Les plans que tu peux apprendre passent en premier.")
+	p.donateurs = aide
+
+	-- catégories (colonne de gauche)
+	CreerCategories(p, f, boutonsCats, function(i)
+		categorie = i
+		p.defile:SetVerticalScroll(0)
+		MajParcourir()
+	end)
 
 	-- en-têtes de colonnes
 	local x0 = LARGEUR_CATS + 20
@@ -1023,34 +1011,6 @@ local pageMes, lignesM, boutonsCatsMes = nil, {}, {}
 local rechercheMes, categorieMes = "", 1
 local choixDon
 
-local function Garder(cat, classe)
-	if cat.autres then return not CLASSES_RANGEES[classe or -1] end
-	if cat.classes then return cat.classes[classe or -1] == true end
-	return true
-end
-
--- Colonne des catégories (même liste que les dons de la guilde)
-local function CreerCategories(p, f, boutons, Choisir)
-	local fondC = p:CreateTexture(nil, "BACKGROUND")
-	fondC:SetPoint("TOPLEFT", f, "TOPLEFT", 8, HAUT_ENCART - 4)
-	fondC:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 8, 10)
-	fondC:SetWidth(LARGEUR_CATS)
-	PoserAtlas(fondC, "Professions-background-summarylist", { 0, 0, 0, 0.25 })
-	for i, c in ipairs(CATEGORIES) do
-		local bt = CreateFrame("Button", nil, p)
-		bt:SetSize(LARGEUR_CATS - 12, 22)
-		bt:SetPoint("TOPLEFT", f, "TOPLEFT", 14, HAUT_ENCART - 10 - (i - 1) * 24)
-		bt:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
-		bt.choisi = bt:CreateTexture(nil, "BACKGROUND")
-		bt.choisi:SetAllPoints(bt)
-		bt.choisi:SetColorTexture(1, 0.82, 0, 0.18)
-		bt.texte = bt:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-		bt.texte:SetPoint("LEFT", bt, "LEFT", 8, 0)
-		bt.texte:SetText(c.nom)
-		bt:SetScript("OnClick", function() Choisir(i) end)
-		boutons[i] = bt
-	end
-end
 
 -- Quantité donnée : celle choisie, jamais plus que ce que j'ai
 local function QteDonnee(objet)
@@ -1153,9 +1113,9 @@ local function MajMes()
 			local nomO, _, qualite = InfoObjet(objet)
 			if rechercheMes == "" or Simplifier(nomO):find(rechercheMes, 1, true) then
 				for i, c in ipairs(CATEGORIES) do
-					if Garder(c, o.classe) then comptesMes[i] = (comptesMes[i] or 0) + 1 end
+					if Classee(c, o.classe) then comptesMes[i] = (comptesMes[i] or 0) + 1 end
 				end
-				if Garder(cat, o.classe) then liste[#liste + 1] = { o = o, nomO = nomO or "", qualite = qualite } end
+				if Classee(cat, o.classe) then liste[#liste + 1] = { o = o, nomO = nomO or "", qualite = qualite } end
 			end
 		end
 	end
@@ -1262,27 +1222,7 @@ local function CreerMes(f)
 		z.qte:ClearFocus()
 		if AjouterDon(choixDon, tonumber(z.qte:GetText())) then ChoisirDon(nil) end
 	end)
-	local function Deposer()
-		local genre, objet = GetCursorInfo()
-		if genre == "item" and objet then
-			ChoisirDon(tonumber(objet))
-			ClearCursor()
-			return true
-		end
-	end
-	for _, cible in ipairs({ z, z.case }) do
-		cible:SetScript("OnReceiveDrag", Deposer)
-		cible:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-		cible:SetScript("OnClick", function(_, bouton)
-			-- clic droit : retire l'objet de la case ; clic gauche : dépose l'objet tenu (ou vide la case)
-			if bouton == "RightButton" then
-				if choixDon then ChoisirDon(nil) end
-				GameTooltip:Hide()
-				return
-			end
-			if not Deposer() and choixDon then ChoisirDon(nil) end
-		end)
-	end
+	ns.BrancherDepot({ z, z.case }, function(o) ChoisirDon(o) end, function() return choixDon end)
 	z.case:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		if choixDon then

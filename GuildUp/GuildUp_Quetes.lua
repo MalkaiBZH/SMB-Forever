@@ -18,25 +18,14 @@ local pret = false
 local dernierEnvoi = 0
 local MajFenetre
 
-local function Normaliser(nom) return ns.Normaliser and ns.Normaliser(nom) or nom end
-local function MaCle() return Normaliser(UnitName("player")) end
-local function TestSolo() return ns.TestSolo and ns.TestSolo() end
-local function NomCourt(nom) return ((nom or "?"):gsub("%-", " ")) end
+local Normaliser = ns.Normaliser
+local MaCle = ns.MaCle
+local TestSolo = ns.TestSolo
+local NomCourt = ns.NomCourt
 local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end end
-local function AtlasExiste(a) return C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(a) ~= nil end
+local AtlasExiste = ns.AtlasExiste
 
-local CHIFFRES = "0123456789abcdefghijklmnopqrstuvwxyz"
-local function Base36(n)
-	n = math.floor(n)
-	if n <= 0 then return "0" end
-	local s = ""
-	while n > 0 do
-		local r = n % 36
-		s = CHIFFRES:sub(r + 1, r + 1) .. s
-		n = math.floor(n / 36)
-	end
-	return s
-end
+local Base36 = ns.Base36
 
 --------------------------------------------------------------------------------
 -- Mes quêtes (titre + zone : les en-têtes du journal de quêtes sont les zones)

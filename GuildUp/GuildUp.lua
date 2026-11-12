@@ -32,6 +32,13 @@ local DEFAUT = {
 local db
 local MajBarreRole -- petite barre de choix du rôle, définie plus bas
 
+-- Lecture d'un réglage du jeu (CVar) : la fonction du client, et une version protégée
+local LireCVarJeu = (C_CVar and C_CVar.GetCVar) or GetCVar
+local function LireCVar(nom)
+	local ok, v = pcall(LireCVarJeu, nom)
+	return ok and v or nil
+end
+
 local function Message(texte)
 	print("|cff3399ffGuildUp|r : " .. texte)
 end
@@ -350,16 +357,18 @@ local function Masquer(f)
 	if f.lueur then for _, t in ipairs(f.lueur) do t:Hide() end end
 end
 
-local function Degrade(tex, a1, a2)
+-- Dégradé horizontal d'une couleur, de l'opacité a1 à a2 (selon ce que le client permet)
+local function DegradeCouleur(tex, r, g, b, a1, a2)
 	tex:SetColorTexture(1, 1, 1, 1)
 	if tex.SetGradient and CreateColor then
-		tex:SetGradient("HORIZONTAL", CreateColor(db.r, db.g, db.b, a1), CreateColor(db.r, db.g, db.b, a2))
+		tex:SetGradient("HORIZONTAL", CreateColor(r, g, b, a1), CreateColor(r, g, b, a2))
 	elseif tex.SetGradientAlpha then
-		tex:SetGradientAlpha("HORIZONTAL", db.r, db.g, db.b, a1, db.r, db.g, db.b, a2)
+		tex:SetGradientAlpha("HORIZONTAL", r, g, b, a1, r, g, b, a2)
 	else
-		tex:SetColorTexture(db.r, db.g, db.b, (a1 + a2) / 2)
+		tex:SetColorTexture(r, g, b, (a1 + a2) / 2)
 	end
 end
+local function Degrade(tex, a1, a2) DegradeCouleur(tex, db.r, db.g, db.b, a1, a2) end
 
 -- Pose la bannière pour que son intérieur bleu couvre une zone définie par rapport aux bords
 -- d'une région : gauche = bord gauche + dxG, droite = bord droit + dxD, haut = bord haut + dyH,
@@ -502,15 +511,7 @@ local FONDU_LUEUR = 40        -- longueur des fondus gauche / droite (pixels à 
 local COULEUR_LUEUR = { 1, 0.78, 0.2, 1 }
 
 local function DegradeAlpha(tex, a1, a2)
-	local r, g, b = COULEUR_LUEUR[1], COULEUR_LUEUR[2], COULEUR_LUEUR[3]
-	tex:SetColorTexture(1, 1, 1, 1)
-	if tex.SetGradient and CreateColor then
-		tex:SetGradient("HORIZONTAL", CreateColor(r, g, b, a1), CreateColor(r, g, b, a2))
-	elseif tex.SetGradientAlpha then
-		tex:SetGradientAlpha("HORIZONTAL", r, g, b, a1, r, g, b, a2)
-	else
-		tex:SetColorTexture(r, g, b, (a1 + a2) / 2)
-	end
+	DegradeCouleur(tex, COULEUR_LUEUR[1], COULEUR_LUEUR[2], COULEUR_LUEUR[3], a1, a2)
 end
 
 local function CreerLueur(parent)
@@ -838,7 +839,7 @@ local function AncragesBlizzard(uf)
 	-- Listes d'auras
 	pcall(function()
 		local af = uf.AurasFrame
-		local lire = (C_CVar and C_CVar.GetCVar) or GetCVar
+		local lire = LireCVarJeu
 		local espacement = tonumber(lire("nameplateDebuffPadding")) or 0
 		af.DebuffListFrame:ClearAllPoints()
 		af.DebuffListFrame:SetPoint("LEFT", hbc, "LEFT", 0, 0)
@@ -964,11 +965,6 @@ local function StyleAllie(texte, taille, unit)
 	pcall(texte.SetTextColor, texte, CouleurJeu(unit))
 end
 
-local function LireCVar(nom)
-	local lire = (C_CVar and C_CVar.GetCVar) or GetCVar
-	local ok, v = pcall(lire, nom)
-	return ok and v or nil
-end
 -- options « Noms » du jeu : noms des joueurs alliés, et leur guilde (réglage absent = affiché)
 local function GuildesVoulues() return LireCVar("UnitNamePlayerGuild") ~= "0" end
 
@@ -1289,7 +1285,7 @@ local function ImposerCVars()
 		end)
 		return
 	end
-	local lire = (C_CVar and C_CVar.GetCVar) or GetCVar
+	local lire = LireCVarJeu
 	local ecrire = (C_CVar and C_CVar.SetCVar) or SetCVar
 	local voulues = {}
 	for nom, valeur in pairs(CVARS_IMPOSEES) do voulues[nom] = valeur end
@@ -1533,7 +1529,7 @@ local ETATS = { auto = true, tank = true, heal = true, dps = true, horscombat = 
 -- /smb diag : décrit la barre de nom de ta cible, pour comprendre pourquoi rien ne s'affiche
 local function DiagCollecte(L)
 	do
-		local lire = (C_CVar and C_CVar.GetCVar) or GetCVar
+		local lire = LireCVarJeu
 		local t = {}
 		for _, nom in ipairs({ "nameplateShowFriends", "nameplateShowFriendlyPlayers", "nameplateShowFriendlyNPCs", "nameplateShowAll", "UnitNameFriendlyPlayerName", "UnitNamePlayerGuild",
 			"WorldTextMinSize", "nameplateMinScale", "nameplateMaxScale", "nameplateSelectedScale", "nameplateMaxDistance" }) do
@@ -1678,17 +1674,7 @@ local fenetreCopie
 
 local function AfficherCopie(texte)
 	if not fenetreCopie then
-		local ok, f = pcall(CreateFrame, "Frame", "GuildUpCopie", UIParent, "BasicFrameTemplateWithInset")
-		if not ok then f = CreateFrame("Frame", "GuildUpCopie", UIParent) end
-		f:SetSize(520, 380)
-		f:SetPoint("CENTER")
-		f:SetFrameStrata("DIALOG")
-		f:SetMovable(true)
-		f:EnableMouse(true)
-		f:RegisterForDrag("LeftButton")
-		f:SetScript("OnDragStart", f.StartMoving)
-		f:SetScript("OnDragStop", f.StopMovingOrSizing)
-		tinsert(UISpecialFrames, "GuildUpCopie")
+		local f = ns.FenetreDeplacable("GuildUpCopie", 520, 380)
 		if f.TitleText then f.TitleText:SetText("GuildUp — diag (Ctrl+C pour copier)") end
 
 		local defile = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
@@ -1807,29 +1793,8 @@ local function NouveauTitre(parent, x, y, texte)
 end
 
 local function CreerFenetre()
-	local ok, f = pcall(CreateFrame, "Frame", "GuildUpFenetre", UIParent, "BasicFrameTemplateWithInset")
-	if not ok then
-		f = CreateFrame("Frame", "GuildUpFenetre", UIParent, "BackdropTemplate")
-		f:SetBackdrop({
-			bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-			edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-			tile = true, tileSize = 32, edgeSize = 32,
-			insets = { left = 11, right = 12, top = 12, bottom = 11 },
-		})
-		local fermer = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-		fermer:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -4)
-	end
-	f:SetSize(330, 354)
-	f:SetPoint("CENTER")
-	f:SetFrameStrata("DIALOG")
-	f:SetMovable(true)
-	f:EnableMouse(true)
-	f:SetClampedToScreen(true)
-	f:RegisterForDrag("LeftButton")
-	f:SetScript("OnDragStart", f.StartMoving)
-	f:SetScript("OnDragStop", f.StopMovingOrSizing)
+	local f = ns.FenetreDeplacable("GuildUpFenetre", 330, 354)
 	f:SetScript("OnShow", MajFenetre)
-	tinsert(UISpecialFrames, "GuildUpFenetre") -- Échap ferme la fenêtre
 
 	local titre = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	if not f.TitleText then titre:SetPoint("TOP", f, "TOP", 0, -16) end

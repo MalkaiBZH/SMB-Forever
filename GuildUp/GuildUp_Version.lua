@@ -29,7 +29,7 @@ local function Comparer(a, b)
 	return 0
 end
 
-local function NomCourt(nom) return ((nom or "?"):gsub("%-", " ")) end
+local NomCourt = ns.NomCourt
 
 local versions = {}       -- [nom normalisé] = { nom, v }
 local plusRecenteVue      -- plus haute version déjà signalée (une seule bulle par version)
@@ -125,18 +125,10 @@ local function MontrerNouveautes(version)
 	version = version or MA_VERSION
 	if not NOTES[version] then version = ORDRE[1] end
 	if not fenNotes then
-		local ok, f = pcall(CreateFrame, "Frame", "GuildUpNouveautes", UIParent, "BasicFrameTemplateWithInset")
-		if not ok then f = CreateFrame("Frame", "GuildUpNouveautes", UIParent, "BackdropTemplate") end
-		f:SetSize(470, 440)
+		local f = ns.FenetreDeplacable("GuildUpNouveautes", 470, 440)
+		f:ClearAllPoints()
 		f:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
-		f:SetFrameStrata("DIALOG")
 		f:SetToplevel(true)
-		f:SetMovable(true)
-		f:EnableMouse(true)
-		f:RegisterForDrag("LeftButton")
-		f:SetScript("OnDragStart", f.StartMoving)
-		f:SetScript("OnDragStop", f.StopMovingOrSizing)
-		tinsert(UISpecialFrames, "GuildUpNouveautes")
 		local barre = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		if not f.TitleText then barre:SetPoint("TOP", f, "TOP", 0, -6) end
 		barre:SetText("Nouveautés")

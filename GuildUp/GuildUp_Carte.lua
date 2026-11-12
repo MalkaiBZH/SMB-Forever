@@ -28,10 +28,7 @@ local function Partage()
 	return db and db.actif and db.partagePosition
 end
 
-local function Normaliser(nom)
-	if ns.Normaliser then return ns.Normaliser(nom) end
-	return nom
-end
+local Normaliser = ns.Normaliser
 
 local function Envoyer(msg)
 	if not IsInGuild() then return end
@@ -125,13 +122,9 @@ local function PositionSurCarte(p, carteAffichee)
 	return x, y
 end
 
-local function CouleurClasse(classe)
-	local c = classe and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classe]
-	if c then return c.r, c.g, c.b end
-	return 1, 0.82, 0
-end
+local CouleurClasse = ns.CouleurClasse
 
-local NOMS_ROLES = { tank = "|cff3399ffTank|r", heal = "|cff33dd55Heal|r", dps = "|cffff4444DPS|r" }
+local NOMS_ROLES = ns.NOMS_ROLES
 
 -- Un point = un ancrage (taille 1, à l'échelle de la carte) + le point lui-même, à échelle
 -- compensée pour garder la même taille à l'écran quel que soit le zoom
@@ -214,14 +207,7 @@ local ENTREES = {
 	{ { "naxxramas" }, 1423, 0.399, 0.258 },
 }
 
-local ACCENTS = {
-	["à"] = "a", ["â"] = "a", ["ç"] = "c", ["é"] = "e", ["è"] = "e", ["ê"] = "e", ["ë"] = "e",
-	["î"] = "i", ["ï"] = "i", ["ô"] = "o", ["ù"] = "u", ["û"] = "u", ["œ"] = "oe",
-	["À"] = "a", ["É"] = "e", ["È"] = "e", ["Ê"] = "e", ["Î"] = "i", ["Ô"] = "o", ["Œ"] = "oe",
-}
-local function Simplifier(t)
-	return ((t or ""):gsub("[\195\197][\128-\191]", ACCENTS)):lower()
-end
+local Simplifier = ns.Simplifier
 
 -- Entrée connue par le jeu, dans la zone de l'activité (ou sa zone parente)
 local function EntreeDuJeu(nom, mapID)

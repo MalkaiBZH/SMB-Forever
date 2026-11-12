@@ -17,13 +17,13 @@ local debut = GetTime()
 local pret = false
 local Maj
 
-local function Normaliser(nom) return ns.Normaliser and ns.Normaliser(nom) or nom end
-local function MaCle() return Normaliser(UnitName("player")) end
-local function TestSolo() return ns.TestSolo and ns.TestSolo() end
-local function NomCourt(nom) return ((nom or "?"):gsub("%-", " "):gsub(" %(test%)$", "")) end
+local Normaliser = ns.Normaliser
+local MaCle = ns.MaCle
+local TestSolo = ns.TestSolo
+local NomCourt = ns.NomCourt
 local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end end
-local function Erreur(t) if ns.Erreur then ns.Erreur(t) end end
-local function AtlasExiste(a) return C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(a) ~= nil end
+local Erreur = ns.Erreur
+local AtlasExiste = ns.AtlasExiste
 
 --------------------------------------------------------------------------------
 -- Données
@@ -56,26 +56,9 @@ local function Guilde()
 	return b.guildes[nom]
 end
 
-local function InfoObjet(objet)
-	local f = GetItemInfo or (C_Item and C_Item.GetItemInfo)
-	local nom, lien, qualite, icone
-	if f then
-		local ok, n, l, q, _, _, _, _, _, _, i = pcall(f, objet)
-		if ok then nom, lien, qualite, icone = n, l, q, i end
-	end
-	if not icone then
-		local fi = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
-		if fi then
-			local ok, _, _, _, _, i = pcall(fi, objet)
-			if ok then icone = i end
-		end
-	end
-	return nom, lien, qualite, icone
-end
+local InfoObjet = ns.InfoObjet
 
-local function Precharger(objet)
-	if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, objet) end
-end
+local Precharger = ns.Precharger
 
 local function Coder(liste)
 	local t = {}
@@ -146,19 +129,10 @@ end
 -- des absents qu'il a gardées. Chaque liste porte sa date (heure du serveur) : on garde la plus
 -- récente. Une liste vide reste notée (pour qu'un besoin retiré disparaisse aussi chez les autres).
 --   "V~cle~date~objet36:qte,…"  liste d'un autre membre, renvoyée
-local function Maintenant() return GetServerTime and GetServerTime() or time() end
+local Maintenant = ns.Maintenant
 local relayees = {}   -- [cle] = moment où une liste de ce membre est passée (envoyée ou reçue)
 
-local function B36(n)
-	local c, t = "0123456789abcdefghijklmnopqrstuvwxyz", ""
-	n = math.floor(n)
-	repeat
-		local r = n % 36
-		t = c:sub(r + 1, r + 1) .. t
-		n = math.floor(n / 36)
-	until n == 0
-	return t
-end
+local B36 = ns.Base36
 
 -- Enregistre une liste (directe ou relayée) si elle est plus récente que celle connue ; renvoie
 -- l'ancienne liste si elle a été remplacée
@@ -244,13 +218,7 @@ local choix                    -- objet choisi dans la zone d'ajout
 -- Recherche d'un objet par son nom dans tout le jeu (GuildUp_Objets.lua), même sans l'avoir
 --------------------------------------------------------------------------------
 
-local ACCENTS = { ["à"] = "a", ["â"] = "a", ["ä"] = "a", ["ç"] = "c", ["é"] = "e", ["è"] = "e", ["ê"] = "e",
-	["ë"] = "e", ["î"] = "i", ["ï"] = "i", ["ô"] = "o", ["ö"] = "o", ["ù"] = "u", ["û"] = "u", ["ü"] = "u",
-	["À"] = "a", ["Â"] = "a", ["Ç"] = "c", ["É"] = "e", ["È"] = "e", ["Ê"] = "e", ["Î"] = "i", ["Ô"] = "o",
-	["Û"] = "u", ["œ"] = "oe", ["Œ"] = "oe" }
-local function Simplifier(s)
-	return ((s or ""):gsub("[\195\197][\128-\191]", ACCENTS):gsub("’", " "):gsub("'", " "):lower())
-end
+local Simplifier = ns.Simplifier
 
 local index                    -- { { id, qualité, nom, nom simplifié }, … } (construit au premier besoin)
 local function Index()
@@ -289,12 +257,7 @@ local function ChercherObjets(texte, max)
 end
 ns.ChercherObjets = ChercherObjets
 
-local function Depuis(t)
-	local s = Maintenant() - (t or Maintenant())
-	if s < 3600 then return math.max(1, math.floor(s / 60)) .. " min" end
-	if s < 86400 then return math.floor(s / 3600) .. " h" end
-	return math.floor(s / 86400) .. " j"
-end
+local Depuis = ns.Depuis
 
 local function LigneBase(parent, largeur)
 	local b = CreateFrame("Frame", nil, parent)
@@ -690,27 +653,7 @@ ns.CreerPageBesoins = function(f, hautEncart)
 	end)
 	z.infini:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	-- glisser un objet sur la case (ou cliquer avec un objet sur le curseur)
-	local function Deposer()
-		local genre, objet = GetCursorInfo()
-		if genre == "item" and objet then
-			Choisir(tonumber(objet))
-			ClearCursor()
-			return true
-		end
-	end
-	for _, cible in ipairs({ z, z.case }) do
-		cible:SetScript("OnReceiveDrag", Deposer)
-		cible:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-		cible:SetScript("OnClick", function(_, bouton)
-			-- clic droit : retire l'objet de la case ; clic gauche : dépose l'objet tenu (ou vide la case)
-			if bouton == "RightButton" then
-				if choix then Choisir(nil) end
-				GameTooltip:Hide()
-				return
-			end
-			if not Deposer() and choix then Choisir(nil) end
-		end)
-	end
+	ns.BrancherDepot({ z, z.case }, function(o) Choisir(o) end, function() return choix end)
 	z.case:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		if choix then

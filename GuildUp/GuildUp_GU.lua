@@ -12,7 +12,7 @@ local MEDIA = "Interface\\AddOns\\GuildUp\\media\\"
 local ZAARDOZ = "zaardoz-gu"
 local CORNE, CORNE2 = 566064, 567386 -- sound/doodad/dwarfhorn.ogg, sound/events/scourge_horn.ogg
 
-local function Normaliser(nom) return ns.Normaliser and ns.Normaliser(nom) or nom end
+local Normaliser = ns.Normaliser
 -- emote coupée ? (case « GU! » des notifications du volet, ou /smb gu ; ancien réglage db.emoteGU lu aussi)
 local function Coupee()
 	local db = ns.DB and ns.DB()
@@ -23,7 +23,7 @@ local function Coupee()
 	end
 	return type(db.notifs) == "table" and db.notifs.gu == false
 end
-local function MaCle() return Normaliser(UnitName("player")) end
+local MaCle = ns.MaCle
 
 --------------------------------------------------------------------------------
 -- Emote « GU! »

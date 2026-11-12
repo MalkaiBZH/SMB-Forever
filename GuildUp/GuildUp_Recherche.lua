@@ -16,7 +16,7 @@ local function NomStyle(v)
 	return "?"
 end
 
-local function Erreur(t) if ns.Erreur then ns.Erreur(t) else print("GuildUp : " .. t) end end
+local Erreur = ns.Erreur
 local function DB() return ns.DB and ns.DB() end
 
 local function StyleChoisi()
@@ -121,13 +121,7 @@ local ANNEAUX = {
 	{ atlas = "worldquest-tracker-ring-selected", taille = 46 },
 	{ fichier = "Interface\\Cooldown\\star4", taille = 46 },
 }
-local function AtlasExiste(nom)
-	if C_Texture and C_Texture.GetAtlasInfo then
-		local ok, info = pcall(C_Texture.GetAtlasInfo, nom)
-		return ok and info ~= nil
-	end
-	return false
-end
+local AtlasExiste = ns.AtlasExiste
 ns.TextureAnneau = function()
 	for _, a in ipairs(ANNEAUX) do
 		if a.fichier or AtlasExiste(a.atlas) then return a end

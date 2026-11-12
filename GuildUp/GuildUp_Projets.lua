@@ -16,12 +16,12 @@ local TOMBE = 365 * 86400         -- … mais la trace de suppression (id, date)
                                   -- pour qu'un membre longtemps absent ne fasse pas revenir le projet
 local ATTENTE_MAX = 120           -- secondes : réception incomplète (morceaux perdus) abandonnée
 
-local function Normaliser(nom) return ns.Normaliser and ns.Normaliser(nom) or nom end
-local function MaCle() return Normaliser(UnitName("player")) end
-local function TestSolo() return ns.TestSolo and ns.TestSolo() end
-local function NomCourt(nom) return ((nom or "?"):gsub("%-.*$", ""):gsub("#test$", "")) end
+local Normaliser = ns.Normaliser
+local MaCle = ns.MaCle
+local TestSolo = ns.TestSolo
+local NomCourt = ns.NomCourt
 local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end end
-local function Maintenant() return GetServerTime and GetServerTime() or time() end
+local Maintenant = ns.Maintenant
 local function Outils() return ns.OutilsCarnet or {} end
 local function Propre(t) return ((t or ""):gsub("[~|\n]", " ")) end
 
@@ -648,22 +648,7 @@ end
 -- menu « Nouveau projet » : vide, ou copie d'une de mes listes
 local menuNouveau
 local function MenuNouveau(ancre)
-	if not menuNouveau then
-		menuNouveau = CreateFrame("Frame", "GuildUpMenuNouveauProjet", UIParent, "BackdropTemplate")
-		menuNouveau:SetFrameStrata("FULLSCREEN_DIALOG")
-		menuNouveau:SetClampedToScreen(true)
-		if menuNouveau.SetBackdrop then
-			menuNouveau:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-				edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14,
-				insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-			menuNouveau:SetBackdropColor(0.05, 0.05, 0.05, 0.97)
-		end
-		menuNouveau.boutons = {}
-		menuNouveau:SetScript("OnUpdate", function(self)
-			if not self:IsMouseOver(20, -20, -20, 20) and not (self.ancre and self.ancre:IsMouseOver()) then self:Hide() end
-		end)
-		tinsert(UISpecialFrames, "GuildUpMenuNouveauProjet")
-	end
+	menuNouveau = menuNouveau or ns.CadreMenu("GuildUpMenuNouveauProjet")
 	local m = menuNouveau
 	local choix = { { "|cff33dd55Projet vide…|r", nil } }
 	local carnets = Outils().Carnets and Outils().Carnets() or {}
@@ -672,15 +657,7 @@ local function MenuNouveau(ancre)
 	table.sort(noms)
 	for _, nom in ipairs(noms) do choix[#choix + 1] = { "À partir de « " .. nom .. " »", nom } end
 	for i, c in ipairs(choix) do
-		local b = m.boutons[i]
-		if not b then
-			b = CreateFrame("Button", nil, m)
-			b:SetHeight(20)
-			b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
-			b.texte = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-			b.texte:SetPoint("LEFT", b, "LEFT", 8, 0)
-			m.boutons[i] = b
-		end
+		local b = ns.BoutonMenu(m, i)
 		b:ClearAllPoints()
 		b:SetPoint("TOPLEFT", m, "TOPLEFT", 4, -4 - (i - 1) * 20)
 		b:SetPoint("RIGHT", m, "RIGHT", -4, 0)

@@ -14,7 +14,7 @@ local JOURS = { "dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam." }
 local debut = GetTime()
 local premiereLecture = true
 
-local function Erreur(t) if ns.Erreur then ns.Erreur(t) end end
+local Erreur = ns.Erreur
 
 local function Vus()
 	local db = ns.DB and ns.DB()

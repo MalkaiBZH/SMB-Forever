@@ -14,6 +14,12 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUp/`. Voir `README.md
   fichiers** : un module expose ses fonctions via `ns.Xxx = function…`, les autres les appellent de façon
   défensive (`if ns.Xxx then ns.Xxx() end`) car l'ordre de chargement compte.
 - **Ordre de chargement** = ordre des fichiers dans `GuildUp/GuildUp.toc`. Tout nouveau fichier doit y être ajouté.
+- **Outils communs** : `GuildUp_Outils.lua` (chargé juste après `GuildUp.lua`) contient la seule version de chaque
+  petite fonction : `ns.NomCourt`, `ns.MaCle`, `ns.Maintenant` (heure du serveur), `ns.Simplifier` (recherche sans
+  accents), `ns.Depuis`, `ns.Base36`, `ns.CouleurClasse` / `ns.CouleurClasseTexte`, `ns.NOMS_ROLES`, `ns.InfoObjet`,
+  `ns.Precharger`, `ns.AtlasExiste`, `ns.PoserAtlas`, `ns.CadreMenu` / `ns.BoutonMenu`, `ns.BrancherDepot`,
+  `ns.FenetreDeplacable`. Le cœur fournit `ns.Normaliser`, `ns.TestSolo`, `ns.Erreur`, `ns.CouperUTF8`.
+  Un module les reprend en tête de fichier (`local NomCourt = ns.NomCourt`) : ne pas en recopier de version locale.
 - Appels d'API défensifs : `(C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage`,
   `pcall(CreateFrame, …, "Template")` avec un modèle de repli. Le client Forever n'a pas toutes les API
   ni tous les modèles : ne pas supposer qu'une API retail existe.

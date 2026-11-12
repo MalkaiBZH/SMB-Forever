@@ -12,8 +12,8 @@ local debut = GetTime()
 local CALME = 20 -- rien juste après la connexion
 local dejaEntre = false
 
-local function Normaliser(nom) return ns.Normaliser and ns.Normaliser(nom) or nom end
-local function NomCourt(nom) return ((nom or "?"):gsub("%-", " ")) end
+local Normaliser = ns.Normaliser
+local NomCourt = ns.NomCourt
 local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end end
 local function Nettoyer(t) return ((t or ""):gsub("[~|]", " ")) end
 
