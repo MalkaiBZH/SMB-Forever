@@ -90,6 +90,17 @@ local function MontrerSurCarte(carte, x, y)
 	end
 end
 
+-- Appels reçus (ceux qui me concernent : j'ai le niveau), les plus récents d'abord, gardés 30 min
+-- pour l'accueil de la fenêtre GuildUpSMB
+local GARDE_APPELS = 30 * 60
+local appels = {} -- { nom, carte, x, y, niveau, zone, texte, quand (time()) }
+ns.AppelsAide = function()
+	local limite = time() - GARDE_APPELS
+	for i = #appels, 1, -1 do if appels[i].quand < limite then table.remove(appels, i) end end
+	return appels
+end
+ns.MontrerAppelSurCarte = function(a) if a then MontrerSurCarte(a.carte, a.x, a.y) end end
+
 local function Recevoir(prefixe, msg, canal, expediteur)
 	if prefixe ~= PREFIXE or canal ~= "GUILD" or not msg or not expediteur then return end
 	if Normaliser(expediteur) == Normaliser(UnitName("player")) and not TestSolo() then return end
@@ -99,6 +110,12 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	-- seulement ceux qui ont le niveau pour aider
 	if (UnitLevel("player") or 0) < niveau - ECART_NIVEAU then return end
 	local memeZone = zone ~= "" and GetZoneText and GetZoneText() == zone
+	-- un seul appel gardé par membre (le dernier)
+	for i = #appels, 1, -1 do if appels[i].nom == expediteur then table.remove(appels, i) end end
+	table.insert(appels, 1, { nom = expediteur, carte = carte, x = x, y = y, niveau = niveau, zone = zone,
+		texte = texte, quand = time() })
+	if ns.MajBouton then ns.MajBouton() end
+	if ns.MajInterface then ns.MajInterface() end
 	if ns.Notifier then
 		ns.Notifier("aide", "Demande d'aide", ("%s (niv %d) a besoin d'aide · %s%s"):format(NomCourt(expediteur), niveau,
 			zone ~= "" and zone or "?", texte ~= "" and (" : « " .. texte .. " »") or ""),

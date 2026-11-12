@@ -1016,7 +1016,7 @@ local function ToutRafraichir()
 		end
 	end
 	MajCible()
-	if ns.MajBoutonCarte then ns.MajBoutonCarte() end
+	if ns.MajBouton then ns.MajBouton() end
 end
 
 -- Évènements en rafale (liste de guilde, réglages, statuts…) : un seul rafraîchissement complet,
@@ -1255,7 +1255,7 @@ evPlaques:SetScript("OnEvent", function(self, event, arg1)
 	end
 end)
 
--- Partagé avec GuildUp.lua, GuildUp_MiniCarte.lua et GuildUp_Options.lua
+-- Partagé avec GuildUp.lua, GuildUp_Bouton.lua et GuildUp_Options.lua
 ns.Plaques = {
 	ToutRafraichir = ToutRafraichir, SurActivation = SurActivation, MajJoueur = MajJoueur, MajBarre = MajBarre,
 	Bordures = Bordures, DeplacerAuras = DeplacerAuras, PlacerIncantation = PlacerIncantation,

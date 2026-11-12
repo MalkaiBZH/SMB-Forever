@@ -402,6 +402,10 @@ local function NombreDemandes(objet, nonVues)
 	end
 	return n
 end
+-- pour l'accueil de la fenêtre GuildUpSMB : demandes reçues { nom, objet, quand, vu }, la plus récente
+-- d'abord, et le nombre de demandes pas encore vues (onglet Demandes)
+ns.DemandesDons = function() return Historique() end
+ns.NombreDemandesDons = function() return NombreDemandes(nil, true) end
 
 -- Demandes à transmettre à un donneur hors ligne : db.relaisDons[guilde][cible][k] = { nom, objet, quand, t }
 local function Relais()

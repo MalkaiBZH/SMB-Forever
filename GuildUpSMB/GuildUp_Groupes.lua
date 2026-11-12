@@ -446,7 +446,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		}
 		if not ancienne then
 			local nomContenu = InfoContenu(etat.annonces[id].code).nom
-			-- bulle + son discret à côté du bouton de la mini-carte (pas pendant le calme de connexion :
+			-- bulle + son discret à côté du médaillon GuildUpSMB (pas pendant le calme de connexion :
 			-- les groupes déjà ouverts arrivent tous d'un coup et ne sont pas « nouveaux »)
 			local idQuete = tonumber((etat.annonces[id].code or ""):match("^q(%d+)$"))
 			if GetTime() <= finCalme then

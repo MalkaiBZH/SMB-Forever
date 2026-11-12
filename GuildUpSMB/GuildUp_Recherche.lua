@@ -110,7 +110,7 @@ local function RendrePublic(annonce, nomContenu)
 end
 
 --------------------------------------------------------------------------------
--- Texture de l'anneau qui tourne autour du bouton de mini-carte : la première qui existe
+-- Texture de l'anneau qui tourne autour du médaillon GuildUpSMB : la première qui existe
 --------------------------------------------------------------------------------
 
 local ANNEAUX = {
@@ -234,7 +234,7 @@ ev:SetScript("OnEvent", function(_, event)
 	if event == "LFG_LIST_ACTIVE_ENTRY_UPDATE" then
 		if not EstInscrit() then inscritParNous = false end
 		if ns.majBoutonsPublic then ns.majBoutonsPublic() end
-		if ns.MajBoutonCarte then ns.MajBoutonCarte() end -- anneau vert du bouton de mini-carte
+		if ns.MajBouton then ns.MajBouton() end -- anneau vert du médaillon GuildUpSMB
 	elseif event == "LFG_LIST_APPLICANT_LIST_UPDATED" then
 		local ok, n = pcall(C_LFGList.GetNumApplicants)
 		n = ok and tonumber(n) or 0

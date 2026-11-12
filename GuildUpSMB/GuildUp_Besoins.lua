@@ -792,3 +792,27 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 		end)
 	end
 end)
+
+-- Pour l'accueil de la fenêtre GuildUpSMB : besoins des autres membres que je sais fabriquer
+-- { cle, nom, objet, qte, enLigne }, les membres en ligne d'abord (mêmes filtres que la liste)
+ns.BesoinsQueJeSaisFabriquer = function()
+	local res = {}
+	if not ns.JeSaisFabriquer then return res end
+	local limite = Maintenant() - OUBLI
+	for cle, e in pairs(Guilde() or {}) do
+		if type(e) == "table" and (e.vu or 0) >= limite and DansLaGuilde(cle)
+			and (TestSolo() or not cle:find("#test", 1, true)) then
+			local enLigne = ns.EnLigneMembre and ns.EnLigneMembre(cle) or false
+			for objet, qte in pairs(e.liste or {}) do
+				if ns.JeSaisFabriquer(objet) then
+					res[#res + 1] = { cle = cle, nom = e.nom, objet = objet, qte = qte, enLigne = enLigne }
+				end
+			end
+		end
+	end
+	table.sort(res, function(a, b)
+		if a.enLigne ~= b.enLigne then return a.enLigne end
+		return (a.nom or "") < (b.nom or "")
+	end)
+	return res
+end

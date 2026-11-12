@@ -161,6 +161,7 @@ local function Avancement(p)
 	for _, t in ipairs(b) do if Etat(p, t.objet, t.qte) == FAITE then faites = faites + 1 end end
 	return faites, total
 end
+ns.AvancementProjet = Avancement -- tâches faites, total (accueil de la fenêtre GuildUpSMB)
 
 -- métier de récolte nécessaire pour réunir un objet (nil : tout le monde peut)
 local InfoInstant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant

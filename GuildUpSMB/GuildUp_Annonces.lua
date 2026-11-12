@@ -3,7 +3,7 @@
 --   "N~niveau"          j'ai atteint un niveau
 --   "M~nom du métier"   j'ai appris un métier
 --   "P~nom~palier"      j'ai franchi un palier de métier (75, 150, 225, 300…)
--- Les autres membres voient une bulle à côté du bouton de la mini-carte. /smb annonces les coupe.
+-- Les autres membres voient une bulle à côté du médaillon GuildUpSMB. /smb annonces les coupe.
 
 local NOM_ADDON, ns = ...
 

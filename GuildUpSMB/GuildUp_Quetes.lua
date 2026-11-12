@@ -213,6 +213,7 @@ local function Partages()
 	end)
 	return res
 end
+ns.QuetesEnCommun = Partages -- mes quêtes faites aussi par d'autres membres (accueil de la fenêtre GuildUpSMB)
 
 -- Fenêtre « Quêtes en commun », dans le style de la page « Récit du lieu » (addon Spoken) :
 -- cadre de panneau du jeu (DefaultPanelFlatTemplate), parchemin des détails de quête, contour

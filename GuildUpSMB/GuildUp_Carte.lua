@@ -1,5 +1,5 @@
 -- GuildUpSMB : positions des membres de la guilde sur la carte du monde.
--- Chacun choisit de partager sa position (bouton « Position » du volet de la mini-carte,
+-- Chacun choisit de partager sa position (menu rapide du médaillon GuildUpSMB ou options,
 -- activé par défaut, réglage partagePosition). Messages d'addon invisibles sur le canal de guilde :
 --   "P~carte~x~y~CLASSE~PORTRAIT"  position (carte = uiMapID de C_Map.GetBestMapForUnit, x/y entre 0
 --                          et 1 ; PORTRAIT = « nain-chaman-femme », vide sans portrait ; les anciennes

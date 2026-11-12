@@ -1180,8 +1180,9 @@ ns.EnAttente = function()
 end
 
 Rafraichir = function()
-	-- compteur sur le bouton de la mini-carte, même fenêtre fermée
-	if ns.MajBoutonCarte then ns.MajBoutonCarte() end
+	-- compteur du médaillon GuildUpSMB (et accueil de la fenêtre), même fenêtre fermée
+	if ns.MajBouton then ns.MajBouton() end
+	if ns.MajInterface then ns.MajInterface() end
 	if not etat.fenetre or not etat.fenetre:IsShown() then return end
 	local n = 0
 	for id in pairs(etat.annonces) do

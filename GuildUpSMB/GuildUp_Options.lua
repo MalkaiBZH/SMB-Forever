@@ -12,11 +12,10 @@ local db = setmetatable({}, {
 -- (fichiers chargés avant celui-ci)
 local DEFAUT, rolesConnus, LireCVarJeu, Message, Erreur, NomComplet, EstDeMaGuilde, Etat, MonRole, RoleManuel, PoserRoleManuel, Annoncer = ns.Coeur.DEFAUT, ns.Coeur.rolesConnus, ns.Coeur.LireCVarJeu, ns.Coeur.Message, ns.Coeur.Erreur, ns.Coeur.NomComplet, ns.Coeur.EstDeMaGuilde, ns.Coeur.Etat, ns.Coeur.MonRole, ns.Coeur.RoleManuel, ns.Coeur.PoserRoleManuel, ns.Coeur.Annoncer
 local ToutRafraichir, SurActivation, MajBarre, Bordures, DeplacerAuras, PlacerIncantation, fondsPlaques, misesEnPage, modifiees = ns.Plaques.ToutRafraichir, ns.Plaques.SurActivation, ns.Plaques.MajBarre, ns.Plaques.Bordures, ns.Plaques.DeplacerAuras, ns.Plaques.PlacerIncantation, ns.Plaques.fondsPlaques, ns.Plaques.misesEnPage, ns.Plaques.modifiees
-local ReglagesBarre = ns.MiniCarte.ReglagesBarre
 -- Réglages hors DEFAUT, remis à zéro avec les autres (les données des modules : carnets, dons,
 -- besoins, projets, identité, cvarsAvant… sont gardées)
 local REGLAGES_HORS_DEFAUT = {
-	"notifs", "barre", "annoncesGuilde", "emoteGU", "voletNotifs", "coursesCompact",
+	"notifs", "bouton", "barre", "interface", "annoncesGuilde", "emoteGU", "voletNotifs", "coursesCompact",
 	"afficherDebug", "tousNiveaux", "styleJeu", "rappelGroupe", "portee", "rolesPerso",
 }
 
@@ -36,7 +35,8 @@ end
 local function OuiNon(v) return v and "|cff00ff00oui|r" or "|cffff4444non|r" end
 
 local function Aide()
-	Message("/smb tout seul ouvre la fenêtre d'options. Commandes :")
+	Message("/smb tout seul ouvre la fenêtre GuildUpSMB. Commandes :")
+	print("  /smb options — réglages de l'addon")
 	print("  /smb groupes — recherche de groupe de la guilde")
 	print("  /smb metiers — registre des métiers de la guilde")
 	print("  /smb quetes — quêtes en commun avec la guilde")
@@ -49,7 +49,7 @@ local function Aide()
 	print("  /smb nouveautes — les nouveautés de cette version")
 	print("  /smb sos — appeler la guilde à l'aide")
 	print("  /smb on | off — bannières de la guilde (" .. OuiNon(db.actif) .. ")")
-	print("  /smb barre — afficher / cacher le bouton de la mini-carte")
+	print("  /smb bouton — afficher / cacher le médaillon GuildUpSMB")
 	print("  /smb noms — nom et guilde des autres joueurs (" .. OuiNon(db.nomsAllies) .. ")")
 	print("  /smb lueur — lueur derrière la bannière de ta cible (" .. OuiNon(db.lueur) .. ")")
 	print("  /smb medaillons — portraits des joueurs sur les bannières (" .. OuiNon(db.medaillons ~= false) .. ")")
@@ -62,7 +62,7 @@ local function Aide()
 end
 
 local fenetre, MajFenetre -- fenêtre d'options, définies plus bas
--- pour le volet de la mini-carte (GuildUp_MiniCarte.lua) : rafraîchit la fenêtre si elle est ouverte
+-- pour le médaillon et la fenêtre GuildUpSMB (rôle, position) : rafraîchit la fenêtre si elle est ouverte
 ns.MajOptions = function() if fenetre and fenetre:IsShown() then MajFenetre() end end
 
 local function Rafraichir()
@@ -379,10 +379,9 @@ local function CreerFenetre()
 		function() return db.medaillons ~= false end, function(v) db.medaillons = v; ToutRafraichir() end)
 	NouvelleCase(f, x, Ligne(), "Membres de ma zone à l'écran",
 		function() return db.reperes ~= false end, function(v) db.reperes = v end)
-	NouvelleCase(f, x, Ligne(), "Afficher le bouton de la mini-carte",
-		function() return db.barre == nil or db.barre.visible ~= false end, function(v)
-			if type(db.barre) ~= "table" then db.barre = {} end
-			db.barre.visible = v
+	NouvelleCase(f, x, Ligne(), "Afficher le médaillon GuildUpSMB",
+		function() return ns.BoutonVisible and ns.BoutonVisible() end, function(v)
+			if ns.BasculerBouton then ns.BasculerBouton(v) end
 		end)
 
 	NouveauTitre(f, x, Ligne(20) - 6, "Mon rôle (annoncé à la guilde)")
@@ -407,6 +406,65 @@ local function CreerFenetre()
 		local r = MonRole()
 		detecte:SetText("Rôle annoncé : " .. (r and r:upper() or "inconnu (bannière neutre)"))
 	end })
+
+	-- Moi : pseudo commun à mes personnages (visible seulement au survol), mes personnages, position
+	NouveauTitre(f, x, Ligne(20) - 6, "Moi")
+	local yPseudo = Ligne(26)
+	local tPseudo = f:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	tPseudo:SetPoint("TOPLEFT", f, "TOPLEFT", x + 4, yPseudo - 4)
+	tPseudo:SetText("Pseudo")
+	local pseudo = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+	pseudo:SetSize(110, 18)
+	pseudo:SetPoint("LEFT", tPseudo, "RIGHT", 12, 0)
+	pseudo:SetAutoFocus(false)
+	pseudo:SetMaxLetters(16)
+	pseudo:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+	pseudo:SetScript("OnEscapePressed", function(self) self:SetText(db.pseudo or ""); self:ClearFocus() end)
+	pseudo:SetScript("OnEditFocusLost", function(self)
+		local t = strtrim(((self:GetText() or ""):gsub("[~|,\n]", "")))
+		db.pseudo = t ~= "" and t or nil
+		if ns.AnnoncerIdentite then ns.AnnoncerIdentite() end
+	end)
+	pseudo:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText("Pseudo")
+		GameTooltip:AddLine("Un nom commun à tous tes personnages (par exemple « Miko »).", 1, 1, 1, true)
+		GameTooltip:AddLine("La guilde le voit seulement au survol de ton nom : partout ailleurs, ton vrai nom reste affiché (pour le courrier et les messages, qui partent toujours au bon personnage).", 0.7, 0.7, 0.7, true)
+		GameTooltip:Show()
+	end)
+	pseudo:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	table.insert(controles, { maj = function() if not pseudo:HasFocus() then pseudo:SetText(db.pseudo or "") end end })
+	local persos = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+	persos:SetSize(70, 20)
+	persos:SetPoint("LEFT", pseudo, "RIGHT", 8, 0)
+	persos:SetText("Persos")
+	persos:SetScript("OnClick", function(self) if ns.MenuPersos then ns.MenuPersos(self) end end)
+	NouvelleCase(f, x, Ligne(), "Partager ma position avec la guilde",
+		function() return db.partagePosition end, function()
+			if ns.BasculerPartagePosition then ns.BasculerPartagePosition() end
+		end, true)
+
+	-- Notifications : une case par type de bulle (deux colonnes)
+	NouveauTitre(f, x, Ligne(20) - 6, "Notifications")
+	local NOTIFS = {
+		{ "groupes", "Groupes" }, { "candidatures", "Candidatures" },
+		{ "niveaux", "Niveaux" }, { "metiers", "Métiers" },
+		{ "evenements", "Événements" }, { "quetes", "Quêtes" },
+		{ "commandes", "Commandes" }, { "plans", "Échanges" },
+		{ "version", "Version" }, { "aide", "Aide" },
+		{ "gu", (ns.Config and ns.Config.cri) and (tostring(ns.Config.cri):upper() .. "!") or "Cri" },
+	}
+	local yNotif
+	for i, n in ipairs(NOTIFS) do
+		local cat = n[1]
+		if i % 2 == 1 then yNotif = Ligne() end
+		NouvelleCase(f, (i % 2 == 0) and (x + 150) or x, yNotif, n[2],
+			function() return not (type(db.notifs) == "table" and db.notifs[cat] == false) end,
+			function(v)
+				if type(db.notifs) ~= "table" then db.notifs = {} end
+				db.notifs[cat] = (not v) and false or nil
+			end)
+	end
 
 	-- Partie Debug : cachée par défaut, affichée avec /smb debug (pour tester l'addon)
 	local hauteurSansDebug = -Ligne(0) + 50
@@ -472,6 +530,7 @@ local function BasculerFenetre()
 	fenetre = fenetre or ns.AvecSons(CreerFenetre(), "options")
 	fenetre:SetShown(not fenetre:IsShown())
 end
+ns.BasculerOptions = BasculerFenetre -- (fenêtre GuildUpSMB, menu rapide du médaillon)
 
 
 SLASH_GUILDUP1 = "/smb"
@@ -534,10 +593,9 @@ SlashCmdList.GUILDUP = function(msg)
 	elseif cmd == "groupes" or cmd == "groupe" then
 		if ns.BasculerGroupes then ns.BasculerGroupes() end
 		return
-	elseif cmd == "barre" then
-		local r = ReglagesBarre()
-		r.visible = not r.visible
-		Message("bouton de la mini-carte : " .. OuiNon(r.visible))
+	elseif cmd == "bouton" or cmd == "barre" then
+		local visible = ns.BasculerBouton and ns.BasculerBouton()
+		Message("médaillon GuildUpSMB : " .. OuiNon(visible))
 	elseif cmd == "diag" then
 		Diag(); return
 	elseif cmd == "debug" then
@@ -591,7 +649,13 @@ SlashCmdList.GUILDUP = function(msg)
 		ReinitialiserReglages()
 		Message("réglages par défaut (tes carnets, dons, besoins et projets sont gardés)")
 	else
-		if cmd == "" then BasculerFenetre() else Aide() end
+		if cmd == "" then
+			if ns.BasculerInterface then ns.BasculerInterface() else BasculerFenetre() end
+		elseif cmd == "options" or cmd == "reglages" or cmd == "réglages" then
+			BasculerFenetre()
+		else
+			Aide()
+		end
 		return
 	end
 	ToutRafraichir()

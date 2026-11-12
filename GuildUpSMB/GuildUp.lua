@@ -310,7 +310,7 @@ ev:SetScript("OnEvent", function(self, event, arg1)
 	end
 end)
 
--- Partagé avec GuildUp_Plaques.lua, GuildUp_MiniCarte.lua et GuildUp_Options.lua (chargés après)
+-- Partagé avec GuildUp_Plaques.lua, GuildUp_Bouton.lua et GuildUp_Options.lua (chargés après)
 ns.Coeur = {
 	DEFAUT = DEFAUT, rolesConnus = rolesConnus, LireCVarJeu = LireCVarJeu, LireCVar = LireCVar,
 	Message = Message, Erreur = Erreur, SonsSurBoutons = SonsSurBoutons, NomComplet = NomComplet,

@@ -30,7 +30,11 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   - Contenu : `DEFAUT` (réglages par défaut), base `GuildUpDB`, sons, identité des joueurs et rôles (choix, annonce à la guilde), initialisation.
   - Fournit `ns.DB()`, `ns.Normaliser`, `ns.Erreur`, `ns.TestSolo`, et `ns.Coeur` (fonctions partagées avec les fichiers suivants).
 - `GuildUp_Plaques.lua` : bannières derrière le nom et la barre de vie (barres de nom et cadre de cible), modèles de bannière (passés en paramètre), mise en page des barres de nom, réglages du jeu imposés (CVars), événements des barres de nom. Exporte `ns.Plaques`.
-- `GuildUp_MiniCarte.lua` : bouton de la mini-carte, volet, bulles `ns.Notifier(catégorie, titre, texte, son, action)`.
+- `GuildUp_Bouton.lua` : médaillon flottant (`ns.MajBouton`), menu rapide, `ns.ChoisirRole`, bulles
+  `ns.Notifier(catégorie, titre, texte, son, action)`.
+- `GuildUp_Interface.lua` : fenêtre principale (style sombre et doré : `Habiller`, `Bouton`, `CarteAccueil`…),
+  menu des sections et page Accueil ; `ns.OuvrirInterface(page)`, `ns.MajInterface()`, `ns.NouveautesGuilde()`.
+  Les sections pas encore intégrées ouvrent leur ancienne fenêtre (`ouvrir` dans `SECTIONS`).
 - `GuildUp_Options.lua` : fenêtre d'options, `/smb diag`, réinitialisation, commandes `/smb`.
 - Les fichiers découpés accèdent à `GuildUpDB` par un mandataire `db` (même nom qu'avant) et reprennent les fonctions partagées en tête de fichier (`local Message = ns.Coeur.Message`).
 - Groupes : `GuildUp_Catalogue.lua` (contenus de la recherche de groupe), `GuildUp_Groupes.lua` (protocole, état partagé `ns.Groupes.etat`, actions), `GuildUp_GroupesFenetre.lua` (interface).

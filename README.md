@@ -15,7 +15,7 @@ et le lancer : il installe l'addon et le tient à jour tout seul (voir ci-dessou
 
 1. Copier le dossier `GuildUpSMB/` dans `World of Warcraft/<version du client>/Interface/AddOns/`.
 2. Lancer le jeu (ou `/reload`) et vérifier que « GuildUpSMB » est coché dans la liste des addons.
-3. Taper `/smb` pour ouvrir les options, ou cliquer sur le bouton de la mini-carte.
+3. Cliquer sur le médaillon GuildUpSMB (en haut à droite, déplaçable), ou taper `/smb`.
 
 ### Mise à jour automatique (Windows)
 
@@ -53,12 +53,18 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
   Hors du champ de vision : au bord de l'écran avec une flèche (sur les côtés, ou en bas quand il est
   derrière). Clic : chuchoter. Seulement les membres qui partagent leur position et ont un portrait.
   `/smb reperes` pour couper.
-- **Bouton de mini-carte** : choix de son rôle, accès à toutes les fenêtres, notifications.
-  Halo doré quand des groupes sont ouverts, anneau vert quand on est en attente.
+- **Médaillon GuildUpSMB** : bouton rond à placer où l'on veut sur l'écran (glisser), anneau à la
+  couleur de son rôle, pastille des nouveautés (groupes ouverts, appels à l'aide, demandes de dons).
+  Halo doré quand des groupes sont ouverts, anneau vert quand on est en attente. Clic : la fenêtre
+  GuildUpSMB ; clic droit : menu rapide (rôle, partage de position, groupes, appel à l'aide, options).
+- **Fenêtre GuildUpSMB** (style sombre et doré) : menu à gauche (Accueil, Groupes, Quêtes en commun,
+  Artisanat, Mes carnets, Dons, Événements, À l'aide !, Options) et choix du rôle en haut. L'accueil
+  résume la guilde : membres sur ta carte, groupes ouverts (postuler en un clic), appels à l'aide,
+  demandes de dons, besoins que tu sais fabriquer, avancement du dernier projet.
 - **Recherche de groupe de la guilde** : places Tank / Heal / DPS, groupes jusqu'à 40, et bouton
   « Rendre public » pour inscrire le groupe dans la recherche du jeu.
 - **Carte de la guilde** : position des membres sur la carte du monde (partage activé par défaut,
-  désactivable dans le volet de la mini-carte).
+  désactivable dans les options ou le menu rapide du médaillon).
 - **Quêtes en commun** : les quêtes que d'autres membres font aussi, avec « Créer un groupe ».
 - **Artisanat** :
   - *Registre* des métiers et recettes de chaque membre, commande en un clic ;
@@ -79,7 +85,8 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
 
 | Commande | Effet |
 |---|---|
-| `/smb` | Fenêtre d'options |
+| `/smb` | Fenêtre GuildUpSMB |
+| `/smb options` | Fenêtre d'options (pseudo, notifications…) |
 | `/smb groupes` | Recherche de groupe de la guilde |
 | `/smb metiers` | Registre des métiers |
 | `/smb quetes` | Quêtes en commun |
@@ -92,7 +99,7 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
 | `/smb sos` | Appeler la guilde à l'aide |
 | `/smb nouveautes` | Nouveautés de la version |
 | `/smb on` / `off` | Activer / couper les bannières |
-| `/smb barre` | Afficher / cacher le bouton de la mini-carte |
+| `/smb bouton` | Afficher / cacher le médaillon GuildUpSMB |
 | `/smb noms` | Nom et guilde des autres joueurs |
 | `/smb lueur` | Lueur derrière la bannière de la cible |
 | `/smb medaillons` | Portraits des joueurs sur les bannières |

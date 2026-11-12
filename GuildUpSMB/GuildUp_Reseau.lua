@@ -145,6 +145,19 @@ ns.EstLeRelais = function(exclu)
 	return true
 end
 
+-- Nombre de membres connectés qui ont GuildUpSMB (un message reçu depuis moins de 10 min), moi compris
+ns.MembresActifs = function()
+	local moi = ns.MaCle and ns.MaCle()
+	local maintenant, n = GetTime(), moi and 1 or 0
+	for cle, t in pairs(actifs) do
+		if maintenant - t <= ACTIF and cle ~= moi and not cle:find("#test", 1, true)
+			and not (ns.EnLigneMembre and ns.MembreGuilde and ns.MembreGuilde(cle) ~= nil and not ns.EnLigneMembre(cle)) then
+			n = n + 1
+		end
+	end
+	return n
+end
+
 --------------------------------------------------------------------------------
 -- Longues listes : découpage en morceaux et réassemblage
 --------------------------------------------------------------------------------

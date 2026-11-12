@@ -12,6 +12,7 @@ GuildUp_Outils.lua
 GuildUp_Reseau.lua
 GuildUp_Plaques.lua
 GuildUp_Bouton.lua
+GuildUp_Interface.lua
 GuildUp_Options.lua
 GuildUp_Identite.lua
 GuildUp_Catalogue.lua
