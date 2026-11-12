@@ -11,7 +11,10 @@
 local NOM_ADDON, ns = ...
 local PREFIXE = "GuildUpPrj"
 local LIBRE, PRISE, FAITE = 0, 1, 2
-local OUBLI = 30 * 86400          -- projets supprimés oubliés après 30 jours
+local OUBLI = 30 * 86400          -- projets supprimés : contenu oublié après 30 jours…
+local TOMBE = 365 * 86400         -- … mais la trace de suppression (id, date) est gardée un an,
+                                  -- pour qu'un membre longtemps absent ne fasse pas revenir le projet
+local ATTENTE_MAX = 120           -- secondes : réception incomplète (morceaux perdus) abandonnée
 
 local function Normaliser(nom) return ns.Normaliser and ns.Normaliser(nom) or nom end
 local function MaCle() return Normaliser(UnitName("player")) end
@@ -56,8 +59,17 @@ local function ListeProjets()
 	local l, ps = {}, Projets()
 	local maintenant = Maintenant()
 	for id, p in pairs(ps) do
-		if p.supprime and maintenant - p.supprime > OUBLI then ps[id] = nil
-		elseif p.nom and not p.supprime then l[#l + 1] = p end
+		if p.supprime then
+			if maintenant - p.supprime > TOMBE then
+				ps[id] = nil
+			elseif maintenant - p.supprime > OUBLI and (p.nom or next(p.entrees or {})) then
+				ps[id] = { id = id, supprime = p.supprime, maj = p.maj } -- trace minimale
+			end
+		elseif not p.nom then
+			ps[id] = nil -- coquille (réception jamais terminée) : rien à garder
+		else
+			l[#l + 1] = p
+		end
 	end
 	table.sort(l, function(a, b) return (a.cree or a.maj or 0) > (b.cree or b.maj or 0) end)
 	return l
@@ -108,17 +120,36 @@ local function Taches(p)
 	return ordreF, ordreB
 end
 
-local function Etat(p, objet)
+-- qteActuelle : quantité demandée aujourd'hui ; une tâche « faite » pour une quantité plus petite
+-- (l'auteur a augmenté le projet depuis) redevient à faire
+local function Etat(p, objet, qteActuelle)
 	local t = p.taches[objet]
 	if not t or (t.etat or LIBRE) == LIBRE then return LIBRE end
+	if t.etat == FAITE and t.qte and qteActuelle and qteActuelle > t.qte then return LIBRE end
 	return t.etat, t.qui
+end
+
+-- quantité demandée pour un objet du projet (tâche à fabriquer ou à réunir), ou nil
+local function QteTache(p, objet)
+	local f, b = Taches(p)
+	for _, t in ipairs(f) do if t.objet == objet then return t.qte end end
+	for _, t in ipairs(b) do if t.objet == objet then return t.qte end end
+end
+
+-- Départage de deux versions d'une même tâche : la plus récente ; à la même seconde, la plus
+-- avancée (libre < prise < faite), puis le plus grand nom : tous les membres choisissent pareil
+local function Gagne(nouv, anc)
+	if not anc then return true end
+	if (nouv.maj or 0) ~= (anc.maj or 0) then return (nouv.maj or 0) > (anc.maj or 0) end
+	if (nouv.etat or LIBRE) ~= (anc.etat or LIBRE) then return (nouv.etat or LIBRE) > (anc.etat or LIBRE) end
+	return (nouv.qui or "") > (anc.qui or "")
 end
 
 local function Avancement(p)
 	local f, b = Taches(p)
 	local total, faites = #f + #b, 0
-	for _, t in ipairs(f) do if Etat(p, t.objet) == FAITE then faites = faites + 1 end end
-	for _, t in ipairs(b) do if Etat(p, t.objet) == FAITE then faites = faites + 1 end end
+	for _, t in ipairs(f) do if Etat(p, t.objet, t.qte) == FAITE then faites = faites + 1 end end
+	for _, t in ipairs(b) do if Etat(p, t.objet, t.qte) == FAITE then faites = faites + 1 end end
 	return faites, total
 end
 
@@ -243,6 +274,7 @@ local function ChangerTache(p, objet, etat)
 	t.etat = etat
 	t.qui = etat == LIBRE and nil or (etat == PRISE and MaCle() or t.qui or MaCle())
 	t.maj = math.max(Maintenant(), (t.maj or 0) + 1)
+	t.qte = QteTache(p, objet)
 	p.taches[objet] = t
 	EnvoyerTache(p, objet)
 	Maj()
@@ -252,7 +284,8 @@ end
 -- Réception
 --------------------------------------------------------------------------------
 
-local enAttente = {}   -- [id] = { maj, n, morceaux } : objets d'un projet en cours de réception
+local enAttente = {}   -- [id] = { maj, n, morceaux, recu } : objets d'un projet en cours de réception
+local orphelines = {}  -- [id] = { [objet] = tâche } : tâches reçues avant leur projet
 local annules = {}     -- [id] = true : quelqu'un a déjà renvoyé ce projet après un « Q »
 local reponsePrevue = false
 
@@ -282,13 +315,19 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		local id, maj, auteur, relais, nom = reste:match("^([^~]+)~(%d+)~([^~]*)~(%d)~(.*)$")
 		if not id then return end
 		maj = tonumber(maj)
-		local p = Projet(id, true)
-		if maj <= (p.maj or 0) or (p.supprime and p.supprime >= maj) then
-			if maj >= (p.maj or 0) then annules[id] = true end
+		-- réceptions abandonnées (morceaux perdus)
+		for k, a in pairs(enAttente) do
+			if GetTime() - (a.recu or 0) > ATTENTE_MAX then enAttente[k], orphelines[k] = nil, nil end
+		end
+		local p = Projet(id) -- le projet n'est créé qu'une fois reçu en entier
+		local majConnue = p and p.maj or 0
+		if maj <= majConnue or (p and p.supprime and p.supprime >= maj) then
+			if maj >= majConnue then annules[id] = true end
 			return
 		end
 		annules[id] = true
-		enAttente[id] = { maj = maj, nom = nom, auteur = auteur, nouveau = p.nom == nil and relais == "0", morceaux = {} }
+		enAttente[id] = { maj = maj, nom = nom, auteur = auteur, nouveau = not (p and p.nom) and relais == "0",
+			morceaux = {}, recu = GetTime() }
 	elseif genre == "E" then
 		local id, maj, i, n, liste = reste:match("^([^~]+)~(%d+)~(%d+)~(%d+)~(.*)$")
 		local a = id and enAttente[id]
@@ -305,6 +344,19 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			for o, q in a.morceaux[k]:gmatch("(%d+):(%d+)") do p.entrees[#p.entrees + 1] = { objet = tonumber(o), qte = tonumber(q) } end
 		end
 		enAttente[id] = nil
+		-- tâches arrivées avant le projet
+		for objet, t in pairs(orphelines[id] or {}) do
+			if Gagne(t, p.taches[objet]) then p.taches[objet] = t end
+		end
+		orphelines[id] = nil
+		-- tâches d'objets qui ne font plus partie du projet (l'auteur l'a modifié) : retirées
+		local f, b = Taches(p)
+		local encore = {}
+		for _, t in ipairs(f) do encore[t.objet] = true end
+		for _, t in ipairs(b) do encore[t.objet] = true end
+		for objet in pairs(p.taches) do
+			if not encore[objet] then p.taches[objet] = nil end
+		end
 		if a.nouveau and p.auteur ~= MaCle() then
 			Alerte(("%s lance le projet « %s »."):format(NomCourt(p.auteur), p.nom), id)
 		end
@@ -313,11 +365,20 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		local id, objet, qui, etat, maj = reste:match("^([^~]+)~(%d+)~([^~]*)~(%d)~(%d+)$")
 		if not id then return end
 		objet, etat, maj = tonumber(objet), tonumber(etat), tonumber(maj)
-		local p = Projet(id, true)
+		local nouv = { qui = qui ~= "" and qui or nil, etat = etat, maj = maj }
+		local p = Projet(id)
+		if not (p and p.nom) then
+			-- projet pas encore reçu : la tâche attend (sans créer de coquille)
+			if p and p.supprime then return end
+			orphelines[id] = orphelines[id] or {}
+			if Gagne(nouv, orphelines[id][objet]) then orphelines[id][objet] = nouv end
+			return
+		end
 		local t = p.taches[objet]
-		if t and (t.maj or 0) >= maj then return end
+		if not Gagne(nouv, t) then return end
 		local avant = t and t.etat
-		p.taches[objet] = { qui = qui ~= "" and qui or nil, etat = etat, maj = maj }
+		if etat ~= LIBRE then nouv.qte = QteTache(p, objet) end
+		p.taches[objet] = nouv
 		-- quelqu'un prend une tâche de mon projet : je le sais
 		if EstAuteur(p) and etat == PRISE and avant ~= PRISE and qui ~= MaCle() and p.nom then
 			local O = Outils()
@@ -538,7 +599,7 @@ MajPage = function()
 		local jai = O.JAi and O.JAi(t.objet) or 0
 		l.texte:SetText(("%s%s|r |cffffffffx%d|r%s%s%s"):format(qc and qc.hex or "|cffffffff", nom or "…", t.qte, detail,
 			t.objectif and "  |cffffd100(objectif)|r" or "", jai > 0 and ("  |cff999999(tu en as %d)|r"):format(jai) or ""))
-		local etat, qui = Etat(p, t.objet)
+		local etat, qui = Etat(p, t.objet, t.qte)
 		local qualifies, moiOk, raison = Qualifies(t)
 		l.qualifies = qualifies
 		if etat == FAITE then
