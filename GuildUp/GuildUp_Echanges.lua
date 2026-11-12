@@ -222,6 +222,7 @@ local function LireBanque()
 end
 
 local EnvoyerMaListe
+local envoiPrevu = false
 local function LireMesObjets()
 	local sacs = {}
 	for sac = 0, (NUM_BAG_SLOTS or 4) do LireSac(sac, sacs) end
@@ -250,7 +251,14 @@ local function LireMesObjets()
 		if not mesObjets[objet] or mesObjets[objet].nombre ~= t[objet].nombre then change = true end
 	end
 	mesObjets = t
-	if change and pret and EnvoyerMaListe then EnvoyerMaListe() end
+	-- ramassages en série (objet donné qu'on continue de récolter) : un seul envoi après 45 s
+	if change and pret and EnvoyerMaListe and not envoiPrevu then
+		envoiPrevu = true
+		C_Timer.After(45, function()
+			envoiPrevu = false
+			EnvoyerMaListe()
+		end)
+	end
 	if MajTout then MajTout() end
 end
 
@@ -496,9 +504,12 @@ local function RelayerListes(pour)
 	C_Timer.After(3 + math.random() * 7, function()
 		local g = Guilde()
 		if not g then return end
+		-- un seul relais pour toute la guilde
+		if ns.EstLeRelais and not ns.EstLeRelais(pour) then return end
 		for qui, e in pairs(g) do
 			if type(e) == "table" and qui ~= pour and not qui:find("#test", 1, true)
 				and (e.vu or 0) >= Maintenant() - OUBLI and not (ns.MembreGuilde and ns.MembreGuilde(qui) == false)
+				and not (ns.EnLigneMembre and ns.EnLigneMembre(qui)) -- connecté : il répond lui-même
 				and not (relayees[qui] and GetTime() - relayees[qui] < 30) then
 				relayees[qui] = GetTime()
 				local mots = {}

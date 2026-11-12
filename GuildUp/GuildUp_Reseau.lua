@@ -94,6 +94,7 @@ end
 --------------------------------------------------------------------------------
 
 local ecouteurs = {}   -- [préfixe] = { fonction, canaux }
+local actifs = {}      -- [clé] = dernier message reçu de ce membre (il a GuildUp et il est là)
 local cadre = CreateFrame("Frame")
 cadre:RegisterEvent("CHAT_MSG_ADDON")
 cadre:SetScript("OnEvent", function(_, _, prefixe, msg, canal, expediteur)
@@ -104,6 +105,10 @@ cadre:SetScript("OnEvent", function(_, _, prefixe, msg, canal, expediteur)
 	-- textures |T…|t qu'un message forgé glisserait dans une bulle ou une infobulle)
 	if msg:find("|", 1, true) then msg = msg:gsub("|", "") end
 	stats.recus = stats.recus + 1
+	if canal == "GUILD" and ns.Normaliser then
+		local cle = ns.Normaliser(expediteur)
+		if cle then actifs[cle] = GetTime() end
+	end
 	local ok, err = pcall(e.fonction, prefixe, msg, canal, expediteur)
 	if not ok then
 		stats.echecs = stats.echecs + 1
@@ -118,6 +123,26 @@ ns.Ecouter = function(prefixe, fonction, canaux)
 	ecouteurs[prefixe] = { fonction = fonction, canaux = canaux or { GUILD = true } }
 	local inscription = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
 	if inscription then pcall(inscription, prefixe) end
+end
+
+-- Suis-je le relais ? Quand un membre se connecte, un seul membre lui renvoie les listes des absents
+-- au lieu de toute la guilde : celui qui a la plus petite clé parmi les membres actifs (un message
+-- de GuildUp reçu depuis moins de 10 min, et pas hors ligne d'après la liste de guilde). « exclu » :
+-- le membre qui vient de se connecter.
+local ACTIF = 600
+ns.EstLeRelais = function(exclu)
+	local moi = ns.MaCle and ns.MaCle()
+	if not moi then return true end
+	local maintenant = GetTime()
+	for cle, t in pairs(actifs) do
+		if maintenant - t > ACTIF then
+			actifs[cle] = nil
+		elseif cle ~= exclu and cle ~= moi and cle < moi and not cle:find("#test", 1, true)
+			and not (ns.EnLigneMembre and ns.MembreGuilde and ns.MembreGuilde(cle) ~= nil and not ns.EnLigneMembre(cle)) then
+			return false
+		end
+	end
+	return true
 end
 
 --------------------------------------------------------------------------------

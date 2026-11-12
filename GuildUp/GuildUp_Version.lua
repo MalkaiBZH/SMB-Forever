@@ -44,6 +44,9 @@ local function Annoncer()
 	dernierEnvoi = GetTime()
 end
 
+local derniereAnnonceVue = 0 -- un membre a annoncé une version au moins égale à la mienne
+local reponsePrevue = false
+
 local function Recevoir(prefixe, msg, canal, expediteur)
 	if prefixe ~= PREFIXE or canal ~= "GUILD" or not msg or not expediteur then return end
 	local v = msg:match("^V~(.+)$")
@@ -53,6 +56,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	if cle == moi then return end
 	versions[cle] = { nom = expediteur, v = v }
 	local c = Comparer(v, MA_VERSION)
+	if c >= 0 then derniereAnnonceVue = GetTime() end
 	if c > 0 then
 		if not plusRecenteVue or Comparer(v, plusRecenteVue) > 0 then
 			plusRecenteVue = v
@@ -62,9 +66,16 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 					nil, function() end)
 			end
 		end
-	elseif c < 0 and GetTime() - dernierEnvoi > 60 then
-		-- il est en retard : on lui renvoie notre version (au plus une fois par minute)
-		C_Timer.After(2 + math.random() * 5, Annoncer)
+	elseif c < 0 and GetTime() - dernierEnvoi > 60 and not reponsePrevue then
+		-- il est en retard : on lui renvoie notre version (au plus une fois par minute), sauf si un
+		-- autre membre à jour l'a fait pendant notre petit délai au hasard
+		reponsePrevue = true
+		dernierEnvoi = GetTime()
+		local prevue = GetTime()
+		C_Timer.After(2 + math.random() * 5, function()
+			reponsePrevue = false
+			if derniereAnnonceVue < prevue then Annoncer() end
+		end)
 	end
 end
 
