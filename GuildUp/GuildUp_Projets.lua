@@ -197,18 +197,9 @@ local function EnvoyerProjet(p, relais)
 	if p.supprime then Envoyer(("X~%s~%d"):format(p.id, p.supprime)); return end
 	if not p.nom then return end
 	Envoyer(("P~%s~%d~%s~%s~%s"):format(p.id, p.maj, p.auteur or "?", relais and "1" or "0", Propre(p.nom)))
-	local morceaux, cur = {}, {}
-	local long = 0
-	for _, e in ipairs(p.entrees) do
-		local m = e.objet .. ":" .. e.qte
-		if long + #m + 1 > TAILLE_MORCEAU and #cur > 0 then
-			morceaux[#morceaux + 1] = table.concat(cur, ",")
-			cur, long = {}, 0
-		end
-		cur[#cur + 1] = m
-		long = long + #m + 1
-	end
-	morceaux[#morceaux + 1] = table.concat(cur, ",")
+	local mots = {}
+	for _, e in ipairs(p.entrees) do mots[#mots + 1] = e.objet .. ":" .. e.qte end
+	local morceaux = ns.Morceaux(mots, TAILLE_MORCEAU)
 	for i, m in ipairs(morceaux) do Envoyer(("E~%s~%d~%d~%d~%s"):format(p.id, p.maj, i, #morceaux, m)) end
 end
 local function EnvoyerTache(p, objet)
@@ -286,6 +277,7 @@ end
 
 local enAttente = {}   -- [id] = { maj, n, morceaux, recu } : objets d'un projet en cours de réception
 local orphelines = {}  -- [id] = { [objet] = tâche } : tâches reçues avant leur projet
+local reassembleur = ns.Reassembleur(40) -- objets des projets en cours de réception
 local annules = {}     -- [id] = true : quelqu'un a déjà renvoyé ce projet après un « Q »
 local reponsePrevue = false
 
@@ -332,16 +324,15 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		local id, maj, i, n, liste = reste:match("^([^~]+)~(%d+)~(%d+)~(%d+)~(.*)$")
 		local a = id and enAttente[id]
 		if not a or tonumber(maj) ~= a.maj then return end
-		a.n = tonumber(n)
-		a.morceaux[tonumber(i)] = liste
-		for k = 1, a.n do if not a.morceaux[k] then return end end
+		local parts = reassembleur:Ajouter(id, a.maj, i, n, liste)
+		if not parts then return end
 		-- tout est arrivé : on remplace le projet
 		local p = Projet(id, true)
 		p.nom, p.auteur, p.maj = a.nom, a.auteur, a.maj
 		p.cree = p.cree or a.maj
 		p.entrees = {}
-		for k = 1, a.n do
-			for o, q in a.morceaux[k]:gmatch("(%d+):(%d+)") do p.entrees[#p.entrees + 1] = { objet = tonumber(o), qte = tonumber(q) } end
+		for k = 1, #parts do
+			for o, q in parts[k]:gmatch("(%d+):(%d+)") do p.entrees[#p.entrees + 1] = { objet = tonumber(o), qte = tonumber(q) } end
 		end
 		enAttente[id] = nil
 		-- tâches arrivées avant le projet
@@ -832,18 +823,13 @@ end
 -- Évènements
 --------------------------------------------------------------------------------
 
-do
-	local inscription = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
-	if inscription then pcall(inscription, PREFIXE) end
-end
+ns.Ecouter(PREFIXE, Recevoir)
 
 local ev = CreateFrame("Frame")
-for _, nom in ipairs({ "CHAT_MSG_ADDON", "PLAYER_ENTERING_WORLD", "GUILD_ROSTER_UPDATE" }) do pcall(ev.RegisterEvent, ev, nom) end
+for _, nom in ipairs({ "PLAYER_ENTERING_WORLD", "GUILD_ROSTER_UPDATE" }) do pcall(ev.RegisterEvent, ev, nom) end
 local premiere = true
 ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
-	if event == "CHAT_MSG_ADDON" then
-		Recevoir(a1, a2, a3, a4)
-	elseif event == "GUILD_ROSTER_UPDATE" then
+	if event == "GUILD_ROSTER_UPDATE" then
 		if page and page:IsVisible() then Maj() end
 	elseif event == "PLAYER_ENTERING_WORLD" and premiere then
 		premiere = false

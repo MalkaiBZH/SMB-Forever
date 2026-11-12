@@ -125,11 +125,7 @@ local function Decouper(msg, sep)
 	return t
 end
 
-local function Envoyer(msg, canal, cible)
-	if canal == "GUILD" and not IsInGuild() then return end
-	local envoi = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
-	if envoi then pcall(envoi, PREFIXE, msg, canal, cible) end
-end
+local function Envoyer(msg, canal, cible) ns.EnvoyerAddon(PREFIXE, msg, canal or "GUILD", cible) end
 
 local CouleurClasse = ns.CouleurClasseTexte
 
@@ -2030,22 +2026,16 @@ end
 -- Évènements
 --------------------------------------------------------------------------------
 
-do
-	local inscription = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
-	if inscription then pcall(inscription, PREFIXE) end
-end
+ns.Ecouter(PREFIXE, Recevoir, { GUILD = true, WHISPER = true })
 
 local premiereEntree = true
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("PLAYER_ENTERING_WORLD")
-ev:RegisterEvent("CHAT_MSG_ADDON")
 ev:RegisterEvent("GROUP_ROSTER_UPDATE")
 ev:RegisterEvent("PLAYER_GUILD_UPDATE")
 ev:RegisterEvent("PLAYER_LEVEL_UP")
 ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
-	if event == "CHAT_MSG_ADDON" then
-		Recevoir(a1, a2, a3, a4)
-	elseif event == "GROUP_ROSTER_UPDATE" then
+	if event == "GROUP_ROSTER_UPDATE" then
 		SurChangementDeGroupe()
 	elseif event == "PLAYER_LEVEL_UP" then
 		C_Timer.After(0.5, Rafraichir)

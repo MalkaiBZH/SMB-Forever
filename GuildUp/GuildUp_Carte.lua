@@ -30,11 +30,8 @@ end
 
 local Normaliser = ns.Normaliser
 
-local function Envoyer(msg)
-	if not IsInGuild() then return end
-	local envoi = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
-	if envoi then pcall(envoi, PREFIXE, msg, "GUILD") end
-end
+-- position : message « jetable » (remplace celui encore en attente, jamais réessayé)
+local function Envoyer(msg) ns.EnvoyerAddon(PREFIXE, msg, "GUILD", nil, { jetable = true }) end
 
 --------------------------------------------------------------------------------
 -- Envoi de ma position
@@ -683,20 +680,14 @@ end
 -- Évènements
 --------------------------------------------------------------------------------
 
-do
-	local inscription = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or RegisterAddonMessagePrefix
-	if inscription then pcall(inscription, PREFIXE) end
-end
+ns.Ecouter(PREFIXE, Recevoir)
 
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("PLAYER_ENTERING_WORLD")
-ev:RegisterEvent("CHAT_MSG_ADDON")
 ev:RegisterEvent("ADDON_LOADED")
 local premiereEntree = true
 ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
-	if event == "CHAT_MSG_ADDON" then
-		Recevoir(a1, a2, a3, a4)
-	elseif event == "ADDON_LOADED" then
+	if event == "ADDON_LOADED" then
 		if a1 == "Blizzard_WorldMap" then InstallerSuivi() end
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		InstallerSuivi()
