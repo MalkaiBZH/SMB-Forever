@@ -100,8 +100,8 @@ local function RendrePublic(annonce, nomContenu)
 		return
 	end
 	inscritParNous = true
-	if ns.Alerte then
-		ns.Alerte("Groupe public", ("Inscrit à la recherche du jeu (%s)"):format(NomStyle(style)))
+	if ns.Notifier then
+		ns.Notifier("groupes", "Groupe public", ("Inscrit à la recherche du jeu (%s)"):format(NomStyle(style)))
 	end
 end
 
@@ -240,8 +240,8 @@ ev:SetScript("OnEvent", function(_, event)
 	elseif event == "LFG_LIST_APPLICANT_LIST_UPDATED" then
 		local ok, n = pcall(C_LFGList.GetNumApplicants)
 		n = ok and tonumber(n) or 0
-		if n > dernierNombre and ns.Alerte then
-			ns.Alerte("Candidature publique", "Un joueur hors guilde veut rejoindre ton groupe", nil, function()
+		if n > dernierNombre and ns.Notifier then
+			ns.Notifier("candidatures", "Candidature publique", "Un joueur hors guilde veut rejoindre ton groupe", nil, function()
 				if LFGParentFrame and not LFGParentFrame:IsShown() and ToggleLFGParentFrame then
 					pcall(ToggleLFGParentFrame)
 				elseif LFGParentFrame then

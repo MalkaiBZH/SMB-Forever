@@ -1956,8 +1956,8 @@ CreerFiche = function()
 	end)
 	f.ajouter:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	besoin:SetScript("OnClick", function()
-		if ns.AjouterBesoin and ns.AjouterBesoin(f.objet, f.qte or 1) and ns.Alerte then
-			ns.Alerte("Besoin ajouté", (InfoObjet(f.objet) or "Objet") .. " est dans tes besoins : la guilde le voit.", "aucun", function() end)
+		if ns.AjouterBesoin and ns.AjouterBesoin(f.objet, f.qte or 1) and ns.Notifier then
+			ns.Notifier(nil, "Besoin ajouté", (InfoObjet(f.objet) or "Objet") .. " est dans tes besoins : la guilde le voit.", "aucun", function() end)
 		end
 	end)
 	local lienB = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
@@ -2209,7 +2209,7 @@ MontrerMenuListes = function(bouton, objet)
 			b:SetScript("OnClick", function()
 				m:Hide()
 				AjouterObjet(objet, 1, nom)
-				if ns.Alerte then ns.Alerte("Liste de courses", nomObjet .. " ajouté à « " .. nom .. " »", "aucun", function() ns.OuvrirCourses() end) end
+				if ns.Notifier then ns.Notifier(nil, "Liste de courses", nomObjet .. " ajouté à « " .. nom .. " »", "aucun", function() ns.OuvrirCourses() end) end
 			end)
 		elseif ch.nouvelleListe then
 			b.texte:SetText("|cff33dd55+ Nouvelle liste…|r")
@@ -2223,7 +2223,7 @@ MontrerMenuListes = function(bouton, objet)
 			b:SetScript("OnClick", function()
 				m:Hide()
 				if ns.AjouterAProjet then ns.AjouterAProjet(p.id, objet, 1) end
-				if ns.Alerte then ns.Alerte("Projet de guilde", nomObjet .. " ajouté au projet « " .. p.nom .. " »", "aucun", function() ns.OuvrirProjet(p.id) end) end
+				if ns.Notifier then ns.Notifier("commandes", "Projet de guilde", nomObjet .. " ajouté au projet « " .. p.nom .. " »", "aucun", function() ns.OuvrirProjet(p.id) end) end
 			end)
 		else
 			b.texte:SetText("|cff33dd55+ Nouveau projet…|r")
@@ -2291,8 +2291,8 @@ local function CreerLigneItem(parent, largeur)
 	end)
 	b.besoin:SetScript("OnClick", function(self)
 		local o = self:GetParent().objet
-		if o and ns.AjouterBesoin and ns.AjouterBesoin(o, 1) and ns.Alerte then
-			ns.Alerte("Besoin ajouté", ((InfoObjet(o)) or "Objet") .. " est dans tes besoins : la guilde le voit.", "aucun",
+		if o and ns.AjouterBesoin and ns.AjouterBesoin(o, 1) and ns.Notifier then
+			ns.Notifier(nil, "Besoin ajouté", ((InfoObjet(o)) or "Objet") .. " est dans tes besoins : la guilde le voit.", "aucun",
 				function() if ns.OuvrirBesoins then ns.OuvrirBesoins() end end)
 		end
 	end)

@@ -135,9 +135,9 @@ end
 --------------------------------------------------------------------------------
 
 local function AlerteBesoin(nom, objet, qte)
-	if not ns.Alerte then return end
+	if not ns.Notifier then return end
 	local nomO, lien = InfoObjet(objet)
-	ns.Alerte("Besoin dans la guilde", ("%s cherche %s%s — tu sais le fabriquer"):format(NomCourt(nom),
+	ns.Notifier("plans", "Besoin dans la guilde", ("%s cherche %s%s — tu sais le fabriquer"):format(NomCourt(nom),
 		lien or nomO or ("l'objet " .. objet), TexteQte(qte) and (" " .. TexteQte(qte)) or ""), nil,
 		function() if ns.OuvrirBesoins then ns.OuvrirBesoins() end end)
 end

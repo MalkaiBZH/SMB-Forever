@@ -89,8 +89,8 @@ local function LireEvenementsGuilde()
 			local cle = tostring(e.eventID or (e.title .. e.month .. e.monthDay .. e.hour .. e.minute))
 			if not vus[cle] then
 				vus[cle] = time()
-				if not calme and ns.Alerte then
-					ns.Alerte("Nouvel événement de guilde", ("|cffffd100%s|r — %s"):format(e.title, TexteDate(e)),
+				if not calme and ns.Notifier then
+					ns.Notifier("evenements", "Nouvel événement de guilde", ("|cffffd100%s|r — %s"):format(e.title, TexteDate(e)),
 						nil, OuvrirCalendrier)
 				end
 			end

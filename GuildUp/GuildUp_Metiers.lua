@@ -823,8 +823,8 @@ local function RecevoirCommande(genre, reste, cle, nom)
 		local cible, code, id, qteC = strsplit("~", reste)
 		qteC = tonumber(qteC)
 		if not PourMoi(cible) or not code or not id then return end
-		if ns.Alerte then
-			ns.Alerte("Nouvelle commande", ("%s te demande : %s%s"):format(NomCourt(nom),
+		if ns.Notifier then
+			ns.Notifier("commandes", "Nouvelle commande", ("%s te demande : %s%s"):format(NomCourt(nom),
 				(qteC and qteC > 1) and (qteC .. " x ") or "", NomRecette(code)), "aucun",
 				function()
 					local nomMP = cle:find("#test", 1, true) and UnitName("player")
@@ -836,12 +836,12 @@ local function RecevoirCommande(genre, reste, cle, nom)
 		-- réponse d'un crafteur qui a une version plus ancienne (bouton Accepter / Refuser)
 		local cible, _, ok, code = strsplit("~", reste)
 		if not PourMoi(cible) then return end
-		if ns.Alerte then
+		if ns.Notifier then
 			if ok == "1" then
-				ns.Alerte("Commande acceptée", ("%s s'en occupe : %s"):format(NomCourt(nom), NomRecette(code or "")),
+				ns.Notifier("commandes", "Commande acceptée", ("%s s'en occupe : %s"):format(NomCourt(nom), NomRecette(code or "")),
 					"TELL_MESSAGE", function() end)
 			else
-				ns.Alerte("Commande refusée", ("par %s"):format(NomCourt(nom)), nil, function() end)
+				ns.Notifier("commandes", "Commande refusée", ("par %s"):format(NomCourt(nom)), nil, function() end)
 			end
 		end
 	end

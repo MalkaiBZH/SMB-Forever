@@ -40,7 +40,7 @@ local function Envoyer(texte)
 	local msg = ("H~%d~%d~%d~%d~%s~%s"):format(carte or 0, math.floor((x or 0) * 10000),
 		math.floor((y or 0) * 10000), UnitLevel("player") or 0, zone:gsub("~", " "), texte)
 	if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end
-	if ns.Alerte then ns.Alerte("Demande d'aide", "Ton appel est parti vers la guilde.", "aucun", function() end) end
+	if ns.Notifier then ns.Notifier("aide", "Demande d'aide", "Ton appel est parti vers la guilde.", "aucun", function() end) end
 end
 
 StaticPopupDialogs["GUILDUP_AIDE"] = {
@@ -98,8 +98,8 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	-- seulement ceux qui ont le niveau pour aider
 	if (UnitLevel("player") or 0) < niveau - ECART_NIVEAU then return end
 	local memeZone = zone ~= "" and GetZoneText and GetZoneText() == zone
-	if ns.Alerte then
-		ns.Alerte("Demande d'aide", ("%s (niv %d) a besoin d'aide · %s%s"):format(NomCourt(expediteur), niveau,
+	if ns.Notifier then
+		ns.Notifier("aide", "Demande d'aide", ("%s (niv %d) a besoin d'aide · %s%s"):format(NomCourt(expediteur), niveau,
 			zone ~= "" and zone or "?", texte ~= "" and (" : « " .. texte .. " »") or ""),
 			memeZone and "RAID_WARNING" or nil, function() MontrerSurCarte(carte, x, y) end)
 	end

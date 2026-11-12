@@ -56,8 +56,8 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	if c > 0 then
 		if not plusRecenteVue or Comparer(v, plusRecenteVue) > 0 then
 			plusRecenteVue = v
-			if ns.Alerte then
-				ns.Alerte("Nouvelle version de GuildUp",
+			if ns.Notifier then
+				ns.Notifier("version", "Nouvelle version de GuildUp",
 					("%s a la %s (toi : %s) — mets à jour via CurseForge"):format(NomCourt(expediteur), v, MA_VERSION),
 					nil, function() end)
 			end

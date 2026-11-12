@@ -2218,7 +2218,8 @@ local function CreerVolet()
 		{ "niveaux", "Niveaux" }, { "metiers", "Métiers" },
 		{ "evenements", "Événements" }, { "quetes", "Quêtes" },
 		{ "commandes", "Commandes" }, { "plans", "Échanges" },
-		{ "version", "Version" }, { "gu", "GU!" },
+		{ "version", "Version" }, { "aide", "Aide" },
+		{ "gu", "GU!" },
 	}
 	v.notifs = {}
 	for i, n in ipairs(NOTIFS) do
@@ -2525,30 +2526,28 @@ end
 -- action (facultative) : fonction appelée au clic sur la bulle (par défaut : fenêtre des groupes)
 ns.MEDIA = MEDIA
 
--- Catégorie de chaque bulle (d'après son titre), pour pouvoir les couper une par une
--- dans la fenêtre /smb (db.notifs[catégorie] = false)
-local CATEGORIES_BULLES = {
-	["Nouveau groupe de la guilde"] = "groupes",
-	["Nouvelle candidature"] = "candidatures", ["Candidature refusée"] = "candidatures",
-	["Candidature publique"] = "candidatures", ["Groupe public"] = "groupes",
-	["La guilde progresse"] = "niveaux",
-	["Nouveau métier"] = "metiers", ["Métier"] = "metiers",
-	["Nouvel événement de guilde"] = "evenements",
-	["Commande acceptée"] = "commandes", ["Commande refusée"] = "commandes", ["Commande envoyée"] = "commandes",
-	["Nouvelle commande"] = "commandes", ["Besoin dans la guilde"] = "plans", ["Demande de don"] = "plans",
-	["Groupe toujours en recherche"] = "groupes", ["Demande d'aide"] = "groupes", ["Merci !"] = "plans",
-	["Quête en commun"] = "quetes", ["Groupe pour ta quête"] = "quetes",
-	["Plan à donner"] = "plans", ["Demande de plan"] = "plans",
-	["Nouvelle version de GuildUp"] = "version",
-	["Projet de guilde"] = "commandes",
-}
+-- Les bulles sont rangées par catégorie (passée par l'appelant), pour pouvoir les couper une par
+-- une dans le volet de la mini-carte (db.notifs[catégorie] = false) ; nil = toujours affichée
+-- (retours immédiats d'une action du joueur)
 local function NotifActive(categorie)
 	return not (categorie and type(db.notifs) == "table" and db.notifs[categorie] == false)
 end
 
-ns.Alerte = function(titre, texte, son, action)
-	if not db or not boutonCarte or not boutonCarte:IsShown() then return end
-	if not NotifActive(CATEGORIES_BULLES[titre]) then return end
+-- Place de la bulle : à gauche du bouton de la mini-carte, ou en haut à droite de l'écran si le
+-- bouton est caché (/smb barre)
+local function AncrerBulle(b)
+	b:ClearAllPoints()
+	if boutonCarte and boutonCarte:IsShown() then
+		b:SetPoint("RIGHT", boutonCarte, "LEFT", -6, 0)
+	else
+		b:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -230, -40)
+	end
+end
+
+-- Renvoie true si la bulle est affichée (false : GuildUp pas prêt ou catégorie coupée)
+ns.Notifier = function(categorie, titre, texte, son, action)
+	if not db then return false end
+	if not NotifActive(categorie) then return false end
 	bulle = bulle or CreerBulle()
 	if bulle.Reinit then bulle.Reinit(bulle) end -- une bulle spéciale (GuildUp_GU) l'avait décorée
 	bulle.action = action
@@ -2556,8 +2555,7 @@ ns.Alerte = function(titre, texte, son, action)
 	bulle.texte:SetText(texte or "")
 	local largeur = math.max(bulle.titre:GetStringWidth(), bulle.texte:GetStringWidth()) + 26
 	bulle:SetSize(largeur, bulle.titre:GetStringHeight() + bulle.texte:GetStringHeight() + 24)
-	bulle:ClearAllPoints()
-	bulle:SetPoint("RIGHT", boutonCarte, "LEFT", -6, 0)
+	AncrerBulle(bulle)
 	bulle:SetAlpha(1)
 	bulle.fin = GetTime() + DUREE_BULLE
 	bulle:Show()
@@ -2580,10 +2578,11 @@ ns.Alerte = function(titre, texte, son, action)
 	C_Timer.After(DUREE_BULLE + 0.2, function()
 		if bulle and jeton == jetonBulle then bulle:Hide() end
 	end)
+	return true
 end
 
 ns.AlerteNouveauGroupe = function(chef, contenu)
-	ns.Alerte("Nouveau groupe de la guilde", ("%s ouvre un groupe : |cffffd100%s|r"):format(chef or "?", contenu or "?"))
+	ns.Notifier("groupes", "Nouveau groupe de la guilde", ("%s ouvre un groupe : |cffffd100%s|r"):format(chef or "?", contenu or "?"))
 end
 
 SLASH_GUILDUP1 = "/smb"

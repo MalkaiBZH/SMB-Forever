@@ -228,8 +228,12 @@ end
 -- appelé par GuildUp_Annonces à la réception d'une montée de niveau ; true = déjà affichée
 ns.NiveauSpecial = function(expediteur, niveau)
 	if not expediteur or (Normaliser(expediteur) or ""):lower() ~= ZAARDOZ then return false end
-	if not ns.Alerte then return false end
-	ns.Alerte("La guilde progresse", ("Zaardoz Gu a atteint le niveau %s !"):format(niveau), "aucun", function() end)
+	if not ns.Notifier then return false end
+	-- bulle filtrée (notification « Niveaux » coupée) : ni corne ni décoration, et pas de bulle
+	-- ordinaire non plus (true = traité)
+	if not ns.Notifier("niveaux", "La guilde progresse", ("Zaardoz Gu a atteint le niveau %s !"):format(niveau), "aucun", function() end) then
+		return true
+	end
 	-- corne de guerre (fichiers du jeu : corne naine d'Ironforge, sinon celle du Fléau)
 	if PlaySoundFile then
 		local ok, joue = pcall(PlaySoundFile, CORNE, "Master")
