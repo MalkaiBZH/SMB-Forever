@@ -357,7 +357,11 @@ local function AfficherPlaque(f, unit, barre, tailleNom, niveauVisible)
 		PoserDegrade(f, barre, -margeX - 20, droite + 20, haut, bas, true)
 		return
 	end
-	PoserBanniere(f, ImageBanniere(Etat(unit), m), barre, -margeX, droite, haut, bas, hauteur, m, MedaillonUnite(unit))
+	-- pas de portrait sur les barres de nom quand je suis en combat ou que ce membre l'est (rafraîchi par
+	-- PLAYER_REGEN_DISABLED / PLAYER_REGEN_ENABLED et UNIT_FLAGS) ; le cadre de cible garde le sien
+	local enCombat = UnitAffectingCombat("player") or UnitAffectingCombat(unit)
+	PoserBanniere(f, ImageBanniere(Etat(unit), m), barre, -margeX, droite, haut, bas, hauteur, m,
+		not enCombat and MedaillonUnite(unit) or nil)
 	LueurBanniere(f, unit, barre, -margeX, droite, haut, bas, hauteur, niveauVisible, m)
 end
 
@@ -1195,6 +1199,7 @@ ns.ActiverPlaques = function()
 		"PLAYER_SPECIALIZATION_CHANGED", "ACTIVE_TALENT_GROUP_CHANGED", "CVAR_UPDATE",
 		"PLAYER_FLAGS_CHANGED", "UNIT_FLAGS", "UNIT_HEALTH", "UNIT_MAXHEALTH",
 		"UNIT_SPELLCAST_START", "UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_EMPOWER_START",
+		"PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", -- entrée / sortie de combat : portraits
 	}) do
 		pcall(evPlaques.RegisterEvent, evPlaques, e) -- certains évènements peuvent ne pas exister sur ce client
 	end
@@ -1231,6 +1236,8 @@ evPlaques:SetScript("OnEvent", function(self, event, arg1)
 		if f then Masquer(f) end
 	elseif event == "PLAYER_TARGET_CHANGED" then
 		ToutRafraichir() -- lueur de la cible, barre complète du joueur ciblé
+	elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
+		ToutRafraichir() -- portraits retirés dès l'entrée en combat, remis à la sortie
 	elseif event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" then
 		-- vie qui passe sous le maximum ou y revient : on ne refait la barre qu'à ce moment-là
 		if arg1 and arg1:find("^nameplate") and UnitIsPlayer(arg1) then

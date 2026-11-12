@@ -134,8 +134,11 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.14.1"] = {
+		"Les portraits disparaissent des barres de nom pendant le combat (le tien ou celui du membre) et reviennent à la sortie.",
+	},
 	["2.14.0"] = {
 		"|cffffd100Guilde|r : la version de SMB Forever de chaque membre, en vert s'il est à jour, en bleu s'il est en retard, en or s'il est en avance. La dernière version vue reste affichée quand il est hors ligne (sa date est dans l'infobulle). Nouveau tri « Par version », et la recherche trouve une version (« 2.12 »).",
 	},

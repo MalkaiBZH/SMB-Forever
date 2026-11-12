@@ -46,7 +46,8 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
 - **Portraits** : le médaillon des membres de la guilde (race, classe et sexe reconnus par le jeu,
   56 portraits Alliance dans `GuildUpSMB/media/portraits/`) s'affiche à gauche de leur nom, sur les barres
   de nom et le cadre de cible. Les anciennes bannières horizontales derrière le nom ne sont plus dessinées :
-  sans portrait, rien derrière le nom. Lueur dorée sur la cible. `/smb medaillons` pour couper.
+  sans portrait, rien derrière le nom. En combat (toi ou le membre), les barres de nom n'ont plus de portrait ;
+  il revient à la sortie du combat. Lueur dorée sur la cible. `/smb medaillons` pour couper.
 - **Repères dans le HUD** : les membres de la guilde présents sur la même carte ont un repère (portrait,
   prénom à la couleur de la classe, distance) toujours sur le tour de l'écran, comme dans un jeu de tir :
   en haut quand ils sont devant (dans leur direction exacte), sur les côtés quand ils sont à gauche ou à
