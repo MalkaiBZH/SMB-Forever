@@ -1046,8 +1046,9 @@ end
 -- Pour le carnet de craft : commander un objet (avec une quantité) à un membre
 ns.CommanderObjet = function(cle, nom, objet, qte) DemanderConfirmation(cle, nom, "i" .. objet, qte) end
 
--- Pour GuildUp_Besoins.lua
+-- Pour GuildUp_Besoins.lua et GuildUp_Echanges.lua
 ns.EnLigneMembre = function(cle) return EnLigne(cle, { vu = 0 }) end
+ns.DemanderRoster = function() DemanderRoster() end
 ns.MembreGuilde = function(cle)
 	if not rosterLu then return nil end
 	return roster[cle] ~= nil

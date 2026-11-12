@@ -9,6 +9,8 @@
 --   "D~objet~cible~quand"                       je voudrais ce don (+ message privé si en ligne)
 --   "R~cible~demandeur~objet~quand"             demande faite pendant que « cible » était hors ligne,
 --                                               renvoyée par un membre à sa connexion
+--   "A~demandeur~objet~quand"                   accusé de réception du donneur : les membres qui
+--                                               gardaient cette demande pour lui l'oublient
 -- Les demandes reçues sont gardées (onglet « Demandes ») ; celles faites à un donneur hors ligne
 -- sont gardées par les membres connectés et lui arrivent à sa connexion.
 -- Les listes sont gardées (GuildUpDB) : visibles même quand le donneur est hors ligne.
@@ -413,21 +415,40 @@ local function GarderPourPlusTard(cible, nom, objet, quand)
 end
 -- Le donneur vient de se connecter : on lui renvoie les demandes gardées (après un petit délai au
 -- hasard, pour qu'un seul membre le fasse ; les autres voient passer les « R » et oublient les leurs)
+local transmissionPrevue = {} -- [cible] = true : renvoi déjà programmé
 local function Transmettre(cible)
 	local r = Relais()
-	if not r or not r[cible] or not next(r[cible]) then return end
+	if not r or not r[cible] or not next(r[cible]) or transmissionPrevue[cible] then return end
+	transmissionPrevue[cible] = true
 	C_Timer.After(2 + math.random() * 6, function()
+		transmissionPrevue[cible] = nil
 		local liste = r[cible]
 		if not liste then return end
-		local limite = time() - GARDE_RELAIS
+		local maintenant = time()
+		local limite = maintenant - GARDE_RELAIS
 		for k, d in pairs(liste) do
-			if (d.t or 0) >= limite then
+			if (d.t or 0) < limite then
+				liste[k] = nil
+			elseif maintenant - (d.t or 0) >= 20 then
+				-- 20 s sans accusé de réception : le donneur ne l'a pas eue
 				Envoyer(("R~%s~%s~%d~%d"):format(cible, d.nom, d.objet, d.quand))
+				liste[k] = nil
 			end
-			liste[k] = nil
 		end
-		r[cible] = nil
+		if not next(liste) then r[cible] = nil end
 	end)
+end
+-- Donneurs en ligne qui ont des demandes en attente (à ma connexion, quand la liste de guilde change)
+local function TransmettreAuxConnectes()
+	local r = Relais()
+	if not r or not ns.EnLigneMembre then return end
+	for cible in pairs(r) do
+		if ns.EnLigneMembre(cible) then Transmettre(cible) end
+	end
+end
+-- J'ai reçu une demande : accusé à la guilde, pour que personne ne la garde pour moi
+local function Accuser(nomDem, objet, quand)
+	Envoyer(("A~%s~%d~%d"):format(nomDem, objet, quand or 0))
 end
 
 -- Bulle de résumé pour les demandes arrivées pendant mon absence (regroupées)
@@ -569,7 +590,20 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		if r and r[cible] then r[cible][Normaliser(nomDem) .. ":" .. objet .. ":" .. (quand or 0)] = nil end
 		if cible == moi or (TestSolo() and cible == moi .. "#test") then
 			if NoterDemande(nomDem, objet, quand) then ResumerAbsence() end
+			Accuser(nomDem, objet, quand)
 			if MajTout then MajTout() end
+		end
+
+	elseif genre == "A" then
+		-- le donneur (expéditeur) a bien reçu cette demande : on oublie notre copie
+		local nomDem, objet, quand = strsplit("~", reste)
+		objet, quand = tonumber(objet), tonumber(quand)
+		if not nomDem or not objet then return end
+		local r = Relais()
+		local cible = cle:gsub("#test$", "")
+		if r and r[cible] then
+			r[cible][Normaliser(nomDem) .. ":" .. objet .. ":" .. (quand or 0)] = nil
+			if not next(r[cible]) then r[cible] = nil end
 		end
 
 	elseif genre == "D" then
@@ -577,11 +611,13 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		objet, quand = tonumber(objet), tonumber(quand) or Maintenant()
 		if not objet or not cible then return end
 		if not (cible == moi or (TestSolo() and cible == moi .. "#test")) then
-			-- pour un autre : s'il est hors ligne, je garde la demande pour la lui renvoyer
-			if ns.EnLigneMembre and not ns.EnLigneMembre(cible) then GarderPourPlusTard(cible, nom, objet, quand) end
+			-- pour un autre : je garde la demande jusqu'à son accusé de réception (« A ») ; s'il était
+			-- en fait hors ligne, elle lui sera renvoyée à sa connexion
+			GarderPourPlusTard(cible, nom, objet, quand)
 			return
 		end
 		NoterDemande(nom, objet, quand)
+		Accuser(nom, objet, quand)
 		local nomO, lien = InfoObjet(objet)
 		if ns.Notifier then
 			-- sans son : le message privé du demandeur sonne déjà
@@ -602,10 +638,12 @@ local function Demander(d)
 	mesDemandes[k] = true
 	local quand = Maintenant()
 	Envoyer(("D~%d~%s~%d"):format(d.objet, d.cle, quand))
+	if ns.DemanderRoster then ns.DemanderRoster() end
+	-- je garde aussi la demande jusqu'à l'accusé de réception du donneur : s'il vient de se
+	-- déconnecter (encore vu « en ligne »), elle lui arrivera à sa prochaine connexion
+	local prenom, famille = UnitFullName("player")
+	GarderPourPlusTard(d.cle, famille and famille ~= "" and (prenom .. "-" .. famille) or prenom, d.objet, quand)
 	if not d.enLigne then
-		-- donneur hors ligne : je garde aussi la demande ; elle lui arrivera à sa connexion
-		local prenom, famille = UnitFullName("player")
-		GarderPourPlusTard(d.cle, famille and famille ~= "" and (prenom .. "-" .. famille) or prenom, d.objet, quand)
 		local nomO, lien = InfoObjet(d.objet)
 		if ns.Notifier then
 			ns.Notifier("plans", "Demande de don", ("%s est hors ligne : ta demande pour %s lui sera transmise dès que possible"):format(
@@ -1471,6 +1509,8 @@ end
 -- Ouvre la fenêtre des dons sur un onglet (1 Dons, 2 Mes dons, 3 Demandes, 4 Besoins) ; déjà ouverte
 -- sur cet onglet : la ferme (bouton « Dons » du volet)
 local function Creer()
+	-- qui est en ligne : la liste de guilde n'est sinon relue qu'à la connexion
+	if ns.DemanderRoster then ns.DemanderRoster() end
 	if fen then return end
 	CreerFenetre()
 	if ns.AvecSons then ns.AvecSons(fen, "fenetre") end
@@ -1622,6 +1662,7 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 	elseif event == "BANKFRAME_CLOSED" then
 		banqueOuverte = false
 	elseif event == "GET_ITEM_INFO_RECEIVED" or event == "GUILD_ROSTER_UPDATE" then
+		if event == "GUILD_ROSTER_UPDATE" and pret then TransmettreAuxConnectes() end
 		if fen and fen:IsShown() and not prevuMaj then
 			prevuMaj = true
 			C_Timer.After(0.3, function() prevuMaj = false; MajTout() end)
@@ -1636,6 +1677,7 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 			pret = true
 			if next(Dons()) then EnvoyerMaListe() end
 			Envoyer("Q")
+			TransmettreAuxConnectes()
 		end)
 	end
 end)
