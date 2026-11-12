@@ -88,7 +88,7 @@ local function RendrePublic(annonce, nomContenu)
 	local com = annonce.commentaire ~= "" and annonce.commentaire or (nomContenu or "")
 	local pose = PoserCommentaire(("[%s] %s"):format(NomStyle(style), com))
 	if ns.NoterAppelRecherche then
-		ns.NoterAppelRecherche(("GuildUpSMB : bouton Rendre public (commentaire posé=%s)"):format(tostring(pose == true)))
+		ns.NoterAppelRecherche(("SMB Forever : bouton Rendre public (commentaire posé=%s)"):format(tostring(pose == true)))
 	end
 	local ok, err = pcall(C_LFGList.CreateListing, {
 		activityIDs = { activite },

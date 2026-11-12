@@ -1372,7 +1372,7 @@ MajFenetre = function()
 	fen.videG:SetShown(#liste == 0)
 	fen.videG:SetText(Speciales() and "Personne n'a de recette spéciale (ou ne l'a pas encore partagée)."
 		or recherche ~= "" and "Personne ne correspond à ta recherche."
-		or filtre and "Personne n'a ce métier (parmi les membres qui ont GuildUpSMB)."
+		or filtre and "Personne n'a ce métier (parmi les membres qui ont SMB Forever)."
 		or "Personne pour l'instant.")
 	MajDetail(choisie)
 	fen.bas:SetText(("|cff6fd08c%d en ligne|r · ouvre chacun de tes métiers une fois pour partager tes recettes"):format(enLigne))

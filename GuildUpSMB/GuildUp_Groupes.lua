@@ -42,7 +42,7 @@ local etat = {
 local function Rafraichir() if ns.RafraichirGroupes then ns.RafraichirGroupes() end end
 
 local function Message(texte)
-	print("|cff3399ffGuildUpSMB|r : " .. texte)
+	print("|cff3399ffSMB Forever|r : " .. texte)
 end
 
 local function DB() return ns.DB and ns.DB() end

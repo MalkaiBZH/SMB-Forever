@@ -126,7 +126,10 @@ function UI.Bouton(parent, texte, style, largeur, hauteur)
 	b.texte:SetText(texte or "")
 	if style == "or" then
 		UI.Habiller(b, { C.orFonce[1], C.orFonce[2], C.orFonce[3], 1 }, { C.ors[1], C.ors[2], C.ors[3], 1 })
-		b.texte:SetTextColor(0.1, 0.08, 0.03)
+		-- texte sombre sur l'or : sans l'ombre noire de la police du jeu, qui le rendait baveux
+		b.texte:SetTextColor(0.07, 0.05, 0.02)
+		b.texte:SetShadowOffset(0, 0)
+		b.texte:SetShadowColor(0, 0, 0, 0)
 	elseif style == "aide" then
 		UI.Habiller(b, C.fondAide, C.bordAide)
 		b.texte:SetFontObject("GameFontNormal")
@@ -146,6 +149,35 @@ function UI.Bouton(parent, texte, style, largeur, hauteur)
 end
 
 -- pastille ronde (compteur) : rouge, ou discrète (neutre)
+-- Croix de fermeture plate : carré bordé, deux traits dorés en croix (texte « X » si le client ne
+-- sait pas tourner une texture) ; fermer() au clic. Pas de son de clic : la fenêtre joue le sien.
+function UI.Fermer(parent, fermer, taille)
+	taille = taille or 28
+	local b = CreateFrame("Button", nil, parent, "BackdropTemplate")
+	UI.Habiller(b, { 0, 0, 0, 0 }, C.bordMoyen)
+	b:SetSize(taille, taille)
+	local tourne = true
+	for _, angle in ipairs({ 45, -45 }) do
+		local t = b:CreateTexture(nil, "ARTWORK")
+		t:SetColorTexture(C.ors[1], C.ors[2], C.ors[3], 1)
+		t:SetSize(taille * 0.55, 2)
+		t:SetPoint("CENTER")
+		if not (t.SetRotation and pcall(t.SetRotation, t, math.rad(angle))) then
+			tourne = false
+			t:Hide()
+		end
+	end
+	if not tourne then
+		local x = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		x:SetPoint("CENTER", 0, 0)
+		x:SetText("X")
+		x:SetTextColor(unpack(C.ors))
+	end
+	Survol(b, 0.1)
+	b:SetScript("OnClick", function() if fermer then fermer() end end)
+	return b
+end
+
 function UI.Pastille(parent, neutre)
 	local p = CreateFrame("Frame", nil, parent)
 	p:SetSize(20, 20)

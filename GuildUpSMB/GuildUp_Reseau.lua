@@ -18,7 +18,7 @@ local function AvertirEchec(prefixe, raison)
 	if GetTime() - dernierAvertissement < 30 then return end
 	dernierAvertissement = GetTime()
 	if UIErrorsFrame and UIErrorsFrame.AddMessage then
-		UIErrorsFrame:AddMessage(("GuildUpSMB : un message (%s) n'a pas pu partir : %s"):format(prefixe or "?", raison), 1, 0.82, 0)
+		UIErrorsFrame:AddMessage(("SMB Forever : un message (%s) n'a pas pu partir : %s"):format(prefixe or "?", raison), 1, 0.82, 0)
 	end
 end
 

@@ -387,8 +387,9 @@ local function Barre(parent, hauteur)
 end
 
 -- Petite croix (fermer une fenêtre, retirer une ligne) : bouton fantôme du kit
+-- croix plate du kit (fermer, retirer) ; le clic est posé par l'appelant (SetScript OnClick)
 local function Croix(parent, taille)
-	return UI.Bouton(parent, "x", "fantome", taille or 22, taille or 22)
+	return UI.Fermer(parent, nil, taille or 22)
 end
 
 -- Fenêtre à part (encyclopédie) : cadre sombre à bordure dorée, bandeau de titre qu'on glisse pour

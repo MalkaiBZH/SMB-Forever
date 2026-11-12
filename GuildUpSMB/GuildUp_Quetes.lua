@@ -308,7 +308,7 @@ local function CreerPage(parent)
 	p.vide:SetPoint("TOPLEFT", p.liste, "TOPLEFT", 4, -8)
 	p.vide:SetPoint("RIGHT", p, "RIGHT", -MARGE, 0)
 	p.vide:SetWordWrap(true)
-	p.vide:SetText("Aucun membre de la guilde (avec GuildUpSMB) ne fait les mêmes quêtes que toi pour l'instant.")
+	p.vide:SetText("Aucun membre de la guilde (avec SMB Forever) ne fait les mêmes quêtes que toi pour l'instant.")
 	p.lignes = {}
 	-- à l'ouverture : qui est en ligne (la liste de guilde n'est sinon relue qu'à la connexion)
 	p:SetScript("OnShow", function()

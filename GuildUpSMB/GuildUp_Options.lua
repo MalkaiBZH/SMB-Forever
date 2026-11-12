@@ -43,9 +43,9 @@ end
 local function OuiNon(v) return v and "|cff00ff00oui|r" or "|cffff4444non|r" end
 
 local function Aide()
-	Message("/smb tout seul ouvre la fenêtre GuildUpSMB. Commandes :")
+	Message("/smb tout seul ouvre la fenêtre SMB Forever. Commandes :")
 	print("  /smb options — réglages de l'addon")
-	print("  /smb taille 1.2 — taille de la fenêtre GuildUpSMB (de 0.7 à 1.6)")
+	print("  /smb taille 1.2 — taille de la fenêtre SMB Forever (de 0.7 à 1.6)")
 	print("  /smb groupes — recherche de groupe de la guilde")
 	print("  /smb metiers — registre des métiers de la guilde")
 	print("  /smb quetes — quêtes en commun avec la guilde")
@@ -58,7 +58,7 @@ local function Aide()
 	print("  /smb nouveautes — les nouveautés de cette version")
 	print("  /smb sos — appeler la guilde à l'aide")
 	print("  /smb on | off — bannières de la guilde (" .. OuiNon(db.actif) .. ")")
-	print("  /smb bouton — afficher / cacher le médaillon GuildUpSMB")
+	print("  /smb bouton — afficher / cacher le médaillon SMB Forever")
 	print("  /smb noms — nom et guilde des autres joueurs (" .. OuiNon(db.nomsAllies) .. ")")
 	print("  /smb lueur — lueur derrière la bannière de ta cible (" .. OuiNon(db.lueur) .. ")")
 	print("  /smb medaillons — portraits des joueurs sur les bannières (" .. OuiNon(db.medaillons ~= false) .. ")")
@@ -226,7 +226,7 @@ local function DiagCollecte(L)
 			local ok, e = pcall(fn, uf)
 			return ok and "ok" or ("ERREUR " .. tostring(e))
 		end
-		L("  mise en page GuildUpSMB appliquée : " .. tostring(misesEnPage[uf] == true))
+		L("  mise en page SMB Forever appliquée : " .. tostring(misesEnPage[uf] == true))
 		L("  placement de l'incantation : " .. Tenter(PlacerIncantation))
 		Decrire("LevelFrame", uf.LevelFrame)
 		Decrire("PlayerLevelDiffFrame", uf.PlayerLevelDiffFrame)
@@ -269,10 +269,9 @@ local function AfficherCopie(texte)
 		tinsert(UISpecialFrames, "GuildUpCopie")
 		local titre = UI.Texte(f, "GameFontNormal", UI.C.ors)
 		titre:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -12)
-		titre:SetText("GuildUpSMB — diag (Ctrl+C pour copier)")
-		local fermer = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-		fermer:SetPoint("TOPRIGHT", f, "TOPRIGHT", -2, -2)
-		fermer:SetScript("OnClick", function() f:Hide() end)
+		titre:SetText("SMB Forever — diag (Ctrl+C pour copier)")
+		local fermer = UI.Fermer(f, function() f:Hide() end, 24)
+		fermer:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -6)
 		local fond = UI.Cadre(f, UI.C.champ, UI.C.bord)
 		fond:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -36)
 		fond:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -10, 10)
@@ -402,7 +401,7 @@ local function CreerPage(parent)
 		function() return db.medaillons ~= false end, function(v) db.medaillons = v end)
 	Case(affichage, 14, -92, "Membres de ma zone sur le tour de l'écran",
 		function() return db.reperes ~= false end, function(v) db.reperes = v end)
-	Case(affichage, 14, -118, "Afficher le médaillon GuildUpSMB",
+	Case(affichage, 14, -118, "Afficher le médaillon SMB Forever",
 		function() return ns.BoutonVisible and ns.BoutonVisible() end,
 		function(v) if ns.BasculerBouton then ns.BasculerBouton(v) end end)
 	local tTaille = UI.Texte(affichage, "GameFontHighlight", C.texte)
@@ -625,7 +624,7 @@ SlashCmdList.GUILDUP = function(msg)
 		return
 	elseif cmd == "bouton" or cmd == "barre" then
 		local visible = ns.BasculerBouton and ns.BasculerBouton()
-		Message("médaillon GuildUpSMB : " .. OuiNon(visible))
+		Message("médaillon SMB Forever : " .. OuiNon(visible))
 	elseif cmd == "diag" then
 		Diag(); return
 	elseif cmd == "debug" then
@@ -659,7 +658,7 @@ SlashCmdList.GUILDUP = function(msg)
 			Message("ex. /smb taille 1.2 (de 0.7 à 1.6)")
 			e = ns.EchelleInterface()
 		end
-		Message(("taille de la fenêtre GuildUpSMB : %.2f"):format(e or 1.1))
+		Message(("taille de la fenêtre SMB Forever : %.2f"):format(e or 1.1))
 		ns.MajOptions()
 		return
 	elseif cmd == "reperes" or cmd == "repères" or cmd == "hud" then

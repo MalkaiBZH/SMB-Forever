@@ -268,7 +268,7 @@ ns.MenuPersos = function(ancre)
 	menu.aide:ClearAllPoints()
 	menu.aide:SetPoint("TOPLEFT", menu, "TOPLEFT", 8, -30 - #persos * 20)
 	menu.aide:SetWidth(204)
-	menu.aide:SetText("Tes personnages de cette guilde apparaissent ici dès que tu t'y connectes avec GuildUpSMB. La guilde les voit au survol de ton nom.")
+	menu.aide:SetText("Tes personnages de cette guilde apparaissent ici dès que tu t'y connectes avec SMB Forever. La guilde les voit au survol de ton nom.")
 	menu:SetSize(220, 40 + #persos * 20 + menu.aide:GetStringHeight())
 	menu.ancre = ancre
 	menu:ClearAllPoints()

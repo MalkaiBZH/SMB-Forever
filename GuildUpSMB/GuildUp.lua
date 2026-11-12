@@ -39,7 +39,7 @@ local function LireCVar(nom)
 end
 
 local function Message(texte)
-	print("|cff3399ffGuildUpSMB|r : " .. texte)
+	print("|cff3399ffSMB Forever|r : " .. texte)
 end
 
 --------------------------------------------------------------------------------

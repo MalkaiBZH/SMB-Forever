@@ -614,11 +614,10 @@ local function CreerFenetre()
 	f.sousTitre = Texte(tete, "GameFontHighlightSmall", C.gris)
 	f.sousTitre:SetPoint("TOPLEFT", titre, "BOTTOMLEFT", 0, -3)
 
-	local fermer = CreateFrame("Button", nil, tete, "UIPanelCloseButton")
-	fermer:SetPoint("RIGHT", tete, "RIGHT", -6, 0)
-	fermer:SetScript("OnClick", function() f:Hide() end)
+	local fermer = UI.Fermer(tete, function() f:Hide() end, 30)
+	fermer:SetPoint("RIGHT", tete, "RIGHT", -10, 0)
 	-- choix du rôle : trois boutons collés
-	local x = -44
+	local x = -50
 	for i = 3, 1, -1 do
 		local role = ({ "tank", "heal", "dps" })[i]
 		local b = CreateFrame("Button", nil, tete, "BackdropTemplate")

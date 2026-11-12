@@ -87,7 +87,7 @@ end
 
 local function Infobulle(self)
 	GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-	GameTooltip:SetText("GuildUpSMB")
+	GameTooltip:SetText("SMB Forever")
 	local role = MonRole()
 	GameTooltip:AddLine("Ton rôle : " .. (role and ROLES[role] and ROLES[role].nom or "inconnu"), 1, 1, 1)
 	local n = ns.NouveautesGuilde and ns.NouveautesGuilde()
@@ -400,7 +400,7 @@ ns.Notifier = function(categorie, titre, texte, son, action)
 	bulle = bulle or CreerBulle()
 	if bulle.Reinit then bulle.Reinit(bulle) end -- une bulle spéciale (GuildUp_GU) l'avait décorée
 	bulle.action = action
-	bulle.titre:SetText(titre or "GuildUpSMB")
+	bulle.titre:SetText(titre or "SMB Forever")
 	bulle.texte:SetText(texte or "")
 	local largeur = math.max(bulle.titre:GetStringWidth(), bulle.texte:GetStringWidth()) + 26
 	bulle:SetSize(largeur, bulle.titre:GetStringHeight() + bulle.texte:GetStringHeight() + 24)
