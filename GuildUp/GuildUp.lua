@@ -1923,7 +1923,8 @@ ns.RoleChoisiALaMain = function() return db and db.monRole end
 
 -- Taille du bouton de mini-carte (1 = celle des boutons des autres addons)
 local ECHELLE_BOUTON = 1.3
--- Anneau vert qui tourne (texture media\anneau.tga de Miko) : passer à true quand le fichier existe
+-- Anneau vert qui tourne (texture media\anneau.tga de Miko, fournie) : activé par défaut.
+-- false = repli sur le halo qui pulse en vert
 local ANNEAU_CUSTOM = true
 
 -- Place le bouton sur le bord de la mini-carte, à l'angle donné (en degrés). Les décalages d'un
@@ -2277,8 +2278,8 @@ local function CreerBoutonCarte()
 	b.pulse:SetLooping("REPEAT")
 
 	-- anneau qui tourne (vert) : je suis moi-même en attente (mon annonce, ma candidature, groupe
-	-- public). Texture faite par Miko : media\anneau.tga (blanche, teintée ici). En attendant
-	-- qu'elle existe, c'est le halo qui pulse en vert.
+	-- public). Texture faite par Miko : media\anneau.tga (blanche, teintée ici). Si ANNEAU_CUSTOM
+	-- est à false, c'est le halo qui pulse en vert à la place.
 	if ANNEAU_CUSTOM then
 		b.anneau = b:CreateTexture(nil, "OVERLAY", nil, 1)
 		b.anneau:SetTexture("Interface\\AddOns\\GuildUp\\media\\anneau")
@@ -2398,7 +2399,7 @@ MajBarreRole = function()
 		b.tourne:Stop()
 		b.anneau:Hide()
 	end
-	-- halo : jaune pour les groupes ; vert seulement tant que la texture de l'anneau n'existe pas
+	-- halo : jaune pour les groupes ; vert seulement si l'anneau est désactivé (ANNEAU_CUSTOM = false)
 	if (moi and not anneauVert) or (groupes and not moi) then
 		if moi then b.halo:SetVertexColor(0.25, 1, 0.35, 1) else b.halo:SetVertexColor(1, 0.82, 0.1, 1) end
 		b.halo:Show()
