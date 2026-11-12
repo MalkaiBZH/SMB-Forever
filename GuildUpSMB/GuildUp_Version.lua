@@ -39,9 +39,30 @@ ns.ComparerVersions = Comparer -- (page Guilde : versions en retard)
 
 local NomCourt = ns.NomCourt
 
-local versions = {}       -- [nom normalisé] = { nom, v }
--- version de l'addon d'un membre (annonce reçue), pour la page Guilde (GuildUp_Membres.lua)
-ns.VersionMembre = function(cle) local e = cle and versions[cle]; return e and e.v end
+local versions = {}       -- [nom normalisé] = { nom, v } : annonces reçues pendant la session
+-- Dernière version vue de chaque membre, gardée d'une session à l'autre (GuildUpDB.versionsVues[clé] =
+-- { v = version, t = date }), oubliée après 60 jours sans nouvelle
+local OUBLI_VERSION = 60 * 86400
+local function VersionsVues()
+	local db = ns.DB and ns.DB()
+	if not db then return nil end
+	if type(db.versionsVues) ~= "table" then db.versionsVues = {} end
+	return db.versionsVues
+end
+-- version de l'addon d'un membre, pour la page Guilde (GuildUp_Membres.lua) :
+--   version, date où on l'a vue (time()), true si annoncée pendant cette session
+ns.VersionMembre = function(cle)
+	if not cle then return nil end
+	local e = versions[cle]
+	local vues = VersionsVues()
+	local g = vues and vues[cle]
+	if e then return e.v, type(g) == "table" and g.t or time(), true end
+	if type(g) == "table" and type(g.v) == "string" then
+		if type(g.t) ~= "number" or time() - g.t > OUBLI_VERSION then vues[cle] = nil; return nil end
+		return g.v, g.t, false
+	end
+	return nil
+end
 local plusRecenteVue      -- plus haute version déjà signalée (une seule bulle par version)
 local dernierEnvoi = 0
 
@@ -76,7 +97,11 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	local cle = ns.Normaliser and ns.Normaliser(expediteur) or expediteur
 	local moi = ns.Normaliser and ns.Normaliser(UnitName("player")) or UnitName("player")
 	if cle == moi then return end
+	v = v:gsub("[^%w%.%-]", ""):sub(1, 16) -- texte venu du réseau : chiffres, points et tirets
+	if v == "" then return end
 	versions[cle] = { nom = expediteur, v = v }
+	local vues = VersionsVues()
+	if vues then vues[cle] = { v = v, t = time() } end
 	if sorte == "V" then RepondrePresence() end
 	local c = Comparer(v, MA_VERSION)
 	if c >= 0 then derniereAnnonceVue = GetTime() end
@@ -109,8 +134,11 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.14.0"] = {
+		"|cffffd100Guilde|r : la version de SMB Forever de chaque membre, en vert s'il est à jour, en bleu s'il est en retard, en or s'il est en avance. La dernière version vue reste affichée quand il est hors ligne (sa date est dans l'infobulle). Nouveau tri « Par version », et la recherche trouve une version (« 2.12 »).",
+	},
 	["2.13.1"] = {
 		"Le nombre de membres « en ligne avec l'addon » est juste dès ta connexion : les membres présents se signalent à ton arrivée, et un membre silencieux n'est plus oublié au bout de 10 minutes.",
 	},

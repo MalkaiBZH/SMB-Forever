@@ -1,10 +1,11 @@
 -- GuildUpSMB : page « Guilde » de la fenêtre SMB Forever (ns.AjouterPage("guilde"), kit ns.UI).
 -- Tous les membres de la liste de guilde du jeu, en ligne et hors ligne, avec tout ce que l'addon sait
 -- d'eux : portrait, nom à la couleur de la classe, niveau, classe, rang, en ligne (zone) ou vu il y a…,
--- pseudo et personnages (identités), rôle annoncé, SMB Forever (et sa version si connue), métiers et
+-- pseudo et personnages (identités), rôle annoncé, SMB Forever et sa version (verte : à jour, bleue : plus
+-- ancienne que la mienne, dorée : plus récente ; la dernière vue est gardée 60 jours), métiers et
 -- niveaux (fiches du registre), position partagée sur ma carte (distance), note publique de guilde.
--- En haut : recherche (nom, pseudo, zone, métier, rang, note), puces Tous / En ligne / Avec l'addon /
--- À suivre (avec son compteur), tri (en ligne d'abord, par niveau, par rang), compteur, bouton « Mon
+-- En haut : recherche (nom, pseudo, zone, métier, rang, note, version), puces Tous / En ligne / Avec l'addon /
+-- À suivre (avec son compteur), tri (en ligne d'abord, par niveau, par rang, par version), compteur, bouton « Mon
 -- profil » (ns.OuvrirProfil).
 -- Rangée sur deux lignes (identité ; détails), infobulle complète au survol, clic = chuchoter (en
 -- ligne), clic droit = menu (Chuchoter, Inviter dans le groupe). Liste « virtuelle » : seules les
@@ -42,7 +43,8 @@ local FRAIS = 45              -- secondes : position partagée encore valable (c
 
 local FILTRES = { "Tous", "En ligne", "Avec l'addon", "À suivre" }
 local SUIVRE = 4              -- puce de la vue « À suivre » (la dernière : son compteur change sa largeur)
-local TRIS = { { "enligne", "En ligne d'abord" }, { "niveau", "Par niveau" }, { "rang", "Par rang" } }
+local TRIS = { { "enligne", "En ligne d'abord" }, { "niveau", "Par niveau" }, { "rang", "Par rang" },
+	{ "version", "Par version" } }
 local INACTIF = 30            -- jours sans connexion à partir desquels un membre est « inactif »
 local DELAI_RAPPEL = 600      -- secondes : pas deux rappels au même joueur en 10 min
 local LARGEUR_RAPPEL = 84     -- bouton « Rappeler » à droite de la rangée
@@ -127,15 +129,18 @@ local function Infos(e, maCle)
 	local p = positions and positions[cle]
 	if p and GetTime() - (p.vu or 0) < FRAIS then m.position = p end
 	if m.position and ns.DistanceMembre then m.distance, m.unite = ns.DistanceMembre(cle) end
-	if moi then m.version = ns.Version
-	elseif ns.VersionMembre then m.version = ns.VersionMembre(cle) end
+	-- version : annoncée pendant la session, ou la dernière vue (gardée 60 jours, avec sa date)
+	if moi then m.version, m.versionSession = ns.Version, true
+	elseif ns.VersionMembre then m.version, m.versionVue, m.versionSession = ns.VersionMembre(cle) end
+	if type(m.version) ~= "string" then m.version = nil end
+	if m.version and ns.Version then m.ecart = Comparer(m.version, ns.Version) end
 	m.addon = (moi or m.version or m.identite or m.fiche or m.position or m.role) and true or false
 	-- vue « À suivre » : inactif, sans l'addon, version plus ancienne que la mienne
 	if not moi then
 		local jours = not m.enLigne and JoursAbsent(e.absence)
 		if jours and jours >= INACTIF then m.inactif = math.floor(jours) end
 		m.sansAddon = not m.addon
-		if m.version and ns.Version and Comparer(m.version, ns.Version) < 0 then m.ancienne = true end
+		if m.ecart and m.ecart < 0 then m.ancienne = true end
 		m.aSuivre = (m.inactif or m.sansAddon or m.ancienne) and true or false
 		-- rappel possible : en ligne, et quelque chose à lui dire
 		m.rappel = m.enLigne and (m.sansAddon or m.ancienne) and true or false
@@ -150,7 +155,8 @@ end
 
 -- texte où chercher : nom, pseudo, personnages, zone, métiers, rang, classe, note
 local function TexteRecherche(m)
-	local morceaux = { NomCourt(m.nom), m.pseudo or "", m.e.zone or "", m.e.rang or "", m.e.classeNom or "", m.e.note or "" }
+	local morceaux = { NomCourt(m.nom), m.pseudo or "", m.e.zone or "", m.e.rang or "", m.e.classeNom or "", m.e.note or "",
+		m.version or "" }
 	for _, mt in ipairs(m.metiers) do morceaux[#morceaux + 1] = mt.nom end
 	if m.identite then
 		for _, c in ipairs(m.identite.persos or {}) do morceaux[#morceaux + 1] = NomCourt(c) end
@@ -188,6 +194,17 @@ local TRIER = {
 	rang = function(a, b)
 		local ra, rb = a.e.rangIndex or 99, b.e.rangIndex or 99
 		if ra ~= rb then return ra < rb end
+		if a.enLigne ~= b.enLigne then return a.enLigne end
+		return a.tri < b.tri
+	end,
+	-- versions de SMB Forever, la plus récente d'abord ; puis l'addon sans version connue, puis les autres
+	version = function(a, b)
+		if (a.version and true or false) ~= (b.version and true or false) then return a.version and true or false end
+		if a.version and a.version ~= b.version then
+			local c = Comparer(a.version, b.version)
+			if c ~= 0 then return c > 0 end
+		end
+		if a.addon ~= b.addon then return a.addon end
 		if a.enLigne ~= b.enLigne then return a.enLigne end
 		return a.tri < b.tri
 	end,
@@ -271,6 +288,17 @@ end
 
 -- version annoncée par un membre, réduite aux chiffres, points et tirets (texte venu du réseau)
 local function VersionPropre(v) return (tostring(v or "?"):gsub("[^%w%.%-]", ""):sub(1, 16)) end
+
+-- version affichée sur la rangée : verte si à jour, bleue si plus ancienne que la mienne, dorée si plus
+-- récente, grise si on sait seulement qu'il a l'addon (la date d'une version d'une session précédente
+-- est dans l'infobulle)
+local function TexteVersion(m)
+	if not m.version then return GRIS .. "SMB Forever|r" end
+	local couleur = VERT
+	if m.ancienne then couleur = "|cff6aa6e6"
+	elseif m.ecart and m.ecart > 0 then couleur = OR end
+	return couleur .. "SMB " .. VersionPropre(m.version) .. "|r"
+end
 
 local function TexteRappel(m)
 	local nomAddon = ((ns.Config and ns.Config.nomPublic) or "SMB Forever"):gsub("[|~]", "")
@@ -403,12 +431,15 @@ local function Infobulle(self)
 		tt:AddLine("|cffffd100Principal :|r " .. NomCourt(m.principal), 1, 1, 1)
 	end
 	if m.role then tt:AddLine("|cffffd100Rôle :|r " .. UI.TexteRole(m.role), 1, 1, 1) end
-	-- SMB Forever
-	if m.version and m.ancienne then
-		tt:AddLine("|cffffd100SMB Forever :|r " .. VersionPropre(m.version) .. " |cff6aa6e6(plus ancienne que la tienne : "
-			.. tostring(ns.Version) .. ")|r", 1, 1, 1)
-	elseif m.version then
-		tt:AddLine("|cffffd100SMB Forever :|r " .. m.version, 1, 1, 1)
+	-- SMB Forever (version : à jour, plus ancienne ou plus récente que la mienne ; date si pas vue cette session)
+	if m.version then
+		local quand = (not m.versionSession and m.versionVue) and (" |cff9c9380(vue " .. UI.IlYa(m.versionVue) .. ")|r") or ""
+		local ecart = ""
+		if m.moi then ecart = " |cff9c9380(toi)|r"
+		elseif m.ancienne then ecart = " |cff6aa6e6(plus ancienne que la tienne : " .. tostring(ns.Version) .. ")|r"
+		elseif m.ecart and m.ecart > 0 then ecart = " |cfff1cf6b(plus récente que la tienne : " .. tostring(ns.Version) .. ")|r"
+		else ecart = " |cff6fd08c(à jour)|r" end
+		tt:AddLine("|cffffd100SMB Forever :|r " .. VersionPropre(m.version) .. ecart .. quand, 1, 1, 1)
 	elseif m.addon then
 		tt:AddLine("|cffffd100SMB Forever :|r oui", 1, 1, 1)
 	else
@@ -613,7 +644,7 @@ local function Remplir(r, m)
 		gauche = t
 	end
 	for i = #etiquettes + 1, #r.etiquettes do r.etiquettes[i]:Hide() end
-	r.addon:SetText((not suivre and m.addon) and ("SMB" .. (m.version and (" " .. m.version) or "")) or "")
+	r.addon:SetText((not suivre and m.addon) and TexteVersion(m) or "")
 	r.ligne2:ClearAllPoints()
 	r.ligne2:SetPoint("BOTTOMLEFT", r.portrait, "BOTTOMRIGHT", 10, 1)
 	r.ligne2:SetPoint("RIGHT", gauche, "LEFT", -12, 0)

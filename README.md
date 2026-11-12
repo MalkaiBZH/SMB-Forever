@@ -62,9 +62,10 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
   demandes de dons, besoins que tu sais fabriquer, avancement du dernier projet.
 - **Page Guilde** : tous les membres de la guilde, en ligne et hors ligne, avec tout ce que l'addon sait
   d'eux : niveau, classe, rang, zone ou dernière connexion, pseudo et personnage principal, rôle,
-  SMB Forever (et sa version), métiers et niveaux, distance s'il est sur ta carte, note de guilde.
-  Recherche (nom, pseudo, zone, métier), filtres Tous / En ligne / Avec l'addon, tri (en ligne d'abord,
-  par niveau, par rang). Survol : la fiche complète ; clic : chuchoter ; clic droit : chuchoter ou
+  SMB Forever et sa version (verte si à jour, bleue si plus ancienne que la tienne, dorée si plus récente ;
+  la dernière version vue d'un membre est gardée 60 jours, avec sa date dans l'infobulle), métiers et niveaux,
+  distance s'il est sur ta carte, note de guilde. Recherche (nom, pseudo, zone, métier, version), filtres
+  Tous / En ligne / Avec l'addon, tri (en ligne d'abord, par niveau, par rang, par version). Survol : la fiche complète ; clic : chuchoter ; clic droit : chuchoter ou
   inviter dans le groupe.
   **À suivre** : les membres à relancer (inactifs depuis 30 jours ou plus, sans l'addon, version plus ancienne
   que la tienne), avec une étiquette colorée ; « Rappeler » envoie un message privé poli à un membre en ligne
@@ -144,6 +145,7 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
 ## Données enregistrées
 
 - `GuildUpDB` (par compte) : réglages, dons, besoins, projets, identité, listes reçues des autres membres,
+  dernière version de SMB Forever vue de chaque membre (`versionsVues`, oubliée après 60 jours),
   groupes programmés (`groupesProgrammes` : ton annonce programmée, ses inscrits et tes inscriptions, oubliés
   1 h après le départ).
 - `GuildUpMetiersDB` (par compte) : métiers et recettes de ses personnages et des membres de la guilde.
