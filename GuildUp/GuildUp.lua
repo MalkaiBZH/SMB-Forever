@@ -1140,6 +1140,58 @@ local function ToutRafraichir()
 	if MajBarreRole then MajBarreRole() end
 end
 
+-- Évènements en rafale (liste de guilde, réglages, statuts…) : un seul rafraîchissement complet,
+-- 0,2 s après le premier
+local rafraichissementPrevu = false
+local function PlanifierRafraichissement()
+	if rafraichissementPrevu then return end
+	rafraichissementPrevu = true
+	C_Timer.After(0.2, function()
+		rafraichissementPrevu = false
+		ToutRafraichir()
+	end)
+end
+
+-- Rôle d'un joueur changé : seulement sa barre de nom (et le cadre de cible si c'est lui)
+local function MajJoueur(cle)
+	if not db then return end
+	for _, plaque in ipairs(C_NamePlate.GetNamePlates() or {}) do
+		local uf = plaque.UnitFrame
+		if uf and uf.unit and not (plaque.IsForbidden and plaque:IsForbidden()) and NomComplet(uf.unit) == cle then
+			MajBarre(uf)
+		end
+	end
+	if UnitExists("target") and NomComplet("target") == cle then MajCible() end
+end
+
+-- Auras et incantations : Blizzard replace ses éléments à chaque mise à jour, on repasse après lui.
+-- Une seule passe par image pour toutes les barres concernées, et seulement pour celles des
+-- membres de la guilde (mise en page GuildUp).
+local aReplacer = { auras = {}, incantation = {} }
+local replacementPrevu = false
+local function PlanifierReplacement(genre, unite)
+	local plaque = C_NamePlate.GetNamePlateForUnit(unite)
+	if not (plaque and plaque.UnitFrame and misesEnPage[plaque.UnitFrame]) then return end
+	aReplacer[genre][unite] = true
+	if replacementPrevu then return end
+	replacementPrevu = true
+	C_Timer.After(0, function()
+		replacementPrevu = false
+		for u in pairs(aReplacer.auras) do
+			aReplacer.auras[u] = nil
+			local p = C_NamePlate.GetNamePlateForUnit(u)
+			if p and p.UnitFrame and misesEnPage[p.UnitFrame] then DeplacerAurasUnite(u) end
+		end
+		for u in pairs(aReplacer.incantation) do
+			aReplacer.incantation[u] = nil
+			local p = C_NamePlate.GetNamePlateForUnit(u)
+			if p and not (p.IsForbidden and p:IsForbidden()) and p.UnitFrame and misesEnPage[p.UnitFrame] then
+				pcall(PlacerIncantation, p.UnitFrame)
+			end
+		end
+	end)
+end
+
 --------------------------------------------------------------------------------
 -- Annonce des rôles entre membres de la guilde (messages d'addon invisibles)
 --------------------------------------------------------------------------------
@@ -1175,8 +1227,11 @@ local function Recevoir(prefixe, msg, expediteur)
 	end
 	local role = msg:match("^R:(.+)$")
 	if role then
-		rolesConnus[expediteur] = ROLE_VALIDE[role] and role or nil
-		ToutRafraichir()
+		local nouveau = ROLE_VALIDE[role] and role or nil
+		if rolesConnus[expediteur] ~= nouveau then
+			rolesConnus[expediteur] = nouveau
+			MajJoueur(expediteur)
+		end
 	end
 end
 
@@ -1338,28 +1393,17 @@ ev:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4)
 	elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ROLES_ASSIGNED"
 		or event == "PLAYER_SPECIALIZATION_CHANGED" or event == "ACTIVE_TALENT_GROUP_CHANGED" then
 		Annoncer(false)
-		ToutRafraichir()
+		PlanifierRafraichissement()
 	elseif event == "UNIT_SPELLCAST_START" or event == "UNIT_SPELLCAST_CHANNEL_START"
 		or event == "UNIT_SPELLCAST_EMPOWER_START" then
 		-- Blizzard peut replacer la barre d'incantation quand elle s'affiche : on repasse après lui
 		if arg1 and arg1:find("^nameplate") and db.incantationHaut and not incantationRefusee then
-			C_Timer.After(0, function()
-				local plaque = C_NamePlate.GetNamePlateForUnit(arg1)
-				if plaque and not (plaque.IsForbidden and plaque:IsForbidden()) and plaque.UnitFrame
-					and misesEnPage[plaque.UnitFrame] then
-					pcall(PlacerIncantation, plaque.UnitFrame)
-				end
-			end)
+			PlanifierReplacement("incantation", arg1)
 		end
 	elseif event == "UNIT_AURA" then
 		-- Blizzard peut replacer ses icônes en mettant les auras à jour : on repasse après lui
 		if arg1 and arg1:find("^nameplate") and db.aurasSous then
-			C_Timer.After(0, function()
-				local plaque = C_NamePlate.GetNamePlateForUnit(arg1)
-				if plaque and plaque.UnitFrame and misesEnPage[plaque.UnitFrame] then
-					DeplacerAurasUnite(arg1)
-				end
-			end)
+			PlanifierReplacement("auras", arg1)
 		end
 	elseif event == "NAME_PLATE_UNIT_ADDED" then
 		if arg1 then etatsVie[arg1] = VieEntamee(arg1) end -- nouvelle unité sur ce jeton
@@ -1390,7 +1434,8 @@ ev:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4)
 			MajCible()
 		end
 	else
-		ToutRafraichir()
+		-- GUILD_ROSTER_UPDATE, CVAR_UPDATE, PLAYER_FLAGS_CHANGED, PLAYER_GUILD_UPDATE… : regroupés
+		PlanifierRafraichissement()
 	end
 end)
 
