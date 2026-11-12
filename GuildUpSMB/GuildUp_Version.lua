@@ -92,8 +92,12 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.12.0"] = {
+		"|cffffd100Suivi des commandes|r : nouvel onglet Commandes dans Artisanat. Tes commandes reçues et passées y restent 30 jours, avec leur état. Accepte, refuse, marque « Fait » ou « Reçue », annule : l'autre est prévenu par une bulle.",
+		"|cffffd100Encyclopédie|r : bouton « Voir dans Items » sur un objet fabricable, pour voir qui sait le fabriquer et le commander.",
+	},
 	["2.11.0"] = {
 		"Nouvelle page |cffffd100Événements|r dans la fenêtre SMB Forever : les événements de la guilde et tes invitations des 30 prochains jours, groupés par jour, avec ton état d'inscription. Clique sur un événement pour voir sa description et la liste des inscrits, et réponds directement (S'inscrire, Peut-être, Se désinscrire). La bulle d'un nouvel événement ouvre cette page, et l'accueil rappelle le prochain événement.",
 	},

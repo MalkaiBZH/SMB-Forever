@@ -2,13 +2,14 @@
 -- Pages fournies ici (ns.AjouterPage) :
 --   « artisanat » : onglets Registre (GuildUp_Metiers.lua), Items (ici : tous les objets fabricables,
 --     catégories et sous-catégories, recherche, filtres « Pour ma classe », « Jusqu'à mon niveau », niveau requis min / max et « Fabricable par la
---     guilde », tri ; « Besoin », « Ajouter » à une liste ou à un projet)
---     et Projets de guilde (GuildUp_Projets.lua).
+--     guilde », tri ; « Besoin », « Ajouter » à une liste ou à un projet), Projets de guilde
+--     (GuildUp_Projets.lua) et Commandes (GuildUp_Metiers.lua : commandes reçues et passées).
 --   « carnets » (Mes carnets) : mes listes à gauche ; à droite la liste de courses de la liste choisie,
 --     qui calcule tout ce qu'il faut, sous-recettes comprises, compare avec les sacs et la banque, et
 --     dit d'où viennent les composants ; « Réduire » la remplace par une mini-liste sur l'écran.
 -- Fenêtres à part, aux couleurs du kit : l'encyclopédie (fiche d'un objet, Alt + clic sur un objet du
--- jeu ; collée à droite de la fenêtre GuildUpSMB), la mini-liste et la bulle 3D des PNJ.
+-- jeu ; collée à droite de la fenêtre GuildUpSMB ; « Voir dans Items » ouvre l'onglet Items sur un objet
+-- fabricable, avec ses artisans), la mini-liste et la bulle 3D des PNJ.
 -- Données : GuildUp_Craft.lua (recettes du client Forever) et GuildUp_Sources.lua (sources tirées
 -- une fois de QuestieDB). Rien ne dépend d'un autre addon. Aucun message réseau ici.
 
@@ -1363,6 +1364,7 @@ MajFiche = function()
 		fiche.besoin:Hide()
 		fiche.ajouter:Hide()
 		fiche.lien:Hide()
+		fiche.items:Hide()
 		for _, l in ipairs(lignesFiche) do l:Hide() end
 		for _, c in ipairs(fiche.cadres or {}) do c:Hide() end
 		fiche.defile:Hauteur(10)
@@ -1379,8 +1381,10 @@ MajFiche = function()
 	fiche.jai:SetText(banque and ("Tu en as %d dans tes sacs · %d à la banque"):format(sacs, banque)
 		or ("Tu en as %d dans tes sacs · banque inconnue (ouvre-la une fois)"):format(sacs))
 	fiche.besoin:Show()
-	fiche.ajouter:SetShown(RecettesDe(objet) ~= nil)
+	local fabricable = RecettesDe(objet) ~= nil
+	fiche.ajouter:SetShown(fabricable)
 	fiche.lien:Show()
+	fiche.items:SetShown(fabricable)
 
 	local y, i = 4, 0
 	local contenu = fiche.contenu
@@ -1845,8 +1849,9 @@ CreerFiche = function()
 	f.jai:SetPoint("TOPLEFT", f.nom, "BOTTOMLEFT", 0, -5)
 	f.jai:SetPoint("RIGHT", f, "RIGHT", -14, 0)
 	f.jai:SetWordWrap(true)
-	-- actions : besoin de la guilde, ajouter à une liste (objets fabricables), lien dans la discussion
-	f.besoin = UI.Bouton(f, "Besoin", "fantome", 74, 26)
+	-- actions : besoin de la guilde, ajouter à une liste (objets fabricables), lien dans la discussion,
+	-- voir dans l'onglet Items (objets fabricables : qui sait le fabriquer, commander)
+	f.besoin = UI.Bouton(f, "Besoin", "fantome", 66, 26)
 	f.besoin:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -94)
 	UI.Infobulle(f.besoin, "Ajouter aux besoins", "La guilde verra que tu cherches cet objet.")
 	f.besoin:SetScript("OnClick", function()
@@ -1854,13 +1859,13 @@ CreerFiche = function()
 			ns.Notifier(nil, "Besoin ajouté", (InfoObjet(f.objet) or "Objet") .. " est dans tes besoins : la guilde le voit.", "aucun", function() end)
 		end
 	end)
-	f.ajouter = UI.Bouton(f, "Ajouter à une liste", "or", 140, 26)
+	f.ajouter = UI.Bouton(f, "Ajouter", "or", 76, 26)
 	f.ajouter:SetPoint("LEFT", f.besoin, "RIGHT", 6, 0)
 	f.ajouter:SetScript("OnClick", function(self)
 		if ns.MontrerMenuListes and f.objet then ns.MontrerMenuListes(self, f.objet) end
 	end)
 	UI.Infobulle(f.ajouter, "Ajouter à une liste de courses", "Choisis une de tes listes ou un de tes projets de guilde, ou crée-en un nouveau.")
-	f.lien = UI.Bouton(f, "Lien", "fantome", 60, 26)
+	f.lien = UI.Bouton(f, "Lien", "fantome", 50, 26)
 	f.lien:SetPoint("LEFT", f.ajouter, "RIGHT", 6, 0)
 	f.lien:SetScript("OnClick", function()
 		local _, lien = InfoObjet(f.objet)
@@ -1870,6 +1875,12 @@ CreerFiche = function()
 		end
 	end)
 	UI.Infobulle(f.lien, "Lien", "Met le lien de l'objet dans la discussion.")
+	f.items = UI.Bouton(f, "Voir dans Items", "fantome", 110, 26)
+	f.items:SetPoint("LEFT", f.lien, "RIGHT", 6, 0)
+	f.items:SetScript("OnClick", function()
+		if f.objet and ns.MontrerObjetItems then ns.MontrerObjetItems(f.objet) end
+	end)
+	UI.Infobulle(f.items, "Voir dans Items", "Ouvre l'onglet Items de la page Artisanat sur cet objet : qui, dans la guilde, sait le fabriquer, et le bouton Commander.")
 	local filet = UI.Filet(f)
 	filet:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -130)
 	filet:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -130)
@@ -2610,7 +2621,7 @@ local function CreerPageItems(parent)
 		l.portrait:SetPoint("LEFT", l, "LEFT", 6, 0)
 		l.commander = UI.Bouton(l, "Commander", "or", 84, 24)
 		l.commander:SetPoint("RIGHT", l, "RIGHT", -6, 0)
-		UI.Infobulle(l.commander, "Commander", "Demande-lui de te fabriquer cet objet (tu choisis la quantité).")
+		UI.Infobulle(l.commander, "Commander", "Demande-lui de te fabriquer cet objet (tu choisis la quantité). Tu la suis dans l'onglet Commandes.")
 		l.nom = UI.Texte(l, "GameFontHighlight")
 		l.nom:SetPoint("TOPLEFT", l.portrait, "TOPRIGHT", 8, 1)
 		l.nom:SetPoint("RIGHT", l.commander, "LEFT", -6, 0)
@@ -2692,13 +2703,18 @@ end
 -- Ouvre Artisanat > Items sur un objet (son détail et ses artisans à droite)
 ns.MontrerObjetItems = function(objet)
 	objetChoisi, objetChoisiLie = objet, nil
+	-- lié quand ramassé ? (pas de « Besoin » dans le détail)
+	for _, o in ipairs(Catalogue()) do
+		if o[1] == objet then objetChoisiLie = o[7]; break end
+	end
 	if ns.OuvrirArtisanat then ns.OuvrirArtisanat(2) end
 	if RendreItems then RendreItems() end
 end
 
 --------------------------------------------------------------------------------
--- Page « Artisanat » de la fenêtre GuildUpSMB : onglets Registre (GuildUp_Metiers.lua), Items (ici)
--- et Projets de guilde (GuildUp_Projets.lua). Chaque onglet est créé à sa première ouverture ; la
+-- Page « Artisanat » de la fenêtre GuildUpSMB : onglets Registre (GuildUp_Metiers.lua), Items (ici),
+-- Projets de guilde (GuildUp_Projets.lua) et Commandes (GuildUp_Metiers.lua ; compteur des commandes
+-- reçues en attente, ns.MajCompteCommandes). Chaque onglet est créé à sa première ouverture ; la
 -- page ne suit pas le rafraîchissement automatique de la fenêtre (rafraichirAuto = false) : chaque
 -- module la rafraîchit sur ses évènements.
 --------------------------------------------------------------------------------
@@ -2708,14 +2724,22 @@ local CREER_ONGLETS = {
 	function(q) return ns.CreerPageRegistre and ns.CreerPageRegistre(q) end,
 	function(q) return CreerPageItems(q) end,
 	function(q) return ns.CreerPageProjets and ns.CreerPageProjets(q) end,
+	function(q) return ns.CreerPageCommandes and ns.CreerPageCommandes(q) end,
 }
+
+-- compteur de l'onglet Commandes : commandes reçues qui attendent ma réponse (GuildUp_Metiers.lua)
+ns.MajCompteCommandes = function()
+	if pageArtisanat and pageArtisanat.onglets then
+		pageArtisanat.onglets:Compte(4, ns.CommandesEnAttente and ns.CommandesEnAttente() or 0)
+	end
+end
 
 local function CreerPageArtisanat(parent)
 	local p = CreateFrame("Frame", nil, parent)
 	p:SetAllPoints()
 	p.rafraichirAuto = false
 	p.sousPages = {}
-	p.onglets = UI.Onglets(p, { "Registre", "Items", "Projets de guilde" }, function(i)
+	p.onglets = UI.Onglets(p, { "Registre", "Items", "Projets de guilde", "Commandes" }, function(i)
 		p.Selectionner(i)
 		p.Maj()
 	end)
@@ -2736,6 +2760,7 @@ local function CreerPageArtisanat(parent)
 	p.Maj = function()
 		local sp = p.sousPages[p.onglet]
 		if sp and sp.Maj then sp.Maj() end
+		ns.MajCompteCommandes()
 	end
 	-- ns.OuvrirInterface("artisanat", onglet)
 	p.Ouvrir = function(onglet)
@@ -2744,11 +2769,12 @@ local function CreerPageArtisanat(parent)
 	end
 	pageArtisanat = p
 	p.Selectionner(ongletVoulu or 1)
+	ns.MajCompteCommandes()
 	return p
 end
 if ns.AjouterPage then ns.AjouterPage("artisanat", CreerPageArtisanat) end
 
--- onglet 1 Registre, 2 Items, 3 Projets (sans onglet : le dernier montré)
+-- onglet 1 Registre, 2 Items, 3 Projets, 4 Commandes (sans onglet : le dernier montré)
 ns.OuvrirArtisanat = function(onglet)
 	ongletVoulu = onglet or (pageArtisanat and pageArtisanat.onglet) or 1
 	if pageArtisanat then pageArtisanat.Selectionner(ongletVoulu) end

@@ -82,9 +82,10 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
 - **Quêtes en commun** : les quêtes que d'autres membres font aussi, avec « Créer un groupe ».
 - **Artisanat** :
   - *Registre* des métiers et recettes de chaque membre, commande en un clic ;
+  - *Commandes* : les commandes reçues et passées, gardées 30 jours, avec leur état (en attente, acceptée, refusée, faite, annulée). L'artisan accepte, refuse ou marque « Fait » ; le client annule ou marque « Reçue ». Chaque changement prévient l'autre par une bulle (envoyé à son retour s'il est hors ligne). Le nombre de commandes reçues en attente s'affiche sur l'onglet ;
   - *Items* : tous les objets fabricables, par catégorie, avec des filtres (ma classe, mon niveau, niveau requis, fabricable par la guilde) ; un clic sur un objet montre à droite qui, dans la guilde, sait le fabriquer (chuchoter, commander) ;
   - *Carnet de craft* et liste de courses (sous-recettes, sacs et banque, provenance des composants) ;
-  - *Encyclopédie* des objets (Alt + clic sur un objet) ;
+  - *Encyclopédie* des objets (Alt + clic sur un objet) ; « Voir dans Items » montre qui sait fabriquer l'objet ;
   - *Dons* (un hôtel des ventes gratuit), *Demandes* et *Besoins* ;
   - *Dons et besoins croisés* : quand un membre met en don un objet de tes besoins, une bulle te prévient (une seule fois par donneur et par objet ; clic : la page Dons sur cet objet). Dans l'onglet Dons, ces dons portent la marque « Dans tes besoins », passent en tête, et la case « Mes besoins » ne montre qu'eux. Dans l'onglet Besoins, chacun de tes besoins mis en don indique « donné par X » avec un bouton Demander ; dans « Besoins de la guilde », ce que tu as dans tes sacs ou ta banque est marqué « tu en as N » ;
   - *Projets de guilde* : une liste d'objets à fabriquer, découpée en tâches à prendre.

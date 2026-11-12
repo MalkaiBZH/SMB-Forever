@@ -53,7 +53,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
 - Les fichiers découpés accèdent à `GuildUpDB` par un mandataire `db` (même nom qu'avant) et reprennent les fonctions partagées en tête de fichier (`local Message = ns.Coeur.Message`).
 - Pages de la fenêtre GuildUpSMB (chacune enregistrée par son module avec `ns.AjouterPage`) : Guilde
   (`GuildUp_Membres.lua`), Groupes (`GuildUp_GroupesFenetre.lua`), Quêtes en commun (`GuildUp_Quetes.lua`), Dons (`GuildUp_Echanges.lua` +
-  `GuildUp_Besoins.lua`), Artisanat (`GuildUp_Carnet.lua` ; onglets Registre dans `GuildUp_Metiers.lua`, Items dans
+  `GuildUp_Besoins.lua`), Artisanat (`GuildUp_Carnet.lua` ; onglets Registre et Commandes dans `GuildUp_Metiers.lua`, Items dans
   `GuildUp_Carnet.lua`, Projets dans `GuildUp_Projets.lua`), Mes carnets (`GuildUp_Carnet.lua`), Options
   (`GuildUp_Options.lua`), Événements (`GuildUp_Evenements.lua`). Les anciennes fonctions `ns.Ouvrir*` / `ns.Basculer*` ouvrent ces pages
   (`ns.OuvrirInterface(page, ...)`). L'encyclopédie, la mini-liste du carnet et l'aperçu 3D restent des fenêtres à part.
