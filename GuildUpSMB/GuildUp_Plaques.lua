@@ -740,8 +740,8 @@ local AGRANDISSEMENT_ALLIE = 1.5 -- taille fixe des noms hors guilde (x1.5 la po
 -- Taille des noms hors guilde : relevée une seule fois (police des barres de nom du jeu x 1,5), puis
 -- gardée pour tout le monde. La relire à chaque fois la faisait suivre les changements du jeu.
 local tailleNomsAllies
--- Cadre porteur du nom et de la guilde, par barre de nom : il suit l'échelle de la barre (donc la
--- distance, voir CVARS_ALLIES) mais pas sa transparence
+-- Cadre porteur du nom et de la guilde, par barre de nom : il suit l'échelle de la barre (réglée par
+-- le jeu) mais pas sa transparence
 local porteursNoms = {} -- [UnitFrame] = cadre
 local function PorteurNom(uf)
 	local p = porteursNoms[uf]
@@ -1109,18 +1109,16 @@ local CVARS_IMPOSEES = {
 local CVARS_ALLIES = {
 	{ "nameplateShowFriends", "1" },
 	{ "nameplateShowFriendlyPlayers", "1" },
-	-- taille selon la distance, comme les noms flottants du jeu (qui suivent la perspective) : taille
-	-- normale jusqu'à 10 m, puis de plus en plus petite jusqu'à 20 % à 41 m, là où la barre de nom
-	-- prend le relais du nom flottant (mesuré en jeu : il y fait ~1/6 de notre nom de près). Sans
-	-- cela, le nom passait d'un coup de tout petit à très grand en entrant dans la portée.
-	{ "nameplateMinScale", "0.2" },
-	{ "nameplateMaxScale", "1" },
-	{ "nameplateMaxScaleDistance", "10" }, -- distance (depuis la caméra) jusqu'à laquelle : taille normale
-	-- distance comptée DEPUIS LA PORTÉE MAXIMALE des barres de nom (en revenant vers soi) où la taille
-	-- minimale est atteinte : 0 = seulement tout au bout de la portée, là où se fait le relais
-	{ "nameplateMinScaleDistance", "0" },
-	{ "nameplateSelectedScale", "1" }, -- la cible n'est plus agrandie (1,2 par défaut)
+	-- (la taille des barres de nom selon la distance et celle de la cible restent celles du jeu :
+	-- voir TAILLES_DU_JEU)
 }
+
+-- Taille des barres de nom (selon la distance, et de la cible) : GuildUpSMB n'y touche plus, le jeu
+-- garde son comportement par défaut. Les anciennes versions les imposaient (taille fixe, puis essais
+-- selon la distance) : elles sont remises une fois aux valeurs par défaut du jeu, puis laissées au
+-- joueur (ou à un autre addon).
+local TAILLES_DU_JEU = { "nameplateMinScale", "nameplateMaxScale", "nameplateMaxScaleDistance",
+	"nameplateMinScaleDistance", "nameplateSelectedScale" }
 
 local function ImposerCVars()
 	if InCombatLockdown() then
@@ -1151,6 +1149,21 @@ local function ImposerCVars()
 		end
 	end
 	db.portee = nil
+	-- tailles des barres de nom : valeurs par défaut du jeu, une seule fois
+	if not db.taillesDuJeu then
+		local defaut = C_CVar and C_CVar.GetCVarDefault
+		for _, nom in ipairs(TAILLES_DU_JEU) do
+			local ok, v = false, nil
+			if defaut then ok, v = pcall(defaut, nom) end
+			if ok and v ~= nil then
+				pcall(ecrire, nom, v)
+			elseif db.cvarsAvant[nom] then
+				pcall(ecrire, nom, db.cvarsAvant[nom]) -- (client sans GetCVarDefault : valeur d'avant GuildUpSMB)
+			end
+			db.cvarsAvant[nom] = nil
+		end
+		db.taillesDuJeu = true
+	end
 	for nom, valeur in pairs(voulues) do
 		local ok, actuelle = pcall(lire, nom)
 		if ok and actuelle ~= nil and tostring(actuelle) ~= valeur then
