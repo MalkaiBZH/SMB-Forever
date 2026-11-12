@@ -173,51 +173,22 @@ local function Degrade(tex, a1, a2) DegradeCouleur(tex, db.r, db.g, db.b, a1, a2
 -- barres de nom restreintes. hauteurInt = hauteur de cette zone (fixe l'échelle de l'image).
 -- medaillon (facultatif) : portrait du joueur à la place de la mascotte (morceau gauche)
 local function PoserBanniere(f, image, region, dxG, dxD, dyH, dyB, hauteurInt, m, medaillon)
-	local k = hauteurInt / (m.INT_BAS - m.INT_HAUT)
-	local yHaut = dyH + (m.INT_HAUT - m.V_HAUT) * k
-	local yBas = dyB - (m.V_BAS - m.INT_BAS) * k
-	for _, cle in ipairs(ORDRE) do
-		local t, c = f[cle], m.MORCEAUX[cle]
-		t:ClearAllPoints()
-		t:SetTexture(image)
-		t:SetVertexColor(1, 1, 1, 1)
-		t:SetTexCoord(c[1] / TEX_L, c[2] / TEX_L, m.V_HAUT / TEX_H, m.V_BAS / TEX_H)
-	end
-	local g, a, o, b, d = f.g, f.a, f.o, f.b, f.d
-	local function Largeur(cle) return (m.MORCEAUX[cle][2] - m.MORCEAUX[cle][1]) * k end
-
-	-- morceau gauche : son bord droit est 16 px (image) après le début de l'intérieur
-	local xG = dxG + (m.MORCEAUX.g[2] - m.INT_GAUCHE) * k
-	g:SetPoint("TOPRIGHT", region, "TOPLEFT", xG, yHaut)
-	g:SetPoint("BOTTOMRIGHT", region, "BOTTOMLEFT", xG, yBas)
-	g:SetWidth(Largeur("g"))
-	-- embout droit : son bord gauche est 56 px (image) avant la fin de l'intérieur
-	local xD = dxD - (m.INT_DROITE - m.MORCEAUX.d[1]) * k
-	d:SetPoint("TOPLEFT", region, "TOPRIGHT", xD, yHaut)
-	d:SetPoint("BOTTOMLEFT", region, "BOTTOMRIGHT", xD, yBas)
-	d:SetWidth(Largeur("d"))
-	-- ornement central : centré sur l'intérieur, jamais étiré
-	local xO = (dxG + dxD) / 2
-	o:SetPoint("TOP", region, "TOP", xO, yHaut)
-	o:SetPoint("BOTTOM", region, "BOTTOM", xO, yBas)
-	o:SetWidth(Largeur("o"))
-	-- parties unies : elles comblent l'espace restant de chaque côté de l'ornement
-	b:SetPoint("TOPLEFT", o, "TOPRIGHT", 0, 0)
-	b:SetPoint("BOTTOMRIGHT", d, "BOTTOMLEFT", 0, 0)
-	for _, cle in ipairs(ORDRE) do f[cle]:Show() end
-
+	-- La barre horizontale de la bannière n'est plus dessinée : seulement le portrait à côté du nom,
+	-- et rien pour un joueur sans portrait (ou portraits coupés). Les mesures du modèle de bannière
+	-- (m) servent encore à placer le portrait et la lueur de la cible. (image : plus utilisée)
+	for _, cle in ipairs(ORDRE) do f[cle]:Hide() end
 	if not medaillon then
-		a:SetPoint("TOPLEFT", g, "TOPRIGHT", 0, 0)
-		a:SetPoint("BOTTOMRIGHT", o, "BOTTOMLEFT", 0, 0)
 		if f.medaillon then f.medaillon:Hide() end
 		return
 	end
+	local k = hauteurInt / (m.INT_BAS - m.INT_HAUT)
+	local yHaut = dyH + (m.INT_HAUT - m.V_HAUT) * k
+	local yBas = dyB - (m.V_BAS - m.INT_BAS) * k
+
 	-- Médaillon : rond, de la hauteur de la bannière, collé à gauche de l'intérieur (il ne passe pas
-	-- sous le nom ni la barre de vie). La bannière elle-même disparaît : il ne reste que le médaillon
-	-- à côté du nom et de la barre de vie (plus léger à l'écran).
+	-- sous le nom ni la barre de vie)
 	local taille = (m.V_BAS - m.V_HAUT) * k
 	local yCentre = (yHaut + yBas) / 2
-	for _, cle in ipairs(ORDRE) do f[cle]:Hide() end
 	if not f.medaillon then
 		-- juste au-dessus de la bannière, dans le même cadre
 		local couche, sous = f.couche or "BACKGROUND", (f.sousCouche or 0) + 1
@@ -736,7 +707,26 @@ local policesNoms = {} -- [UnitFrame] = police d'origine du nom { police, taille
 local OMBRE_ALLIE = { 0, 0, 0, 0.45 } -- ombre douce qui adoucit le bord des lettres (alpha 0 = aucune)
 local RENDU_ALLIE = 3            -- texte dessiné 3 fois plus grand puis réduit (épaisseur des noms du jeu)
 local DECALAGE_Y_ALLIE = -25    -- nom + guilde descendus de 25 px (négatif = plus bas)
-local AGRANDISSEMENT_ALLIE = 1.5 -- taille fixe des noms hors guilde (x1.5 la police des barres)
+local AGRANDISSEMENT_ALLIE = 1 -- noms hors guilde : taille de la police des barres de nom du jeu
+-- Taille des noms hors guilde : relevée une seule fois (police des barres de nom du jeu), puis
+-- gardée pour tout le monde. La relire à chaque fois la faisait suivre les changements du jeu.
+local tailleNomsAllies
+-- Cadre porteur du nom et de la guilde, par barre de nom : il suit l'échelle de la barre (réglée par
+-- le jeu) mais pas sa transparence
+local porteursNoms = {} -- [UnitFrame] = cadre
+local function PorteurNom(uf)
+	local p = porteursNoms[uf]
+	if not p then
+		p = CreateFrame("Frame", nil, uf)
+		p:SetSize(1, 1)
+		p:SetPoint("CENTER", uf, "CENTER")
+		-- même transparence que l'écran, pas celle de la barre (le jeu rend les barres translucides)
+		if p.SetIgnoreParentAlpha then p:SetIgnoreParentAlpha(true) end
+		porteursNoms[uf] = p
+	end
+	p:SetFrameLevel(uf:GetFrameLevel() + 5)
+	return p
+end
 
 -- police des noms flottants du jeu (Friz Quadrata), taille fixe
 local function PoliceAllie() return UNIT_NAME_FONT or STANDARD_TEXT_FONT end
@@ -843,14 +833,16 @@ local function MajNomSeul(uf, unit)
 			local ok, police, taille, contour = pcall(uf.name.GetFont, uf.name)
 			if ok and police then policesNoms[uf] = { police, taille or 10, contour or "" } end
 		end
-		local taille = (policesNoms[uf] and policesNoms[uf][2] or 10) * AGRANDISSEMENT_ALLIE
+		if not tailleNomsAllies and policesNoms[uf] then tailleNomsAllies = (policesNoms[uf][2] or 10) * AGRANDISSEMENT_ALLIE end
+		local taille = tailleNomsAllies or 10 * AGRANDISSEMENT_ALLIE
+		local porteur = PorteurNom(uf)
 		-- le nom de Blizzard ne suit pas le rendu « grand puis réduit » (le jeu remet sa propre
 		-- échelle) : on le rend invisible et on écrit le nôtre, centré au-dessus de la barre
 		pcall(uf.name.SetAlpha, uf.name, 0)
 		nomSeul[uf] = true
 		local n = textesNoms[uf]
 		if not n then
-			n = uf:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+			n = porteur:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 			textesNoms[uf] = n
 		end
 		n:ClearAllPoints()
@@ -862,7 +854,7 @@ local function MajNomSeul(uf, unit)
 		local guilde = GuildesVoulues() and GetGuildInfo(unit)
 		if guilde and guilde ~= "" then
 			if not t then
-				t = uf:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+				t = porteur:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 				textesGuilde[uf] = t
 			end
 			t:ClearAllPoints()
@@ -1088,12 +1080,16 @@ local CVARS_IMPOSEES = {
 local CVARS_ALLIES = {
 	{ "nameplateShowFriends", "1" },
 	{ "nameplateShowFriendlyPlayers", "1" },
-	-- taille fixe : le jeu agrandit / réduit les barres de nom selon la distance (0,8 à 1 par
-	-- défaut) ; à 1 / 1, toutes les barres gardent la même taille quelle que soit la distance
-	{ "nameplateMinScale", "1" },
-	{ "nameplateMaxScale", "1" },
-	{ "nameplateSelectedScale", "1" }, -- la cible n'est plus agrandie (1,2 par défaut)
+	-- (la taille des barres de nom selon la distance et celle de la cible restent celles du jeu :
+	-- voir TAILLES_DU_JEU)
 }
+
+-- Taille des barres de nom (selon la distance, et de la cible) : GuildUpSMB n'y touche plus, le jeu
+-- garde son comportement par défaut. Les anciennes versions les imposaient (taille fixe, puis essais
+-- selon la distance) : elles sont remises une fois aux valeurs par défaut du jeu, puis laissées au
+-- joueur (ou à un autre addon).
+local TAILLES_DU_JEU = { "nameplateMinScale", "nameplateMaxScale", "nameplateMaxScaleDistance",
+	"nameplateMinScaleDistance", "nameplateSelectedScale" }
 
 local function ImposerCVars()
 	if InCombatLockdown() then
@@ -1124,6 +1120,21 @@ local function ImposerCVars()
 		end
 	end
 	db.portee = nil
+	-- tailles des barres de nom : valeurs par défaut du jeu, une seule fois
+	if not db.taillesDuJeu then
+		local defaut = C_CVar and C_CVar.GetCVarDefault
+		for _, nom in ipairs(TAILLES_DU_JEU) do
+			local ok, v = false, nil
+			if defaut then ok, v = pcall(defaut, nom) end
+			if ok and v ~= nil then
+				pcall(ecrire, nom, v)
+			elseif db.cvarsAvant[nom] then
+				pcall(ecrire, nom, db.cvarsAvant[nom]) -- (client sans GetCVarDefault : valeur d'avant GuildUpSMB)
+			end
+			db.cvarsAvant[nom] = nil
+		end
+		db.taillesDuJeu = true
+	end
 	for nom, valeur in pairs(voulues) do
 		local ok, actuelle = pcall(lire, nom)
 		if ok and actuelle ~= nil and tostring(actuelle) ~= valeur then

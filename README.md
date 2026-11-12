@@ -14,12 +14,10 @@ l'addon voient et partagent ces informations**.
 
 ## Fonctionnalités
 
-- **Bannières par rôle** : bannière derrière le nom et la barre de vie des membres de la guilde
-  (barres de nom et cadre de cible), selon leur rôle tank / heal / dps. Modèle orné hors groupe,
-  sobre en groupe ou en raid. Lueur dorée sur la cible.
-- **Portraits** : le médaillon du joueur (race, classe et sexe reconnus par le jeu, 56 portraits Alliance
-  dans `GuildUpSMB/media/portraits/`) s'affiche à gauche de son nom, à la place de la bannière ; sans portrait,
-  la bannière reste. `/smb medaillons` pour couper.
+- **Portraits** : le médaillon des membres de la guilde (race, classe et sexe reconnus par le jeu,
+  56 portraits Alliance dans `GuildUpSMB/media/portraits/`) s'affiche à gauche de leur nom, sur les barres
+  de nom et le cadre de cible. Les anciennes bannières horizontales derrière le nom ne sont plus dessinées :
+  sans portrait, rien derrière le nom. Lueur dorée sur la cible. `/smb medaillons` pour couper.
 - **Bouton de mini-carte** : choix de son rôle, accès à toutes les fenêtres, notifications.
   Halo doré quand des groupes sont ouverts, anneau vert quand on est en attente.
 - **Recherche de groupe de la guilde** : places Tank / Heal / DPS, groupes jusqu'à 40, et bouton
