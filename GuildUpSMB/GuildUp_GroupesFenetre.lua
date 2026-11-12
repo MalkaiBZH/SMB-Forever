@@ -1,4 +1,4 @@
--- GuildUp : fenêtre de la recherche de groupe de la guilde (onglets Parcourir et Mon groupe), dans le
+-- GuildUpSMB : fenêtre de la recherche de groupe de la guilde (onglets Parcourir et Mon groupe), dans le
 -- style de la recherche de groupe officielle de Forever. Le protocole, l'état (annonces, candidatures)
 -- et les actions sont dans GuildUp_Groupes.lua.
 

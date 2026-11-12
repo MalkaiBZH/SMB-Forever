@@ -1,8 +1,8 @@
--- GuildUp : bannières derrière le nom et la barre de vie des membres de la guilde (barres de nom et
+-- GuildUpSMB : bannières derrière le nom et la barre de vie des membres de la guilde (barres de nom et
 -- cadre de cible), couleurs par rôle, mise en page des barres de nom, réglages du jeu (CVars) imposés.
 
 local NOM_ADDON, ns = ...
-local MEDIA = "Interface\\AddOns\\GuildUp\\media\\"
+local MEDIA = "Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\" -- le dossier de l'addon, quel que soit son nom
 
 -- GuildUpDB (réglages) : la table est chargée par GuildUp.lua (ADDON_LOADED) ; ce mandataire y donne
 -- accès sous le même nom « db » (nil avant le chargement)
@@ -559,8 +559,8 @@ local function CacherLueursBlizzard(uf)
 	for _, b in ipairs(LueursBlizzard(uf)) do b:Hide() end
 	-- Blizzard les réaffiche en recalculant la sélection : on repasse derrière lui
 	for _, obj in ipairs({ uf.healthBar, uf.PlayerLevelDiffFrame }) do
-		if obj and not obj.crochetLueurGuildUp and type(obj.UpdateSelectionBorder) == "function" then
-			obj.crochetLueurGuildUp = true
+		if obj and not obj.crochetLueurGuildUpSMB and type(obj.UpdateSelectionBorder) == "function" then
+			obj.crochetLueurGuildUpSMB = true
 			hooksecurefunc(obj, "UpdateSelectionBorder", function(self)
 				if modifiees[uf] and self.selectedBorder then self.selectedBorder:Hide() end
 			end)
@@ -603,7 +603,7 @@ local function ColorerBarreVie(uf, unit)
 	modifiees[uf] = true
 end
 
--- Mise en page GuildUp (auras sous la barre, niveau, nom à gauche, incantation en haut) :
+-- Mise en page GuildUpSMB (auras sous la barre, niveau, nom à gauche, incantation en haut) :
 -- seulement sur les barres de nom des membres de la guilde. Quand une barre de nom passe à
 -- un autre joueur, on demande à Blizzard de refaire sa propre mise en page (UpdateAnchors,
 -- ApplyStyleAndAnchoring) : on ne peut pas lire les positions d'origine nous-mêmes.
@@ -788,7 +788,7 @@ end
 -- options « Noms » du jeu : noms des joueurs alliés, et leur guilde (réglage absent = affiché)
 local function GuildesVoulues() return LireCVar("UnitNamePlayerGuild") ~= "0" end
 
-local textesNoms = {} -- [UnitFrame] = nom écrit par GuildUp (remplace celui de Blizzard)
+local textesNoms = {} -- [UnitFrame] = nom écrit par GuildUpSMB (remplace celui de Blizzard)
 
 -- Sur Forever, chaque personnage a un nom de famille, rangé là où les autres versions mettent
 -- le royaume (UnitFullName : « Miko », « Banko ») ; le jeu l'affiche après le prénom
@@ -1051,7 +1051,7 @@ end
 
 -- Auras et incantations : Blizzard replace ses éléments à chaque mise à jour, on repasse après lui.
 -- Une seule passe par image pour toutes les barres concernées, et seulement pour celles des
--- membres de la guilde (mise en page GuildUp).
+-- membres de la guilde (mise en page GuildUpSMB).
 local aReplacer = { auras = {}, incantation = {} }
 local replacementPrevu = false
 local function PlanifierReplacement(genre, unite)
@@ -1078,13 +1078,13 @@ local function PlanifierReplacement(genre, unite)
 end
 
 
--- Réglages Blizzard des barres de nom imposés par GuildUp à chaque connexion
+-- Réglages Blizzard des barres de nom imposés par GuildUpSMB à chaque connexion
 -- (nameplateDebuffPadding = option « Espacement des affaiblissements »)
 local CVARS_IMPOSEES = {
 	nameplateDebuffPadding = "25",
 }
 
--- Réglages imposés tant que GuildUp est actif (remis comme avant à la désactivation) :
+-- Réglages imposés tant que GuildUpSMB est actif (remis comme avant à la désactivation) :
 -- barres de nom alliées affichées (Maj+V) ; les noms flottants du jeu restent actifs : au-delà
 -- de la portée des barres (limite interne du jeu), chacun retrouve son nom d'origine
 local CVARS_ALLIES = {
@@ -1113,7 +1113,7 @@ local function ImposerCVars()
 	local voulues = {}
 	for nom, valeur in pairs(CVARS_IMPOSEES) do voulues[nom] = valeur end
 	if db.actif and db.nomsAllies then
-		-- GuildUp activé = barres de nom alliées affichées (comme Maj+V) ; le nom du réglage
+		-- GuildUpSMB activé = barres de nom alliées affichées (comme Maj+V) ; le nom du réglage
 		-- change selon les versions du client, ceux qui n'existent pas sont ignorés
 		for _, c in ipairs(CVARS_ALLIES) do voulues[c[1]] = c[2] end
 	end
@@ -1129,7 +1129,7 @@ local function ImposerCVars()
 	for nom, valeur in pairs(voulues) do
 		local ok, actuelle = pcall(lire, nom)
 		if ok and actuelle ~= nil and tostring(actuelle) ~= valeur then
-			-- valeur d'avant GuildUp, remise si on désactive
+			-- valeur d'avant GuildUpSMB, remise si on désactive
 			if db.cvarsAvant[nom] == nil then db.cvarsAvant[nom] = tostring(actuelle) end
 			local okE, res = pcall(ecrire, nom, valeur)
 			local okR, apres = pcall(lire, nom)
@@ -1140,7 +1140,7 @@ local function ImposerCVars()
 	end
 end
 
--- GuildUp désactivé (ou /smb noms coupé) : barres de nom alliées remises comme avant
+-- GuildUpSMB désactivé (ou /smb noms coupé) : barres de nom alliées remises comme avant
 local function RendreCVarsAllies()
 	if InCombatLockdown() then
 		local attente = CreateFrame("Frame")

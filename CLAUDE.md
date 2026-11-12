@@ -1,7 +1,7 @@
 # CLAUDE.md
 
-Addon World of Warcraft **GuildUp** (Lua), pour le client **WoW Forever** (`## Interface: 16001`,
-client 1.60.1, style Vanilla). Tout le code est dans `GuildUp/`. Voir `README.md` pour les fonctionnalités.
+Addon World of Warcraft **GuildUpSMB** (Lua), pour le client **WoW Forever** (`## Interface: 16001`,
+client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README.md` pour les fonctionnalités.
 
 ## Conventions
 
@@ -13,7 +13,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUp/`. Voir `README.md
 - Chaque fichier commence par `local NOM_ADDON, ns = ...`. **`ns` est la seule communication entre
   fichiers** : un module expose ses fonctions via `ns.Xxx = function…`, les autres les appellent de façon
   défensive (`if ns.Xxx then ns.Xxx() end`) car l'ordre de chargement compte.
-- **Ordre de chargement** = ordre des fichiers dans `GuildUp/GuildUp.toc`. Tout nouveau fichier doit y être ajouté.
+- **Ordre de chargement** = ordre des fichiers dans `GuildUpSMB/GuildUpSMB.toc`. Tout nouveau fichier doit y être ajouté.
 - **Outils communs** : `GuildUp_Outils.lua` (chargé juste après `GuildUp.lua`) contient la seule version de chaque
   petite fonction : `ns.NomCourt`, `ns.MaCle`, `ns.Maintenant` (heure du serveur), `ns.Simplifier` (recherche sans
   accents), `ns.Depuis`, `ns.Base36`, `ns.CouleurClasse` / `ns.CouleurClasseTexte`, `ns.NOMS_ROLES`, `ns.InfoObjet`,
@@ -34,6 +34,8 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUp/`. Voir `README.md
 - `GuildUp_Options.lua` : fenêtre d'options, `/smb diag`, réinitialisation, commandes `/smb`.
 - Les fichiers découpés accèdent à `GuildUpDB` par un mandataire `db` (même nom qu'avant) et reprennent les fonctions partagées en tête de fichier (`local Message = ns.Coeur.Message`).
 - Groupes : `GuildUp_Catalogue.lua` (contenus de la recherche de groupe), `GuildUp_Groupes.lua` (protocole, état partagé `ns.Groupes.etat`, actions), `GuildUp_GroupesFenetre.lua` (interface).
+- `GuildUp_Config.lua` : **réglages propres à la guilde** (`ns.Config` : nom public, cri de guilde, emote animée,
+  membre vedette). Chargé en premier, sans dépendance ; les autres modules le lisent via `ns.Config`.
 - `GuildUp_Reseau.lua` : **tout le réseau passe par lui**.
   - `ns.EnvoyerAddon(préfixe, msg, canal, cible, { jetable = true })` : file unique, un message toutes les 0,3 s, nouvel essai si le jeu refuse, refus au-delà de 255 octets.
   - `ns.Ecouter(préfixe, fonction, canaux)` : réception unique, canal `GUILD` par défaut.
@@ -43,7 +45,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUp/`. Voir `README.md
 - Un fichier par fonctionnalité, chacun avec **son préfixe de message d'addon** sur le canal `GUILD` :
   `GuildUpGrp` (groupes), `GuildUpPos` (carte), `GuildUpQst` (quêtes), `GuildUpMet` (métiers),
   `GuildUpEch` (dons), `GuildUpBes` (besoins), `GuildUpPrj` (projets), `GuildUpId` (identité),
-  `GuildUpAnn` (annonces), `GuildUpAid` (aide), `GuildUpVer` (version), `GuildUpGU` (emote GU!).
+  `GuildUpAnn` (annonces), `GuildUpAid` (aide), `GuildUpVer` (version), `GuildUpGU` (emote du cri de guilde).
 - Protocoles texte : champs séparés par `~`, identifiants en base 36, **255 caractères maximum par
   message** (découpage en morceaux de 200 si besoin). Nettoyer `~` et `|` dans les textes saisis.
 - Message `Q` = « renvoyez-moi vos données » à la connexion. Les listes des absents sont gardées en
@@ -74,13 +76,13 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUp/`. Voir `README.md
 
 Pas de build ni de tests automatisés : on teste **en jeu**, après `/reload`.
 - Mode Debug : mettre `afficherDebug = true` dans `GuildUpDB`
-  (`WTF/Account/<compte>/SavedVariables/GuildUp.lua`, jeu fermé). Les cases Debug apparaissent alors
+  (`WTF/Account/<compte>/SavedVariables/GuildUpSMB.lua`, jeu fermé). Les cases Debug apparaissent alors
   dans `/smb` : `test` (tout le monde compte comme membre de la guilde), `testSolo` (ses propres
   messages sont traités comme ceux d'un autre membre), `testGroupe` (bannières de groupe partout).
 - `/smb diag` : diagnostic de la barre de nom de la cible.
 
 ## Publier une version
 
-1. Monter `## Version` dans `GuildUp/GuildUp.toc`. Un suffixe `-dev` (ex. `1.6.1-dev`) empêche
+1. Monter `## Version` dans `GuildUpSMB/GuildUpSMB.toc`. Un suffixe `-dev` (ex. `1.6.1-dev`) empêche
    d'annoncer la version à la guilde.
 2. Ajouter les nouveautés dans `GuildUp_Version.lua` (tables `ORDRE` et `NOTES`, la plus récente en premier).

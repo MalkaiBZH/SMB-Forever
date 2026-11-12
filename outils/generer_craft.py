@@ -1,4 +1,4 @@
-"""Régénère GuildUp/GuildUp_Craft.lua depuis les tables du client WoW Forever publiées par wago.tools.
+"""Régénère GuildUpSMB/GuildUp_Craft.lua depuis les tables du client WoW Forever publiées par wago.tools.
 
 Usage :
     python outils/generer_craft.py [build] [--dossier DOSSIER_CSV] [--verifier]
@@ -24,7 +24,7 @@ import sys
 import urllib.request
 
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FICHIER = os.path.join(RACINE, "GuildUp", "GuildUp_Craft.lua")
+FICHIER = os.path.join(RACINE, "GuildUpSMB", "GuildUp_Craft.lua")
 
 # SkillLine du jeu -> code de métier de GuildUp (GuildUp_Metiers.lua)
 METIERS = {171: "AL", 164: "FO", 333: "EN", 202: "IN", 165: "TC", 197: "CO", 755: "JO", 773: "CA",

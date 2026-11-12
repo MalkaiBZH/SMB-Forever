@@ -1,5 +1,5 @@
--- GuildUp : projets de guilde. Un membre crée un projet (une liste d'objets à fabriquer, partagée
--- avec toute la guilde) ; GuildUp en déduit les tâches (ce qu'il faut fabriquer, ce qu'il faut
+-- GuildUpSMB : projets de guilde. Un membre crée un projet (une liste d'objets à fabriquer, partagée
+-- avec toute la guilde) ; GuildUpSMB en déduit les tâches (ce qu'il faut fabriquer, ce qu'il faut
 -- réunir) et chaque membre qualifié peut cocher « Je m'en occupe » : son nom s'affiche à côté.
 --
 -- Synchro (préfixe GuildUpPrj, canal GUILD) — chaque information porte sa date (GetServerTime) et

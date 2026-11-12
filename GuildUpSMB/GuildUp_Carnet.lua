@@ -1,4 +1,4 @@
--- GuildUp : fenêtre « Artisanat » (onglets Registre, Items et Projets) et carnet de craft.
+-- GuildUpSMB : fenêtre « Artisanat » (onglets Registre, Items et Projets) et carnet de craft.
 -- Le carnet : on choisit des recettes et des quantités ; la « Liste de courses » (fenêtre à part)
 -- calcule tout ce qu'il faut, sous-recettes comprises, compare avec les sacs et la banque, et dit
 -- d'où viennent les composants et qui, dans la guilde, sait les fabriquer.

@@ -1,5 +1,5 @@
-"""Allège GuildUp/GuildUp_Objets.lua : dans la liste des objets liés (ns.DONNEES_OBJETS_LIES), ne garde
-que les objets fabriqués par une recette de GuildUp/GuildUp_Craft.lua.
+"""Allège GuildUpSMB/GuildUp_Objets.lua : dans la liste des objets liés (ns.DONNEES_OBJETS_LIES), ne garde
+que les objets fabriqués par une recette de GuildUpSMB/GuildUp_Craft.lua.
 
 Cette liste ne sert qu'au catalogue de l'onglet « Items » (GuildUp_Carnet.lua, Catalogue()), qui ne
 montre de toute façon que les objets fabricables : le reste était lu au chargement puis jeté.
@@ -10,8 +10,8 @@ import os
 import re
 
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CRAFT = os.path.join(RACINE, "GuildUp", "GuildUp_Craft.lua")
-OBJETS = os.path.join(RACINE, "GuildUp", "GuildUp_Objets.lua")
+CRAFT = os.path.join(RACINE, "GuildUpSMB", "GuildUp_Craft.lua")
+OBJETS = os.path.join(RACINE, "GuildUpSMB", "GuildUp_Objets.lua")
 
 
 def main():

@@ -1,19 +1,29 @@
--- GuildUp : petites surprises de la guilde.
---  * « GU! » : quand un joueur l'écrit (dire, crier, groupe, raid, guilde…), une emote GU monte
---    doucement depuis le bas de l'écran, à une position au hasard, puis s'efface (comme les pluies
---    d'emotes de Twitch, en discret). Toute la guilde la voit : en canal de guilde chacun lit le
---    message ; ailleurs, l'auteur prévient la guilde par un message d'addon (préfixe GuildUpGU).
---  * Zaardoz Gu monte de niveau : la bulle « La guilde progresse » en version fête, avec son GIF
---    animé dedans et un texte arc-en-ciel qui défile (pour toute la guilde, via l'annonce de niveau
---    déjà envoyée par GuildUp_Annonces).
+-- GuildUpSMB : petites surprises de la guilde (réglées dans GuildUp_Config.lua).
+--  * Cri de guilde (« 33 ») : quand un joueur l'écrit (dire, crier, groupe, raid, guilde…), une
+--    emote descend doucement depuis le haut de l'écran, à une position au hasard, puis s'efface
+--    (comme les pluies d'emotes de Twitch, en discret). Elle peut être animée (planche d'images).
+--    Toute la guilde la voit : en canal de guilde chacun lit le message ; ailleurs, l'auteur
+--    prévient la guilde par un message d'addon (préfixe GuildUpGU, message « G »).
+--  * Membre vedette (facultatif) : quand il monte de niveau, la bulle « La guilde progresse » passe
+--    en version fête, avec un texte arc-en-ciel qui défile et, si demandé, son animation (pour toute
+--    la guilde, via l'annonce de niveau déjà envoyée par GuildUp_Annonces).
 
 local NOM_ADDON, ns = ...
-local MEDIA = "Interface\\AddOns\\GuildUp\\media\\"
-local ZAARDOZ = "zaardoz-gu"
+local MEDIA = ns.MEDIA or ("Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\")
+local CFG = ns.Config or {}
+-- cri de guilde (en majuscules) et son motif de recherche ; nil = pas de cri
+local CRI = type(CFG.cri) == "string" and CFG.cri ~= "" and CFG.cri:upper() or nil
+local CRI_MOTIF = CRI and (CRI:gsub("%p", "%%%0")) or nil
+-- emote animée (planche d'images) ; nil = image fixe
+local ANIM_EMOTE = type(CFG.emoteAnimation) == "table" and (tonumber(CFG.emoteAnimation.images) or 0) > 1 and CFG.emoteAnimation or nil
+-- membre vedette : clé « prénom-famille » en minuscules, et nom affiché ; nil = personne
+local VEDETTE = type(CFG.vedette) == "string" and CFG.vedette ~= "" and CFG.vedette or nil
+local VEDETTE_CLE = VEDETTE and (VEDETTE:lower():gsub("%s+", "-")) or nil
+local VEDETTE_NOM = VEDETTE and (VEDETTE:gsub("%-", " ")) or ""
 local CORNE, CORNE2 = 566064, 567386 -- sound/doodad/dwarfhorn.ogg, sound/events/scourge_horn.ogg
 
 local Normaliser = ns.Normaliser
--- emote coupée ? (case « GU! » des notifications du volet, ou /smb gu ; ancien réglage db.emoteGU lu aussi)
+-- emote coupée ? (case du cri dans les notifications du volet, ou /smb gu ; ancien réglage db.emoteGU lu aussi)
 local function Coupee()
 	local db = ns.DB and ns.DB()
 	if not db then return false end
@@ -24,13 +34,16 @@ local function Coupee()
 	return type(db.notifs) == "table" and db.notifs.gu == false
 end
 local MaCle = ns.MaCle
+local function EstVedette(nom)
+	return VEDETTE_CLE ~= nil and nom ~= nil and (Normaliser(nom) or ""):lower() == VEDETTE_CLE
+end
 
 --------------------------------------------------------------------------------
--- Emote « GU! »
+-- Emote du cri de guilde
 --------------------------------------------------------------------------------
 
 local PREFIXE = "GuildUpGU"
-local TAILLE, DUREE, DESCENTE = 50, 3.4, 140 -- taille, durée de vie, hauteur parcourue (pixels)
+local TAILLE, DUREE, DESCENTE = 64, 3.4, 140 -- taille, durée de vie, hauteur parcourue (pixels)
 local MAX_ECRAN = 15                           -- au plus 15 emotes à la fois
 local pool = {}
 local diag = { detectees = 0, affichees = 0, refus = "" } -- pour /smb diag
@@ -44,7 +57,7 @@ local function NouvelleEmote()
 	f:EnableMouse(false)
 	f.tex = f:CreateTexture(nil, "OVERLAY")
 	f.tex:SetPoint("CENTER", f, "CENTER", 0, 0)
-	f.tex:SetTexture(MEDIA .. "gu_emote")
+	f.tex:SetTexture(MEDIA .. (ANIM_EMOTE and ANIM_EMOTE.fichier or "gu_emote"))
 	f.tex:SetSize(1, 1)
 	f:SetScript("OnUpdate", function(self) self:Placer() end)
 	-- position, taille et transparence à l'instant présent (appelé aussi juste avant d'afficher :
@@ -62,6 +75,13 @@ local function NouvelleEmote()
 		local a = math.min(1, t / 0.35)
 		local s = 0.5 + 0.5 * (1 - (1 - a) * (1 - a))
 		self.tex:SetSize(TAILLE * s * self.echelle, TAILLE * s * self.echelle)
+		-- emote animée : image de la planche à cet instant
+		if ANIM_EMOTE then
+			local cols, rangs = ANIM_EMOTE.colonnes or ANIM_EMOTE.images, ANIM_EMOTE.rangees or 1
+			local i = math.floor(t * (ANIM_EMOTE.ips or 10)) % ANIM_EMOTE.images
+			local col, rang = i % cols, math.floor(i / cols)
+			self.tex:SetTexCoord(col / cols, (col + 1) / cols, rang / rangs, (rang + 1) / rangs)
+		end
 		local alpha = math.min(1, t / 0.2)
 		if t > DUREE - 0.9 then alpha = math.min(alpha, (DUREE - t) / 0.9) end
 		self:SetAlpha(alpha)
@@ -102,26 +122,27 @@ ns.EmoteGU = Emote
 ns.DiagGU = function(L)
 	local n = 0
 	for _, e in ipairs(pool) do if e:IsShown() then n = n + 1 end end
-	L(("GU! : %d détectés, %d affichés, %d à l'écran%s%s"):format(diag.detectees, diag.affichees, n,
+	L(("cri « %s » : %d détectés, %d affichés, %d à l'écran%s%s"):format(CRI or "aucun", diag.detectees, diag.affichees, n,
 		diag.refus ~= "" and (", dernier refus : " .. diag.refus) or "", Coupee() and " (COUPÉE : notifications du volet ou /smb gu)" or ""))
 end
 
 local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end end
 
--- « GU! » / « gu ! » (avec point d'exclamation, toute casse), ou le mot « GU » / « gu » tout seul
--- (casse respectée, mot entier de deux lettres : pas « guitare », « Gu », « gU »…)
+-- Le cri suivi d'un point d'exclamation (« 33! », « 33 ! », toute casse), ou le cri tout seul,
+-- en mot entier, tout en majuscules ou tout en minuscules (« 33 », mais pas « 133 » ni « 333 »)
 local function DitGU(msg)
-	if type(msg) ~= "string" then return false end
-	if (" " .. msg:upper() .. " "):find("[^%w\128-\255]GU%s*!") then return true end
-	for mot in msg:gmatch("[%a\128-\255]+") do
-		if mot == "GU" or mot == "gu" then return true end
+	if not CRI or type(msg) ~= "string" then return false end
+	if (" " .. msg:upper() .. " "):find("[^%w\128-\255]" .. CRI_MOTIF .. "%s*!") then return true end
+	local minuscules = CRI:lower()
+	for mot in msg:gmatch("[%w\128-\255]+") do
+		if mot == CRI or mot == minuscules then return true end
 	end
 	return false
 end
 
 --------------------------------------------------------------------------------
--- Zaardoz Gu monte de niveau : son GIF DANS la bulle de niveau, texte arc-en-ciel qui défile,
--- bordure aux couleurs changeantes
+-- Le membre vedette monte de niveau : texte arc-en-ciel qui défile, bordure aux couleurs
+-- changeantes et, avec vedetteAnimation, son GIF DANS la bulle de niveau
 --------------------------------------------------------------------------------
 
 local ANIM = { images = 19, colonnes = 8, larg = 115, haut = 128, planche = { 1024, 512 }, fps = 10 }
@@ -166,11 +187,18 @@ local function Decorer(bulle, niveau)
 		deco.gif = deco:CreateTexture(nil, "ARTWORK")
 		deco.gif:SetSize(GIF_L, GIF_H)
 		deco.gif:SetPoint("TOP", bulle, "TOP", 0, -5)
-		deco.gif:SetTexture(MEDIA .. "zaardoz")
+		if CFG.vedetteAnimation then
+			deco.gif:SetTexture(MEDIA .. "zaardoz")
+		else
+			-- pas d'image : le texte prend la place (bulle plus basse)
+			deco.gif:SetColorTexture(0, 0, 0, 0)
+			deco.gif:SetHeight(1)
+		end
 		deco.cadreGif = deco:CreateTexture(nil, "BORDER")
 		deco.cadreGif:SetPoint("TOPLEFT", deco.gif, "TOPLEFT", -2, 2)
 		deco.cadreGif:SetPoint("BOTTOMRIGHT", deco.gif, "BOTTOMRIGHT", 2, -2)
 		deco.cadreGif:SetColorTexture(1, 0.82, 0, 1)
+		if not CFG.vedetteAnimation then deco.cadreGif:Hide() end
 		deco:SetScript("OnUpdate", function(self)
 			local t = GetTime() - self.debut
 			-- GIF
@@ -187,8 +215,8 @@ local function Decorer(bulle, niveau)
 			self.cadreGif:SetColorTexture(Teinte((t * 0.35 + 0.5) % 1))
 		end)
 	end
-	deco.ligne1 = ("Zaardoz Gu a atteint le niveau %s !"):format(niveau)
-	deco.ligne2 = "GU ! GU ! GU !"
+	deco.ligne1 = ("%s a atteint le niveau %s !"):format(VEDETTE_NOM, niveau)
+	deco.ligne2 = CRI and (CRI .. " ! " .. CRI .. " ! " .. CRI .. " !") or "Bravo !"
 	deco.debut = GetTime()
 	deco.derniere = nil
 	-- format vertical : le GIF en haut, les textes centrés dessous
@@ -202,7 +230,7 @@ local function Decorer(bulle, niveau)
 	bulle.texte:SetWidth(GIF_L - 8)
 	bulle.texte:SetWordWrap(true)
 	bulle.texte:SetText(deco.ligne1 .. "\n\n" .. deco.ligne2)
-	local hauteur = 5 + GIF_H + 10 + bulle.texte:GetStringHeight() + 14
+	local hauteur = 5 + (CFG.vedetteAnimation and GIF_H or 1) + 10 + bulle.texte:GetStringHeight() + 14
 	bulle:SetSize(GIF_L + 10, hauteur)
 	deco:Show()
 	-- à la prochaine bulle ordinaire : tout revient comme avant
@@ -226,11 +254,11 @@ end
 
 -- appelé par GuildUp_Annonces à la réception d'une montée de niveau ; true = déjà affichée
 ns.NiveauSpecial = function(expediteur, niveau)
-	if not expediteur or (Normaliser(expediteur) or ""):lower() ~= ZAARDOZ then return false end
+	if not EstVedette(expediteur) then return false end
 	if not ns.Notifier then return false end
 	-- bulle filtrée (notification « Niveaux » coupée) : ni corne ni décoration, et pas de bulle
 	-- ordinaire non plus (true = traité)
-	if not ns.Notifier("niveaux", "La guilde progresse", ("Zaardoz Gu a atteint le niveau %s !"):format(niveau), "aucun", function() end) then
+	if not ns.Notifier("niveaux", "La guilde progresse", ("%s a atteint le niveau %s !"):format(VEDETTE_NOM, niveau), "aucun", function() end) then
 		return true
 	end
 	-- corne de guerre (fichiers du jeu : corne naine d'Ironforge, sinon celle du Fléau)
@@ -252,7 +280,7 @@ local CANAUX = { "CHAT_MSG_SAY", "CHAT_MSG_YELL", "CHAT_MSG_PARTY", "CHAT_MSG_PA
 local ev = CreateFrame("Frame")
 for _, nom in ipairs(CANAUX) do pcall(ev.RegisterEvent, ev, nom) end
 pcall(ev.RegisterEvent, ev, "PLAYER_LEVEL_UP")
--- un membre a écrit « GU! » hors du canal de guilde : on le voit aussi
+-- un membre a écrit le cri hors du canal de guilde : on le voit aussi
 ns.Ecouter(PREFIXE, function(_, msg, _, expediteur)
 	if msg ~= "G" then return end
 	local cle = Normaliser(expediteur)
@@ -260,10 +288,10 @@ ns.Ecouter(PREFIXE, function(_, msg, _, expediteur)
 end)
 ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 	if event == "PLAYER_LEVEL_UP" then
-		-- c'est moi, Zaardoz : je vois aussi mon GIF (les autres le reçoivent par l'annonce)
-		if MaCle():lower() == ZAARDOZ then
+		-- c'est moi, la vedette : je vois aussi ma fête (les autres la reçoivent par l'annonce)
+		if EstVedette(MaCle()) then
 			local niveau = a1
-			C_Timer.After(1, function() ns.NiveauSpecial("Zaardoz-Gu", niveau) end)
+			C_Timer.After(1, function() ns.NiveauSpecial(MaCle(), niveau) end)
 		end
 		return
 	end

@@ -1,4 +1,4 @@
--- GuildUp : passer un groupe de la guilde dans la recherche de groupe du jeu.
+-- GuildUpSMB : passer un groupe de la guilde dans la recherche de groupe du jeu.
 -- Onglet « Mon groupe » : choix du style de jeu + bouton « Rendre public », qui inscrit le groupe
 -- comme la fenêtre « Annonce » du jeu : C_LFGList.CreateListing({ activityIDs, generalPlaystyle,
 -- newPlayerFriendly, voiceMode }) (forme relevée sur Forever le 2026-11-10). Il faut un vrai clic.
@@ -88,7 +88,7 @@ local function RendrePublic(annonce, nomContenu)
 	local com = annonce.commentaire ~= "" and annonce.commentaire or (nomContenu or "")
 	local pose = PoserCommentaire(("[%s] %s"):format(NomStyle(style), com))
 	if ns.NoterAppelRecherche then
-		ns.NoterAppelRecherche(("GuildUp : bouton Rendre public (commentaire posé=%s)"):format(tostring(pose == true)))
+		ns.NoterAppelRecherche(("GuildUpSMB : bouton Rendre public (commentaire posé=%s)"):format(tostring(pose == true)))
 	end
 	local ok, err = pcall(C_LFGList.CreateListing, {
 		activityIDs = { activite },

@@ -1,4 +1,4 @@
--- GuildUp : pseudo commun à tous ses personnages, et personnage principal / secondaires.
+-- GuildUpSMB : pseudo commun à tous ses personnages, et personnage principal / secondaires.
 --
 -- Le pseudo n'apparaît QU'AU SURVOL (infobulles) : partout ailleurs (listes, bulles, chat, courrier)
 -- on garde le vrai nom en jeu, pour ne jamais écrire au mauvais joueur si deux membres ont le même pseudo.
@@ -268,7 +268,7 @@ ns.MenuPersos = function(ancre)
 	menu.aide:ClearAllPoints()
 	menu.aide:SetPoint("TOPLEFT", menu, "TOPLEFT", 8, -30 - #persos * 20)
 	menu.aide:SetWidth(204)
-	menu.aide:SetText("Tes personnages de cette guilde apparaissent ici dès que tu t'y connectes avec GuildUp. La guilde les voit au survol de ton nom.")
+	menu.aide:SetText("Tes personnages de cette guilde apparaissent ici dès que tu t'y connectes avec GuildUpSMB. La guilde les voit au survol de ton nom.")
 	menu:SetSize(220, 40 + #persos * 20 + menu.aide:GetStringHeight())
 	menu.ancre = ancre
 	menu:ClearAllPoints()

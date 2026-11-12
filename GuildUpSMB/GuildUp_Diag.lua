@@ -1,4 +1,4 @@
--- GuildUp : outils de diagnostic, pour comprendre le client Forever et préparer les données
+-- GuildUpSMB : outils de diagnostic, pour comprendre le client Forever et préparer les données
 -- (mode Debug : /smb debug). Rien ici ne sert au jeu normal.
 
 local NOM_ADDON, ns = ...

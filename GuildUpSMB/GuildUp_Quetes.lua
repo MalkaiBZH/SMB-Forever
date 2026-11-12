@@ -1,5 +1,5 @@
--- GuildUp : quêtes en commun avec la guilde.
--- Chaque GuildUp envoie la liste des quêtes en cours du joueur (identifiants), préfixe "GuildUpQst" :
+-- GuildUpSMB : quêtes en commun avec la guilde.
+-- Chaque GuildUpSMB envoie la liste des quêtes en cours du joueur (identifiants), préfixe "GuildUpQst" :
 --   "L~id,id,..."  ma liste (identifiants en base 36), à la connexion et quand elle change
 --   "Q"            « envoyez vos listes » (à la connexion)
 -- La fenêtre « Quêtes en commun » (style parchemin, comme le journal de quêtes) montre mes quêtes
@@ -486,7 +486,7 @@ local function CreerFenetre(hote)
 	f.vide:SetPoint("TOP", defile, "TOP", 0, -40)
 	f.vide:SetWidth(LARGEUR - 90)
 	Encre(f.vide, ENCRE_CLAIRE)
-	f.vide:SetText("Aucun membre de la guilde (avec GuildUp) ne fait les mêmes quêtes que toi pour l'instant.")
+	f.vide:SetText("Aucun membre de la guilde (avec GuildUpSMB) ne fait les mêmes quêtes que toi pour l'instant.")
 	f:SetScript("OnShow", function()
 		if C_GuildInfo and C_GuildInfo.GuildRoster then pcall(C_GuildInfo.GuildRoster) elseif GuildRoster then pcall(GuildRoster) end
 		MajFenetre()

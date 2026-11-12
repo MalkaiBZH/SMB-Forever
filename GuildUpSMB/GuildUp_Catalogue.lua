@@ -1,4 +1,4 @@
--- GuildUp : catalogue des contenus de la recherche de groupe (donjons, raids, quêtes, champs de
+-- GuildUpSMB : catalogue des contenus de la recherche de groupe (donjons, raids, quêtes, champs de
 -- bataille…), lu dans la recherche de groupe Blizzard du client (C_LFGList), avec les icônes de
 -- donjon (GetLFGDungeonInfo) et une liste de secours. Utilisé par GuildUp_Groupes.lua.
 -- Code d'un contenu : "a<id d'activité>" (jeu), "s<n°>" (liste de secours) ou "q<id de quête>".

@@ -1,11 +1,12 @@
 ## Interface: 16001
-## Title: GuildUp
+## Title: GuildUpSMB
 ## Notes: Outils de guilde : bannières par rôle, groupes et quêtes, artisanat et dons, calendrier, carte.|n|n/smb pour les options
 ## Author: Miko
-## IconTexture: Interface\AddOns\GuildUp\media\gu_emote
+## IconTexture: Interface\AddOns\GuildUpSMB\media\gu_emote
 ## Version: 1.6.0
 ## SavedVariables: GuildUpDB, GuildUpMetiersDB
 
+GuildUp_Config.lua
 GuildUp.lua
 GuildUp_Outils.lua
 GuildUp_Reseau.lua

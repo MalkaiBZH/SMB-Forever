@@ -1,8 +1,8 @@
--- GuildUp : bouton de la mini-carte, son volet (rôle, fenêtres, position, notifications) et les
+-- GuildUpSMB : bouton de la mini-carte, son volet (rôle, fenêtres, position, notifications) et les
 -- bulles de notification (ns.Notifier).
 
 local NOM_ADDON, ns = ...
-local MEDIA = "Interface\\AddOns\\GuildUp\\media\\"
+local MEDIA = "Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\" -- le dossier de l'addon, quel que soit son nom
 
 -- GuildUpDB (réglages) : la table est chargée par GuildUp.lua (ADDON_LOADED) ; ce mandataire y donne
 -- accès sous le même nom « db » (nil avant le chargement)
@@ -105,7 +105,7 @@ local function PlacerVolet()
 end
 
 -- Volet du bouton de mini-carte : pseudo et personnages, mon rôle (Tank / Heal / DPS), boutons des
--- fenêtres (groupes, artisanat, dons…), partage de position, activation de GuildUp et
+-- fenêtres (groupes, artisanat, dons…), partage de position, activation de GuildUpSMB et
 -- notifications (repliables)
 local LARGEUR_VOLET = 206
 
@@ -297,7 +297,7 @@ local function CreerVolet()
 			function() if ns.BasculerEchanges then ns.BasculerEchanges() end end })
 	Filet(-188)
 
-	-- Ligne 5 : activer GuildUp (bannières, noms, barres de nom alliées)
+	-- Ligne 5 : activer GuildUpSMB (bannières, noms, barres de nom alliées)
 	local actif = CreateFrame("CheckButton", nil, v, "UICheckButtonTemplate")
 	actif:SetSize(24, 24)
 	actif:SetPoint("LEFT", v, "TOPLEFT", 6, -206)
@@ -338,7 +338,7 @@ local function CreerVolet()
 		{ "evenements", "Événements" }, { "quetes", "Quêtes" },
 		{ "commandes", "Commandes" }, { "plans", "Échanges" },
 		{ "version", "Version" }, { "aide", "Aide" },
-		{ "gu", "GU!" },
+		{ "gu", (ns.Config and ns.Config.cri) and (tostring(ns.Config.cri):upper() .. "!") or "Cri" },
 	}
 	v.notifs = {}
 	for i, n in ipairs(NOTIFS) do
@@ -435,7 +435,7 @@ local function CreerBoutonCarte()
 	-- est à false, c'est le halo qui pulse en vert à la place.
 	if ANNEAU_CUSTOM then
 		b.anneau = b:CreateTexture(nil, "OVERLAY", nil, 1)
-		b.anneau:SetTexture("Interface\\AddOns\\GuildUp\\media\\anneau")
+		b.anneau:SetTexture(MEDIA .. "anneau")
 		b.anneau:SetSize(87, 87)
 		b.anneau:SetPoint("CENTER", b, "TOPLEFT", 17, -16.5)
 		b.anneau:SetBlendMode("ADD")
@@ -491,7 +491,7 @@ local function CreerBoutonCarte()
 	end)
 	b:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-		GameTooltip:SetText("GuildUp")
+		GameTooltip:SetText("GuildUpSMB")
 		local role = MonRole()
 		GameTooltip:AddLine("Ton rôle : " .. (role and ICONES_ROLE[role].nom or "inconnu"), 1, 1, 1)
 		local n = ns.NombreGroupes and ns.NombreGroupes() or 0
@@ -663,14 +663,14 @@ local function AncrerBulle(b)
 	end
 end
 
--- Renvoie true si la bulle est affichée (false : GuildUp pas prêt ou catégorie coupée)
+-- Renvoie true si la bulle est affichée (false : GuildUpSMB pas prêt ou catégorie coupée)
 ns.Notifier = function(categorie, titre, texte, son, action)
 	if not db then return false end
 	if not NotifActive(categorie) then return false end
 	bulle = bulle or CreerBulle()
 	if bulle.Reinit then bulle.Reinit(bulle) end -- une bulle spéciale (GuildUp_GU) l'avait décorée
 	bulle.action = action
-	bulle.titre:SetText(titre or "GuildUp")
+	bulle.titre:SetText(titre or "GuildUpSMB")
 	bulle.texte:SetText(texte or "")
 	local largeur = math.max(bulle.titre:GetStringWidth(), bulle.texte:GetStringWidth()) + 26
 	bulle:SetSize(largeur, bulle.titre:GetStringHeight() + bulle.texte:GetStringHeight() + 24)

@@ -1,4 +1,4 @@
--- GuildUp : recherche de groupe réservée à la guilde.
+-- GuildUpSMB : recherche de groupe réservée à la guilde.
 -- Style de la recherche de groupe officielle de Forever (cadre à portrait, onglets, barres de
 -- groupe, boutons de catégorie), avec un affichage des places par rôle façon FF14 : chaque
 -- groupe montre ses emplacements Tank / Heal / DPS, pris ou libres.
@@ -42,7 +42,7 @@ local etat = {
 local function Rafraichir() if ns.RafraichirGroupes then ns.RafraichirGroupes() end end
 
 local function Message(texte)
-	print("|cff3399ffGuildUp|r : " .. texte)
+	print("|cff3399ffGuildUpSMB|r : " .. texte)
 end
 
 local function DB() return ns.DB and ns.DB() end

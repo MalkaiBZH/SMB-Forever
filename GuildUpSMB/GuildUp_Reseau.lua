@@ -1,4 +1,4 @@
--- GuildUp : réseau commun à tous les modules (chargé juste après GuildUp_Outils.lua, voir le .toc).
+-- GuildUpSMB : réseau commun à tous les modules (chargé juste après GuildUp_Outils.lua, voir le .toc).
 --   * une seule file d'envoi des messages d'addon (le jeu en limite le nombre par seconde) ;
 --   * une seule réception (ns.Ecouter) : inscription du préfixe, canal vérifié, aiguillage par préfixe ;
 --   * découpage d'une longue liste en morceaux (ns.Morceaux) et réassemblage (ns.Reassembleur).
@@ -18,7 +18,7 @@ local function AvertirEchec(prefixe, raison)
 	if GetTime() - dernierAvertissement < 30 then return end
 	dernierAvertissement = GetTime()
 	if UIErrorsFrame and UIErrorsFrame.AddMessage then
-		UIErrorsFrame:AddMessage(("GuildUp : un message (%s) n'a pas pu partir : %s"):format(prefixe or "?", raison), 1, 0.82, 0)
+		UIErrorsFrame:AddMessage(("GuildUpSMB : un message (%s) n'a pas pu partir : %s"):format(prefixe or "?", raison), 1, 0.82, 0)
 	end
 end
 
@@ -94,14 +94,14 @@ end
 --------------------------------------------------------------------------------
 
 local ecouteurs = {}   -- [préfixe] = { fonction, canaux }
-local actifs = {}      -- [clé] = dernier message reçu de ce membre (il a GuildUp et il est là)
+local actifs = {}      -- [clé] = dernier message reçu de ce membre (il a GuildUpSMB et il est là)
 local cadre = CreateFrame("Frame")
 cadre:RegisterEvent("CHAT_MSG_ADDON")
 cadre:SetScript("OnEvent", function(_, _, prefixe, msg, canal, expediteur)
 	local e = prefixe and ecouteurs[prefixe]
 	if not e or not msg or not expediteur or expediteur == "" then return end
 	if not e.canaux[canal] then return end
-	-- aucun message d'addon de GuildUp ne contient « | » : on le retire (codes de couleur, liens,
+	-- aucun message d'addon de GuildUpSMB ne contient « | » : on le retire (codes de couleur, liens,
 	-- textures |T…|t qu'un message forgé glisserait dans une bulle ou une infobulle)
 	if msg:find("|", 1, true) then msg = msg:gsub("|", "") end
 	stats.recus = stats.recus + 1
@@ -127,7 +127,7 @@ end
 
 -- Suis-je le relais ? Quand un membre se connecte, un seul membre lui renvoie les listes des absents
 -- au lieu de toute la guilde : celui qui a la plus petite clé parmi les membres actifs (un message
--- de GuildUp reçu depuis moins de 10 min, et pas hors ligne d'après la liste de guilde). « exclu » :
+-- de GuildUpSMB reçu depuis moins de 10 min, et pas hors ligne d'après la liste de guilde). « exclu » :
 -- le membre qui vient de se connecter.
 local ACTIF = 600
 ns.EstLeRelais = function(exclu)

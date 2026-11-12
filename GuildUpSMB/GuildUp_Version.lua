@@ -1,5 +1,5 @@
--- GuildUp : vérification de version.
--- Chaque GuildUp annonce sa version à la guilde à la connexion ("V~1.3.0", préfixe "GuildUpVer").
+-- GuildUpSMB : vérification de version.
+-- Chaque GuildUpSMB annonce sa version à la guilde à la connexion ("V~1.3.0", préfixe "GuildUpVer").
 -- Si un membre a une version plus récente, une bulle propose de mettre l'addon à jour (CurseForge).
 -- Si un membre a une version plus ancienne, on lui renvoie la nôtre pour qu'il soit prévenu.
 
@@ -61,7 +61,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		if not plusRecenteVue or Comparer(v, plusRecenteVue) > 0 then
 			plusRecenteVue = v
 			if ns.Notifier then
-				ns.Notifier("version", "Nouvelle version de GuildUp",
+				ns.Notifier("version", "Nouvelle version de GuildUpSMB",
 					("%s a la %s (toi : %s) — mets à jour via CurseForge"):format(NomCourt(expediteur), v, MA_VERSION),
 					nil, function() end)
 			end
@@ -84,12 +84,12 @@ end
 -- (/smb nouveautes pour la rouvrir)
 --------------------------------------------------------------------------------
 
-local NOM_PUBLIC = "GuildUp Zz"
+local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "GuildUpSMB" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
 local ORDRE = { "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
 	["1.6.0"] = {
-		"|cffffd100Carnet de craft|r : tes listes de courses. Choisis des objets, GuildUp calcule tous les composants (sous-recettes comprises) et ce qu'il te manque d'après tes sacs et ta banque. Réduit, il ne laisse à l'écran que la liste des composants, mise à jour en direct.",
+		"|cffffd100Carnet de craft|r : tes listes de courses. Choisis des objets, GuildUpSMB calcule tous les composants (sous-recettes comprises) et ce qu'il te manque d'après tes sacs et ta banque. Réduit, il ne laisse à l'écran que la liste des composants, mise à jour en direct.",
 		"|cffffd100Encyclopédie|r : d'où vient chaque objet (marchands, butin classé par zone avec les élites, récolte, quêtes), zones et marchands sur la carte du monde, modèle 3D des monstres, formules et recettes, « Utilisé dans ». |cffffd100Alt + clic|r sur n'importe quel objet du jeu pour l'ouvrir.",
 		"|cffffd100Items|r (Artisanat) : tous les objets fabricables, rangés comme à l'hôtel des ventes (catégories, sous-catégories, tri par niveau d'objet).",
 		"|cffffd100Projets de guilde|r : des listes partagées avec toute la guilde ; chacun coche « Je m'en occupe » sur ce qu'il sait faire, et son nom s'affiche.",
@@ -225,7 +225,7 @@ ns.DiagVersion = function(L)
 		local c = Comparer(e.v, MA_VERSION)
 		if c < 0 then plusAncienne = plusAncienne + 1 elseif c > 0 then plusRecente = plusRecente + 1 end
 	end
-	L(("version : %s ; %d membre(s) avec GuildUp vus (%d plus ancienne(s), %d plus récente(s))"):format(
+	L(("version : %s ; %d membre(s) avec GuildUpSMB vus (%d plus ancienne(s), %d plus récente(s))"):format(
 		MA_VERSION, n, plusAncienne, plusRecente))
 end
 

@@ -1,7 +1,7 @@
--- GuildUp : fenêtre d'options, diagnostic (/smb diag), réinitialisation et commandes /smb.
+-- GuildUpSMB : fenêtre d'options, diagnostic (/smb diag), réinitialisation et commandes /smb.
 
 local NOM_ADDON, ns = ...
-local MEDIA = "Interface\\AddOns\\GuildUp\\media\\"
+local MEDIA = "Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\" -- le dossier de l'addon, quel que soit son nom
 
 -- GuildUpDB (réglages) : la table est chargée par GuildUp.lua (ADDON_LOADED) ; ce mandataire y donne
 -- accès sous le même nom « db » (nil avant le chargement)
@@ -216,7 +216,7 @@ local function DiagCollecte(L)
 			local ok, e = pcall(fn, uf)
 			return ok and "ok" or ("ERREUR " .. tostring(e))
 		end
-		L("  mise en page GuildUp appliquée : " .. tostring(misesEnPage[uf] == true))
+		L("  mise en page GuildUpSMB appliquée : " .. tostring(misesEnPage[uf] == true))
 		L("  placement de l'incantation : " .. Tenter(PlacerIncantation))
 		Decrire("LevelFrame", uf.LevelFrame)
 		Decrire("PlayerLevelDiffFrame", uf.PlayerLevelDiffFrame)
@@ -244,7 +244,7 @@ local fenetreCopie
 local function AfficherCopie(texte)
 	if not fenetreCopie then
 		local f = ns.FenetreDeplacable("GuildUpCopie", 520, 380)
-		if f.TitleText then f.TitleText:SetText("GuildUp — diag (Ctrl+C pour copier)") end
+		if f.TitleText then f.TitleText:SetText("GuildUpSMB — diag (Ctrl+C pour copier)") end
 
 		local defile = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
 		defile:SetPoint("TOPLEFT", f, "TOPLEFT", 12, -30)
@@ -367,7 +367,7 @@ local function CreerFenetre()
 
 	local titre = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	if not f.TitleText then titre:SetPoint("TOP", f, "TOP", 0, -16) end
-	titre:SetText("GuildUp")
+	titre:SetText("GuildUpSMB")
 
 	local x, y = 16, -34
 	local function Ligne(h) local v = y; y = y - (h or 24); return v end
@@ -498,11 +498,11 @@ SlashCmdList.GUILDUP = function(msg)
 		if fi and fi:IsShown() then fi:Hide() elseif ns.OuvrirFiche then ns.OuvrirFiche(nil) end
 		return
 	elseif cmd == "gu" then
-		-- même réglage que la case « GU! » des notifications du volet
+		-- même réglage que la case du cri de guilde dans les notifications du volet
 		if type(db.notifs) ~= "table" then db.notifs = {} end
 		db.notifs.gu = (db.notifs.gu == false) and nil or false
 		db.emoteGU = nil
-		Message(db.notifs.gu == false and "emote « GU! » coupée." or "emote « GU! » activée.")
+		Message(db.notifs.gu == false and "emote du cri de guilde coupée." or "emote du cri de guilde activée.")
 		return
 	elseif cmd == "projets" or cmd == "projet" then
 		if ns.OuvrirProjet then ns.OuvrirProjet() end

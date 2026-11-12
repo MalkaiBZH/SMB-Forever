@@ -1,11 +1,11 @@
--- GuildUp : bannière derrière le nom et la barre de vie des membres de ta guilde.
+-- GuildUpSMB : bannière derrière le nom et la barre de vie des membres de ta guilde.
 -- L'image dépend du rôle (tank / heal / dps), qu'on soit en combat ou non ; rôle inconnu =
--- bannière neutre (fichier "horscombat"). Chaque GuildUp annonce le rôle de son joueur à la guilde.
+-- bannière neutre (fichier "horscombat"). Chaque GuildUpSMB annonce le rôle de son joueur à la guilde.
 -- Affichage local uniquement : seuls les joueurs qui ont l'addon le voient.
 
 -- ns : table partagée entre les fichiers de l'addon (GuildUp_Groupes.lua s'en sert)
 local NOM_ADDON, ns = ...
-local MEDIA = "Interface\\AddOns\\GuildUp\\media\\"
+local MEDIA = "Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\" -- le dossier de l'addon, quel que soit son nom
 
 local DEFAUT = {
 	actif     = true,
@@ -38,7 +38,7 @@ local function LireCVar(nom)
 end
 
 local function Message(texte)
-	print("|cff3399ffGuildUp|r : " .. texte)
+	print("|cff3399ffGuildUpSMB|r : " .. texte)
 end
 
 --------------------------------------------------------------------------------
@@ -67,8 +67,8 @@ local function SonsSurBoutons(cadre, vus)
 	local parent = cadre.GetParent and cadre:GetParent()
 	local fermeture = parent and parent.CloseButton == cadre
 		or (cadre.GetName and (cadre:GetName() or ""):find("CloseButton$"))
-	if (genre == "Button" or genre == "CheckButton") and not cadre.sonGuildUp and not fermeture then
-		cadre.sonGuildUp = true
+	if (genre == "Button" or genre == "CheckButton") and not cadre.sonGuildUpSMB and not fermeture then
+		cadre.sonGuildUpSMB = true
 		cadre:HookScript("OnClick", function(self)
 			if genre == "CheckButton" then
 				Son(self:GetChecked() and "IG_MAINMENU_OPTION_CHECKBOX_ON" or "IG_MAINMENU_OPTION_CHECKBOX_OFF")
@@ -91,8 +91,8 @@ ns.Erreur = Erreur
 
 -- Ajoute les sons d'ouverture / fermeture et des boutons à une fenêtre, et la renvoie
 ns.AvecSons = function(f, type_)
-	if not f or f.sonsGuildUp then return f end
-	f.sonsGuildUp = true
+	if not f or f.sonsGuildUpSMB then return f end
+	f.sonsGuildUpSMB = true
 	local sons = SONS_FENETRES[type_ or "fenetre"]
 	if sons then
 		f:HookScript("OnShow", function() Son(sons[1]) end)
@@ -119,7 +119,7 @@ end
 local ROLES = { TANK = "tank", HEALER = "heal", DAMAGER = "dps" }
 local ROLE_VALIDE = { tank = true, heal = true, dps = true }
 
-local rolesConnus = {} -- ["Nom-Royaume"] = rôle annoncé par son GuildUp
+local rolesConnus = {} -- ["Nom-Royaume"] = rôle annoncé par son GuildUpSMB
 
 -- Sur Forever, le royaume d'un joueur (UnitFullName : « Miko », « Banko ») n'est pas le nom
 -- interne du serveur (GetNormalizedRealmName : « CAMWOWEU5Realm5PvE »), et les noms complets
@@ -188,11 +188,11 @@ end
 
 -- Partagé avec les autres fichiers de l'addon
 ns.MonRole = function() return db and MonRole() end
--- Rôle annoncé par le GuildUp d'un joueur, à partir de son nom normalisé
+-- Rôle annoncé par le GuildUpSMB d'un joueur, à partir de son nom normalisé
 ns.RoleDeNom = function(nomNormalise) return nomNormalise and rolesConnus[nomNormalise] end
 -- Mode test seul (Debug) : se voir comme un autre membre
 ns.TestSolo = function() return db and db.test and db.testSolo end
--- Rôle connu d'une unité (tank / heal / dps) ou nil : moi, rôle de groupe, ou rôle annoncé par son GuildUp
+-- Rôle connu d'une unité (tank / heal / dps) ou nil : moi, rôle de groupe, ou rôle annoncé par son GuildUpSMB
 ns.RoleConnu = function(unit)
 	if not db or not unit or not UnitExists(unit) then return nil end
 	if UnitIsUnit(unit, "player") then return MonRole() end
