@@ -1,6 +1,7 @@
 -- GuildUp : d'où viennent les composants d'artisanat (marchands, butin, récolte, contenants, quêtes).
 -- Données tirées une fois de la base QuestieDB (version Forever, GPL-3.0, merci à ses auteurs) par
--- /gup export le 2026-11-11 13:35 (build 70888) ; GuildUp n'a pas besoin de Questie.
+-- l'outil d'export de l'auteur d'origine (/gup export, absent de ce dépôt) le 2026-11-11 13:35
+-- (build 70888) ; GuildUp n'a pas besoin de Questie.
 -- objets : id|marchands|butin (les plus répandus)|nombre total de monstres|récolte|contenants|quêtes
 -- pnj    : id|nom|niv min|niv max|zone principale|faction (A, H, AH)|positions x,y;x,y (0-100)|sous-titre|rang (0 normal, 1 élite, 2 rare élite, 3 boss, 4 rare)
 -- récolte: id|nom|zone:nombre:x,y;x,y#zone:…   zones : id|nom|carte du monde   quêtes : id|nom

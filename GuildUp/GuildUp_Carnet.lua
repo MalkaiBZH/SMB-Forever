@@ -29,7 +29,10 @@ local PoserAtlas = ns.PoserAtlas
 -- Données : recettes et sources
 --------------------------------------------------------------------------------
 
-local recettes        -- [sort] = { sort, metier, niveau, objet, rendement, composants = { {objet, n}, … } }
+local recettes        -- [sort] = { sort, metier, niveau, jaune, difficulte, objet, rendement, composants = { {objet, n}, … } }
+                      -- niveau : requis (1 = inconnu, le client ne le renseigne presque jamais) ;
+                      -- jaune : la recette commence à donner moins de points (0 = inconnu) ;
+                      -- difficulte : la plus grande des deux (pour trier)
 local parObjet        -- [objet] = { recette, … } (recettes qui fabriquent cet objet)
 local formuleSort     -- [objet formule] = recette qu'elle apprend
 local parCompo        -- [composant] = { recette, … } (recettes qui l'utilisent)
@@ -80,9 +83,10 @@ end
 local function Recettes()
 	if recettes then return recettes end
 	recettes, parObjet, parCompo = {}, {}, {}
-	for sort, metier, niveau, objet, rend, compos in (ns.DONNEES_CRAFT or ""):gmatch("(%d+):(%a+):(%d+):(%d+):(%d+):([^\n]*)") do
-		local r = { sort = tonumber(sort), metier = metier, niveau = tonumber(niveau), objet = tonumber(objet),
-			rendement = math.max(1, tonumber(rend) or 1), composants = {} }
+	for sort, metier, niveau, jaune, objet, rend, compos in (ns.DONNEES_CRAFT or ""):gmatch("(%d+):(%a+):(%d+):(%d+):(%d+):(%d+):([^\n]*)") do
+		local r = { sort = tonumber(sort), metier = metier, niveau = tonumber(niveau), jaune = tonumber(jaune),
+			objet = tonumber(objet), rendement = math.max(1, tonumber(rend) or 1), composants = {} }
+		r.difficulte = math.max(r.niveau, r.jaune)
 		for o, n in compos:gmatch("(%d+)x(%d+)") do
 			o = tonumber(o)
 			r.composants[#r.composants + 1] = { o, tonumber(n) }
@@ -95,7 +99,7 @@ local function Recettes()
 			table.insert(parObjet[r.objet], r)
 		end
 	end
-	for _, l in pairs(parObjet) do table.sort(l, function(a, b) return a.niveau < b.niveau end) end
+	for _, l in pairs(parObjet) do table.sort(l, function(a, b) return a.difficulte < b.difficulte end) end
 	ns.DONNEES_CRAFT = nil
 	CalculerCycles()
 	-- formules / recettes / plans : l'objet qui apprend chaque recette
@@ -270,6 +274,13 @@ local function JAi(objet)
 	return sacs + (banque or 0)
 end
 local function NomMetier(code) return ns.NomMetierCode and ns.NomMetierCode(code) or code end
+-- « Forge 125 » (niveau requis connu), « Forge (jaune à 125) », ou « Forge » seul
+local function TexteRecette(r)
+	local m = NomMetier(r.metier)
+	if (r.niveau or 1) > 1 then return m .. " " .. r.niveau end
+	if (r.jaune or 0) > 0 then return m .. " |cff999999(jaune à " .. r.jaune .. ")|r" end
+	return m
+end
 local function NomZone(z)
 	local e = z and Sources().zones[z]
 	if e then return e.nom end
@@ -762,7 +773,7 @@ MajCourses = function()
 		if n.racine and not n.recette then
 			suffixe = "  |cff999999(à obtenir)|r"
 		elseif n.racine then
-			suffixe = ("  |cff999999%s %d · %d fabrication%s|r"):format(NomMetier(n.recette.metier), n.recette.niveau,
+			suffixe = ("  |cff999999%s · %d fabrication%s|r"):format(TexteRecette(n.recette),
 				n.fabrications, n.fabrications > 1 and "s" or "")
 		elseif n.fabricable and n.enfants then
 			suffixe = ("  |cff999999(%d fabrication%s)|r"):format(n.fabrications, n.fabrications > 1 and "s" or "")
@@ -1545,7 +1556,7 @@ MajFiche = function()
 	if recs then
 		Ajouter("Fabriqué", 0, { titre = true, icone = ns.IconeMetierCode and ns.IconeMetierCode(recs[1].metier) or "Interface\\Icons\\Trade_BlackSmithing" })
 		for _, r in ipairs(recs) do
-			Ajouter(("%s %d%s"):format(NomMetier(r.metier), r.niveau,
+			Ajouter(("%s%s"):format(TexteRecette(r),
 				r.rendement > 1 and (" · " .. r.rendement .. " par fabrication") or ""), 1, { sous = true })
 			if r.formules then
 				for _, fo in ipairs(r.formules) do
@@ -1585,7 +1596,7 @@ MajFiche = function()
 	local appris = RecetteDeFormule(objet)
 	if appris then
 		Ajouter("Apprend", 0, { titre = true, icone = ns.IconeMetierCode and ns.IconeMetierCode(appris.metier) or "Interface\\Icons\\INV_Scroll_03" })
-		Ajouter(("%s %d"):format(NomMetier(appris.metier), appris.niveau), 1, { sous = true })
+		Ajouter(TexteRecette(appris), 1, { sous = true })
 		if appris.objet > 0 then
 			local nomA, _, qualA, iconeA = InfoObjet(appris.objet)
 			if not nomA then Precharger(appris.objet) end
@@ -1694,7 +1705,7 @@ MajFiche = function()
 		table.sort(ordre)
 		for _, m in ipairs(ordre) do
 			local l = parMetier[m]
-			table.sort(l, function(a, b) if a.niveau ~= b.niveau then return a.niveau < b.niveau end return a.sort < b.sort end)
+			table.sort(l, function(a, b) if a.difficulte ~= b.difficulte then return a.difficulte < b.difficulte end return a.sort < b.sort end)
 			Ajouter(m, 1, { sous = true })
 			for _, r in ipairs(l) do
 				local qte = 0
@@ -1710,7 +1721,7 @@ MajFiche = function()
 					local nS, iS = NomSort(r.sort)
 					nomU, iconeU = nomU or nS, iconeU or iS
 				end
-				Ajouter(("|cff999999%d|r  %s%s|r  |cff999999(x%d)|r"):format(r.niveau, qcU and qcU.hex or "|cffffffff", nomU or "…", qte), 2, {
+				Ajouter(("|cff999999%s|r  %s%s|r  |cff999999(x%d)|r"):format(r.difficulte > 1 and tostring(r.difficulte) or "", qcU and qcU.hex or "|cffffffff", nomU or "…", qte), 2, {
 					icone = iconeU, objet = r.objet > 0 and r.objet or nil,
 					action = r.objet > 0 and function() ns.OuvrirFiche(r.objet) end or nil })
 			end
@@ -2274,7 +2285,7 @@ MajCarnet = function()
 			for _, art in ipairs(ns.ArtisansDe and ns.ArtisansDe(o[1]) or {}) do
 				if art.moi then moi = true elseif art.enLigne then enLigne = enLigne + 1 end
 			end
-			b.info:SetText(((o[6] or 0) > 0 and ("|cffbbbbbbNiv. %d|r  ·  "):format(o[6]) or "") .. ("Fabriqué : %s %d%s"):format(NomMetier(r.metier), r.niveau,
+			b.info:SetText(((o[6] or 0) > 0 and ("|cffbbbbbbNiv. %d|r  ·  "):format(o[6]) or "") .. ("Fabriqué : %s%s"):format(TexteRecette(r),
 				moi and "  |cff33dd55· tu sais le faire|r" or enLigne > 0 and ("  |cff33dd55· %d artisan%s en ligne|r"):format(enLigne, enLigne > 1 and "s" or "") or ""))
 		else
 			b.info:SetText(((o[6] or 0) > 0 and ("|cffbbbbbbNiv. %d|r" .. (Sources().objets[o[1]] and "  ·  " or "")):format(o[6]) or "")
@@ -2526,6 +2537,7 @@ end
 
 -- outils partagés avec les projets de guilde (GuildUp_Projets.lua)
 ns.OutilsCarnet = { RecettesDe = RecettesDe, InfoObjet = InfoObjet, NomMetier = NomMetier, JAi = JAi,
+	TexteRecette = TexteRecette,
 	Developper = Developper, NouveauContexte = NouveauContexte,
 	Precharger = Precharger, Sources = Sources, BarreMetier = BarreMetier, Carnets = Carnets }
 

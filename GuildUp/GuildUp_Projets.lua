@@ -665,7 +665,7 @@ MajPage = function()
 		local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
 		local detail = ""
 		if t.recette then
-			detail = ("  |cff999999%s %d|r"):format(O.NomMetier and O.NomMetier(t.recette.metier) or "?", t.recette.niveau)
+			detail = "  |cff999999" .. (O.TexteRecette and O.TexteRecette(t.recette) or "?") .. "|r"
 		end
 		local jai = O.JAi and O.JAi(t.objet) or 0
 		l.texte:SetText(("%s%s|r |cffffffffx%d|r%s%s%s"):format(qc and qc.hex or "|cffffffff", nom or "…", t.qte, detail,

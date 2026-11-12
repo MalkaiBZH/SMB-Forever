@@ -46,11 +46,17 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUp/`. Voir `README.md
 
 ## Données générées (ne pas éditer à la main)
 
-- `GuildUp_Objets.lua`, `GuildUp_Craft.lua`, `GuildUp_Recettes.lua` : générés depuis les tables du client
-  Forever (wago.tools).
-- `GuildUp_Sources.lua` : extrait une fois de QuestieDB (GPL-3.0).
-- Ces fichiers font ~30 000 lignes : **ne pas les lire en entier**, utiliser Grep. L'outil d'export
-  (`ns.Exporter`, `/smb export`) n'est pas dans ce dépôt.
+- `GuildUp_Craft.lua` (recettes : métier, niveau requis, niveau « jaune », objet, rendement, composants) :
+  généré par `python outils/generer_craft.py <build>` depuis les tables du client publiées par wago.tools
+  (SkillLineAbility, SpellEffect, SpellReagents ; CSV gardés dans `outils/cache/`, ignoré par git).
+  `--verifier` compare au fichier actuel sans rien écrire. Le niveau requis vaut 1 pour presque toutes
+  les recettes (le client ne le renseigne pas) : l'interface affiche alors le niveau « jaune ».
+- `GuildUp_Objets.lua` : objets échangeables (ItemSparse) et objets liés fabricables. Après une
+  régénération des recettes, relancer `python outils/filtrer_objets_lies.py`.
+- `GuildUp_Recettes.lua` (recettes apprises avec un plan) et `GuildUp_Sources.lua` (tiré de QuestieDB,
+  GPL-3.0) : générés par l'outil d'export de l'auteur d'origine (`ns.Exporter`, `/gup export`), absent de
+  ce dépôt.
+- Ces fichiers font plusieurs milliers de lignes : **ne pas les lire en entier**, utiliser Grep.
 
 ## Particularités de Forever
 
