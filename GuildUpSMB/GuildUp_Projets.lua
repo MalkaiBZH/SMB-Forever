@@ -7,6 +7,11 @@
 --   P~id~maj~auteur~nom          en-tête d'un projet        E~id~maj~i~n~objet:qte,…   ses objets (morceaux)
 --   T~id~objet~qui~etat~maj      une tâche (etat 0 libre, 1 prise, 2 faite ; qui = clé du joueur)
 --   X~id~maj                     projet supprimé            Q                          « envoyez-moi les projets »
+--   U~id~objet:qui:état:date,…   tâches relayées en lot (morceaux), pour un absent
+--
+-- Interface : onglet « Projets de guilde » de la page Artisanat de la fenêtre GuildUpSMB (kit ns.UI ;
+-- la page et ses onglets sont dans GuildUp_Carnet.lua) : projets à gauche, tâches du projet choisi
+-- à droite (Je m'en occupe / C'est fait ! / Libérer / Pas encore fait, selon l'état et qui je suis).
 
 local NOM_ADDON, ns = ...
 local PREFIXE = "GuildUpPrj"
@@ -26,8 +31,11 @@ local function Outils() return ns.OutilsCarnet or {} end
 local function Propre(t) return ((t or ""):gsub("[~|\n]", " ")) end
 
 local pret = false
-local MajPage                       -- rafraîchit l'onglet (défini plus bas)
-local function Maj() if MajPage then MajPage() end end
+local MajPage                       -- dessine l'onglet (défini plus bas)
+-- données changées : l'onglet Projets, s'il est à l'écran (page Artisanat de la fenêtre GuildUpSMB)
+local function Maj()
+	if ns.ArtisanatVisible and ns.ArtisanatVisible(3) and ns.MajInterface then ns.MajInterface() end
+end
 
 --------------------------------------------------------------------------------
 -- Données : db.projets[id] = { id, nom, auteur, maj, entrees = { {objet, qte} },
@@ -470,36 +478,63 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 end
 
 --------------------------------------------------------------------------------
--- Onglet « Projets » de la fenêtre Artisanat de la guilde
+-- Onglet « Projets de guilde » de la page Artisanat (fenêtre GuildUpSMB, kit ns.UI) : à gauche les
+-- projets, à droite le projet choisi (avancement, tâches à fabriquer puis à réunir)
 --------------------------------------------------------------------------------
+
+local UI = ns.UI
+local C = UI.C
+local MARGE = 16
+local LARGEUR_PROJETS = 210
+local HAUTEUR_PROJET, ECART_PROJET = 52, 6
+local HAUTEUR_TACHE, ECART_TACHE = 48, 6
+local ICONE_INCONNUE = "Interface\\Icons\\INV_Misc_QuestionMark"
+local VERT, OR, GRIS = "|cff6fd08c", "|cfff1cf6b", "|cff9c937f"
 
 local page, choisi
 local boutonsProjets, lignes = {}, {}
-local LARGEUR_C = 200
 
+-- « toi » (en vert) ou le nom du membre (doré)
 local function CouleurNom(cle)
-	return (cle == MaCle() and "|cff33dd55" or "|cffffd100") .. NomCourt(cle) .. "|r"
+	if cle == MaCle() then return VERT .. "toi|r" end
+	return OR .. NomCourt(cle or "?") .. "|r"
+end
+
+-- bouton d'action d'une tâche : style « or » (action principale) ou « fantome », texte, état, infobulle
+local function StyleBouton(b, style)
+	if style == "or" then
+		UI.Habiller(b, { C.orFonce[1], C.orFonce[2], C.orFonce[3], 1 }, { C.ors[1], C.ors[2], C.ors[3], 1 })
+		b.texte:SetTextColor(0.1, 0.08, 0.03)
+	else
+		UI.Habiller(b, { 0, 0, 0, 0 }, C.bordMoyen)
+		b.texte:SetTextColor(unpack(C.ors))
+	end
+end
+local function Bouton(b, texte, style, actif, bulle, action)
+	StyleBouton(b, style)
+	b:Ecrire(texte)
+	b:Activer(actif)
+	b.bulle = bulle or false
+	b:SetScript("OnClick", action)
+	b:Show()
 end
 
 local function BoutonProjet(i)
 	local b = boutonsProjets[i]
 	if b then return b end
-	b = CreateFrame("Button", nil, page.contC)
-	b:SetHeight(40)
-	b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
-	b.choisi = b:CreateTexture(nil, "BACKGROUND")
-	b.choisi:SetAllPoints(b)
-	b.choisi:SetColorTexture(1, 0.82, 0, 0.18)
-	b.nom = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	b.nom:SetPoint("TOPLEFT", b, "TOPLEFT", 6, -5)
-	b.nom:SetPoint("RIGHT", b, "RIGHT", -4, 0)
-	b.nom:SetJustifyH("LEFT")
-	b.nom:SetWordWrap(false)
-	b.info = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	b.info:SetPoint("TOPLEFT", b.nom, "BOTTOMLEFT", 0, -3)
-	b.info:SetPoint("RIGHT", b, "RIGHT", -4, 0)
-	b.info:SetJustifyH("LEFT")
-	b:SetScript("OnClick", function(self) choisi = self.id; page.defile:SetVerticalScroll(0); Maj() end)
+	b = UI.Rangee(page.projets.contenu, HAUTEUR_PROJET)
+	b.nom = UI.Texte(b, "GameFontNormal", C.texte)
+	b.nom:SetPoint("TOPLEFT", b, "TOPLEFT", 12, -9)
+	b.nom:SetPoint("RIGHT", b, "RIGHT", -10, 0)
+	b.info = UI.Texte(b, "GameFontHighlightSmall", C.gris)
+	b.info:SetPoint("TOPLEFT", b.nom, "BOTTOMLEFT", 0, -5)
+	b.info:SetPoint("RIGHT", b, "RIGHT", -10, 0)
+	b:SetScript("OnClick", function(self)
+		choisi = self.id
+		page.liste:Haut()
+		MajPage()
+	end)
+	b.id = false
 	boutonsProjets[i] = b
 	return b
 end
@@ -507,33 +542,22 @@ end
 local function Ligne(i)
 	local l = lignes[i]
 	if l then return l end
-	l = CreateFrame("Button", nil, page.contenu)
-	l:SetHeight(28)
-	l.fond = l:CreateTexture(nil, "BACKGROUND")
-	l.fond:SetAllPoints(l)
-	l:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+	l = UI.Rangee(page.liste.contenu, HAUTEUR_TACHE)
 	l.icone = l:CreateTexture(nil, "ARTWORK")
-	l.icone:SetSize(22, 22)
-	l.icone:SetPoint("LEFT", l, "LEFT", 4, 0)
-	l.texte = l:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	l.texte:SetPoint("TOPLEFT", l.icone, "TOPRIGHT", 6, 1)
-	l.texte:SetJustifyH("LEFT")
-	l.texte:SetWordWrap(false)
-	l.etat = l:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	l.etat:SetPoint("BOTTOMLEFT", l.icone, "BOTTOMRIGHT", 6, 0)
-	l.etat:SetJustifyH("LEFT")
-	l.etat:SetWordWrap(false)
-	l.action = CreateFrame("Button", nil, l, "UIPanelButtonTemplate")
-	l.action:SetSize(112, 22)
-	l.action:SetPoint("RIGHT", l, "RIGHT", -26, 0)
-	l.action2 = CreateFrame("Button", nil, l, "UIPanelButtonTemplate")
-	l.action2:SetSize(70, 22)
-	l.action2:SetPoint("RIGHT", l.action, "LEFT", -4, 0)
-	l.retirer = CreateFrame("Button", nil, l, "UIPanelCloseButton")
-	l.retirer:SetSize(22, 22)
-	l.retirer:SetPoint("RIGHT", l, "RIGHT", 0, 0)
-	l.texte:SetPoint("RIGHT", l.action2, "LEFT", -6, 0)
-	l.etat:SetPoint("RIGHT", l.action2, "LEFT", -6, 0)
+	l.icone:SetSize(32, 32)
+	l.icone:SetPoint("LEFT", l, "LEFT", 10, 0)
+	l.icone:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+	l.retirer = UI.Bouton(l, "x", "fantome", 22, 22)
+	l.retirer:SetPoint("RIGHT", l, "RIGHT", -10, 0)
+	UI.Infobulle(l.retirer, "Retirer du projet", "Retire cet objectif du projet (pour toute la guilde).")
+	l.action = UI.Bouton(l, "", "or", 120, 28)
+	l.action:SetPoint("RIGHT", l, "RIGHT", -40, 0)
+	l.action2 = UI.Bouton(l, "", "fantome", 80, 28)
+	l.action2:SetPoint("RIGHT", l.action, "LEFT", -6, 0)
+	l.texte = UI.Texte(l, "GameFontHighlight", C.texte)
+	l.texte:SetPoint("TOPLEFT", l.icone, "TOPRIGHT", 10, -1)
+	l.etat = UI.Texte(l, "GameFontHighlightSmall", C.gris)
+	l.etat:SetPoint("TOPLEFT", l.texte, "BOTTOMLEFT", 0, -5)
 	for _, b in ipairs({ l.action, l.action2 }) do
 		b:SetScript("OnEnter", function(self)
 			if not self.bulle then return end
@@ -543,9 +567,16 @@ local function Ligne(i)
 		end)
 		b:SetScript("OnLeave", function() GameTooltip:Hide() end)
 		b:SetMotionScriptsWhileDisabled(true)
+		b.bulle = false
 	end
 	l:SetScript("OnClick", function(self)
-		if self.objet and ns.OuvrirFiche then ns.OuvrirFiche(self.objet, self.qte, _G.GuildUpArtisanat) end
+		if not self.objet then return end
+		if IsModifiedClick and IsModifiedClick("CHATLINK") then
+			local _, lien = (Outils().InfoObjet or function() end)(self.objet)
+			if lien and ChatEdit_InsertLink then ChatEdit_InsertLink(lien) end
+			return
+		end
+		if ns.OuvrirFiche then ns.OuvrirFiche(self.objet, self.qte) end
 	end)
 	l:SetScript("OnEnter", function(self)
 		if not self.objet then return end
@@ -559,177 +590,184 @@ local function Ligne(i)
 				GameTooltip:AddLine("Peuvent s'en occuper :", 1, 0.82, 0)
 				for k = 1, math.min(8, #self.qualifies) do
 					local a = self.qualifies[k]
-					GameTooltip:AddLine("  - " .. NomCourt(a.nom) .. (a.enLigne and " |cff33dd55(en ligne)|r" or ""), 1, 1, 1)
+					GameTooltip:AddLine("  - " .. NomCourt(a.nom) .. (a.enLigne and " |cff6fd08c(en ligne)|r" or ""), 1, 1, 1)
 				end
 				if #self.qualifies > 8 then GameTooltip:AddLine(("  … et %d autres"):format(#self.qualifies - 8), 0.7, 0.7, 0.7) end
 			end
 		end
-		GameTooltip:AddLine("Clic : fiche dans l'encyclopédie", 0.6, 0.6, 0.6)
+		GameTooltip:AddLine("Clic : fiche dans l'encyclopédie · Maj-clic : lien", 0.6, 0.6, 0.6)
 		GameTooltip:Show()
 	end)
 	l:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	l.objet, l.qte, l.qualifies = false, false, false
 	lignes[i] = l
 	return l
 end
 
-local function Bouton(b, texte, actif, bulle, action)
-	b:SetText(texte)
-	b:SetEnabled(actif)
-	b.bulle = bulle
-	b:SetScript("OnClick", action)
-	b:Show()
-end
-
 MajPage = function()
-	if not page or not page:IsVisible() then return end
+	if not page then return end
 	local liste = ListeProjets()
 	-- colonne de gauche : les projets
 	if choisi and not (Projet(choisi) and Projet(choisi).nom and not Projet(choisi).supprime) then choisi = nil end
 	if not choisi and liste[1] then choisi = liste[1].id end
-	local y = 2
+	local contenuP = page.projets.contenu
+	local y = 0
 	for i, p in ipairs(liste) do
 		local b = BoutonProjet(i)
 		b:ClearAllPoints()
-		b:SetPoint("TOPLEFT", page.contC, "TOPLEFT", 0, -y)
-		b:SetWidth(page.contC:GetWidth())
+		b:SetPoint("TOPLEFT", contenuP, "TOPLEFT", 0, -y)
+		b:SetPoint("RIGHT", contenuP, "RIGHT", 0, 0)
 		b.id = p.id
-		b.choisi:SetShown(p.id == choisi)
+		local estChoisi = p.id == choisi
+		b:SetBackdropColor(unpack(estChoisi and C.actif or C.carte))
+		b:SetBackdropBorderColor(unpack(estChoisi and C.orFonce or C.bord))
 		b.nom:SetText(p.nom)
+		b.nom:SetTextColor(unpack(estChoisi and C.ors or C.texte))
 		local faites, total = Avancement(p)
-		b.info:SetText(("par %s  ·  %s%d / %d|r"):format(CouleurNom(p.auteur), faites == total and total > 0 and "|cff33dd55" or "|cffffffff", faites, total))
+		b.info:SetText(("par %s · %s%d / %d|r"):format(CouleurNom(p.auteur), (faites == total and total > 0) and VERT or GRIS, faites, total))
 		b:Show()
-		y = y + 42
+		y = y + HAUTEUR_PROJET + ECART_PROJET
 	end
 	for i = #liste + 1, #boutonsProjets do boutonsProjets[i]:Hide() end
-	page.contC:SetHeight(math.max(10, y))
+	page.projets:Hauteur(y)
 	page.videC:SetShown(#liste == 0)
 
 	-- partie droite : le projet choisi
 	local p = choisi and Projet(choisi)
-	page.entete:SetShown(p ~= nil)
-	page.vide:SetShown(p == nil)
-	if not p then
-		for _, l in ipairs(lignes) do l:Hide() end
-		page.contenu:SetHeight(10)
-		return
-	end
+	page.entete:SetShown(p ~= nil and p ~= false)
+	page.liste:SetShown(p ~= nil and p ~= false)
+	page.vide:SetShown(not p)
+	if not p then return end
 	local O = Outils()
 	page.titreP:SetText(p.nom)
-	page.auteurP:SetText(("Projet de %s  ·  %d objectif%s"):format(CouleurNom(p.auteur), #p.entrees, #p.entrees > 1 and "s" or ""))
+	page.auteurP:SetText(("Projet de %s · %d objectif%s"):format(CouleurNom(p.auteur), #p.entrees, #p.entrees > 1 and "s" or ""))
 	local faites, total = Avancement(p)
 	page.barre:SetMinMaxValues(0, math.max(1, total))
 	page.barre:SetValue(faites)
-	page.barre.texte:SetText(("%d / %d tâches faites"):format(faites, total))
+	page.avance:SetText(("%d / %d tâches faites"):format(faites, total))
 	page.supprimer:SetShown(EstAuteur(p))
 	page.ajouter:SetShown(EstAuteur(p))
 
 	local fab, base = Taches(p)
-	local i, yy = 0, 2
-	local largeur = page.contenu:GetWidth()
-	local function Titre(texte)
+	local contenu = page.liste.contenu
+	local i, yy = 0, 0
+	local function Placer(l, h)
+		l:ClearAllPoints()
+		l:SetPoint("TOPLEFT", contenu, "TOPLEFT", 0, -yy)
+		l:SetPoint("RIGHT", contenu, "RIGHT", 0, 0)
+		l:SetHeight(h)
+		l:Show()
+	end
+	-- titre de section (« À fabriquer (4) ») ou message : ligne sans cadre ni boutons
+	local function Titre(texte, couleur)
 		i = i + 1
 		local l = Ligne(i)
-		l:ClearAllPoints()
-		l:SetPoint("TOPLEFT", page.contenu, "TOPLEFT", 0, -yy)
-		l:SetWidth(largeur)
-		l:SetHeight(22)
-		l.objet, l.qualifies = nil, nil
-		l.fond:SetColorTexture(1, 0.82, 0, 0.12)
+		Placer(l, 30)
+		l.objet, l.qte, l.qualifies = false, false, false
+		l:SetBackdropColor(0, 0, 0, 0)
+		l:SetBackdropBorderColor(0, 0, 0, 0)
+		l:EnableMouse(false)
 		l.icone:Hide()
 		l.texte:SetFontObject("GameFontNormal")
+		l.texte:SetTextColor(unpack(couleur or C.ors))
 		l.texte:ClearAllPoints()
-		l.texte:SetPoint("LEFT", l, "LEFT", 8, 0)
-		l.texte:SetPoint("RIGHT", l, "RIGHT", -8, 0)
+		l.texte:SetPoint("LEFT", l, "LEFT", 2, 0)
+		l.texte:SetPoint("RIGHT", l, "RIGHT", -2, 0)
 		l.texte:SetText(texte)
 		l.etat:SetText("")
 		l.action:Hide(); l.action2:Hide(); l.retirer:Hide()
-		l:Show()
-		yy = yy + 25
-	end
-	local function Tache(t, k)
-		i = i + 1
-		local l = Ligne(i)
-		l:ClearAllPoints()
-		l:SetPoint("TOPLEFT", page.contenu, "TOPLEFT", 0, -yy)
-		l:SetWidth(largeur)
-		l:SetHeight(30)
-		l.objet, l.qte = t.objet, t.qte
-		l.fond:SetColorTexture(1, 1, 1, k % 2 == 0 and 0.05 or 0.02)
-		local nom, _, qualite, icone = (O.InfoObjet or function() end)(t.objet)
-		if not nom and O.Precharger then O.Precharger(t.objet) end
-		l.icone:SetTexture(icone or "Interface\\Icons\\INV_Misc_QuestionMark")
-		l.icone:Show()
-		l.texte:SetFontObject("GameFontHighlight")
-		l.texte:ClearAllPoints()
-		l.texte:SetPoint("TOPLEFT", l.icone, "TOPRIGHT", 6, 1)
-		l.texte:SetPoint("RIGHT", l.action2, "LEFT", -6, 0)
-		local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
-		local detail = ""
-		if t.recette then
-			detail = "  |cff999999" .. (O.TexteRecette and O.TexteRecette(t.recette) or "?") .. "|r"
-		end
-		local jai = O.JAi and O.JAi(t.objet) or 0
-		l.texte:SetText(("%s%s|r |cffffffffx%d|r%s%s%s"):format(qc and qc.hex or "|cffffffff", nom or "…", t.qte, detail,
-			t.objectif and "  |cffffd100(objectif)|r" or "", jai > 0 and ("  |cff999999(tu en as %d)|r"):format(jai) or ""))
-		local etat, qui = Etat(p, t.objet, t.qte)
-		local qualifies, moiOk, raison = Qualifies(t)
-		l.qualifies = qualifies
-		if etat == FAITE then
-			l.etat:SetText("|TInterface\\RaidFrame\\ReadyCheck-Ready:14:14:0:0|t |cff33dd55Fait|r par " .. CouleurNom(qui))
-		elseif etat == PRISE then
-			l.etat:SetText(CouleurNom(qui) .. " s'en occupe")
-		else
-			l.etat:SetText("|cff999999Libre|r")
-		end
-		l.action2:Hide()
-		local moi, auteur = qui == MaCle(), EstAuteur(p)
-		if etat == LIBRE then
-			Bouton(l.action, "Je m'en occupe", moiOk, not moiOk and raison or "Ton nom s'affichera pour toute la guilde.",
-				function() ChangerTache(p, t.objet, PRISE) end)
-		elseif etat == PRISE and moi then
-			Bouton(l.action, "C'est fait !", true, "Tâche terminée (objets fabriqués ou réunis).", function() ChangerTache(p, t.objet, FAITE) end)
-			Bouton(l.action2, "Libérer", true, "Tu ne t'en occupes plus : la tâche redevient libre.", function() ChangerTache(p, t.objet, LIBRE) end)
-		elseif etat == PRISE and auteur then
-			Bouton(l.action, "Libérer", true, "Rendre la tâche libre (créateur du projet).", function() ChangerTache(p, t.objet, LIBRE) end)
-		elseif etat == FAITE and (moi or auteur) then
-			Bouton(l.action, "Pas encore fait", true, "Annuler : la tâche redevient libre.", function() ChangerTache(p, t.objet, LIBRE) end)
-		else
-			l.action:Hide()
-		end
-		l.retirer:SetShown(auteur and t.objectif)
-		l.retirer:SetScript("OnClick", function() RetirerDuProjet(p, t.objet) end)
-		l:Show()
 		yy = yy + 32
 	end
+	local function Tache(t)
+		i = i + 1
+		local l = Ligne(i)
+		Placer(l, HAUTEUR_TACHE)
+		l:EnableMouse(true)
+		l:SetBackdropColor(unpack(C.carte))
+		l.objet, l.qte = t.objet, t.qte
+		local nom, _, qualite, icone = (O.InfoObjet or function() end)(t.objet)
+		if not nom and O.Precharger then O.Precharger(t.objet) end
+		l.icone:SetTexture(icone or ICONE_INCONNUE)
+		l.icone:Show()
+		local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
+		l.texte:SetFontObject("GameFontHighlight")
+		l.texte:SetTextColor(unpack(C.texte))
+		l.texte:ClearAllPoints()
+		l.texte:SetPoint("TOPLEFT", l.icone, "TOPRIGHT", 10, -1)
+		l.texte:SetText(("%s%s|r %sx%d|r%s"):format(qc and qc.hex or "|cffe8e2d4", nom or "…", GRIS, t.qte,
+			t.objectif and ("  " .. OR .. "(objectif)|r") or ""))
+		local etat, qui = Etat(p, t.objet, t.qte)
+		local qualifies, moiOk, raison = Qualifies(t)
+		l.qualifies = qualifies or false
+		local moi, auteur = qui == MaCle(), EstAuteur(p)
+		-- deuxième ligne : recette, qui s'en occupe, ce que j'en ai
+		local details = {}
+		if t.recette then details[#details + 1] = (O.TexteRecette and O.TexteRecette(t.recette) or "?") end
+		if etat == FAITE then
+			details[#details + 1] = "|TInterface\\RaidFrame\\ReadyCheck-Ready:14:14:0:0|t " .. VERT .. "Fait par|r " .. CouleurNom(qui)
+		elseif etat == PRISE then
+			details[#details + 1] = moi and (OR .. "tu t'en occupes|r") or (CouleurNom(qui) .. " " .. VERT .. "s'en occupe|r")
+		else
+			details[#details + 1] = "libre"
+		end
+		local jai = O.JAi and O.JAi(t.objet) or 0
+		if jai > 0 then details[#details + 1] = ("tu en as %d"):format(jai) end
+		l.etat:SetText(table.concat(details, " · "))
+		l:Fort(etat == PRISE and moi)
+		-- boutons selon l'état
+		l.action2:Hide()
+		if etat == LIBRE then
+			Bouton(l.action, "Je m'en occupe", "or", moiOk, not moiOk and raison or "Ton nom s'affichera pour toute la guilde.",
+				function() ChangerTache(p, t.objet, PRISE) end)
+		elseif etat == PRISE and moi then
+			Bouton(l.action, "C'est fait !", "or", true, "Tâche terminée (objets fabriqués ou réunis).", function() ChangerTache(p, t.objet, FAITE) end)
+			Bouton(l.action2, "Libérer", "fantome", true, "Tu ne t'en occupes plus : la tâche redevient libre.", function() ChangerTache(p, t.objet, LIBRE) end)
+		elseif etat == PRISE and auteur then
+			Bouton(l.action, "Libérer", "fantome", true, "Rendre la tâche libre (créateur du projet).", function() ChangerTache(p, t.objet, LIBRE) end)
+		elseif etat == PRISE then
+			Bouton(l.action, "Pris", "fantome", false, CouleurNom(qui) .. " s'en occupe.", nil)
+		elseif etat == FAITE and (moi or auteur) then
+			Bouton(l.action, "Pas encore fait", "fantome", true, "Annuler : la tâche redevient libre.", function() ChangerTache(p, t.objet, LIBRE) end)
+		else
+			Bouton(l.action, "Fait", "fantome", false, "Tâche terminée.", nil)
+		end
+		l.texte:SetPoint("RIGHT", l.action2:IsShown() and l.action2 or l.action, "LEFT", -10, 0)
+		l.etat:SetPoint("RIGHT", l.action2:IsShown() and l.action2 or l.action, "LEFT", -10, 0)
+		l.retirer:SetShown(auteur and t.objectif)
+		l.retirer:SetScript("OnClick", function() RetirerDuProjet(p, t.objet) end)
+		yy = yy + HAUTEUR_TACHE + ECART_TACHE
+	end
 	if #fab + #base == 0 then
-		Titre(EstAuteur(p) and "Projet vide : ajoute des objets depuis l'onglet Items (bouton Ajouter)." or "Projet vide pour l'instant.")
+		Titre(EstAuteur(p) and "Projet vide : ajoute des objets avec « + Objets » (onglet Items, bouton Ajouter)."
+			or "Projet vide pour l'instant.", C.gris)
 	end
 	if #fab > 0 then
 		Titre(("À fabriquer (%d)"):format(#fab))
-		for k, t in ipairs(fab) do Tache(t, k) end
+		for _, t in ipairs(fab) do Tache(t) end
 		yy = yy + 6
 	end
 	if #base > 0 then
 		Titre(("À réunir (%d)"):format(#base))
-		for k, t in ipairs(base) do Tache(t, k) end
+		for _, t in ipairs(base) do Tache(t) end
 	end
 	for j = i + 1, #lignes do lignes[j]:Hide() end
-	page.contenu:SetHeight(math.max(10, yy))
+	page.liste:Hauteur(yy)
 end
 
 -- menu « Nouveau projet » : vide, ou copie d'une de mes listes
 local menuNouveau
 local function MenuNouveau(ancre)
-	menuNouveau = menuNouveau or ns.CadreMenu("GuildUpMenuNouveauProjet")
+	local O = Outils()
+	menuNouveau = menuNouveau or (O.Menu and O.Menu("GuildUpMenuNouveauProjet")) or ns.CadreMenu("GuildUpMenuNouveauProjet")
 	local m = menuNouveau
-	local choix = { { "|cff33dd55Projet vide…|r", nil } }
-	local carnets = Outils().Carnets and Outils().Carnets() or {}
+	local choix = { { VERT .. "Projet vide…|r", nil } }
+	local carnets = O.Carnets and O.Carnets() or {}
 	local noms = {}
 	for nom in pairs(carnets) do noms[#noms + 1] = nom end
 	table.sort(noms)
 	for _, nom in ipairs(noms) do choix[#choix + 1] = { "À partir de « " .. nom .. " »", nom } end
 	for i, c in ipairs(choix) do
-		local b = ns.BoutonMenu(m, i)
+		local b = O.LigneMenu and O.LigneMenu(m, i) or ns.BoutonMenu(m, i)
 		b:ClearAllPoints()
 		b:SetPoint("TOPLEFT", m, "TOPLEFT", 4, -4 - (i - 1) * 20)
 		b:SetPoint("RIGHT", m, "RIGHT", -4, 0)
@@ -747,10 +785,10 @@ local function MenuNouveau(ancre)
 		b:Show()
 	end
 	for i = #choix + 1, #m.boutons do m.boutons[i]:Hide() end
-	m:SetSize(230, 8 + #choix * 20)
+	m:SetSize(240, 8 + #choix * 20)
 	m.ancre = ancre
 	m:ClearAllPoints()
-	m:SetPoint("TOPLEFT", ancre, "BOTTOMLEFT", 0, -2)
+	m:SetPoint("TOPRIGHT", ancre, "BOTTOMRIGHT", 0, -2)
 	m:Show()
 end
 ns.MenuNouveauProjet = MenuNouveau
@@ -793,104 +831,81 @@ StaticPopupDialogs["GUILDUP_SUPPRIMER_PROJET"] = {
 	OnAccept = function(self, data) local p = data and Projet(data); if p then Supprimer(p) end end,
 }
 
-ns.CreerPageProjets = function(f)
-	local haut = ns.HAUT_ENCART or -88
-	local p = CreateFrame("Frame", nil, f)
-	p:SetAllPoints(f)
+-- Onglet « Projets de guilde » : créé par la page Artisanat (GuildUp_Carnet.lua) dans son cadre
+ns.CreerPageProjets = function(parent)
+	local p = CreateFrame("Frame", nil, parent)
+	p:SetAllPoints()
 	page = p
-	local largeur = f:GetWidth()
-	local titre = p:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	titre:SetPoint("TOPLEFT", f, "TOPLEFT", 70, -32)
-	titre:SetText("Projets de guilde")
-	local aide = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	aide:SetPoint("TOPLEFT", f, "TOPLEFT", 72, -58)
-	aide:SetWidth(440)
-	aide:SetJustifyH("LEFT")
-	aide:SetText("Des listes partagées avec toute la guilde : chacun prend une tâche qu'il sait faire.")
-	local nouveau = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
-	nouveau:SetSize(140, 24)
-	nouveau:SetPoint("TOPRIGHT", f, "TOPRIGHT", -16, -56)
-	nouveau:SetText("+ Nouveau projet")
-	nouveau:SetScript("OnClick", function(self) MenuNouveau(self) end)
 
-	-- colonne des projets
-	local fondC = p:CreateTexture(nil, "BACKGROUND")
-	fondC:SetPoint("TOPLEFT", f, "TOPLEFT", 8, haut - 4)
-	fondC:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 8, 10)
-	fondC:SetWidth(LARGEUR_C)
-	fondC:SetColorTexture(0, 0, 0, 0.3)
-	local defC = CreateFrame("ScrollFrame", nil, p, "UIPanelScrollFrameTemplate")
-	defC:SetPoint("TOPLEFT", f, "TOPLEFT", 12, haut - 8)
-	defC:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 12, 14)
-	defC:SetWidth(LARGEUR_C - 26)
-	p.contC = CreateFrame("Frame", nil, defC)
-	p.contC:SetSize(LARGEUR_C - 28, 10)
-	defC:SetScrollChild(p.contC)
-	p.videC = p:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-	p.videC:SetPoint("TOP", fondC, "TOP", 0, -30)
-	p.videC:SetWidth(LARGEUR_C - 20)
+	-- à droite des onglets : « + Nouveau projet »
+	p.nouveau = UI.Bouton(p, "+ Nouveau projet", "or", 150, 28)
+	p.nouveau:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -12)
+	p.nouveau:SetScript("OnClick", function(self) MenuNouveau(self) end)
+	UI.Infobulle(p.nouveau, "Nouveau projet de guilde", "Une liste partagée avec toute la guilde : chacun prend une tâche qu'il sait faire. Projet vide, ou à partir d'une de tes listes.")
+
+	-- colonne de gauche : les projets
+	p.projets = UI.Liste(p)
+	p.projets:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -56)
+	p.projets:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", MARGE, MARGE)
+	p.projets:SetWidth(LARGEUR_PROJETS + 8)
+	p.videC = UI.Texte(p, "GameFontHighlight", C.gris)
+	p.videC:SetPoint("TOPLEFT", p.projets, "TOPLEFT", 4, -8)
+	p.videC:SetWidth(LARGEUR_PROJETS - 8)
+	p.videC:SetWordWrap(true)
 	p.videC:SetText("Aucun projet pour l'instant.\n\nLance le premier avec « + Nouveau projet ».")
 
-	-- projet choisi
-	local x0 = LARGEUR_C + 20
-	local fondL = p:CreateTexture(nil, "BACKGROUND")
-	fondL:SetPoint("TOPLEFT", f, "TOPLEFT", x0 - 4, haut - 4)
-	fondL:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 10)
-	fondL:SetColorTexture(0, 0, 0, 0.2)
+	-- à droite : le projet choisi
+	local x0 = MARGE + LARGEUR_PROJETS + 8 + 10
 	p.entete = CreateFrame("Frame", nil, p)
-	p.entete:SetPoint("TOPLEFT", f, "TOPLEFT", x0, haut - 8)
-	p.entete:SetPoint("RIGHT", f, "RIGHT", -12, 0)
+	p.entete:SetPoint("TOPLEFT", p, "TOPLEFT", x0, -56)
+	p.entete:SetPoint("RIGHT", p, "RIGHT", -MARGE, 0)
 	p.entete:SetHeight(60)
-	p.titreP = p.entete:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	p.titreP:SetPoint("TOPLEFT", p.entete, "TOPLEFT", 4, 0)
-	p.titreP:SetPoint("RIGHT", p.entete, "RIGHT", -190, 0)
-	p.titreP:SetJustifyH("LEFT")
-	p.titreP:SetWordWrap(false)
-	p.auteurP = p.entete:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	p.auteurP:SetPoint("TOPLEFT", p.titreP, "BOTTOMLEFT", 0, -4)
-	local Barre = Outils().BarreMetier
-	p.barre = Barre and Barre(p.entete, largeur - x0 - 40) or CreateFrame("StatusBar", nil, p.entete)
-	if not p.barre.texte then p.barre.texte = p.barre:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall"); p.barre.texte:SetPoint("CENTER") end
-	p.barre:SetPoint("TOPLEFT", p.entete, "TOPLEFT", 4, -42)
-	p.supprimer = CreateFrame("Button", nil, p.entete, "UIPanelButtonTemplate")
-	p.supprimer:SetSize(90, 22)
+	p.supprimer = UI.Bouton(p.entete, "Supprimer", "fantome", 90, 28)
 	p.supprimer:SetPoint("TOPRIGHT", p.entete, "TOPRIGHT", 0, 0)
-	p.supprimer:SetText("Supprimer")
+	p.supprimer:SetBackdropBorderColor(unpack(C.bordAide))
+	p.supprimer.texte:SetTextColor(unpack(C.aide))
 	p.supprimer:SetScript("OnClick", function()
 		local pr = choisi and Projet(choisi)
 		if pr then StaticPopup_Show("GUILDUP_SUPPRIMER_PROJET", pr.nom, nil, pr.id) end
 	end)
-	p.ajouter = CreateFrame("Button", nil, p.entete, "UIPanelButtonTemplate")
-	p.ajouter:SetSize(96, 22)
-	p.ajouter:SetPoint("RIGHT", p.supprimer, "LEFT", -4, 0)
-	p.ajouter:SetText("+ Objets")
+	UI.Infobulle(p.supprimer, "Supprimer le projet", "Pour toute la guilde (une confirmation est demandée).")
+	p.ajouter = UI.Bouton(p.entete, "+ Objets", "fantome", 90, 28)
+	p.ajouter:SetPoint("RIGHT", p.supprimer, "LEFT", -6, 0)
 	p.ajouter:SetScript("OnClick", function() if ns.OuvrirArtisanat then ns.OuvrirArtisanat(2) end end)
-	p.ajouter:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:SetText("Ajouter des objets au projet")
-		GameTooltip:AddLine("Dans l'onglet Items (ou l'encyclopédie), bouton « Ajouter », puis choisis ce projet.", 1, 1, 1, true)
-		GameTooltip:Show()
-	end)
-	p.ajouter:SetScript("OnLeave", function() GameTooltip:Hide() end)
-	local defile = CreateFrame("ScrollFrame", nil, p, "UIPanelScrollFrameTemplate")
-	defile:SetPoint("TOPLEFT", f, "TOPLEFT", x0, haut - 74)
-	defile:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -30, 14)
-	p.defile = defile
-	p.contenu = CreateFrame("Frame", nil, defile)
-	p.contenu:SetSize(largeur - x0 - 42, 10)
-	defile:SetScrollChild(p.contenu)
-	p.vide = p:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-	p.vide:SetPoint("TOP", fondL, "TOP", 0, -60)
-	p.vide:SetWidth(largeur - x0 - 60)
+	UI.Infobulle(p.ajouter, "Ajouter des objets au projet", "Dans l'onglet Items (ou l'encyclopédie), bouton « Ajouter », puis choisis ce projet.")
+	p.titreP = UI.Texte(p.entete, "GameFontNormalLarge", C.ors)
+	p.titreP:SetPoint("TOPLEFT", p.entete, "TOPLEFT", 0, -2)
+	p.titreP:SetPoint("RIGHT", p.ajouter, "LEFT", -10, 0)
+	p.auteurP = UI.Texte(p.entete, "GameFontHighlightSmall", C.gris)
+	p.auteurP:SetPoint("TOPLEFT", p.titreP, "BOTTOMLEFT", 0, -5)
+	p.auteurP:SetPoint("RIGHT", p.ajouter, "LEFT", -10, 0)
+	p.avance = UI.Texte(p.entete, "GameFontHighlightSmall", C.gris)
+	p.avance:SetPoint("RIGHT", p.entete, "TOPRIGHT", 0, -50)
+	p.avance:SetJustifyH("RIGHT")
+	local Barre = Outils().Barre
+	if Barre then
+		p.barre = Barre(p.entete, 8)
+	else
+		p.barre = CreateFrame("StatusBar", nil, p.entete)
+		p.barre:SetHeight(8)
+		p.barre:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+		p.barre:SetStatusBarColor(C.orFonce[1], C.orFonce[2], C.orFonce[3], 1)
+	end
+	p.barre:SetPoint("LEFT", p.entete, "TOPLEFT", 0, -50)
+	p.barre:SetPoint("RIGHT", p.avance, "LEFT", -12, 0)
+	p.liste = UI.Liste(p)
+	p.liste:SetPoint("TOPLEFT", p, "TOPLEFT", x0, -124)
+	p.liste:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE + 6, MARGE)
+	p.vide = UI.Texte(p, "GameFontHighlight", C.gris)
+	p.vide:SetPoint("TOPLEFT", p, "TOPLEFT", x0 + 4, -64)
 	p.vide:SetText("Choisis un projet à gauche, ou crée-en un.")
-	p:SetScript("OnShow", function() MajPage() end)
+	p.Maj = MajPage
 	return p
 end
 
 ns.OuvrirProjet = function(id)
 	if id then choisi = id end
 	if ns.OuvrirArtisanat then ns.OuvrirArtisanat(3) end
-	Maj()
 end
 ns.MajProjets = Maj
 
@@ -907,11 +922,17 @@ end
 ns.Ecouter(PREFIXE, Recevoir)
 
 local ev = CreateFrame("Frame")
-for _, nom in ipairs({ "PLAYER_ENTERING_WORLD", "GUILD_ROSTER_UPDATE" }) do pcall(ev.RegisterEvent, ev, nom) end
-local premiere = true
-ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
-	if event == "GUILD_ROSTER_UPDATE" then
-		if page and page:IsVisible() then Maj() end
+for _, nom in ipairs({ "PLAYER_ENTERING_WORLD", "GUILD_ROSTER_UPDATE", "GET_ITEM_INFO_RECEIVED" }) do pcall(ev.RegisterEvent, ev, nom) end
+local premiere, prevu = true, false
+ev:SetScript("OnEvent", function(_, event)
+	if event == "GUILD_ROSTER_UPDATE" or event == "GET_ITEM_INFO_RECEIVED" then
+		-- (en ligne, noms d'objets arrivés du serveur) : regroupés, seulement si l'onglet est à l'écran
+		if prevu or not (ns.ArtisanatVisible and ns.ArtisanatVisible(3)) then return end
+		prevu = true
+		C_Timer.After(0.5, function()
+			prevu = false
+			Maj()
+		end)
 	elseif event == "PLAYER_ENTERING_WORLD" and premiere then
 		premiere = false
 		C_Timer.After(25, function()

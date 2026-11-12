@@ -5,7 +5,6 @@
 -- La page est lourde : elle ne suit pas le rafraîchissement automatique de la fenêtre
 -- (rafraichirAuto = false) ; MajTout (= ns.MajOngletsEchanges) la rafraîchit si elle est affichée,
 -- ainsi que le médaillon, à chaque changement (listes reçues, sacs, demandes, liste de guilde…).
--- ns.FenetreOnglets / ns.HAUT_ENCART : ancienne fenêtre à onglets, encore utilisée par l'Artisanat.
 --
 -- Préfixe "GuildUpEch" (canal de guilde) :
 --   "L~part~total~objet:qte:métier:niveau,…"  ma liste de dons complète (vide = plus aucun don)
@@ -30,8 +29,6 @@ local DELAI_SANS_NIVEAU = 10
 local CALME = 25
 local OUBLI = 30 * 86400
 local TAILLE_MORCEAU = 200
-local LARGEUR, HAUTEUR = 720, 520   -- ancienne fenêtre à onglets (ns.FenetreOnglets, Artisanat)
-local HAUT_ENCART = -88
 -- onglets de la page
 local DONS, MES_DONS, DEMANDES, BESOINS = 1, 2, 3, 4
 local GARDE_DEMANDES = 30 * 86400   -- historique des demandes reçues
@@ -1379,87 +1376,6 @@ local function CreerPage(parent)
 	return p
 end
 if ns.AjouterPage then ns.AjouterPage("dons", CreerPage) end
-
--- Fenêtre à onglets (cadre à portrait, bande de pierre, encart illustré) : ancienne fenêtre des dons,
--- encore utilisée par la fenêtre Artisanat (GuildUp_Carnet.lua) en attendant sa page.
--- pages : fonctions (f) -> page ; noms : textes des onglets.
-local function FenetreOnglets(nom, titre, icone, fonds, pages, noms)
-	local ok, f = pcall(CreateFrame, "Frame", nom, UIParent, "PortraitFrameTemplate")
-	if not ok then
-		ok, f = pcall(CreateFrame, "Frame", nom, UIParent, "BasicFrameTemplateWithInset")
-		if not ok then f = CreateFrame("Frame", nom, UIParent) end
-	end
-	f:SetSize(LARGEUR, HAUTEUR)
-	f:SetPoint("CENTER")
-	f:SetFrameStrata("HIGH")
-	f:SetToplevel(true)
-	f:SetMovable(true)
-	f:EnableMouse(true)
-	f:SetClampedToScreen(true)
-	f:RegisterForDrag("LeftButton")
-	f:SetScript("OnDragStart", f.StartMoving)
-	f:SetScript("OnDragStop", f.StopMovingOrSizing)
-	tinsert(UISpecialFrames, nom)
-	if f.SetTitle then pcall(f.SetTitle, f, titre)
-	elseif f.TitleText then f.TitleText:SetText(titre) end
-	if f.SetPortraitToAsset then pcall(f.SetPortraitToAsset, f, icone) end
-
-	local pierre = f:CreateTexture(nil, "BACKGROUND", nil, -5)
-	pierre:SetPoint("TOPLEFT", f, "TOPLEFT", 2, -21)
-	pierre:SetPoint("BOTTOMRIGHT", f, "TOPRIGHT", -2, HAUT_ENCART - 7)
-	PoserAtlas(pierre, "groupfinder-Stat-StoneBG", { 0.12, 0.1, 0.08, 1 })
-	local encart = CreateFrame("Frame", nil, f)
-	encart:SetPoint("TOPLEFT", f, "TOPLEFT", 4, HAUT_ENCART)
-	encart:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -4, 3)
-	encart:SetFrameLevel(f:GetFrameLevel() + 1)
-	local illustration = encart:CreateTexture(nil, "BACKGROUND")
-	illustration:SetPoint("TOPLEFT", encart, "TOPLEFT", 3, -3)
-	illustration:SetPoint("BOTTOMRIGHT", encart, "BOTTOMRIGHT", -3, 3)
-	local pose = false
-	for _, a in ipairs(fonds) do
-		if not pose and PoserAtlas(illustration, a) then pose = true end
-	end
-	if not pose then PoserAtlas(illustration, "groupfinder-background", { 0.06, 0.05, 0.05, 1 }) end
-	local voile = encart:CreateTexture(nil, "BACKGROUND", nil, 1)
-	voile:SetAllPoints(illustration)
-	voile:SetColorTexture(0, 0, 0, 0.2)
-
-	local liste = {}
-	for i, creer in ipairs(pages) do
-		liste[i] = creer(f) or CreateFrame("Frame", nil, f)
-		liste[i]:SetFrameLevel(encart:GetFrameLevel() + 2)
-		liste[i]:Hide()
-	end
-	f.pages = liste
-	f.onglets = {}
-	local function Choisir(i)
-		for k, pg in ipairs(liste) do pg:SetShown(k == i) end
-		f.ongletChoisi = i
-		if PanelTemplates_SetTab then pcall(PanelTemplates_SetTab, f, i) end
-	end
-	f.Choisir = Choisir
-	for i = 1, #liste do
-		local okO, o = pcall(CreateFrame, "Button", nom .. "Tab" .. i, f, "PanelTabButtonTemplate")
-		if not okO then
-			o = CreateFrame("Button", nom .. "Tab" .. i, f, "UIPanelButtonTemplate")
-			o:SetSize(110, 24)
-		end
-		o:SetID(i)
-		o:SetText(noms[i])
-		if PanelTemplates_TabResize then pcall(PanelTemplates_TabResize, o, 0) end
-		if i == 1 then o:SetPoint("TOPLEFT", f, "BOTTOMLEFT", 12, 2)
-		else o:SetPoint("LEFT", f.onglets[i - 1], "RIGHT", 3, 0) end
-		o:SetScript("OnClick", function() Choisir(i) end)
-		f.onglets[i] = o
-	end
-	f.numTabs = #liste
-	f.Tabs = f.onglets
-	Choisir(1)
-	f:Hide()
-	return f
-end
-ns.FenetreOnglets = FenetreOnglets
-ns.HAUT_ENCART = HAUT_ENCART
 
 --------------------------------------------------------------------------------
 -- Ouverture (volet, bulles, accueil, /smb)

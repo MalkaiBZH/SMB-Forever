@@ -3,6 +3,8 @@
 -- (relevées quand le joueur ouvre sa fenêtre de métier : le jeu ne les donne qu'à ce moment-là),
 -- puis les partage avec les autres membres qui ont l'addon. Les fiches reçues sont gardées
 -- (GuildUpMetiersDB) : on voit aussi les membres hors ligne.
+-- Interface : onglet « Registre » de la page Artisanat de la fenêtre GuildUpSMB (kit ns.UI ; la page
+-- et ses onglets sont dans GuildUp_Carnet.lua) : filtres par métier, recherche, membres, fiche.
 --
 -- Messages d'addon sur le canal de guilde (préfixe "GuildUpMet") :
 --   "Q"                                        demande : « envoyez vos résumés »
@@ -41,13 +43,6 @@ local METIERS = {
 }
 local PAR_CODE = {}
 for _, m in ipairs(METIERS) do PAR_CODE[m.code] = m end
-
--- nom anglais utilisé par les images de la fenêtre de métier du jeu (Professions-Recipe-Background-…)
-local KITS = {
-	AL = "Alchemy", FO = "Blacksmithing", EN = "Enchanting", IN = "Engineering", TC = "Leatherworking",
-	CO = "Tailoring", JO = "Jewelcrafting", CA = "Inscription", HE = "Herbalism", MI = "Mining",
-	DE = "Skinning", CU = "Cooking", SE = "FirstAid", PE = "Fishing",
-}
 
 -- minuscules sans accents, pour comparer et chercher (« Écaille » = « ecaille »)
 local Simplifier = ns.Simplifier
@@ -820,38 +815,23 @@ EnLigne = function(cle, e)
 	return e.vu and (time() - e.vu) < 120 or false
 end
 
-local function Chuchoter(cle, e)
-	local nom
-	if cle:find("#test", 1, true) then
-		nom = UnitName("player")
-	elseif roster[cle] then
-		nom = roster[cle].nom          -- nom tel que la liste de guilde le donne
-	else
-		-- pas dans la liste de guilde : on chuchote à « Prénom Famille » (format des noms de Forever)
-		nom = ((e.nom or cle):gsub(" %(test%)$", ""):gsub("%-", " ")) -- « Prénom Famille »
-	end
-	if ChatFrame_SendTell then
-		ChatFrame_SendTell(nom)
-	elseif ChatFrame_OpenChat then
-		ChatFrame_OpenChat("/w " .. nom .. " ")
-	end
-end
-
 --------------------------------------------------------------------------------
--- Fenêtre du registre
+-- Onglet « Registre » de la page Artisanat (fenêtre GuildUpSMB, kit ns.UI)
+-- En haut : « Tous » et un bouton par métier (filtre ; re-clic : retiré), recherche « joueur ou
+-- recette », case « recettes spéciales », Actualiser. À gauche les membres, à droite la fiche du
+-- membre choisi (métiers repliables, recettes : clic = commander, Maj-clic = lien).
 --------------------------------------------------------------------------------
 
-local LARGEUR, HAUTEUR = 720, 520
-local HAUT_ENCART = -88
-local LARGEUR_GAUCHE = 300
-local HAUTEUR_LIGNE = 34
-local LARGEUR_LIGNE = LARGEUR_GAUCHE - 38
-local LARGEUR_DROITE = LARGEUR - LARGEUR_GAUCHE - 14 - 32
-local ICONE_EN_LIGNE = "Interface\\FriendsFrame\\StatusIcon-Online"
-local ICONE_HORS_LIGNE = "Interface\\FriendsFrame\\StatusIcon-Offline"
+local UI = ns.UI
+local C = UI.C
+local MARGE = 16
+local LARGEUR_MEMBRES = 290
+local HAUTEUR_MEMBRE, ECART_MEMBRE = 44, 6
+local HAUT_CORPS = -136                 -- haut des colonnes (sous les filtres et la recherche)
 local ICONE_INCONNUE = "Interface\\Icons\\INV_Misc_QuestionMark"
+local GRIS_HORS_LIGNE = { 0.35, 0.33, 0.27 }
 
-local fen
+local fen                -- le cadre de l'onglet (créé à la première ouverture)
 local function Speciales() return Base().speciales and true or false end
 -- recette affichée selon le filtre « recettes spéciales » (nil = spéciales inconnues pour ce métier)
 -- recettes spéciales = apprises avec un plan (liste tirée des données du jeu : GuildUp_Recettes.lua)
@@ -870,19 +850,27 @@ local pools = { metier = {}, recette = {}, info = {} }
 local indexArtisans          -- [code recette] = { { f = fiche, metier, p }, … } ; nil = à reconstruire
 local function InvaliderIndex() indexArtisans = nil end
 
-PlanifierMaj = function(delai)
-	-- données de métiers changées (fiche reçue, recettes lues) : l'index des artisans est à refaire
-	InvaliderIndex()
-	if not fen or not fen.page or not fen.page:IsVisible() or majPrevue then return end
+-- l'onglet est-il à l'écran ? (page Artisanat de la fenêtre GuildUpSMB, onglet 1)
+local function OngletVisible()
+	if ns.ArtisanatVisible then return ns.ArtisanatVisible(1) end
+	return fen ~= nil and fen:IsVisible()
+end
+
+-- rafraîchissement regroupé (rafales d'évènements, frappe dans la recherche)
+local function MajBientot(delai)
+	if not fen or majPrevue or not OngletVisible() then return end
 	majPrevue = true
 	C_Timer.After(delai or 0.2, function()
 		majPrevue = false
-		if fen and fen.page and fen.page:IsVisible() then MajFenetre() end
+		if fen and OngletVisible() and ns.MajInterface then ns.MajInterface() end
 	end)
 end
 
-local AtlasExiste = ns.AtlasExiste
-local PoserAtlas = ns.PoserAtlas
+PlanifierMaj = function(delai)
+	-- données de métiers changées (fiche reçue, recettes lues) : l'index des artisans est à refaire
+	InvaliderIndex()
+	MajBientot(delai)
+end
 
 local function Fiches()
 	local liste = {}
@@ -1007,53 +995,50 @@ local function ListeAffichee()
 	return res, total, enLigne
 end
 
--- Ligne d'un membre (colonne de gauche)
+-- Barre d'avancement plate (celle du carnet, GuildUp_Carnet.lua ; repli : barre simple)
+local function Barre(parent, hauteur)
+	local B = ns.OutilsCarnet and ns.OutilsCarnet.Barre
+	if B then return B(parent, hauteur) end
+	local b = CreateFrame("StatusBar", nil, parent)
+	b:SetHeight(hauteur or 6)
+	b:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+	b:SetStatusBarColor(C.orFonce[1], C.orFonce[2], C.orFonce[3], 1)
+	return b
+end
+
+-- Rangée d'un membre (colonne de gauche) : point en ligne, nom, zone ou « vu il y a », métiers à droite
 local function CreerLigneMembre(parent)
-	local b = CreateFrame("Button", nil, parent)
-	b:SetSize(LARGEUR_LIGNE, HAUTEUR_LIGNE)
-	b.fond = b:CreateTexture(nil, "BACKGROUND")
-	b.fond:SetAllPoints(b)
-	b.fond:SetColorTexture(1, 1, 1, 0.03)
-	b.choisi = b:CreateTexture(nil, "BORDER")
-	b.choisi:SetAllPoints(b)
-	if not PoserAtlas(b.choisi, "groupfinder-highlightbar-blue") then b.choisi:SetColorTexture(0.2, 0.45, 0.9, 0.3) end
-	b.choisi:SetBlendMode("ADD")
-	b.choisi:SetAlpha(0.7)
-	local survol = b:CreateTexture(nil, "HIGHLIGHT")
-	survol:SetAllPoints(b)
-	survol:SetColorTexture(1, 0.82, 0, 0.12)
-	survol:SetBlendMode("ADD")
-
-	b.etat = b:CreateTexture(nil, "ARTWORK")
-	b.etat:SetSize(12, 12)
-	b.etat:SetPoint("TOPLEFT", b, "TOPLEFT", 3, -5)
-	b.nom = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	b.nom:SetPoint("TOPLEFT", b, "TOPLEFT", 18, -4)
-	b.nom:SetWidth(120)
-	b.nom:SetJustifyH("LEFT")
-	b.nom:SetWordWrap(false)
-	b.sous = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	b.sous:SetPoint("TOPLEFT", b, "TOPLEFT", 18, -19)
-	b.sous:SetWidth(125)
-	b.sous:SetJustifyH("LEFT")
-	b.sous:SetWordWrap(false)
-
-	-- petits métiers à droite (icône + niveau), du plus à droite vers la gauche
+	local b = UI.Rangee(parent, HAUTEUR_MEMBRE)
+	b.point = b:CreateTexture(nil, "ARTWORK")
+	b.point:SetTexture(UI.ROND)
+	b.point:SetSize(8, 8)
+	b.point:SetPoint("LEFT", b, "LEFT", 10, 0)
+	b.nom = UI.Texte(b, "GameFontNormal")
+	b.nom:SetPoint("TOPLEFT", b, "TOPLEFT", 26, -7)
+	b.sous = UI.Texte(b, "GameFontHighlightSmall", C.gris)
+	b.sous:SetPoint("TOPLEFT", b.nom, "BOTTOMLEFT", 0, -3)
+	-- jusqu'à quatre métiers (icône, niveau dessous), du plus à droite vers la gauche
 	b.metiers = {}
 	for i = 1, 4 do
 		local ic = b:CreateTexture(nil, "ARTWORK")
 		ic:SetSize(16, 16)
-		ic:SetPoint("TOPRIGHT", b, "TOPRIGHT", -8 - (i - 1) * 30, -3)
-		local t = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-		t:SetPoint("TOP", ic, "BOTTOM", 0, -1)
+		ic:SetPoint("TOPRIGHT", b, "TOPRIGHT", -14 - (i - 1) * 30, -6)
+		ic:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+		local t = UI.Texte(b, "GameFontHighlightSmall", C.texte)
+		t:SetPoint("TOP", ic, "BOTTOM", 0, -2)
+		t:SetJustifyH("CENTER")
 		b.metiers[i] = { icone = ic, texte = t }
 	end
-	-- un seul métier en grand quand un filtre est actif
-	b.grosIcone = b:CreateTexture(nil, "ARTWORK")
-	b.grosIcone:SetSize(22, 22)
-	b.grosIcone:SetPoint("RIGHT", b, "RIGHT", -68, 0)
-	b.grosTexte = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	b.grosTexte:SetPoint("LEFT", b.grosIcone, "RIGHT", 6, 0)
+	-- métier filtré : pastille « icône n / max »
+	b.pilule = UI.Cadre(b, { 0.165, 0.137, 0.094, 1 })
+	b.pilule:SetHeight(20)
+	b.pilule:SetPoint("RIGHT", b, "RIGHT", -10, 0)
+	b.pilule.icone = b.pilule:CreateTexture(nil, "ARTWORK")
+	b.pilule.icone:SetSize(14, 14)
+	b.pilule.icone:SetPoint("LEFT", b.pilule, "LEFT", 5, 0)
+	b.pilule.icone:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+	b.pilule.texte = UI.Texte(b.pilule, "GameFontHighlightSmall", C.texte)
+	b.pilule.texte:SetPoint("LEFT", b.pilule.icone, "RIGHT", 5, 0)
 
 	b:SetScript("OnClick", function(self)
 		selection = self.cle
@@ -1077,123 +1062,125 @@ local function CreerLigneMembre(parent)
 			end
 		end
 		if rien then GameTooltip:AddLine("Aucun métier connu.", 0.7, 0.7, 0.7) end
+		GameTooltip:AddLine("Clic : voir sa fiche", 0.6, 0.6, 0.6)
 		GameTooltip:Show()
 	end)
 	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	return b
 end
 
-local function RemplirLigneMembre(b, f)
+local function RemplirLigneMembre(b, f, choisi)
 	local e = f.e
 	b.cle, b.e = f.cle, e
-	b.etat:SetTexture(f.enLigne and ICONE_EN_LIGNE or ICONE_HORS_LIGNE)
-	b.nom:SetText(NomCourt(e.nom or f.cle) .. (f.moi and " |cff999999(toi)|r" or ""))
+	b.point:SetVertexColor(unpack(f.enLigne and C.vert or GRIS_HORS_LIGNE))
+	b.nom:SetText(NomCourt(e.nom or f.cle) .. (f.moi and " |cff9c937f(toi)|r" or ""))
 	b.nom:SetTextColor(CouleurClasse(e.classe))
 	if recherche ~= "" and f.trouvees > 0 then
 		local s = f.trouvees > 1 and "s" or ""
-		b.sous:SetText(("|cff33dd55%d recette%s trouvée%s|r"):format(f.trouvees, s, s))
+		b.sous:SetText(("|cff6fd08c%d recette%s trouvée%s|r"):format(f.trouvees, s, s))
 	elseif f.enLigne then
 		local zone = f.moi and GetRealZoneText and GetRealZoneText() or (roster[f.cle] and roster[f.cle].zone)
 		b.sous:SetText(zone and zone ~= "" and zone or "En ligne")
 	else
 		b.sous:SetText("Hors ligne" .. (e.vu and (" · vu il y a " .. Depuis(e.vu)) or ""))
 	end
+	b:SetBackdropColor(unpack(choisi and C.actif or C.carte))
+	b:SetBackdropBorderColor(unpack(choisi and C.orFonce or C.bord))
 
 	for _, s in ipairs(b.metiers) do s.icone:Hide(); s.texte:Hide() end
-	b.grosIcone:Hide()
-	b.grosTexte:Hide()
+	b.pilule:Hide()
+	local droite = 10
 	if filtre then
 		local p = e.profs and e.profs[filtre]
 		if p then
-			b.grosIcone:SetTexture(PAR_CODE[filtre].icone)
-			b.grosTexte:SetText(("%d / %d"):format(p.n or 0, p.max or 0))
-			b.grosIcone:Show()
-			b.grosTexte:Show()
+			b.pilule.icone:SetTexture(PAR_CODE[filtre].icone)
+			b.pilule.texte:SetText(("%d / %d"):format(p.n or 0, p.max or 0))
+			b.pilule:SetWidth(b.pilule.texte:GetStringWidth() + 32)
+			b.pilule:Show()
+			droite = b.pilule.texte:GetStringWidth() + 50
 		end
-		return
+	else
+		-- métiers principaux d'abord (ordre de METIERS), quatre au plus
+		local tous = {}
+		for _, m in ipairs(METIERS) do
+			local p = e.profs and e.profs[m.code]
+			if p then tous[#tous + 1] = { m = m, p = p } end
+		end
+		local i = 0
+		for j = math.min(#tous, 4), 1, -1 do
+			i = i + 1
+			local s, x = b.metiers[i], tous[j]
+			s.icone:SetTexture(x.m.icone)
+			s.texte:SetText(tostring(x.p.n or 0))
+			s.icone:Show()
+			s.texte:Show()
+		end
+		if i > 0 then droite = 14 + i * 30 end
 	end
-	-- métiers principaux d'abord (ordre de METIERS), quatre au plus
-	local i = 0
-	local tous = {}
-	for _, m in ipairs(METIERS) do
-		local p = e.profs and e.profs[m.code]
-		if p then tous[#tous + 1] = { m = m, p = p } end
-	end
-	for j = math.min(#tous, 4), 1, -1 do
-		i = i + 1
-		local s, x = b.metiers[i], tous[j]
-		s.icone:SetTexture(x.m.icone)
-		s.texte:SetText(tostring(x.p.n or 0))
-		s.icone:Show()
-		s.texte:Show()
-	end
+	b.nom:SetPoint("RIGHT", b, "RIGHT", -droite, 0)
+	b.sous:SetPoint("RIGHT", b, "RIGHT", -droite, 0)
 end
 
--- Lignes de la colonne de droite (réutilisées)
-local function Prendre(genre, parent)
+-- Lignes de la fiche (colonne de droite, réutilisées) : métier, recette, information
+local function Prendre(genre)
 	local pool = pools[genre]
 	pool.utilisees = (pool.utilisees or 0) + 1
 	local l = pool[pool.utilisees]
 	if l then return l end
-	l = CreateFrame("Button", nil, parent)
-	l:SetWidth(LARGEUR_DROITE)
+	l = CreateFrame("Button", nil, fen.detail.contenu)
 	l.icone = l:CreateTexture(nil, "ARTWORK")
-	l.texte = l:CreateFontString(nil, "OVERLAY", genre == "metier" and "GameFontNormal"
-		or genre == "info" and "GameFontDisableSmall" or "GameFontHighlightSmall")
-	l.texte:SetJustifyH("LEFT")
-	l.texte:SetWordWrap(false)
+	l.icone:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 	if genre == "metier" then
-		l:SetHeight(30)
-		l.fleche = l:CreateTexture(nil, "ARTWORK")
-		l.fleche:SetSize(14, 14)
-		l.fleche:SetPoint("LEFT", l, "LEFT", 0, 0)
-		l.icone:SetSize(24, 24)
-		l.icone:SetPoint("LEFT", l, "LEFT", 17, 0)
-		l.texte:SetPoint("TOPLEFT", l, "TOPLEFT", 47, -3)
-		local survolM = l:CreateTexture(nil, "HIGHLIGHT")
-		survolM:SetAllPoints(l)
-		survolM:SetColorTexture(1, 0.82, 0, 0.08)
-		survolM:SetBlendMode("ADD")
+		-- en-tête de métier : « + / - », icône, nom (nombre de recettes), barre n / max ; clic = replier
+		l:SetHeight(36)
+		l.filet = UI.Filet(l)
+		l.filet:SetPoint("TOPLEFT", l, "TOPLEFT", 0, 0)
+		l.filet:SetPoint("TOPRIGHT", l, "TOPRIGHT", 0, 0)
+		l.signe = UI.Texte(l, "GameFontNormal", C.ors)
+		l.signe:SetPoint("LEFT", l, "LEFT", 2, 0)
+		l.icone:SetSize(20, 20)
+		l.icone:SetPoint("LEFT", l, "LEFT", 18, 0)
+		l.texte = UI.Texte(l, "GameFontNormal", C.texte)
+		l.texte:SetPoint("LEFT", l.icone, "RIGHT", 8, 0)
+		l.texte:SetWidth(156)
+		l.niveau = UI.Texte(l, "GameFontHighlightSmall", C.gris)
+		l.niveau:SetPoint("RIGHT", l, "RIGHT", -8, 0)
+		l.niveau:SetJustifyH("RIGHT")
+		l.barre = Barre(l, 6)
+		l.barre:SetPoint("LEFT", l, "LEFT", 210, 0)
+		l.barre:SetPoint("RIGHT", l.niveau, "LEFT", -10, 0)
+		UI.Survol(l, 0.04)
 		l:SetScript("OnClick", function(self)
 			if not self.code then return end
 			local o = Base().ouverts
 			o[self.code] = not o[self.code] or nil
 			MajFenetre()
 		end)
-		l.niveau = l:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-		l.niveau:SetPoint("TOPRIGHT", l, "TOPRIGHT", -4, -3)
-		l.barre = CreateFrame("StatusBar", nil, l)
-		l.barre:SetSize(LARGEUR_DROITE - 56, 8)
-		l.barre:SetPoint("BOTTOMLEFT", l, "BOTTOMLEFT", 49, 2)
-		l.barre:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-		l.barre:SetStatusBarColor(0.26, 0.62, 0.18)
-		local fond = l.barre:CreateTexture(nil, "BACKGROUND")
-		fond:SetAllPoints(l.barre)
-		if not PoserAtlas(fond, "Professions-skillbar-bg") then fond:SetColorTexture(0, 0, 0, 0.6) end
-		local contour = l.barre:CreateTexture(nil, "OVERLAY")
-		contour:SetPoint("TOPLEFT", l.barre, "TOPLEFT", -3, 3)
-		contour:SetPoint("BOTTOMRIGHT", l.barre, "BOTTOMRIGHT", 3, -3)
-		if not PoserAtlas(contour, "Professions-skillbar-frame") then contour:Hide() end
-		local filet = l:CreateTexture(nil, "BACKGROUND")
-		filet:SetPoint("TOPLEFT", l, "TOPLEFT", -2, 1)
-		filet:SetPoint("BOTTOMRIGHT", l, "BOTTOMRIGHT", 2, -1)
-		filet:SetColorTexture(1, 0.82, 0, 0.06)
 	elseif genre == "info" then
-		l:SetHeight(18)
-		l.texte:SetPoint("LEFT", l, "LEFT", 47, 0)
-		l.texte:SetWidth(LARGEUR_DROITE - 47)
+		l:SetHeight(22)
 		l.icone:Hide()
+		l.texte = UI.Texte(l, "GameFontHighlightSmall", C.gris)
+		l.texte:SetPoint("LEFT", l, "LEFT", 18, 0)
+		l.texte:SetPoint("RIGHT", l, "RIGHT", -8, 0)
+		l:EnableMouse(false)
 	else
-		l:SetHeight(18)
-		l.icone:SetSize(16, 16)
-		l.icone:SetPoint("LEFT", l, "LEFT", 47, 0)
-		l.texte:SetPoint("LEFT", l.icone, "RIGHT", 6, 0)
-		l.texte:SetWidth(LARGEUR_DROITE - 73)
-		local survol = l:CreateTexture(nil, "HIGHLIGHT")
-		survol:SetAllPoints(l)
-		survol:SetColorTexture(1, 0.82, 0, 0.12)
-		survol:SetBlendMode("ADD")
+		-- recette : icône, nom (couleur de qualité), « clic : commander » au survol
+		l:SetHeight(28)
+		l.icone:SetSize(20, 20)
+		l.icone:SetPoint("LEFT", l, "LEFT", 18, 0)
+		l.indice = UI.Texte(l, "GameFontHighlightSmall", C.gris)
+		l.indice:SetPoint("RIGHT", l, "RIGHT", -8, 0)
+		l.indice:SetJustifyH("RIGHT")
+		l.indice:Hide()
+		l.texte = UI.Texte(l, "GameFontHighlight", C.texte)
+		l.texte:SetPoint("LEFT", l.icone, "RIGHT", 8, 0)
+		l.texte:SetPoint("RIGHT", l, "RIGHT", -110, 0)
+		UI.Survol(l, 0.05)
 		l:SetScript("OnEnter", function(self)
+			if self.commande then
+				self.indice:SetText(self.commande.enLigne and "clic : commander" or "hors ligne")
+				self.indice:Show()
+			end
 			if not self.hyper then return end
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 			if not pcall(GameTooltip.SetHyperlink, GameTooltip, self.hyper) then
@@ -1206,7 +1193,10 @@ local function Prendre(genre, parent)
 			GameTooltip:AddLine("Maj-clic : lien dans la discussion", 0.6, 0.6, 0.6)
 			GameTooltip:Show()
 		end)
-		l:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		l:SetScript("OnLeave", function(self)
+			self.indice:Hide()
+			GameTooltip:Hide()
+		end)
 		l:SetScript("OnClick", function(self)
 			if self.lien and IsModifiedClick and IsModifiedClick("CHATLINK") and ChatEdit_InsertLink then
 				ChatEdit_InsertLink(self.lien)
@@ -1226,42 +1216,40 @@ local function ViderPools()
 	end
 end
 
+-- pose une ligne de la fiche à la hauteur y
+local function Poser(l, y)
+	local c = fen.detail.contenu
+	l:ClearAllPoints()
+	l:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
+	l:SetPoint("RIGHT", c, "RIGHT", 0, 0)
+	l:Show()
+end
+
 local function MajDetail(f)
 	ViderPools()
-	local c = fen.contenuD
 	if not f then
 		fen.dNom:SetText("")
 		fen.dEtat:SetText("")
 		fen.mp:Hide()
 		fen.videD:Show()
-		c:SetHeight(10)
+		fen.detail:Hauteur(10)
 		return
 	end
 	fen.videD:Hide()
 	local e = f.e
-	do
-		local code = filtre
-		if not code then
-			for _, m in ipairs(METIERS) do
-				if e.profs and e.profs[m.code] and not m.recolte then code = m.code; break end
-			end
-		end
-		local atlas = code and KITS[code] and ("Professions-Recipe-Background-" .. KITS[code])
-		if not (atlas and PoserAtlas(fen.fondD, atlas)) then PoserAtlas(fen.fondD, "Professions-Recipe-Background") end
-	end
 	fen.dNom:SetText(NomCourt(e.nom or f.cle))
 	fen.dNom:SetTextColor(CouleurClasse(e.classe))
 	local etat
 	if f.enLigne then
 		local zone = f.moi and GetRealZoneText and GetRealZoneText() or (roster[f.cle] and roster[f.cle].zone)
-		etat = "|cff33dd55En ligne|r" .. (zone and zone ~= "" and (" · " .. zone) or "")
+		etat = "|cff6fd08cen ligne|r" .. (zone and zone ~= "" and (" · " .. zone) or "")
 	else
-		etat = "|cff999999Hors ligne|r" .. (e.vu and (" · vu il y a " .. Depuis(e.vu)) or "")
+		etat = "hors ligne" .. (e.vu and (" · vu il y a " .. Depuis(e.vu)) or "")
 	end
 	fen.dEtat:SetText((e.niveau and e.niveau > 0 and ("Niveau " .. e.niveau .. " · ") or "") .. etat)
 	fen.mp:Show()
 	fen.mp.cle, fen.mp.e = f.cle, e
-	fen.mp:SetEnabled(f.enLigne and not f.moi)
+	fen.mp:Activer(f.enLigne and not f.moi)
 
 	local y = 0
 	local toutMontrer = recherche == "" or f.nomTrouve
@@ -1283,19 +1271,18 @@ local function MajDetail(f)
 				-- repliée par défaut ; toujours dépliée pendant une recherche ou avec le filtre de ce métier
 				local force = (recherche ~= "" and not f.nomTrouve) or filtre == m.code
 				local ouvert = force or Base().ouverts[m.code]
-				local l = Prendre("metier", c)
-				l:ClearAllPoints()
-				l:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
+				local l = Prendre("metier")
+				Poser(l, y)
 				l.code = not force and m.code or nil
-				l.fleche:SetTexture(ouvert and "Interface\\Buttons\\UI-MinusButton-Up" or "Interface\\Buttons\\UI-PlusButton-Up")
-				l.fleche:SetShown(not force and (#recettes > 0 or not m.recolte))
+				l.signe:SetText(ouvert and "-" or "+")
+				l.signe:SetShown(not force and (#recettes > 0 or not m.recolte))
 				l.icone:SetTexture(m.icone)
-				l.texte:SetText(NomMetier(m) .. (#recettes > 0 and ("  |cff999999(" .. #recettes .. ")|r") or ""))
+				l.texte:SetText(NomMetier(m) .. (#recettes > 0 and ("  |cff9c937f(" .. #recettes .. ")|r") or ""))
+				l.texte:SetTextColor(unpack(ouvert and C.ors or C.texte))
 				l.niveau:SetText(("%d / %d"):format(p.n or 0, p.max or 0))
 				l.barre:SetMinMaxValues(0, math.max(p.max or 1, 1))
 				l.barre:SetValue(p.n or 0)
-				l:Show()
-				y = y + 34
+				y = y + 38
 
 				-- recettes triées par nom (les noms inconnus du cache arrivent un peu après)
 				if not ouvert then recettes = {} end
@@ -1303,23 +1290,20 @@ local function MajDetail(f)
 				for _, code in ipairs(recettes) do noms[code] = (InfoRecette(code)) end
 				table.sort(recettes, function(a, b) return (noms[a] or "~") < (noms[b] or "~") end)
 				for _, code in ipairs(recettes) do
-					local r = Prendre("recette", c)
-					r:ClearAllPoints()
-					r:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
+					local r = Prendre("recette")
+					Poser(r, y)
 					local nomR, icone, lien, hyper, qualite = InfoRecette(code)
 					r.icone:SetTexture(icone or ICONE_INCONNUE)
-					r.texte:SetText(nomR or "|cff999999chargement…|r")
+					r.texte:SetText(nomR or "|cff9c937fchargement…|r")
 					local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
-					if qc and nomR then r.texte:SetTextColor(qc.r, qc.g, qc.b) else r.texte:SetTextColor(1, 1, 1) end
+					if qc and nomR then r.texte:SetTextColor(qc.r, qc.g, qc.b) else r.texte:SetTextColor(unpack(C.texte)) end
 					r.lien, r.hyper, r.code = lien, hyper, code
 					r.commande = (not f.moi) and { cle = f.cle, nom = e.nom or f.cle, enLigne = f.enLigne } or nil
-					r:Show()
-					y = y + 18
+					y = y + 28
 				end
 				if ouvert and #recettes == 0 and not m.recolte then
-					local i = Prendre("info", c)
-					i:ClearAllPoints()
-					i:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -y)
+					local i = Prendre("info")
+					Poser(i, y)
 					if Speciales() and (p.nr or #(p.r or {})) > 0 then
 						i.texte:SetText("Aucune recette apprise avec un plan.")
 					elseif (p.nr or 0) > 0 then
@@ -1329,206 +1313,179 @@ local function MajDetail(f)
 					else
 						i.texte:SetText("Pas encore de recettes : il doit ouvrir sa fenêtre de métier.")
 					end
-					i:Show()
-					y = y + 18
+					y = y + 22
 				end
-				y = y + 8
+				y = y + 4
 			end
 		end
 	end
 	if y == 0 then
-		local i = Prendre("info", c)
-		i:ClearAllPoints()
-		i:SetPoint("TOPLEFT", c, "TOPLEFT", 0, 0)
+		local i = Prendre("info")
+		Poser(i, 0)
 		i.texte:SetText(filtre and "Ce métier n'est pas connu." or "Aucun métier connu.")
-		i:Show()
-		y = 18
+		y = 22
 	end
-	c:SetHeight(y)
+	fen.detail:Hauteur(y)
 end
 
 MajFenetre = function()
 	if not fen then return end
+	-- filtres : choisi en surbrillance, les autres grisés
 	for code, bt in pairs(fen.filtres) do
 		local choisi = filtre == code
-		bt.halo:SetShown(choisi)
+		bt:SetBackdropColor(unpack(choisi and C.actif or C.carte))
+		bt:SetBackdropBorderColor(unpack(choisi and C.orFonce or C.bord))
 		bt.icone:SetDesaturated(filtre ~= nil and not choisi)
 		bt.icone:SetAlpha((filtre == nil or choisi) and 1 or 0.55)
 	end
-	if filtre then fen.tous:UnlockHighlight() else fen.tous:LockHighlight() end
+	fen.tous:SetBackdropColor(unpack(filtre and { 0, 0, 0, 0 } or C.actif))
+	fen.tous:SetBackdropBorderColor(unpack(filtre and C.bordMoyen or C.orFonce))
+	fen.nomFiltre:SetText(filtre and (NomMetier(PAR_CODE[filtre]) .. " · classé par niveau") or "")
+	fen.speciales:Poser(Speciales())
 
-	local liste, total, enLigne = ListeAffichee()
-	local y = 0
+	local liste, _, enLigne = ListeAffichee()
 	local choisie
-	for i, f in ipairs(liste) do
-		local b = lignesMembres[i]
-		if not b then
-			b = CreerLigneMembre(fen.contenuG)
-			lignesMembres[i] = b
-		end
-		b:ClearAllPoints()
-		b:SetPoint("TOPLEFT", fen.contenuG, "TOPLEFT", 0, -y)
-		RemplirLigneMembre(b, f)
-		b.fond:SetShown(i % 2 == 0)
-		b:Show()
-		y = y + HAUTEUR_LIGNE
-		if f.cle == selection then choisie = f end
-	end
-	for i = #liste + 1, #lignesMembres do lignesMembres[i]:Hide() end
-	fen.contenuG:SetHeight(math.max(y, 10))
-	fen.videG:SetShown(#liste == 0)
-	fen.speciales:SetChecked(Speciales())
-	fen.videG:SetText(Speciales() and "Personne n'a de recette spéciale (ou ne l'a pas encore partagée)."
-		or recherche ~= "" and "Personne ne correspond à ta recherche."
-		or filtre and "Personne n'a ce métier (parmi les membres qui ont GuildUpSMB)."
-		or "Personne pour l'instant.")
+	for _, f in ipairs(liste) do if f.cle == selection then choisie = f end end
 	if not choisie then
 		choisie = liste[1]
 		selection = choisie and choisie.cle
 	end
-	for i, f in ipairs(liste) do lignesMembres[i].choisi:SetShown(f.cle == selection) end
+	local y = 0
+	local contenu = fen.membres.contenu
+	for i, f in ipairs(liste) do
+		local b = lignesMembres[i]
+		if not b then
+			b = CreerLigneMembre(contenu)
+			lignesMembres[i] = b
+		end
+		b:ClearAllPoints()
+		b:SetPoint("TOPLEFT", contenu, "TOPLEFT", 0, -y)
+		b:SetPoint("RIGHT", contenu, "RIGHT", 0, 0)
+		RemplirLigneMembre(b, f, f.cle == selection)
+		b:Show()
+		y = y + HAUTEUR_MEMBRE + ECART_MEMBRE
+	end
+	for i = #liste + 1, #lignesMembres do lignesMembres[i]:Hide() end
+	fen.membres:Hauteur(y)
+	fen.videG:SetShown(#liste == 0)
+	fen.videG:SetText(Speciales() and "Personne n'a de recette spéciale (ou ne l'a pas encore partagée)."
+		or recherche ~= "" and "Personne ne correspond à ta recherche."
+		or filtre and "Personne n'a ce métier (parmi les membres qui ont GuildUpSMB)."
+		or "Personne pour l'instant.")
 	MajDetail(choisie)
-	fen.bas:SetText(("|cff33dd55%d en ligne|r"):format(enLigne))
+	fen.bas:SetText(("|cff6fd08c%d en ligne|r · ouvre chacun de tes métiers une fois pour partager tes recettes"):format(enLigne))
 end
 
--- Page « Registre » de la fenêtre « Artisanat de la guilde » (GuildUp_Carnet.lua la crée et
--- l'héberge ; même cadre à portrait, 720 de large)
-local function CreerPage(f)
+-- Onglet « Registre » : créé par la page Artisanat (GuildUp_Carnet.lua) dans son cadre, sous les onglets
+local function CreerPage(parent)
+	local f = CreateFrame("Frame", nil, parent)
+	f:SetAllPoints()
 	fen = f
-	local page = CreateFrame("Frame", nil, f)
-	page:SetAllPoints(f)
 
-	-- filtres par métier
+	-- à droite des onglets : membres en ligne et astuce
+	f.bas = UI.Texte(f, "GameFontHighlightSmall", C.gris)
+	f.bas:SetPoint("TOPRIGHT", f, "TOPRIGHT", -MARGE, -24)
+	f.bas:SetJustifyH("RIGHT")
+
+	-- filtres par métier : « Tous », puis une icône par métier
 	f.filtres = {}
-	local tous = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-	tous:SetSize(52, 22)
-	tous:SetPoint("TOPLEFT", f, "TOPLEFT", 66, -30)
-	tous:SetText("Tous")
-	tous:SetScript("OnClick", function() filtre = nil; MajFenetre() end)
-	f.tous = tous
-	local x = 126
+	f.tous = UI.Bouton(f, "Tous", "fantome", 56, 32)
+	f.tous:SetPoint("TOPLEFT", f, "TOPLEFT", MARGE, -54)
+	f.tous:SetScript("OnClick", function() filtre = nil; fen.membres:Haut(); MajFenetre() end)
+	UI.Infobulle(f.tous, "Tous les métiers", "Montre tous les membres, quel que soit leur métier.")
+	local x = MARGE + 62
 	for _, m in ipairs(METIERS) do
 		if m.existe or not (GetSpellInfo or (C_Spell and C_Spell.GetSpellInfo)) then
-			local bt = CreateFrame("Button", nil, page)
-			bt:SetSize(24, 24)
-			bt:SetPoint("TOPLEFT", f, "TOPLEFT", x, -29)
+			local bt = CreateFrame("Button", nil, f, "BackdropTemplate")
+			UI.Habiller(bt, C.carte, C.bord)
+			bt:SetSize(32, 32)
+			bt:SetPoint("TOPLEFT", f, "TOPLEFT", x, -54)
 			bt.icone = bt:CreateTexture(nil, "ARTWORK")
-			bt.icone:SetAllPoints(bt)
+			bt.icone:SetPoint("TOPLEFT", bt, "TOPLEFT", 3, -3)
+			bt.icone:SetPoint("BOTTOMRIGHT", bt, "BOTTOMRIGHT", -3, 3)
 			bt.icone:SetTexture(m.icone)
-			bt.icone:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-			bt.halo = bt:CreateTexture(nil, "OVERLAY")
-			bt.halo:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
-			bt.halo:SetBlendMode("ADD")
-			bt.halo:SetVertexColor(1, 0.82, 0)
-			bt.halo:SetPoint("CENTER", bt, "CENTER", 0, 0)
-			bt.halo:SetSize(46, 46)
-			bt:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+			bt.icone:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+			UI.Survol(bt, 0.12)
+			if ns.SonsSurBoutons then ns.SonsSurBoutons(bt) end
 			bt:SetScript("OnClick", function()
 				filtre = (filtre ~= m.code) and m.code or nil
+				fen.membres:Haut()
 				MajFenetre()
 			end)
 			bt:SetScript("OnEnter", function(self)
 				GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
 				GameTooltip:SetText(NomMetier(m))
-				GameTooltip:AddLine("Clic : voir seulement ce métier, classé par niveau.", 1, 1, 1, true)
+				GameTooltip:AddLine(filtre == m.code and "Clic : revenir à tous les métiers."
+					or "Clic : voir seulement ce métier, classé par niveau.", 1, 1, 1, true)
 				GameTooltip:Show()
 			end)
 			bt:SetScript("OnLeave", function() GameTooltip:Hide() end)
 			f.filtres[m.code] = bt
-			x = x + 28
+			x = x + 36
 		end
 	end
+	f.nomFiltre = UI.Texte(f, "GameFontHighlightSmall", C.gris)
+	f.nomFiltre:SetPoint("LEFT", f, "TOPLEFT", x + 6, -70)
+	f.nomFiltre:SetPoint("RIGHT", f, "TOPRIGHT", -MARGE, -70)
 
-	-- recherche (joueur ou recette)
-	local okR, boite = pcall(CreateFrame, "EditBox", "GuildUpMetiersRecherche", page, "SearchBoxTemplate")
-	if not okR then
-		boite = CreateFrame("EditBox", "GuildUpMetiersRecherche", page, "InputBoxTemplate")
-	end
-	boite:SetSize(230, 20)
-	boite:SetPoint("TOPLEFT", f, "TOPLEFT", 74, -60)
-	boite:SetAutoFocus(false)
-	boite:HookScript("OnTextChanged", function(self)
-		recherche = Simplifier(strtrim(self:GetText() or ""))
-		PlanifierMaj(0.15)
-	end)
-	boite:HookScript("OnEscapePressed", function(self) self:ClearFocus() end)
-	f.recherche = boite
-	if boite.Instructions then boite.Instructions:SetText("Joueur ou recette (ex. « flacon »)") end
-	boite:HookScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-		GameTooltip:SetText("Cherche un joueur ou une recette (ex. « flacon »)")
-		GameTooltip:Show()
-	end)
-	boite:HookScript("OnLeave", function() GameTooltip:Hide() end)
-	-- « Recettes spéciales » : cache les recettes d'entraîneur, garde celles des plans trouvés
-	local sp = CreateFrame("CheckButton", nil, page, "UICheckButtonTemplate")
-	sp:SetSize(22, 22)
-	sp:SetPoint("LEFT", boite, "RIGHT", 14, 0)
-	local tsp = sp.Text or sp.text
-	if not tsp then
-		tsp = sp:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-		tsp:SetPoint("LEFT", sp, "RIGHT", 1, 0)
-	end
-	tsp:SetFontObject("GameFontHighlightSmall")
-	tsp:SetText("Voir uniquement les recettes spéciales")
-	sp:SetScript("OnClick", function(self)
-		Base().speciales = self:GetChecked() and true or nil
+	-- recherche (joueur ou recette), recettes spéciales, Actualiser
+	f.actualiser = UI.Bouton(f, "Actualiser", "fantome", 100, 32)
+	f.actualiser:SetPoint("TOPRIGHT", f, "TOPRIGHT", -MARGE, -94)
+	local dernierQ = 0
+	f.actualiser:SetScript("OnClick", function()
+		LireNiveaux()
+		DemanderRoster()
+		if GetTime() - dernierQ > 10 then
+			dernierQ = GetTime()
+			Envoyer("Q")
+		end
 		MajFenetre()
 	end)
-	sp:SetScript("OnEnter", function(self)
+	UI.Infobulle(f.actualiser, "Actualiser", "Relit tes métiers et la liste de guilde, et redemande les fiches à la guilde (une fois toutes les 10 secondes).")
+	-- « Recettes spéciales » : cache les recettes d'entraîneur, garde celles des plans trouvés
+	f.speciales = UI.Case(f, "Seulement les recettes spéciales", function(oui)
+		Base().speciales = oui or nil
+		fen.membres:Haut()
+		MajFenetre()
+	end)
+	f.speciales:SetPoint("RIGHT", f.actualiser, "LEFT", -16, 0)
+	f.speciales:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
 		GameTooltip:SetText("Recettes spéciales")
 		GameTooltip:AddLine("Cache les recettes apprises chez l'entraîneur : il ne reste que celles apprises avec un plan (butin, vendeur, quête…).", 1, 1, 1, true)
 		GameTooltip:AddLine("D'après les données du jeu : toutes les recettes qu'un objet « Recette » / « Plans » apprend.", 0.6, 0.6, 0.6, true)
 		GameTooltip:Show()
 	end)
-	sp:SetScript("OnLeave", function() GameTooltip:Hide() end)
-	f.speciales = sp
+	f.speciales:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	f.recherche = UI.Champ(f, 380, "Joueur ou recette (ex. « flacon »)", 32)
+	f.recherche:SetPoint("TOPLEFT", f, "TOPLEFT", MARGE, -94)
+	f.recherche:SetPoint("RIGHT", f.speciales, "LEFT", -16, 0)
+	f.recherche.SurTexte = function(t)
+		recherche = Simplifier(strtrim(t or ""))
+		fen.membres:Haut()
+		MajBientot(0.15)
+	end
 
-	-- colonne de gauche : membres, sur le fond de la liste des recettes du jeu
-	local fondG = page:CreateTexture(nil, "BACKGROUND")
-	fondG:SetPoint("TOPLEFT", f, "TOPLEFT", 8, HAUT_ENCART - 4)
-	fondG:SetPoint("BOTTOMRIGHT", f, "BOTTOMLEFT", LARGEUR_GAUCHE + 2, 36)
-	if not PoserAtlas(fondG, "Professions-background-summarylist") then fondG:SetColorTexture(0, 0, 0, 0.25) end
-	-- colonne de droite : fond de recette du métier (changé selon la fiche affichée)
-	f.fondD = page:CreateTexture(nil, "BACKGROUND")
-	f.fondD:SetPoint("TOPLEFT", f, "TOPLEFT", LARGEUR_GAUCHE + 10, HAUT_ENCART - 4)
-	f.fondD:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 36)
-	if not PoserAtlas(f.fondD, "Professions-Recipe-Background") then f.fondD:SetColorTexture(0, 0, 0, 0.2) end
-	f.page = page
-
-	local defileG = CreateFrame("ScrollFrame", nil, page, "UIPanelScrollFrameTemplate")
-	defileG:SetPoint("TOPLEFT", f, "TOPLEFT", 12, HAUT_ENCART - 8)
-	defileG:SetPoint("BOTTOMRIGHT", f, "BOTTOMLEFT", 12 + LARGEUR_LIGNE, 38)
-	f.contenuG = CreateFrame("Frame", nil, defileG)
-	f.contenuG:SetSize(LARGEUR_LIGNE, 10)
-	defileG:SetScrollChild(f.contenuG)
-	f.videG = page:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-	f.videG:SetPoint("TOP", defileG, "TOP", 0, -40)
-	f.videG:SetWidth(LARGEUR_LIGNE - 20)
-
-	-- séparateur
-	local sep = page:CreateTexture(nil, "ARTWORK")
-	sep:SetColorTexture(1, 0.82, 0, 0.3)
-	sep:SetWidth(1)
-	sep:SetPoint("TOPLEFT", f, "TOPLEFT", LARGEUR_GAUCHE + 6, HAUT_ENCART - 8)
-	sep:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", LARGEUR_GAUCHE + 6, 38)
+	-- colonne de gauche : les membres
+	f.membres = UI.Liste(f)
+	f.membres:SetPoint("TOPLEFT", f, "TOPLEFT", MARGE, HAUT_CORPS)
+	f.membres:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", MARGE, MARGE)
+	f.membres:SetWidth(LARGEUR_MEMBRES + 8)
+	f.videG = UI.Texte(f, "GameFontHighlight", C.gris)
+	f.videG:SetPoint("TOPLEFT", f.membres, "TOPLEFT", 4, -8)
+	f.videG:SetWidth(LARGEUR_MEMBRES - 8)
+	f.videG:SetWordWrap(true)
 
 	-- colonne de droite : fiche du membre choisi
-	f.dNom = page:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	f.dNom:SetPoint("TOPLEFT", f, "TOPLEFT", LARGEUR_GAUCHE + 16, HAUT_ENCART - 12)
-	f.dNom:SetJustifyH("LEFT")
-	f.dEtat = page:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	f.dEtat:SetPoint("TOPLEFT", f.dNom, "BOTTOMLEFT", 0, -4)
-	f.dEtat:SetJustifyH("LEFT")
-	f.mp = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-	f.mp:SetSize(90, 22)
-	f.mp:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, HAUT_ENCART - 12)
-	f.mp:SetText("Chuchoter")
-	f.mp:SetScript("OnClick", function(self)
-		if self.cle then Chuchoter(self.cle, self.e) end
-	end)
+	local d = UI.Cadre(f, C.carte, C.bord)
+	d:SetPoint("TOPLEFT", f, "TOPLEFT", MARGE + LARGEUR_MEMBRES + 18, HAUT_CORPS)
+	d:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -MARGE, MARGE)
+	f.mp = UI.Bouton(d, "Chuchoter", "fantome", 96, 26)
+	f.mp:SetPoint("TOPRIGHT", d, "TOPRIGHT", -14, -14)
 	f.mp:SetMotionScriptsWhileDisabled(true)
+	f.mp:SetScript("OnClick", function(self)
+		if self.cle then UI.Chuchoter(self.cle, self.e and self.e.nom) end
+	end)
 	f.mp:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
 		if self.cle == MaCle() then
@@ -1541,67 +1498,42 @@ local function CreerPage(f)
 		GameTooltip:Show()
 	end)
 	f.mp:SetScript("OnLeave", function() GameTooltip:Hide() end)
-	local filetD = page:CreateTexture(nil, "ARTWORK")
-	filetD:SetColorTexture(1, 0.82, 0, 0.3)
-	filetD:SetHeight(1)
-	filetD:SetPoint("TOPLEFT", f, "TOPLEFT", LARGEUR_GAUCHE + 14, HAUT_ENCART - 50)
-	filetD:SetPoint("TOPRIGHT", f, "TOPRIGHT", -12, HAUT_ENCART - 50)
-
-	local defileD = CreateFrame("ScrollFrame", nil, page, "UIPanelScrollFrameTemplate")
-	defileD:SetPoint("TOPLEFT", f, "TOPLEFT", LARGEUR_GAUCHE + 16, HAUT_ENCART - 58)
-	defileD:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -32, 38)
-	f.contenuD = CreateFrame("Frame", nil, defileD)
-	f.contenuD:SetSize(LARGEUR_DROITE, 10)
-	defileD:SetScrollChild(f.contenuD)
-	f.videD = page:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-	f.videD:SetPoint("TOP", defileD, "TOP", 0, -40)
+	f.dNom = UI.Texte(d, "GameFontNormalLarge")
+	f.dNom:SetPoint("TOPLEFT", d, "TOPLEFT", 16, -14)
+	f.dNom:SetPoint("RIGHT", f.mp, "LEFT", -10, 0)
+	f.dEtat = UI.Texte(d, "GameFontHighlightSmall", C.gris)
+	f.dEtat:SetPoint("TOPLEFT", f.dNom, "BOTTOMLEFT", 0, -5)
+	f.dEtat:SetPoint("RIGHT", f.mp, "LEFT", -10, 0)
+	f.detail = UI.Liste(d)
+	f.detail:SetPoint("TOPLEFT", d, "TOPLEFT", 14, -56)
+	f.detail:SetPoint("BOTTOMRIGHT", d, "BOTTOMRIGHT", -6, 10)
+	f.videD = UI.Texte(d, "GameFontHighlight", C.gris)
+	f.videD:SetPoint("TOPLEFT", d, "TOPLEFT", 16, -18)
 	f.videD:SetText("Choisis un membre à gauche.")
 
-	-- bas : compteur + actualiser
-	local filetB = page:CreateTexture(nil, "ARTWORK")
-	filetB:SetColorTexture(1, 0.82, 0, 0.3)
-	filetB:SetHeight(1)
-	filetB:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 8, 34)
-	filetB:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 34)
-	f.bas = page:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	f.bas:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 14)
-	local astuce = page:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	astuce:SetPoint("BOTTOM", f, "BOTTOM", 20, 14)
-	astuce:SetText("Ouvre chacun de tes métiers une fois pour partager tes recettes.")
-	local actualiser = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-	actualiser:SetSize(100, 22)
-	actualiser:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -12, 9)
-	actualiser:SetText("Actualiser")
-	local dernierQ = 0
-	actualiser:SetScript("OnClick", function()
-		LireNiveaux()
-		DemanderRoster()
-		if GetTime() - dernierQ > 10 then
-			dernierQ = GetTime()
-			Envoyer("Q")
-		end
-		MajFenetre()
-	end)
-
-	-- liste de guilde rafraîchie de temps en temps tant que la fenêtre est ouverte
+	-- liste de guilde relue toutes les 30 s tant que l'onglet est affiché
 	local attenteRoster = 0
-	page:SetScript("OnUpdate", function(_, ecoule)
+	f:SetScript("OnUpdate", function(_, ecoule)
 		attenteRoster = attenteRoster + ecoule
 		if attenteRoster > 30 then
 			attenteRoster = 0
 			DemanderRoster()
 		end
 	end)
-	page:SetScript("OnShow", function()
-		LireNiveaux()
+	-- à chaque affichage (et tout de suite : l'onglet est créé déjà affiché), relire mes métiers et la
+	-- liste de guilde
+	f:SetScript("OnShow", function()
+		pcall(LireNiveaux)
 		DemanderRoster()
-		MajFenetre()
 	end)
-	return page
+	pcall(LireNiveaux)
+	DemanderRoster()
+	f.Maj = MajFenetre
+	return f
 end
 ns.CreerPageRegistre = CreerPage
 
--- Bouton « Métiers » du volet, /smb metiers : la fenêtre commune, onglet Registre
+-- Bouton « Métiers » du volet, /smb metiers : la page Artisanat, onglet Registre (re-clic : fermée)
 ns.BasculerMetiers = function()
 	if ns.BasculerArtisanat then ns.BasculerArtisanat(1) end
 end

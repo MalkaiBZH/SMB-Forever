@@ -3,11 +3,11 @@
 -- Pages :
 --   Accueil : ce qui se passe dans la guilde (membres sur ma carte, groupes ouverts, appels à l'aide,
 --             demandes de dons, besoins que je sais fabriquer, avancement d'un projet).
---   Groupes (GuildUp_GroupesFenetre.lua), Quêtes en commun (GuildUp_Quetes.lua), Dons
---   (GuildUp_Echanges.lua + GuildUp_Besoins.lua) et Options (GuildUp_Options.lua) : pages fournies par
---   leur module (ns.AjouterPage), avec le kit d'interface ns.UI (GuildUp_Style.lua).
---   Les autres entrées du menu ouvrent encore leur ancienne fenêtre (Artisanat, Mes carnets) en
---   attendant leur page ; Événements ouvre le calendrier du jeu.
+--   Les autres sections sont des pages fournies par leur module (ns.AjouterPage), avec le kit
+--   d'interface ns.UI (GuildUp_Style.lua) : Groupes (GuildUp_GroupesFenetre.lua), Quêtes en commun
+--   (GuildUp_Quetes.lua), Artisanat (GuildUp_Carnet.lua, onglets Registre de GuildUp_Metiers.lua, Items,
+--   Projets de GuildUp_Projets.lua), Mes carnets (GuildUp_Carnet.lua), Dons (GuildUp_Echanges.lua +
+--   GuildUp_Besoins.lua), Options (GuildUp_Options.lua). Événements ouvre le calendrier du jeu.
 -- Fournit ns.NouveautesGuilde() (pastille du médaillon), ns.BasculerInterface(), ns.OuvrirInterface(page),
 -- ns.MajInterface(). Réglages : db.interface = { x, y } (position). Aucun message réseau.
 
