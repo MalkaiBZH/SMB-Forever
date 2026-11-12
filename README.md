@@ -12,6 +12,19 @@ l'addon voient et partagent ces informations**.
 2. Lancer le jeu (ou `/reload`) et vérifier que « GuildUpSMB » est coché dans la liste des addons.
 3. Taper `/smb` pour ouvrir les options, ou cliquer sur le bouton de la mini-carte.
 
+### Mise à jour automatique (Windows)
+
+`GuildUpSMB-MiseAJour.exe` installe et met à jour l'addon depuis la branche `main` de ce dépôt :
+
+- au lancement, il trouve le dossier `_forever_` du jeu (sinon il le demande), compare le dernier commit
+  à celui installé et ne télécharge que s'il a changé (fichiers ajoutés, modifiés et supprimés) ;
+- la case « Vérifier les mises à jour à chaque démarrage de Windows » le relance sans fenêtre à
+  l'ouverture de session : une bulle signale une nouvelle version ;
+- en jeu, faire `/reload` après une mise à jour.
+
+Construction : `outils\MiseAJour\construire.bat` (compilateur C# fourni avec Windows, rien à installer).
+Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
+
 ## Fonctionnalités
 
 - **Portraits** : le médaillon des membres de la guilde (race, classe et sexe reconnus par le jeu,
