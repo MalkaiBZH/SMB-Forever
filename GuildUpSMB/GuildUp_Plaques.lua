@@ -111,8 +111,12 @@ local function PortraitUnite(unit)
 end
 
 -- chemin du médaillon à afficher pour une unité, ou nil (réglage coupé, pas de portrait)
+-- Pas de portrait quand je suis en groupe / en raid ou en combat : la bannière habituelle revient
+-- (rafraîchi par GROUP_ROSTER_UPDATE et PLAYER_REGEN_DISABLED / PLAYER_REGEN_ENABLED)
 local function MedaillonUnite(unit)
 	if db.medaillons == false then return nil end
+	if (IsInGroup and IsInGroup()) or (IsInRaid and IsInRaid()) then return nil end
+	if UnitAffectingCombat("player") then return nil end
 	local nom = PortraitUnite(unit)
 	return nom and (MEDIA .. "portraits\\" .. nom .. ".tga") or nil
 end
@@ -1220,6 +1224,7 @@ ns.ActiverPlaques = function()
 		"PLAYER_SPECIALIZATION_CHANGED", "ACTIVE_TALENT_GROUP_CHANGED", "CVAR_UPDATE",
 		"PLAYER_FLAGS_CHANGED", "UNIT_FLAGS", "UNIT_HEALTH", "UNIT_MAXHEALTH",
 		"UNIT_SPELLCAST_START", "UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_EMPOWER_START",
+		"PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", -- entrée / sortie de combat : portraits
 	}) do
 		pcall(evPlaques.RegisterEvent, evPlaques, e) -- certains évènements peuvent ne pas exister sur ce client
 	end
@@ -1275,7 +1280,7 @@ evPlaques:SetScript("OnEvent", function(self, event, arg1)
 			MajCible()
 		end
 	else
-		-- GUILD_ROSTER_UPDATE, CVAR_UPDATE, PLAYER_FLAGS_CHANGED, PLAYER_GUILD_UPDATE… : regroupés
+		-- GUILD_ROSTER_UPDATE, CVAR_UPDATE, PLAYER_FLAGS_CHANGED, PLAYER_GUILD_UPDATE, PLAYER_REGEN_… : regroupés
 		PlanifierRafraichissement()
 	end
 end)
