@@ -1,7 +1,7 @@
 -- GuildUpSMB : artisanat et carnet de craft, dans la fenêtre GuildUpSMB (kit ns.UI, GuildUp_Style.lua).
 -- Pages fournies ici (ns.AjouterPage) :
 --   « artisanat » : onglets Registre (GuildUp_Metiers.lua), Items (ici : tous les objets fabricables,
---     catégories et sous-catégories, recherche, tri ; « Besoin », « Ajouter » à une liste ou à un projet)
+--     catégories et sous-catégories, recherche, filtres « Pour ma classe » et « Jusqu'à mon niveau », tri ; « Besoin », « Ajouter » à une liste ou à un projet)
 --     et Projets de guilde (GuildUp_Projets.lua).
 --   « carnets » (Mes carnets) : mes listes à gauche ; à droite la liste de courses de la liste choisie,
 --     qui calcule tout ce qu'il faut, sous-recettes comprises, compare avec les sacs et la banque, et
@@ -2171,7 +2171,69 @@ local function CreerLigneItem(parent)
 	return b
 end
 
--- Onglet Items : la liste (150 objets au plus) selon la catégorie, la recherche et le tri
+-- Filtres « Pour ma classe » et « Jusqu'à mon niveau » (db.itemsClasse, db.itemsNiveau)
+-- Armes (classe d'objet 2) : sous-classes que la classe sait manier (règles de Vanilla).
+--   0 hache 1M, 1 hache 2M, 2 arc, 3 fusil, 4 masse 1M, 5 masse 2M, 6 arme d'hast, 7 épée 1M,
+--   8 épée 2M, 10 bâton, 13 arme de pugilat, 15 dague, 16 arme de jet, 18 arbalète, 19 baguette
+local ARMES_CLASSE = {
+	WARRIOR = { [0] = true, [1] = true, [2] = true, [3] = true, [4] = true, [5] = true, [6] = true, [7] = true, [8] = true, [10] = true, [13] = true, [15] = true, [16] = true, [18] = true },
+	PALADIN = { [0] = true, [1] = true, [4] = true, [5] = true, [6] = true, [7] = true, [8] = true },
+	HUNTER  = { [0] = true, [1] = true, [2] = true, [3] = true, [6] = true, [7] = true, [8] = true, [10] = true, [13] = true, [15] = true, [16] = true, [18] = true },
+	ROGUE   = { [2] = true, [3] = true, [4] = true, [7] = true, [13] = true, [15] = true, [16] = true, [18] = true },
+	PRIEST  = { [4] = true, [10] = true, [15] = true, [19] = true },
+	SHAMAN  = { [0] = true, [1] = true, [4] = true, [5] = true, [10] = true, [13] = true, [15] = true },
+	MAGE    = { [7] = true, [10] = true, [15] = true, [19] = true },
+	WARLOCK = { [7] = true, [10] = true, [15] = true, [19] = true },
+	DRUID   = { [4] = true, [5] = true, [10] = true, [13] = true, [15] = true },
+}
+-- Armures (classe d'objet 4) : type principal (1 tissu, 2 cuir, 3 mailles, 4 plaques) avant et à
+-- partir du niveau 40, boucliers (6) et reliques (7 libram, 8 idole, 9 totem)
+local ARMURE_CLASSE = {
+	WARRIOR = { 3, 4, bouclier = true }, PALADIN = { 3, 4, bouclier = true, relique = 7 },
+	HUNTER = { 2, 3 }, SHAMAN = { 2, 3, bouclier = true, relique = 9 },
+	ROGUE = { 2, 2 }, DRUID = { 2, 2, relique = 8 },
+	PRIEST = { 1, 1 }, MAGE = { 1, 1 }, WARLOCK = { 1, 1 },
+}
+local cacheEquipement = {} -- [objet] = { classe, sous-classe, emplacement } ou false
+local function PourMaClasse(id)
+	local e = cacheEquipement[id]
+	if e == nil then
+		e = false
+		if InfoInstant then
+			local ok, _, _, _, emplacement, _, classe, sous = pcall(InfoInstant, id)
+			if ok and classe then e = { classe, sous, emplacement } end
+		end
+		cacheEquipement[id] = e
+	end
+	if not e then return true end
+	local _, maClasse = UnitClass("player")
+	local classe, sous, emplacement = e[1], e[2], e[3]
+	if classe == 2 then
+		local armes = ARMES_CLASSE[maClasse or ""]
+		return not armes or armes[sous] == true
+	elseif classe == 4 then
+		local a = ARMURE_CLASSE[maClasse or ""]
+		if not a then return true end
+		if sous == 0 or emplacement == "INVTYPE_CLOAK" then return true end -- bijoux, capes (tissu pour tous)
+		if sous == 6 then return a.bouclier == true end
+		if sous == 7 or sous == 8 or sous == 9 then return a.relique == sous end
+		if sous >= 1 and sous <= 4 then
+			return sous == (((UnitLevel("player") or 1) >= 40) and a[2] or a[1])
+		end
+	end
+	return true -- consommables, artisanat, sacs… : pas concernés
+end
+-- niveau requis connu (objet en cache) et plus haut que le mien ; inconnu : gardé (demandé au serveur)
+local function TropHaut(id)
+	local nom, _, _, _, requis = InfoObjet(id)
+	if not nom then
+		if ns.Precharger then ns.Precharger(id) end
+		return false
+	end
+	return (requis or 0) > (UnitLevel("player") or 1)
+end
+
+-- Onglet Items : la liste (150 objets au plus) selon la catégorie, la recherche, les filtres et le tri
 local function RendreItems()
 	if not page then return end
 	local cat = CATEGORIES_ITEMS[categorieItems]
@@ -2184,6 +2246,9 @@ local function RendreItems()
 		else garde = true end
 		if garde and sousCategorie then garde = SousClasse(o[1]) == sousCategorie end
 		if garde and rechercheItems ~= "" then garde = o[4]:find(rechercheItems, 1, true) ~= nil end
+		local db = ns.DB and ns.DB()
+		if garde and db and db.itemsClasse then garde = PourMaClasse(o[1]) end
+		if garde and db and db.itemsNiveau then garde = not TropHaut(o[1]) end
 		if garde then
 			total = total + 1
 			res[#res + 1] = o
@@ -2416,6 +2481,27 @@ local function CreerPageItems(parent)
 	end
 	p.compte = UI.Texte(p, "GameFontHighlightSmall", C.gris)
 	p.compte:SetPoint("TOPLEFT", p, "TOPLEFT", x0 + 2, -96)
+	-- filtres pour moi : ma classe (armes et armures que je peux porter), mon niveau (mémorisés)
+	local function Filtre(cle)
+		return function(oui)
+			local db = ns.DB and ns.DB()
+			if db then db[cle] = oui or nil end
+			p.liste:Haut()
+			RendreItems()
+		end
+	end
+	p.niveau = UI.Case(p, "Jusqu'à mon niveau", Filtre("itemsNiveau"))
+	p.niveau:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -92)
+	UI.Infobulle(p.niveau, "Jusqu'à mon niveau", "Seulement les objets dont le niveau requis ne dépasse pas le tien.")
+	p.classe = UI.Case(p, "Pour ma classe", Filtre("itemsClasse"))
+	p.classe:SetPoint("RIGHT", p.niveau, "LEFT", -18, 0)
+	UI.Infobulle(p.classe, "Pour ma classe",
+		"Armes : celles que ta classe sait manier. Armures : ton type d'armure (plaques ou mailles à partir du niveau 40 pour les classes concernées), plus les capes, bijoux, boucliers et reliques de ta classe. Les autres objets ne sont pas filtrés.")
+	do
+		local db = ns.DB and ns.DB()
+		p.classe:Poser(db and db.itemsClasse)
+		p.niveau:Poser(db and db.itemsNiveau)
+	end
 	p.liste = UI.Liste(p)
 	p.liste:SetPoint("TOPLEFT", p, "TOPLEFT", x0, -116)
 	p.liste:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE + 6, MARGE)

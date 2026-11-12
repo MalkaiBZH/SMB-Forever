@@ -88,8 +88,11 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.6.0"] = {
+		"|cffffd100Artisanat > Items|r : deux filtres, « Pour ma classe » (armes que tu sais manier, ton type d'armure, capes, bijoux, boucliers et reliques de ta classe) et « Jusqu'à mon niveau ». Ils sont gardés d'une session à l'autre.",
+	},
 	["2.5.1"] = {
 		"Boutons dorés plus lisibles (texte net, sans ombre), croix de fermeture plates et dorées.",
 		"L'addon s'appelle |cffffd100SMB Forever|r partout : fenêtres, bulles, messages et liste des addons du jeu.",

@@ -67,6 +67,7 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
 - **Quêtes en commun** : les quêtes que d'autres membres font aussi, avec « Créer un groupe ».
 - **Artisanat** :
   - *Registre* des métiers et recettes de chaque membre, commande en un clic ;
+  - *Items* : tous les objets fabricables, par catégorie, avec les filtres « Pour ma classe » et « Jusqu'à mon niveau » ;
   - *Carnet de craft* et liste de courses (sous-recettes, sacs et banque, provenance des composants) ;
   - *Encyclopédie* des objets (Alt + clic sur un objet) ;
   - *Dons* (un hôtel des ventes gratuit), *Demandes* et *Besoins* ;

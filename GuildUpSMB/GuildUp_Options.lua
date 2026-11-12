@@ -23,7 +23,7 @@ local ToutRafraichir, SurActivation, MajBarre, Bordures, DeplacerAuras, PlacerIn
 -- besoins, projets, identité, cvarsAvant… sont gardées)
 local REGLAGES_HORS_DEFAUT = {
 	"notifs", "bouton", "barre", "interface", "annoncesGuilde", "emoteGU", "voletNotifs", "coursesCompact",
-	"afficherDebug", "tousNiveaux", "styleJeu", "rappelGroupe", "portee", "rolesPerso",
+	"afficherDebug", "tousNiveaux", "itemsClasse", "itemsNiveau", "styleJeu", "rappelGroupe", "portee", "rolesPerso",
 }
 
 -- Bouton « Réinitialiser » et /smb reset : seulement les réglages
