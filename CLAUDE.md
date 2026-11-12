@@ -55,7 +55,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   (`GuildUp_Membres.lua`), Groupes (`GuildUp_GroupesFenetre.lua`), Quêtes en commun (`GuildUp_Quetes.lua`), Dons (`GuildUp_Echanges.lua` +
   `GuildUp_Besoins.lua`), Artisanat (`GuildUp_Carnet.lua` ; onglets Registre dans `GuildUp_Metiers.lua`, Items dans
   `GuildUp_Carnet.lua`, Projets dans `GuildUp_Projets.lua`), Mes carnets (`GuildUp_Carnet.lua`), Options
-  (`GuildUp_Options.lua`). Les anciennes fonctions `ns.Ouvrir*` / `ns.Basculer*` ouvrent ces pages
+  (`GuildUp_Options.lua`), Événements (`GuildUp_Evenements.lua`). Les anciennes fonctions `ns.Ouvrir*` / `ns.Basculer*` ouvrent ces pages
   (`ns.OuvrirInterface(page, ...)`). L'encyclopédie, la mini-liste du carnet et l'aperçu 3D restent des fenêtres à part.
 - Groupes : `GuildUp_Catalogue.lua` (contenus de la recherche de groupe), `GuildUp_Groupes.lua` (protocole, état partagé `ns.Groupes.etat`, actions), `GuildUp_GroupesFenetre.lua` (page Groupes de la fenêtre GuildUpSMB).
 - `GuildUp_Reperes.lua` : repères des membres de la même carte à l'écran (HUD : au-dessus de la tête, en haut, ou au bord), calculés à partir des

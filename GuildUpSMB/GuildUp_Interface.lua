@@ -11,7 +11,7 @@
 --   (GuildUp_GroupesFenetre.lua), Quêtes en commun (GuildUp_Quetes.lua), Artisanat (GuildUp_Carnet.lua,
 --   onglets Registre de GuildUp_Metiers.lua, Items, Projets de GuildUp_Projets.lua), Mes carnets
 --   (GuildUp_Carnet.lua), Dons (GuildUp_Echanges.lua + GuildUp_Besoins.lua), Options
---   (GuildUp_Options.lua). Événements ouvre le calendrier du jeu.
+--   (GuildUp_Options.lua), Événements (GuildUp_Evenements.lua).
 -- Fournit ns.NouveautesGuilde() (pastille du médaillon), ns.BasculerInterface(), ns.OuvrirInterface(page),
 -- ns.MajInterface(), ns.DistanceMembre(cle) (distance d'un membre sur ma carte). Réglages :
 -- db.interface = { x, y } (position). Aucun message réseau.
@@ -72,8 +72,7 @@ local SECTIONS = {
 	{ id = "dons", nom = "Dons", icone = "Interface\\Icons\\INV_Misc_Gift_01",
 		ouvrir = function() if ns.OuvrirEchanges then ns.OuvrirEchanges(nil, 1) end end,
 		badge = function() return ns.NombreDemandesDons and ns.NombreDemandesDons() or 0 end },
-	{ id = "evenements", nom = "Événements", icone = "Interface\\Icons\\INV_Misc_PocketWatch_01",
-		ouvrir = function() if ns.BasculerEvenements then ns.BasculerEvenements() end end },
+	{ id = "evenements", nom = "Événements", icone = "Interface\\Icons\\INV_Misc_PocketWatch_01" },
 }
 local OPTIONS = { id = "options", nom = "Options", icone = "Interface\\Icons\\Trade_Engineering",
 	ouvrir = function() if ns.BasculerOptions then ns.BasculerOptions() end end }
@@ -241,8 +240,8 @@ local function CreerAccueil(parent)
 	-- Groupes ouverts
 	local groupes = CarteAccueil(p, "Groupes ouverts")
 	groupes:SetPoint("TOPLEFT", zone, "BOTTOMLEFT", 0, -ECART)
-	groupes:SetSize(demi, 226)
-	groupes.lignes = { LigneCarte(groupes, 1), LigneCarte(groupes, 2), LigneCarte(groupes, 3) }
+	groupes:SetSize(demi, 182)
+	groupes.lignes = { LigneCarte(groupes, 1), LigneCarte(groupes, 2) }
 	groupes.creer = Bouton(groupes, "Voir les groupes", "fantome", 120, 22)
 	groupes.creer:SetPoint("BOTTOMLEFT", groupes, "BOTTOMLEFT", 14, 10)
 	groupes.creer:SetScript("OnClick", function() Aller("groupes") end)
@@ -250,10 +249,10 @@ local function CreerAccueil(parent)
 	-- Appels à l'aide
 	local aide = CarteAccueil(p, "Appels à l'aide")
 	aide:SetPoint("TOPLEFT", groupes, "TOPRIGHT", ECART, 0)
-	aide:SetSize(demi, 226)
+	aide:SetSize(demi, 182)
 	aide.titre:SetTextColor(unpack(C.aide))
 	aide:SetBackdropBorderColor(0.43, 0.2, 0.14, 1)
-	aide.lignes = { LigneCarte(aide, 1), LigneCarte(aide, 2), LigneCarte(aide, 3) }
+	aide.lignes = { LigneCarte(aide, 1), LigneCarte(aide, 2) }
 	aide.note = Texte(aide, "GameFontDisableSmall")
 	aide.note:SetPoint("BOTTOMLEFT", aide, "BOTTOMLEFT", 14, 12)
 	aide.note:SetText("Seuls les membres qui ont le niveau reçoivent l'appel.")
@@ -261,7 +260,7 @@ local function CreerAccueil(parent)
 	-- Dons : demandes reçues
 	local dons = CarteAccueil(p, "Dons")
 	dons:SetPoint("TOPLEFT", groupes, "BOTTOMLEFT", 0, -ECART)
-	dons:SetSize(demi, 198)
+	dons:SetSize(demi, 160)
 	dons.lignes = { LigneCarte(dons, 1), LigneCarte(dons, 2) }
 	dons.parcourir = Bouton(dons, "Parcourir les dons", "fantome", 130, 22)
 	dons.parcourir:SetPoint("BOTTOMLEFT", dons, "BOTTOMLEFT", 14, 10)
@@ -270,7 +269,7 @@ local function CreerAccueil(parent)
 	-- Tu peux aider : besoins que je sais fabriquer, avancement du dernier projet
 	local aider = CarteAccueil(p, "Tu peux aider")
 	aider:SetPoint("TOPLEFT", dons, "TOPRIGHT", ECART, 0)
-	aider:SetSize(demi, 198)
+	aider:SetSize(demi, 160)
 	aider.lignes = { LigneCarte(aider, 1), LigneCarte(aider, 2) }
 	aider.projet = Texte(aider, "GameFontHighlightSmall", C.texte)
 	aider.projet:SetPoint("BOTTOMLEFT", aider, "BOTTOMLEFT", 14, 24)
@@ -290,6 +289,17 @@ local function CreerAccueil(parent)
 	aider.projetBouton = CreateFrame("Button", nil, aider)
 	aider.projetBouton:SetPoint("TOPLEFT", aider.projet, "TOPLEFT", 0, 4)
 	aider.projetBouton:SetPoint("BOTTOMRIGHT", aider.barre, "BOTTOMRIGHT", 0, -4)
+
+	-- Prochain événement de la guilde (calendrier du jeu, GuildUp_Evenements.lua)
+	local evts = CarteAccueil(p, "Prochain événement")
+	evts:SetPoint("TOPLEFT", dons, "BOTTOMLEFT", 0, -ECART)
+	evts:SetSize(largeur, 80)
+	evts.ligne = LigneCarte(evts, 1)
+	evts.vide:SetText("Aucun événement prévu dans les 30 prochains jours.")
+	evts.tous = Bouton(evts, "Tous les événements", "fantome", 150, 22)
+	evts.tous:SetPoint("TOPRIGHT", evts, "TOPRIGHT", -12, -8)
+	evts.tous:SetScript("OnClick", function() Aller("evenements") end)
+	evts.compte:Hide()
 
 	local function Cacher(lignes, depuis)
 		for i = depuis, #lignes do lignes[i]:Hide() end
@@ -469,6 +479,27 @@ local function CreerAccueil(parent)
 		else
 			aider.plein:Hide()
 		end
+
+		-- prochain événement
+		local prochains = ns.ProchainsEvenements and ns.ProchainsEvenements(3) or {}
+		local ev = prochains[1]
+		local l = evts.ligne
+		if ev then
+			l:Icone(ev.icone)
+			l:Places(nil)
+			l.titre:SetText(ev.titre or "?")
+			l.sous:SetText((ev.date or "") .. ((ev.type and ev.type ~= "") and (" · " .. ev.type) or "")
+				.. ((ev.etatTexte and ev.etatTexte ~= "") and (" · " .. ev.etatTexte) or "")
+				.. (#prochains > 1 and ("  |cff999999(+" .. (#prochains - 1) .. " à venir)|r") or ""))
+			l.bouton:Ecrire("Voir")
+			l.bouton:Activer(true)
+			l.bouton:SetScript("OnClick", function() if ns.OuvrirEvenements then ns.OuvrirEvenements(ev.cle) end end)
+			l:Show()
+		else
+			l:Hide()
+		end
+		evts.vide:SetShown(ev == nil)
+		evts.tous:SetShown(ev ~= nil)
 	end
 	return p
 end

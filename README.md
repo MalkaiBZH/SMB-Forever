@@ -90,7 +90,12 @@ Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.
   - *Projets de guilde* : une liste d'objets à fabriquer, découpée en tâches à prendre.
 - **Annonces** en bulle : montées de niveau, nouveaux métiers, paliers de métier.
 - **À l'aide !** (`/smb sos`) : appel à la guilde avec sa position.
-- **Événements** : création via le calendrier du jeu et notification des nouveaux événements.
+- **Événements** : les événements de la guilde et tes invitations des 30 prochains jours, groupés par jour
+  (Aujourd'hui, Demain…), avec l'heure, le type (donjon ou raid), l'organisateur, le nombre d'inscrits et ton
+  état en couleur. À droite, le détail (description, inscrits avec leur classe et leur état) et les réponses :
+  S'inscrire / Peut-être / Se désinscrire (ou Accepter / Refuser pour une invitation), sans ouvrir le calendrier
+  du jeu. Boutons « Créer un événement de guilde » et « Ouvrir le calendrier ». Une bulle prévient d'un nouvel
+  événement de guilde ; un clic ouvre la page. Le prochain événement est aussi rappelé sur l'accueil.
 - **Identité** : un pseudo commun à tous ses personnages et son personnage principal, visibles au survol.
 - **Vérification de version** : prévient quand un membre a une version plus récente.
 - **Spécial guilde** (réglé dans `GuildUpSMB/GuildUp_Config.lua`) : le cri de guilde « 33 », qui fait apparaître à

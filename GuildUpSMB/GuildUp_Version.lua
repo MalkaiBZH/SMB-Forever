@@ -92,8 +92,11 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.11.0"] = {
+		"Nouvelle page |cffffd100Événements|r dans la fenêtre SMB Forever : les événements de la guilde et tes invitations des 30 prochains jours, groupés par jour, avec ton état d'inscription. Clique sur un événement pour voir sa description et la liste des inscrits, et réponds directement (S'inscrire, Peut-être, Se désinscrire). La bulle d'un nouvel événement ouvre cette page, et l'accueil rappelle le prochain événement.",
+	},
 	["2.10.0"] = {
 		"|cffffd100Carte du monde|r : les membres de la guilde y apparaissent avec leur médaillon, entouré d'un anneau à la couleur de leur classe (un point s'ils n'ont pas de portrait). Le plus récent passe au-dessus quand ils se chevauchent.",
 		"|cffffd100Guilde > À suivre|r : les inactifs depuis un mois, les membres sans SMB Forever et ceux qui ne sont pas à jour, avec une étiquette pour chacun. Le bouton |cffffd100Rappeler|r envoie un message privé poli aux membres en ligne pour qu'ils installent ou mettent à jour l'addon (une fois toutes les 10 min).",
