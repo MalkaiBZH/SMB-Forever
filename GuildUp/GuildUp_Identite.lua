@@ -11,10 +11,10 @@ local NOM_ADDON, ns = ...
 local PREFIXE = "GuildUpId"
 
 local function DB() return ns.DB and ns.DB() end
-local function Normaliser(nom) return ns.Normaliser and ns.Normaliser(nom) or nom end
-local function MaCle() return Normaliser(UnitName("player")) end
-local function TestSolo() return ns.TestSolo and ns.TestSolo() end
-local function NomCourt(nom) return ((nom or "?"):gsub("%-", " "):gsub(" %(test%)$", "")) end
+local Normaliser = ns.Normaliser
+local MaCle = ns.MaCle
+local TestSolo = ns.TestSolo
+local NomCourt = ns.NomCourt
 local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end end
 local function Propre(t) return strtrim(((t or ""):gsub("[~|,\n]", ""))) end
 

@@ -6,6 +6,7 @@
 ## SavedVariables: GuildUpDB, GuildUpMetiersDB
 
 GuildUp.lua
+GuildUp_Outils.lua
 GuildUp_Identite.lua
 GuildUp_Groupes.lua
 GuildUp_Carte.lua

@@ -12,10 +12,10 @@ local ECART_NIVEAU = 3      -- on prévient ceux qui ont au moins (niveau de l'a
 
 local dernierAppel = 0
 
-local function Normaliser(nom) return ns.Normaliser and ns.Normaliser(nom) or nom end
-local function TestSolo() return ns.TestSolo and ns.TestSolo() end
-local function NomCourt(nom) return ((nom or "?"):gsub("%-", " "):gsub(" %(test%)$", "")) end
-local function Erreur(t) if ns.Erreur then ns.Erreur(t) end end
+local Normaliser = ns.Normaliser
+local TestSolo = ns.TestSolo
+local NomCourt = ns.NomCourt
+local Erreur = ns.Erreur
 
 local function MaPosition()
 	if not (C_Map and C_Map.GetBestMapForUnit) then return nil end

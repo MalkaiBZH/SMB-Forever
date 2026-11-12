@@ -13,21 +13,17 @@ local LARGEUR_FICHE, HAUTEUR_FICHE = 340, 450
 local HAUT_CONTENU = -92   -- haut de la zone de contenu, sous la bande de pierre
 local PROFONDEUR_MAX = 6
 
-local function Erreur(t) if ns.Erreur then ns.Erreur(t) end end
-local function NomCourt(nom) return ((nom or "?"):gsub("%-", " "):gsub(" %(test%)$", "")) end
-local ACCENTS = { ["à"] = "a", ["â"] = "a", ["ä"] = "a", ["ç"] = "c", ["é"] = "e", ["è"] = "e", ["ê"] = "e",
-	["ë"] = "e", ["î"] = "i", ["ï"] = "i", ["ô"] = "o", ["ö"] = "o", ["ù"] = "u", ["û"] = "u", ["ü"] = "u",
-	["À"] = "a", ["Â"] = "a", ["Ç"] = "c", ["É"] = "e", ["È"] = "e", ["Ê"] = "e", ["Î"] = "i", ["Ô"] = "o",
-	["Û"] = "u", ["œ"] = "oe", ["Œ"] = "oe" }
-local function Simplifier(s)
-	return ((s or ""):gsub("[\195\197][\128-\191]", ACCENTS):gsub("’", " "):gsub("'", " "):lower())
+local Erreur = ns.Erreur
+local NomCourt = ns.NomCourt
+-- « niv. 12-18 » (ou « niv. 12 ») d'un PNJ, rien si inconnu
+local function TexteNiveaux(p)
+	if not (p.min and p.min > 0) then return "" end
+	if p.max and p.max ~= p.min then return " niv. " .. p.min .. "-" .. p.max end
+	return " niv. " .. p.min
 end
-local function AtlasExiste(a) return C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(a) ~= nil end
-local function PoserAtlas(tex, atlas, couleur)
-	if AtlasExiste(atlas) then tex:SetAtlas(atlas); return true end
-	if couleur then tex:SetColorTexture(unpack(couleur)) end
-	return false
-end
+local Simplifier = ns.Simplifier
+local AtlasExiste = ns.AtlasExiste
+local PoserAtlas = ns.PoserAtlas
 
 --------------------------------------------------------------------------------
 -- Données : recettes et sources
@@ -196,19 +192,7 @@ local function MarqueRang(rang)
 	return ""
 end
 
-local function InfoObjet(objet)
-	local f = GetItemInfo or (C_Item and C_Item.GetItemInfo)
-	local nom, lien, qualite, icone
-	if f then
-		local ok, n, l, q, _, _, _, _, _, _, i = pcall(f, objet)
-		if ok then nom, lien, qualite, icone = n, l, q, i end
-	end
-	if not icone then
-		local fi = (C_Item and C_Item.GetItemIconByID) or GetItemIcon
-		if fi then local ok, i = pcall(fi, objet); if ok then icone = i end end
-	end
-	return nom, lien, qualite, icone
-end
+local InfoObjet = ns.InfoObjet
 local function ClasseObjet(objet)
 	local f = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
 	if not f then return nil end
@@ -225,9 +209,7 @@ local function NomSort(sort)
 		if ok then return nom, icone end
 	end
 end
-local function Precharger(objet)
-	if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, objet) end
-end
+local Precharger = ns.Precharger
 -- Banque : le jeu ne la connaît qu'une fois ouverte. Son contenu est gardé à chaque visite
 -- (db.banquePerso[perso]) pour les sessions suivantes ; nil = jamais vue sur ce personnage.
 local banqueOuverte = false
@@ -307,7 +289,7 @@ local function LignesSources(objet, ajouter)
 		local function Pnj(id)
 			local p = Sources().pnj[id]
 			if not p then return nil end
-			local niv = (p.min and p.min > 0) and ((p.max and p.max ~= p.min) and (" niv. " .. p.min .. "-" .. p.max) or (" niv. " .. p.min)) or ""
+			local niv = TexteNiveaux(p)
 			local zone = NomZone(p.zone)
 			return p.nom .. niv .. (zone and (" · " .. zone) or "")
 		end
@@ -328,7 +310,7 @@ local function LignesSources(objet, ajouter)
 			for _, z in ipairs(ordre) do
 				ajouter("  - " .. z .. " :")
 				for _, p in ipairs(zones[z]) do
-					local niv = (p.min and p.min > 0) and ((p.max and p.max ~= p.min) and (" niv. " .. p.min .. "-" .. p.max) or (" niv. " .. p.min)) or ""
+					local niv = TexteNiveaux(p)
 					ajouter("      - " .. p.nom .. niv)
 				end
 			end
@@ -1023,22 +1005,7 @@ end
 -- menu du nom de la liste : changer de liste, en créer une, supprimer celle-ci
 local menuChoix
 local function MenuChoixListe(ancre)
-	if not menuChoix then
-		menuChoix = CreateFrame("Frame", "GuildUpMenuChoixListe", UIParent, "BackdropTemplate")
-		menuChoix:SetFrameStrata("FULLSCREEN_DIALOG")
-		menuChoix:SetClampedToScreen(true)
-		if menuChoix.SetBackdrop then
-			menuChoix:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-				edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14,
-				insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-			menuChoix:SetBackdropColor(0.05, 0.05, 0.05, 0.97)
-		end
-		menuChoix.boutons = {}
-		menuChoix:SetScript("OnUpdate", function(self)
-			if not self:IsMouseOver(20, -20, -20, 20) and not (self.ancre and self.ancre:IsMouseOver()) then self:Hide() end
-		end)
-		tinsert(UISpecialFrames, "GuildUpMenuChoixListe")
-	end
+	menuChoix = menuChoix or ns.CadreMenu("GuildUpMenuChoixListe")
 	local m = menuChoix
 	local c, db = Carnets()
 	local items = {}
@@ -1053,15 +1020,7 @@ local function MenuChoixListe(ancre)
 	items[#items + 1] = { texte = "|cffff6666Supprimer cette liste|r", action = function()
 		StaticPopup_Show("GUILDUP_SUPPRIMER_CARNET", db.carnetChoisi, nil, db.carnetChoisi) end }
 	for i, it in ipairs(items) do
-		local b = m.boutons[i]
-		if not b then
-			b = CreateFrame("Button", nil, m)
-			b:SetHeight(20)
-			b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
-			b.texte = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-			b.texte:SetPoint("LEFT", b, "LEFT", 8, 0)
-			m.boutons[i] = b
-		end
+		local b = ns.BoutonMenu(m, i)
 		b:ClearAllPoints()
 		b:SetPoint("TOPLEFT", m, "TOPLEFT", 4, -4 - (i - 1) * 20)
 		b:SetPoint("RIGHT", m, "RIGHT", -4, 0)
@@ -1641,7 +1600,7 @@ MajFiche = function()
 	end
 	local function Espace() FermerSection() end
 	local function Niveau(p)
-		return (p.min and p.min > 0) and ((p.max and p.max ~= p.min) and (" niv. " .. p.min .. "-" .. p.max) or (" niv. " .. p.min)) or ""
+		return TexteNiveaux(p)
 	end
 	-- PNJ regroupés par zone (classés par niveau) ; clic = repère sur la carte
 	local function ParZone(ids, faction)
@@ -2256,23 +2215,7 @@ end
 local menuListes
 local MontrerMenuListes
 MontrerMenuListes = function(bouton, objet)
-	if not menuListes then
-		menuListes = CreateFrame("Frame", "GuildUpMenuListes", UIParent, "BackdropTemplate")
-		menuListes:SetFrameStrata("FULLSCREEN_DIALOG")
-		menuListes:SetClampedToScreen(true)
-		if menuListes.SetBackdrop then
-			menuListes:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-				edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14,
-				insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-			menuListes:SetBackdropColor(0.05, 0.05, 0.05, 0.97)
-		end
-		menuListes.boutons = {}
-		menuListes:SetScript("OnUpdate", function(self)
-			-- se ferme quand la souris s'en éloigne
-			if not self:IsMouseOver(20, -20, -20, 20) and not (self.ancre and self.ancre:IsMouseOver()) then self:Hide() end
-		end)
-		tinsert(UISpecialFrames, "GuildUpMenuListes")
-	end
+	menuListes = menuListes or ns.CadreMenu("GuildUpMenuListes")
 	local m = menuListes
 	local c = Carnets()
 	local choix = { { titre = "Mes carnets" } }
@@ -2288,15 +2231,7 @@ MontrerMenuListes = function(bouton, objet)
 	end
 	choix[#choix + 1] = { nouveauProjet = true }
 	for i, ch in ipairs(choix) do
-		local b = m.boutons[i]
-		if not b then
-			b = CreateFrame("Button", nil, m)
-			b:SetHeight(20)
-			b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
-			b.texte = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-			b.texte:SetPoint("LEFT", b, "LEFT", 8, 0)
-			m.boutons[i] = b
-		end
+		local b = ns.BoutonMenu(m, i)
 		b:ClearAllPoints()
 		b:SetPoint("TOPLEFT", m, "TOPLEFT", 4, -4 - (i - 1) * 20)
 		b:SetPoint("RIGHT", m, "RIGHT", -4, 0)

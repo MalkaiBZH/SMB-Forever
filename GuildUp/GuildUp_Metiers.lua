@@ -48,17 +48,7 @@ local KITS = {
 }
 
 -- minuscules sans accents, pour comparer et chercher (« Écaille » = « ecaille »)
-local ACCENTS = {
-	["à"] = "a", ["â"] = "a", ["ä"] = "a", ["ç"] = "c", ["é"] = "e", ["è"] = "e", ["ê"] = "e", ["ë"] = "e",
-	["î"] = "i", ["ï"] = "i", ["ô"] = "o", ["ö"] = "o", ["ù"] = "u", ["û"] = "u", ["ü"] = "u",
-	["À"] = "a", ["Â"] = "a", ["Ç"] = "c", ["É"] = "e", ["È"] = "e", ["Ê"] = "e", ["Î"] = "i",
-	["Ô"] = "o", ["Û"] = "u", ["œ"] = "oe", ["Œ"] = "oe",
-}
-local function Simplifier(s)
-	if not s then return "" end
-	s = s:gsub("[\195\197][\128-\191]", ACCENTS)
-	return s:lower()
-end
+local Simplifier = ns.Simplifier
 
 local function InfoSort(id)
 	if C_Spell and C_Spell.GetSpellInfo then
@@ -78,19 +68,7 @@ local function LienSort(id)
 	return ok and lien or nil
 end
 
-local function InfoObjet(id)
-	local f = GetItemInfo or (C_Item and C_Item.GetItemInfo)
-	local nom, lien, qualite, icone
-	if f then
-		local ok, n, l, q, _, _, _, _, _, _, ic = pcall(f, id)
-		if ok then nom, lien, qualite, icone = n, l, q, ic end
-	end
-	if not icone then
-		local fi = GetItemIcon or (C_Item and C_Item.GetItemIconByID)
-		if fi then local ok, ic = pcall(fi, id); if ok then icone = ic end end
-	end
-	return nom, lien, qualite, icone
-end
+local InfoObjet = ns.InfoObjet
 
 -- nom et icône localisés de chaque métier (tirés du sort d'apprentissage quand il existe)
 for _, m in ipairs(METIERS) do
@@ -149,18 +127,7 @@ end
 -- Outils
 --------------------------------------------------------------------------------
 
-local CHIFFRES = "0123456789abcdefghijklmnopqrstuvwxyz"
-local function Base36(n)
-	n = math.floor(n)
-	if n <= 0 then return "0" end
-	local s = ""
-	while n > 0 do
-		local r = n % 36
-		s = CHIFFRES:sub(r + 1, r + 1) .. s
-		n = math.floor(n / 36)
-	end
-	return s
-end
+local Base36 = ns.Base36
 
 local function Empreinte(liste)
 	if #liste == 0 then return "0" end
@@ -172,32 +139,17 @@ local function Empreinte(liste)
 	return Base36(h)
 end
 
-local function Normaliser(nom)
-	if ns.Normaliser then return ns.Normaliser(nom) end
-	return nom
-end
+local Normaliser = ns.Normaliser
 
-local function MaCle() return Normaliser(UnitName("player")) end
-local function TestSolo() return ns.TestSolo and ns.TestSolo() end
+local MaCle = ns.MaCle
+local TestSolo = ns.TestSolo
 
-local function Depuis(t)
-	local s = math.max(0, time() - (t or 0))
-	if s < 3600 then return math.max(1, math.floor(s / 60)) .. " min" end
-	if s < 86400 then return math.floor(s / 3600) .. " h" end
-	return math.floor(s / 86400) .. " j"
-end
+local Depuis = ns.Depuis
 
-local function CouleurClasse(classe)
-	local c = classe and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classe]
-	if c then return c.r, c.g, c.b end
-	return 1, 0.82, 0
-end
+local CouleurClasse = ns.CouleurClasse
 
 -- Nom affiché : complet, « Prénom Famille » (« Miko-Banko » devient « Miko Banko »)
-local function NomCourt(nom)
-	if not nom then return "?" end
-	return (nom:gsub("%-", " "))
-end
+local NomCourt = ns.NomCourt
 
 -- Nom complet « Prénom Famille » (sur Forever, le nom de famille est à la place du royaume)
 local function NomCompletUnite(u)
@@ -965,14 +917,8 @@ PlanifierMaj = function(delai)
 	end)
 end
 
-local function AtlasExiste(a)
-	return C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(a) ~= nil
-end
-local function PoserAtlas(tex, atlas, couleur)
-	if AtlasExiste(atlas) then tex:SetAtlas(atlas); return true end
-	if couleur then tex:SetColorTexture(unpack(couleur)) end
-	return false
-end
+local AtlasExiste = ns.AtlasExiste
+local PoserAtlas = ns.PoserAtlas
 
 local function Fiches()
 	local liste = {}
