@@ -14,13 +14,16 @@ l'addon voient et partagent ces informations**.
 
 ### Mise à jour automatique (Windows)
 
-`GuildUpSMB-MiseAJour.exe` installe et met à jour l'addon depuis la branche `main` de ce dépôt :
+`GuildUpSMB-MiseAJour.exe` installe l'addon et le garde à jour depuis la branche `main` de ce dépôt.
+Il vit dans la zone de notification (icône de la chope, à côté de l'horloge) :
 
-- au lancement, il trouve le dossier `_forever_` du jeu (sinon il le demande), compare le dernier commit
-  à celui installé et ne télécharge que s'il a changé (fichiers ajoutés, modifiés et supprimés) ;
-- la case « Vérifier les mises à jour à chaque démarrage de Windows » le relance sans fenêtre à
-  l'ouverture de session : une bulle signale une nouvelle version ;
-- en jeu, faire `/reload` après une mise à jour.
+- il trouve le dossier `_forever_` du jeu (sinon il le demande) et vérifie au lancement puis toutes
+  les 15 minutes (5 min à 1 h, réglable) ; il ne télécharge que si un nouveau commit est arrivé ;
+- après une mise à jour, une notification Windows dit quoi faire : `/reload` en jeu, **relancer le
+  jeu** si des fichiers ont été ajoutés ou si le `.toc` a changé, ou rien si le jeu est fermé ;
+- lancé au démarrage de Windows (activé au premier lancement, décochable), il démarre directement
+  dans la zone de notification ; fermer la fenêtre l'y range, « Quitter » (clic droit sur l'icône)
+  l'arrête ; le relancer rouvre sa fenêtre.
 
 Construction : `outils\MiseAJour\construire.bat` (compilateur C# fourni avec Windows, rien à installer).
 Réglages et journal du dernier passage : `%APPDATA%\GuildUpSMB-MiseAJour\`.

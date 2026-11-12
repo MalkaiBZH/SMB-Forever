@@ -1,20 +1,29 @@
-// Mise à jour de l'addon GuildUpSMB depuis GitHub, pour le client WoW Forever.
+// Mise à jour automatique de l'addon GuildUpSMB depuis GitHub, pour le client WoW Forever.
 //
-// Fonctionnement :
-//   1. Trouve le dossier du jeu (_forever_) : réglage enregistré, registre de Blizzard, chemins
-//      habituels, sinon le demande au joueur.
-//   2. Demande à l'API GitHub l'empreinte du dernier commit de la branche (en-tête
-//      « Accept: application/vnd.github.sha » : la réponse est l'empreinte seule, sans JSON).
-//   3. Si elle diffère de celle notée dans Interface\AddOns\GuildUpSMB\.miseajour, télécharge
-//      l'archive de ce commit, en extrait le dossier GuildUpSMB/ (sans les *.bak / *.previous)
-//      et synchronise le dossier installé : fichiers ajoutés, modifiés, supprimés.
+// Application de la zone de notification (une seule instance) :
+//   * trouve le dossier du jeu (_forever_) : réglage enregistré, registre de Blizzard, chemins
+//     habituels, sinon le demande au joueur ;
+//   * vérifie au lancement puis à intervalle régulier (15 min par défaut, 2 min après une erreur) ;
+//     GitHub ne sait pas prévenir un PC : on l'interroge. La requête est conditionnelle (ETag) :
+//     une réponse 304 « rien de neuf » ne compte pas dans la limite de 60 requêtes par heure ;
+//   * l'API renvoie l'empreinte du dernier commit de la branche (en-tête
+//     « Accept: application/vnd.github.sha », réponse sans JSON). Si elle diffère de celle notée dans
+//     Interface\AddOns\GuildUpSMB\.miseajour, télécharge l'archive de ce commit, en extrait le
+//     dossier GuildUpSMB/ (sans les *.bak / *.previous) et synchronise le dossier installé ;
+//   * notification Windows ensuite : /reload si seuls des fichiers existants ont changé, relancer
+//     le jeu si des fichiers sont ajoutés ou si le .toc change (le jeu ne voit les nouveaux fichiers
+//     qu'au démarrage), prochain lancement si le jeu est fermé.
+// Fermer la fenêtre la range dans la zone de notification ; « Quitter » (menu de l'icône) arrête tout.
 //
 // Arguments :
-//   /auto        sans fenêtre (lancement au démarrage de Windows) ; une bulle signale une mise à jour.
+//   /auto           démarrage de Windows : directement dans la zone de notification, sans fenêtre.
 //   /jeu:<dossier>  dossier du jeu imposé, non enregistré (essais).
+//   /verifier       un seul passage, sans interface ; code de sortie 0 = ok (essais, scripts).
+// Relancer le programme alors qu'il tourne affiche la fenêtre de l'instance déjà lancée.
 // Variable d'environnement GUILDUPSMB_JETON : jeton GitHub facultatif (dépôt privé, essais).
 //
-// Réglages : %APPDATA%\GuildUpSMB-MiseAJour\reglages.ini ; journal du dernier passage : journal.txt.
+// Réglages : %APPDATA%\GuildUpSMB-MiseAJour\reglages.ini (jeu, intervalle, demarrage) ;
+// journal du dernier passage : journal.txt. Démarrage avec Windows : clé HKCU\...\Run.
 // Construction : outils\MiseAJour\construire.bat (csc.exe du .NET Framework 4, fourni avec Windows).
 
 using System;
@@ -33,7 +42,7 @@ using Microsoft.Win32;
 
 [assembly: System.Reflection.AssemblyTitle("GuildUpSMB - mise à jour")]
 [assembly: System.Reflection.AssemblyProduct("GuildUpSMB")]
-[assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.0.0.0")]
 
 namespace GuildUpSMB
 {
@@ -42,7 +51,11 @@ namespace GuildUpSMB
 	{
 		public bool DejaAJour;
 		public string Version = "?";
+		public string Commit = "";
 		public int Ajoutes, Modifies, Supprimes;
+		public bool TocModifie;
+		// Le jeu ne voit les nouveaux fichiers (et un .toc changé) qu'à son démarrage.
+		public bool RelancerJeu { get { return Ajoutes > 0 || TocModifie; } }
 	}
 
 	static class MiseAJour
@@ -53,11 +66,19 @@ namespace GuildUpSMB
 		const string MARQUE = ".miseajour";		// empreinte du commit installé, dans le dossier de l'addon
 		const string CLE_DEMARRAGE = @"Software\Microsoft\Windows\CurrentVersion\Run";
 		const string NOM_DEMARRAGE = "GuildUpSMB-MiseAJour";
+		public const string NOM_INSTANCE = @"Local\GuildUpSMB-MiseAJour";
+		public const string NOM_SIGNAL = @"Local\GuildUpSMB-MiseAJour-Afficher";
 
 		static readonly string DossierReglages = Path.Combine(
 			Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GuildUpSMB-MiseAJour");
 		static readonly string FichierReglages = Path.Combine(DossierReglages, "reglages.ini");
 		static readonly string FichierJournal = Path.Combine(DossierReglages, "journal.txt");
+
+		[System.Runtime.InteropServices.DllImport("user32.dll")]
+		static extern bool AllowSetForegroundWindow(int processus);
+
+		// Dernière réponse de l'API, pour les requêtes conditionnelles.
+		static string etagConnu, commitConnu;
 
 		// ---------------------------------------------------------------- Point d'entrée
 
@@ -67,59 +88,58 @@ namespace GuildUpSMB
 			// GitHub refuse les anciens protocoles : TLS 1.2 (3072) obligatoire.
 			ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
 
-			bool auto = false;
+			bool auto = false, unPassage = false;
 			string jeuImpose = null;
 			foreach (string a in args)
 			{
 				if (a.Equals("/auto", StringComparison.OrdinalIgnoreCase)) auto = true;
+				else if (a.Equals("/verifier", StringComparison.OrdinalIgnoreCase)) unPassage = true;
 				else if (a.StartsWith("/jeu:", StringComparison.OrdinalIgnoreCase)) jeuImpose = a.Substring(5).Trim('"');
 			}
+			if (unPassage) return UnPassage(jeuImpose);
 
-			Application.EnableVisualStyles();
-			Application.SetCompatibleTextRenderingDefault(false);
-
-			if (auto) return PassageAuto(jeuImpose);
-			Application.Run(new Fenetre(jeuImpose));
+			bool premiere;
+			using (var instance = new Mutex(true, NOM_INSTANCE, out premiere))
+			{
+				if (!premiere)
+				{
+					// Déjà lancé : un lancement à la main montre sa fenêtre, celui du démarrage ne fait rien.
+					// Lancé par le joueur, ce programme a le droit de passer au premier plan : il le cède à
+					// l'instance déjà lancée (sinon Windows laisse sa fenêtre derrière le jeu).
+					if (!auto)
+						try { AllowSetForegroundWindow(-1); EventWaitHandle.OpenExisting(NOM_SIGNAL).Set(); } catch { }
+					return 0;
+				}
+				using (var signal = new EventWaitHandle(false, EventResetMode.AutoReset, NOM_SIGNAL))
+				{
+					Application.EnableVisualStyles();
+					Application.SetCompatibleTextRenderingDefault(false);
+					Application.Run(new Appli(auto, jeuImpose, signal));
+				}
+			}
 			return 0;
 		}
 
-		// Lancement au démarrage de Windows : pas de fenêtre, une bulle seulement si l'addon a changé.
-		static int PassageAuto(string jeuImpose)
+		static int UnPassage(string jeuImpose)
 		{
 			var journal = new StringBuilder();
-			Action<string> noter = delegate(string t) { journal.AppendLine(t); };
 			try
 			{
 				string jeu = jeuImpose ?? TrouverJeu();
-				if (jeu == null) { noter("Dossier du jeu introuvable : lancez le programme une fois sans /auto."); return 2; }
-				Bilan b = Executer(jeu, noter);
-				if (!b.DejaAJour) Bulle("GuildUpSMB mis à jour", "Version " + b.Version + " installée. Faites /reload en jeu.");
+				if (jeu == null) { journal.AppendLine("Dossier du jeu introuvable."); return 2; }
+				Bilan b = Executer(jeu, delegate(string t) { journal.AppendLine(t); });
+				if (!b.DejaAJour)
+					journal.AppendLine(b.RelancerJeu ? "Il faut relancer le jeu." : "Un /reload suffit.");
 				return 0;
 			}
 			catch (Exception e)
 			{
-				noter("Erreur : " + Message(e));
+				journal.AppendLine("Erreur : " + Message(e));
 				return 1;
 			}
 			finally
 			{
 				EcrireJournal(journal.ToString());
-			}
-		}
-
-		static void Bulle(string titre, string texte)
-		{
-			using (var icone = new NotifyIcon())
-			{
-				icone.Icon = IconeProgramme();
-				icone.Text = "GuildUpSMB";
-				icone.Visible = true;
-				icone.ShowBalloonTip(8000, titre, texte, ToolTipIcon.Info);
-				var minuteur = new System.Windows.Forms.Timer { Interval = 9000 };
-				minuteur.Tick += delegate { minuteur.Stop(); Application.ExitThread(); };
-				minuteur.Start();
-				Application.Run();
-				icone.Visible = false;
 			}
 		}
 
@@ -131,19 +151,14 @@ namespace GuildUpSMB
 			string dossierAddon = Path.Combine(jeu, "Interface", "AddOns", ADDON);
 			string fichierMarque = Path.Combine(dossierAddon, MARQUE);
 
-			noter("Dossier du jeu : " + jeu);
-			noter("Recherche de la dernière version sur GitHub…");
-			string commit = Telecharger("https://api.github.com/repos/" + DEPOT + "/commits/" + BRANCHE,
-				"application/vnd.github.sha").Trim();
-			if (commit.Length < 7 || commit.Length > 64 || commit.Any(c => !Uri.IsHexDigit(c)))
-				throw new Exception("réponse inattendue de GitHub.");
-
+			string commit = DernierCommit();
+			bilan.Commit = commit;
 			string installe = File.Exists(fichierMarque) ? File.ReadAllText(fichierMarque).Trim() : "";
 			if (installe == commit && File.Exists(Path.Combine(dossierAddon, ADDON + ".toc")))
 			{
 				bilan.DejaAJour = true;
 				bilan.Version = LireVersion(dossierAddon);
-				noter("L'addon est déjà à jour (version " + bilan.Version + ", commit " + commit.Substring(0, 7) + ").");
+				noter("Déjà à jour (version " + bilan.Version + ", commit " + commit.Substring(0, 7) + ").");
 				return bilan;
 			}
 
@@ -151,18 +166,17 @@ namespace GuildUpSMB
 			Directory.CreateDirectory(temp);
 			try
 			{
-				noter("Téléchargement du commit " + commit.Substring(0, 7) + "…");
+				noter("Nouvelle version sur GitHub : téléchargement du commit " + commit.Substring(0, 7) + "…");
 				string archive = Path.Combine(temp, "addon.zip");
 				TelechargerFichier("https://api.github.com/repos/" + DEPOT + "/zipball/" + commit, archive);
 
-				noter("Extraction…");
 				string source = Path.Combine(temp, ADDON);
 				Extraire(archive, source);
 				if (!File.Exists(Path.Combine(source, ADDON + ".toc")))
 					throw new Exception("l'archive ne contient pas " + ADDON + "/" + ADDON + ".toc.");
 				bilan.Version = LireVersion(source);
 
-				noter("Installation de la version " + bilan.Version + "…");
+				noter("Installation de la version " + bilan.Version + " dans " + dossierAddon);
 				Directory.CreateDirectory(dossierAddon);
 				Synchroniser(source, dossierAddon, bilan, noter);
 				File.WriteAllText(fichierMarque, commit);
@@ -174,8 +188,37 @@ namespace GuildUpSMB
 
 			noter(string.Format("Terminé : {0} ajouté(s), {1} modifié(s), {2} supprimé(s).",
 				bilan.Ajoutes, bilan.Modifies, bilan.Supprimes));
-			noter("En jeu, faites /reload (ou relancez le jeu) pour charger la nouvelle version.");
 			return bilan;
+		}
+
+		// Empreinte du dernier commit de la branche. Requête conditionnelle : un 304 rend l'empreinte connue.
+		static string DernierCommit()
+		{
+			var requete = (HttpWebRequest)WebRequest.Create("https://api.github.com/repos/" + DEPOT + "/commits/" + BRANCHE);
+			Preparer(requete, "application/vnd.github.sha");
+			if (etagConnu != null && commitConnu != null) requete.Headers[HttpRequestHeader.IfNoneMatch] = etagConnu;
+
+			string commit;
+			try
+			{
+				using (var reponse = (HttpWebResponse)requete.GetResponse())
+				{
+					if (reponse.StatusCode == HttpStatusCode.NotModified) return commitConnu;
+					using (var lecteur = new StreamReader(reponse.GetResponseStream(), Encoding.UTF8))
+						commit = lecteur.ReadToEnd().Trim();
+					if (commit.Length < 7 || commit.Length > 64 || commit.Any(c => !Uri.IsHexDigit(c)))
+						throw new Exception("réponse inattendue de GitHub.");
+					etagConnu = reponse.Headers[HttpResponseHeader.ETag];
+					commitConnu = commit;
+				}
+			}
+			catch (WebException e)
+			{
+				var r = e.Response as HttpWebResponse;
+				if (r != null && r.StatusCode == HttpStatusCode.NotModified && commitConnu != null) return commitConnu;
+				throw;
+			}
+			return commit;
 		}
 
 		// Garde uniquement le dossier GuildUpSMB/ de l'archive (dont la racine est « depot-commit/ »).
@@ -221,6 +264,7 @@ namespace GuildUpSMB
 				{
 					if (Identiques(fichier, destination)) continue;
 					bilan.Modifies++;
+					if (relatif.Equals(ADDON + ".toc", StringComparison.OrdinalIgnoreCase)) bilan.TocModifie = true;
 					noter("  modifié : " + relatif);
 				}
 				else
@@ -229,6 +273,7 @@ namespace GuildUpSMB
 					noter("  ajouté : " + relatif);
 				}
 				Directory.CreateDirectory(Path.GetDirectoryName(destination));
+				if (File.Exists(destination)) File.SetAttributes(destination, FileAttributes.Normal);
 				File.Copy(fichier, destination, true);
 			}
 
@@ -276,31 +321,43 @@ namespace GuildUpSMB
 			return "?";
 		}
 
-		// ---------------------------------------------------------------- Réseau
-
-		static WebClient Client(string accept)
+		// Le jeu tourne-t-il depuis ce dossier ? (Wow.exe du client Forever)
+		public static bool JeuLance(string jeu)
 		{
-			var client = new WebClient();
-			client.Headers[HttpRequestHeader.UserAgent] = "GuildUpSMB-MiseAJour";
-			client.Headers[HttpRequestHeader.Accept] = accept;
-			string jeton = Environment.GetEnvironmentVariable("GUILDUPSMB_JETON");
-			if (!string.IsNullOrEmpty(jeton)) client.Headers[HttpRequestHeader.Authorization] = "Bearer " + jeton.Trim();
-			return client;
+			string dossier = Path.GetFullPath(jeu).TrimEnd('\\');
+			foreach (Process p in Process.GetProcessesByName("Wow"))
+			{
+				try
+				{
+					string exe = p.MainModule.FileName;
+					if (Path.GetDirectoryName(exe).Equals(dossier, StringComparison.OrdinalIgnoreCase)) return true;
+				}
+				catch { return true; }	// processus illisible : on le suppose lancé
+				finally { p.Dispose(); }
+			}
+			return false;
 		}
 
-		static string Telecharger(string url, string accept)
+		// ---------------------------------------------------------------- Réseau
+
+		static void Preparer(HttpWebRequest requete, string accept)
 		{
-			using (WebClient client = Client(accept))
-			{
-				client.Encoding = Encoding.UTF8;
-				return client.DownloadString(url);
-			}
+			requete.UserAgent = "GuildUpSMB-MiseAJour";
+			requete.Accept = accept;
+			requete.Timeout = 30000;
+			string jeton = Environment.GetEnvironmentVariable("GUILDUPSMB_JETON");
+			if (!string.IsNullOrEmpty(jeton)) requete.Headers[HttpRequestHeader.Authorization] = "Bearer " + jeton.Trim();
 		}
 
 		static void TelechargerFichier(string url, string fichier)
 		{
-			using (WebClient client = Client("application/vnd.github+json"))
-				client.DownloadFile(url, fichier);
+			var requete = (HttpWebRequest)WebRequest.Create(url);
+			Preparer(requete, "application/vnd.github+json");
+			requete.Timeout = 120000;
+			using (var reponse = requete.GetResponse())
+			using (var flux = reponse.GetResponseStream())
+			using (var sortie = File.Create(fichier))
+				flux.CopyTo(sortie);
 		}
 
 		public static string Message(Exception e)
@@ -312,11 +369,13 @@ namespace GuildUpSMB
 				if (r != null && (int)r.StatusCode == 404)
 					return "dépôt " + DEPOT + " introuvable sur GitHub (est-il public ?).";
 				if (r != null && (int)r.StatusCode == 403)
-					return "GitHub limite les requêtes (60 par heure) : réessayez plus tard.";
+					return "GitHub limite les requêtes (60 par heure) : nouvel essai plus tard.";
 				return "connexion à GitHub impossible (" + w.Message + ").";
 			}
 			if (e is UnauthorizedAccessException)
-				return "accès refusé au dossier du jeu. Fermez le jeu ou lancez ce programme en tant qu'administrateur. (" + e.Message + ")";
+				return "accès refusé au dossier du jeu. Lancez ce programme en tant qu'administrateur. (" + e.Message + ")";
+			if (e is IOException)
+				return "fichier de l'addon inaccessible (" + e.Message + ").";
 			return e.Message;
 		}
 
@@ -364,11 +423,12 @@ namespace GuildUpSMB
 				candidats.Add(Path.Combine(r, @"Jeux\World of Warcraft\_forever_"));
 			}
 
+			// Le réglage enregistré d'abord (quel que soit le nom du dossier), puis un vrai _forever_.
+			if (JeuValable(candidats[0])) return candidats[0];
 			foreach (string c in candidats)
 				if (JeuValable(c) && Path.GetFileName(c.TrimEnd('\\', '/')).Equals("_forever_", StringComparison.OrdinalIgnoreCase))
 					return c;
-			// Le réglage enregistré peut désigner un dossier valable d'un autre nom.
-			return JeuValable(candidats[0]) ? candidats[0] : null;
+			return null;
 		}
 
 		// ---------------------------------------------------------------- Réglages
@@ -390,13 +450,17 @@ namespace GuildUpSMB
 
 		public static void EcrireReglage(string nom, string valeur)
 		{
-			var lignes = new List<string>();
-			if (File.Exists(FichierReglages))
-				lignes.AddRange(File.ReadAllLines(FichierReglages, Encoding.UTF8)
-					.Where(l => { int e = l.IndexOf('='); return !(e > 0 && l.Substring(0, e).Trim() == nom); }));
-			lignes.Add(nom + "=" + valeur);
-			Directory.CreateDirectory(DossierReglages);
-			File.WriteAllLines(FichierReglages, lignes, Encoding.UTF8);
+			try
+			{
+				var lignes = new List<string>();
+				if (File.Exists(FichierReglages))
+					lignes.AddRange(File.ReadAllLines(FichierReglages, Encoding.UTF8)
+						.Where(l => { int e = l.IndexOf('='); return !(e > 0 && l.Substring(0, e).Trim() == nom); }));
+				lignes.Add(nom + "=" + valeur);
+				Directory.CreateDirectory(DossierReglages);
+				File.WriteAllLines(FichierReglages, lignes, Encoding.UTF8);
+			}
+			catch { }
 		}
 
 		public static void EcrireJournal(string texte)
@@ -413,8 +477,12 @@ namespace GuildUpSMB
 
 		public static bool LanceAuDemarrage()
 		{
-			using (RegistryKey k = Registry.CurrentUser.OpenSubKey(CLE_DEMARRAGE))
-				return k != null && k.GetValue(NOM_DEMARRAGE) != null;
+			try
+			{
+				using (RegistryKey k = Registry.CurrentUser.OpenSubKey(CLE_DEMARRAGE))
+					return k != null && k.GetValue(NOM_DEMARRAGE) != null;
+			}
+			catch { return false; }
 		}
 
 		public static void LancerAuDemarrage(bool oui)
@@ -426,10 +494,283 @@ namespace GuildUpSMB
 			}
 		}
 
-		public static Icon IconeProgramme()
+		// ---------------------------------------------------------------- Icône
+
+		// icone.ico est incorporé au programme (construire.bat) : toutes les tailles, dont 16 x 16 pour la zone de notification.
+		public static Icon Icone(Size taille)
 		{
-			try { return Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application; }
-			catch { return SystemIcons.Application; }
+			try
+			{
+				using (Stream flux = typeof(MiseAJour).Assembly.GetManifestResourceStream("icone.ico"))
+					if (flux != null) return new Icon(flux, taille);
+			}
+			catch { }
+			return SystemIcons.Application;
+		}
+	}
+
+	// ---------------------------------------------------------------- Application (zone de notification)
+
+	class Appli : ApplicationContext
+	{
+		static readonly int[] INTERVALLES = { 5, 15, 30, 60 };	// minutes
+		const int INTERVALLE_DEFAUT = 15;
+		const int DELAI_ERREUR = 2;		// minutes avant un nouvel essai après une erreur
+
+		readonly bool auto;
+		readonly string jeuImpose;
+		readonly NotifyIcon icone = new NotifyIcon();
+		readonly Fenetre fenetre;
+		readonly System.Windows.Forms.Timer minuteur = new System.Windows.Forms.Timer();
+		readonly ToolStripMenuItem menuDemarrage;
+		readonly RegisteredWaitHandle attente;
+		string jeu;
+		bool enCours, quitte, rangeeSignalee;
+		Action apresBulle;	// action d'un clic sur la dernière notification
+
+		public Appli(bool auto, string jeuImpose, EventWaitHandle signal)
+		{
+			this.auto = auto;
+			this.jeuImpose = jeuImpose;
+
+			fenetre = new Fenetre(this);
+			IntPtr poignee = fenetre.Handle;	// poignée créée : BeginInvoke possible avant le premier affichage
+
+			var menu = new ContextMenuStrip();
+			var ouvrir = new ToolStripMenuItem("Ouvrir", null, delegate { Afficher(); });
+			ouvrir.Font = new Font(ouvrir.Font, FontStyle.Bold);
+			menu.Items.Add(ouvrir);
+			menu.Items.Add(new ToolStripMenuItem("Vérifier maintenant", null, delegate { Verifier(true); }));
+			menu.Items.Add(new ToolStripSeparator());
+			menuDemarrage = new ToolStripMenuItem("Lancer au démarrage de Windows", null, delegate { Demarrage = !Demarrage; });
+			menu.Items.Add(menuDemarrage);
+			menu.Items.Add(new ToolStripSeparator());
+			menu.Items.Add(new ToolStripMenuItem("Quitter", null, delegate { Quitter(true); }));
+
+			icone.Icon = MiseAJour.Icone(SystemInformation.SmallIconSize);
+			icone.ContextMenuStrip = menu;
+			icone.MouseClick += delegate(object s, MouseEventArgs e) { if (e.Button == MouseButtons.Left) Afficher(); };
+			icone.BalloonTipClicked += delegate
+			{
+				Action a = apresBulle ?? Afficher;
+				apresBulle = null;
+				a();
+			};
+			Infobulle("démarrage…");
+			icone.Visible = true;
+
+			minuteur.Tick += delegate { Verifier(false); };
+
+			// Un second lancement du programme demande d'afficher la fenêtre.
+			attente = ThreadPool.RegisterWaitForSingleObject(signal, delegate
+			{
+				try { fenetre.BeginInvoke((Action)Afficher); } catch { }
+			}, null, -1, false);
+
+			fenetre.BeginInvoke((Action)MiseEnRoute);
+		}
+
+		void MiseEnRoute()
+		{
+			if (jeuImpose == null)
+			{
+				// Premier lancement : démarrage avec Windows activé par défaut (décochable).
+				if (MiseAJour.LireReglage("demarrage") == null)
+				{
+					try { MiseAJour.LancerAuDemarrage(true); } catch { }
+					MiseAJour.EcrireReglage("demarrage", "propose");
+				}
+				// Suit le programme s'il a été déplacé.
+				else if (MiseAJour.LanceAuDemarrage())
+					try { MiseAJour.LancerAuDemarrage(true); } catch { }
+			}
+			MajDemarrage();
+
+			jeu = jeuImpose ?? MiseAJour.TrouverJeu();
+			if (jeu != null && jeuImpose == null) MiseAJour.EcrireReglage("jeu", jeu);
+			fenetre.MajJeu(jeu);
+
+			if (!auto) Afficher();
+			if (jeu == null)
+			{
+				Infobulle("dossier du jeu à indiquer");
+				if (auto) Bulle("Dossier de WoW Forever introuvable", "Cliquez ici pour l'indiquer.", ToolTipIcon.Warning, DemanderJeu);
+				else DemanderJeu();
+				return;
+			}
+			Verifier(false);
+		}
+
+		// ---- Réglages
+
+		public int Intervalle
+		{
+			get
+			{
+				int m;
+				return int.TryParse(MiseAJour.LireReglage("intervalle"), out m) && INTERVALLES.Contains(m) ? m : INTERVALLE_DEFAUT;
+			}
+			set
+			{
+				MiseAJour.EcrireReglage("intervalle", value.ToString());
+				if (!enCours) Programmer(value);
+			}
+		}
+
+		public static int[] Intervalles { get { return INTERVALLES; } }
+
+		public bool Demarrage
+		{
+			get { return MiseAJour.LanceAuDemarrage(); }
+			set
+			{
+				try { MiseAJour.LancerAuDemarrage(value); }
+				catch (Exception e) { MessageBox.Show(fenetre, e.Message, fenetre.Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+				MiseAJour.EcrireReglage("demarrage", value ? "oui" : "non");
+				MajDemarrage();
+			}
+		}
+
+		void MajDemarrage()
+		{
+			bool oui = MiseAJour.LanceAuDemarrage();
+			menuDemarrage.Checked = oui;
+			fenetre.MajDemarrage(oui);
+		}
+
+		void Programmer(int minutes)
+		{
+			minuteur.Stop();
+			minuteur.Interval = minutes * 60000;
+			minuteur.Start();
+		}
+
+		// ---- Actions
+
+		public void Afficher()
+		{
+			if (quitte) return;
+			fenetre.Show();
+			if (fenetre.WindowState == FormWindowState.Minimized) fenetre.WindowState = FormWindowState.Normal;
+			// Passage au premier plan, même quand Windows refuse l'activation (fenêtre ouverte depuis
+			// l'icône ou une notification pendant qu'un autre programme a la main).
+			fenetre.TopMost = true;
+			fenetre.TopMost = false;
+			fenetre.Activate();
+		}
+
+		// Fenêtre fermée : l'application continue dans la zone de notification (signalé une fois).
+		public void Ranger()
+		{
+			fenetre.Hide();
+			if (rangeeSignalee) return;
+			rangeeSignalee = true;
+			Bulle("GuildUpSMB reste actif", "Les mises à jour continuent en arrière-plan. Clic droit sur l'icône pour quitter.",
+				ToolTipIcon.Info, null);
+		}
+
+		public void DemanderJeu()
+		{
+			Afficher();
+			string choisi = fenetre.ChoisirJeu(jeu);
+			if (choisi == null) return;
+			jeu = choisi;
+			MiseAJour.EcrireReglage("jeu", jeu);
+			fenetre.MajJeu(jeu);
+			Verifier(true);
+		}
+
+		public void Verifier(bool manuel)
+		{
+			if (enCours || quitte) return;
+			if (jeu == null) { if (manuel) DemanderJeu(); return; }
+			enCours = true;
+			minuteur.Stop();
+			string dossier = jeu;
+			fenetre.Debut();
+			Infobulle("vérification…");
+
+			var lignes = new StringBuilder();
+			Action<string> noter = delegate(string t)
+			{
+				string ligne = DateTime.Now.ToString("HH:mm") + "  " + t;
+				lock (lignes) lignes.AppendLine(ligne);
+				fenetre.Noter(ligne);
+			};
+			var fil = new Thread(delegate()
+			{
+				Bilan bilan = null;
+				Exception erreur = null;
+				try { bilan = MiseAJour.Executer(dossier, noter); }
+				catch (Exception e) { erreur = e; noter("Erreur : " + MiseAJour.Message(e)); }
+				MiseAJour.EcrireJournal(lignes.ToString());
+				try { fenetre.BeginInvoke((Action)delegate { Fin(bilan, erreur, manuel); }); } catch { }
+			});
+			fil.IsBackground = true;
+			fil.Start();
+		}
+
+		void Fin(Bilan bilan, Exception erreur, bool manuel)
+		{
+			enCours = false;
+			if (quitte) return;
+			fenetre.Fin(bilan, erreur);
+			string heure = DateTime.Now.ToString("HH:mm");
+			if (erreur != null)
+			{
+				Infobulle("erreur à " + heure + ", nouvel essai bientôt");
+				if (manuel && !fenetre.Visible)
+					Bulle("Mise à jour impossible", MiseAJour.Message(erreur), ToolTipIcon.Warning, null);
+				Programmer(DELAI_ERREUR);
+				return;
+			}
+			Programmer(Intervalle);
+			if (bilan.DejaAJour)
+			{
+				Infobulle(bilan.Version + " à jour (vérifié à " + heure + ")");
+				if (manuel && !fenetre.Visible)
+					Bulle("GuildUpSMB est à jour", "Version " + bilan.Version + ".", ToolTipIcon.Info, null);
+				return;
+			}
+			Infobulle(bilan.Version + " installée à " + heure);
+
+			// Que faire pour charger la nouvelle version ?
+			string texte;
+			if (!MiseAJour.JeuLance(jeu))
+				texte = "Elle sera chargée au prochain lancement du jeu.";
+			else if (bilan.RelancerJeu)
+				texte = "Relancez le jeu : de nouveaux fichiers ont été ajoutés, /reload ne suffit pas.";
+			else
+				texte = "Tapez /reload en jeu pour la charger.";
+			fenetre.Noter(heure + "  " + texte);
+			Bulle("GuildUpSMB " + bilan.Version + " installé", texte, ToolTipIcon.Info, null);
+		}
+
+		void Bulle(string titre, string texte, ToolTipIcon type, Action clic)
+		{
+			apresBulle = clic;
+			icone.ShowBalloonTip(10000, titre, texte, type);
+		}
+
+		// Infobulle de l'icône : 63 caractères au plus (au-delà, Windows Forms refuse).
+		void Infobulle(string etat)
+		{
+			string t = "GuildUpSMB : " + etat;
+			icone.Text = t.Length > 63 ? t.Substring(0, 63) : t;
+		}
+
+		public bool Quitte { get { return quitte; } }
+
+		public void Quitter(bool fermerFenetre)
+		{
+			if (quitte) return;
+			quitte = true;
+			minuteur.Stop();
+			if (attente != null) attente.Unregister(null);
+			icone.Visible = false;
+			icone.Dispose();
+			if (fermerFenetre) fenetre.Close();
+			ExitThread();
 		}
 	}
 
@@ -437,145 +778,158 @@ namespace GuildUpSMB
 
 	class Fenetre : Form
 	{
-		readonly string jeuImpose;
-		string jeu;
+		readonly Appli appli;
 		readonly Label etat = new Label();
 		readonly Label lblJeu = new Label();
 		readonly ProgressBar barre = new ProgressBar();
 		readonly TextBox journal = new TextBox();
 		readonly CheckBox demarrage = new CheckBox();
-		readonly Button btnRelancer = new Button();
+		readonly ComboBox intervalle = new ComboBox();
+		readonly Button btnVerifier = new Button();
 		readonly Button btnDossier = new Button();
-		readonly Button btnFermer = new Button();
-		readonly StringBuilder texteJournal = new StringBuilder();
+		readonly Button btnMasquer = new Button();
+		readonly Button btnQuitter = new Button();
+		bool majEnCours;	// mise à jour des contrôles par le programme : pas d'événement
 
-		public Fenetre(string jeuImpose)
+		public Fenetre(Appli appli)
 		{
-			this.jeuImpose = jeuImpose;
+			this.appli = appli;
 			Text = "GuildUpSMB - mise à jour";
-			Icon = MiseAJour.IconeProgramme();
+			Icon = MiseAJour.Icone(new Size(32, 32));
 			FormBorderStyle = FormBorderStyle.FixedDialog;
 			MaximizeBox = false;
 			StartPosition = FormStartPosition.CenterScreen;
-			ClientSize = new Size(560, 380);
+			ClientSize = new Size(560, 420);
 			Font = new Font("Segoe UI", 9f);
+			ShowInTaskbar = true;
 
 			etat.SetBounds(12, 12, 536, 22);
 			etat.Font = new Font("Segoe UI", 11f, FontStyle.Bold);
+			etat.Text = "En attente…";
 			lblJeu.SetBounds(12, 36, 536, 18);
 			lblJeu.ForeColor = SystemColors.GrayText;
 			lblJeu.AutoEllipsis = true;
-			barre.SetBounds(12, 60, 536, 14);
+			barre.SetBounds(12, 60, 536, 12);
 			barre.Style = ProgressBarStyle.Marquee;
-			journal.SetBounds(12, 82, 536, 230);
+			barre.Visible = false;
+			journal.SetBounds(12, 80, 536, 236);
 			journal.Multiline = true;
 			journal.ReadOnly = true;
 			journal.ScrollBars = ScrollBars.Vertical;
 			journal.BackColor = SystemColors.Window;
 
-			demarrage.SetBounds(12, 318, 536, 22);
-			demarrage.Text = "Vérifier les mises à jour à chaque démarrage de Windows";
-			try { demarrage.Checked = MiseAJour.LanceAuDemarrage(); } catch { }
-			demarrage.CheckedChanged += delegate
-			{
-				try { MiseAJour.LancerAuDemarrage(demarrage.Checked); }
-				catch (Exception e) { MessageBox.Show(this, e.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
-			};
+			demarrage.SetBounds(12, 324, 536, 22);
+			demarrage.Text = "Lancer au démarrage de Windows (dans la zone de notification)";
+			demarrage.CheckedChanged += delegate { if (!majEnCours) appli.Demarrage = demarrage.Checked; };
 
-			btnDossier.SetBounds(12, 346, 170, 26);
+			var lblIntervalle = new Label();
+			lblIntervalle.SetBounds(12, 353, 170, 20);
+			lblIntervalle.Text = "Vérifier les mises à jour toutes les";
+			lblIntervalle.AutoSize = true;
+			intervalle.SetBounds(206, 350, 100, 22);
+			intervalle.DropDownStyle = ComboBoxStyle.DropDownList;
+			foreach (int m in Appli.Intervalles) intervalle.Items.Add(m < 60 ? m + " minutes" : (m / 60) + " heure");
+			intervalle.SelectedIndex = Math.Max(0, Array.IndexOf(Appli.Intervalles, appli.Intervalle));
+			intervalle.SelectedIndexChanged += delegate { appli.Intervalle = Appli.Intervalles[intervalle.SelectedIndex]; };
+
+			btnDossier.SetBounds(12, 384, 170, 26);
 			btnDossier.Text = "Changer le dossier du jeu…";
-			btnDossier.Click += delegate { if (ChoisirJeu()) Lancer(); };
-			btnRelancer.SetBounds(296, 346, 120, 26);
-			btnRelancer.Text = "Vérifier à nouveau";
-			btnRelancer.Click += delegate { Lancer(); };
-			btnFermer.SetBounds(428, 346, 120, 26);
-			btnFermer.Text = "Fermer";
-			btnFermer.Click += delegate { Close(); };
-			CancelButton = btnFermer;
+			btnDossier.Click += delegate { appli.DemanderJeu(); };
+			btnVerifier.SetBounds(194, 384, 130, 26);
+			btnVerifier.Text = "Vérifier maintenant";
+			btnVerifier.Click += delegate { appli.Verifier(true); };
+			btnMasquer.SetBounds(336, 384, 100, 26);
+			btnMasquer.Text = "Masquer";
+			btnMasquer.Click += delegate { appli.Ranger(); };
+			btnQuitter.SetBounds(448, 384, 100, 26);
+			btnQuitter.Text = "Quitter";
+			btnQuitter.Click += delegate { appli.Quitter(true); };
+			CancelButton = btnMasquer;
 
-			Controls.AddRange(new Control[] { etat, lblJeu, barre, journal, demarrage, btnDossier, btnRelancer, btnFermer });
-			Shown += delegate { Demarrer(); };
+			Controls.AddRange(new Control[] { etat, lblJeu, barre, journal, demarrage, lblIntervalle, intervalle,
+				btnDossier, btnVerifier, btnMasquer, btnQuitter });
 		}
 
-		void Demarrer()
+		protected override void OnFormClosing(FormClosingEventArgs e)
 		{
-			jeu = jeuImpose ?? MiseAJour.TrouverJeu();
-			if (jeu == null)
+			if (!appli.Quitte)
 			{
-				MessageBox.Show(this, "Le dossier de WoW Forever (_forever_, qui contient Wow.exe) n'a pas été trouvé.\n"
-					+ "Indiquez-le dans la fenêtre suivante.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
-				if (!ChoisirJeu()) { Close(); return; }
+				if (e.CloseReason == CloseReason.UserClosing)
+				{
+					// La croix range la fenêtre ; « Quitter » arrête le programme.
+					e.Cancel = true;
+					appli.Ranger();
+					return;
+				}
+				appli.Quitter(false);	// fermeture de session Windows, etc.
 			}
-			else if (jeuImpose == null) MiseAJour.EcrireReglage("jeu", jeu);
-			Lancer();
+			base.OnFormClosing(e);
 		}
 
-		bool ChoisirJeu()
+		public void MajJeu(string jeu)
+		{
+			lblJeu.Text = jeu == null ? "Dossier du jeu non trouvé" : "Dossier du jeu : " + jeu;
+		}
+
+		public void MajDemarrage(bool oui)
+		{
+			majEnCours = true;
+			demarrage.Checked = oui;
+			majEnCours = false;
+		}
+
+		public string ChoisirJeu(string actuel)
 		{
 			using (var choix = new FolderBrowserDialog())
 			{
 				choix.Description = "Choisissez le dossier _forever_ de World of Warcraft (celui qui contient Wow.exe).";
 				choix.ShowNewFolderButton = false;
-				if (jeu != null) choix.SelectedPath = jeu;
+				if (actuel != null) choix.SelectedPath = actuel;
 				while (choix.ShowDialog(this) == DialogResult.OK)
 				{
-					if (MiseAJour.JeuValable(choix.SelectedPath))
-					{
-						jeu = choix.SelectedPath;
-						MiseAJour.EcrireReglage("jeu", jeu);
-						return true;
-					}
+					if (MiseAJour.JeuValable(choix.SelectedPath)) return choix.SelectedPath;
 					MessageBox.Show(this, "Ce dossier ne contient pas Wow.exe.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
 				}
 			}
-			return false;
+			return null;
 		}
 
-		void Lancer()
+		public void Debut()
 		{
-			if (jeu == null) return;
-			texteJournal.Clear();
-			journal.Clear();
-			lblJeu.Text = jeu;
 			etat.ForeColor = SystemColors.ControlText;
 			etat.Text = "Vérification…";
 			barre.Visible = true;
-			btnRelancer.Enabled = btnDossier.Enabled = false;
-
-			var fil = new Thread(delegate()
-			{
-				Bilan bilan = null;
-				Exception erreur = null;
-				try { bilan = MiseAJour.Executer(jeu, Noter); }
-				catch (Exception e) { erreur = e; }
-				MiseAJour.EcrireJournal(texteJournal.ToString());
-				BeginInvoke((Action)delegate { Fin(bilan, erreur); });
-			});
-			fil.IsBackground = true;
-			fil.Start();
+			btnVerifier.Enabled = btnDossier.Enabled = false;
 		}
 
-		void Noter(string texte)
+		// Appelé depuis le fil de la mise à jour.
+		public void Noter(string ligne)
 		{
-			lock (texteJournal) texteJournal.AppendLine(texte);
-			BeginInvoke((Action)delegate { journal.AppendText(texte + Environment.NewLine); });
+			try
+			{
+				BeginInvoke((Action)delegate
+				{
+					// Journal limité : on oublie la première moitié quand il devient long.
+					if (journal.TextLength > 60000) journal.Text = journal.Text.Substring(journal.TextLength / 2);
+					journal.AppendText(ligne + Environment.NewLine);
+				});
+			}
+			catch { }
 		}
 
-		void Fin(Bilan bilan, Exception erreur)
+		public void Fin(Bilan bilan, Exception erreur)
 		{
 			barre.Visible = false;
-			btnRelancer.Enabled = btnDossier.Enabled = true;
+			btnVerifier.Enabled = btnDossier.Enabled = true;
 			if (erreur != null)
 			{
-				string m = MiseAJour.Message(erreur);
-				journal.AppendText("Erreur : " + m + Environment.NewLine);
 				etat.ForeColor = Color.Firebrick;
-				etat.Text = "Échec de la mise à jour";
+				etat.Text = "Échec de la mise à jour (nouvel essai dans 2 minutes)";
 			}
 			else if (bilan.DejaAJour)
 			{
 				etat.ForeColor = Color.SeaGreen;
-				etat.Text = "Déjà à jour - version " + bilan.Version;
+				etat.Text = "À jour - version " + bilan.Version;
 			}
 			else
 			{
