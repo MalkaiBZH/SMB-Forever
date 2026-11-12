@@ -6,7 +6,8 @@
 --   "O"                    partage coupé
 -- Envoi toutes les INTERVALLE secondes si le joueur a bougé, sinon un signal toutes les BATTEMENT s
 -- (message « jetable » : un seul en attente dans la file d'envoi).
--- Sur la carte : un point par membre, à la couleur de sa classe ; nom, rôle et âge de la position
+-- Sur la carte : un point par membre, à la couleur de sa classe, cerclé de blanc et de noir (image
+-- media\point.tga de l'addon, taille réglée dans GuildUp_Config.lua) ; nom, rôle et âge de la position
 -- au survol. Les positions sont converties pour s'afficher aussi sur la carte du continent.
 
 local NOM_ADDON, ns = ...
@@ -15,7 +16,9 @@ local PREFIXE = "GuildUpPos"
 local INTERVALLE = 6     -- secondes entre deux vérifications de ma position
 local BATTEMENT = 20     -- envoi même sans bouger, pour dire « je suis toujours là »
 local DUREE_VIE = 45     -- secondes sans nouvelles avant d'effacer un membre (plus de deux battements)
-local TAILLE_POINT = 10   -- petit point de couleur (couleur de classe)
+local TAILLE_POINT = (ns.Config and tonumber(ns.Config.taillePointCarte)) or 16 -- diamètre du point (pixels)
+-- disque blanc de l'addon, teinté ici : ne dépend d'aucune image ni d'aucun masque du client
+local ROND = (ns.MEDIA or ("Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\")) .. "point"
 
 local positions = {}     -- [nom normalisé] = { nom, carte, x, y, classe, vu, instance }
 local dernier = { carte = nil, x = -1, y = -1, t = 0, etat = nil }
@@ -142,23 +145,21 @@ local function CreerEpingle(canevas)
 	local ancre = CreateFrame("Frame", nil, canevas)
 	ancre:SetSize(1, 1)
 	local e = CreateFrame("Button", nil, ancre)
-	e:SetSize(TAILLE_POINT + 6, TAILLE_POINT + 6) -- zone de survol un peu plus large que le point
+	e:SetSize(TAILLE_POINT + 8, TAILLE_POINT + 8) -- zone de survol un peu plus large que le point
 	e:SetPoint("CENTER", ancre, "CENTER", 0, 0)
 	e.ancre = ancre
-	-- un simple rond de couleur (couleur de classe), cerclé de sombre : plus d'icône de personnage
-	e.contour = e:CreateTexture(nil, "BACKGROUND")
-	e.contour:SetSize(TAILLE_POINT + 3, TAILLE_POINT + 3)
-	e.contour:SetPoint("CENTER", e, "CENTER", 0, 0)
-	e.contour:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
-	e.contour:SetVertexColor(0, 0, 0, 0.85)
-	e.point = e:CreateTexture(nil, "ARTWORK")
-	e.point:SetSize(TAILLE_POINT, TAILLE_POINT)
-	e.point:SetPoint("CENTER", e, "CENTER", 0, 0)
-	e.point:SetColorTexture(1, 1, 1, 1)
-	local masque = e:CreateMaskTexture()
-	masque:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
-	masque:SetAllPoints(e.point)
-	e.point:AddMaskTexture(masque)
+	-- trois disques empilés : contour noir, liseré blanc (visible sur toutes les cartes), couleur de classe
+	local function Disque(couche, taille, r, g, b, a)
+		local t = e:CreateTexture(nil, couche)
+		t:SetSize(taille, taille)
+		t:SetPoint("CENTER", e, "CENTER", 0, 0)
+		t:SetTexture(ROND)
+		t:SetVertexColor(r, g, b, a)
+		return t
+	end
+	e.contour = Disque("BACKGROUND", TAILLE_POINT + 6, 0, 0, 0, 0.9)
+	e.lisere = Disque("BORDER", TAILLE_POINT + 3, 1, 1, 1, 1)
+	e.point = Disque("ARTWORK", TAILLE_POINT, 1, 1, 1, 1)
 	e:SetScript("OnEnter", function(self)
 		local p = self.p
 		if not p then return end

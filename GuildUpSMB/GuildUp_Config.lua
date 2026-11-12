@@ -25,4 +25,7 @@ ns.Config = {
 	-- Animation de la vedette : true = planche media\zaardoz.tga (1024 x 512, 19 images de
 	-- 115 x 128, 8 par rangée). false = fête sans image (texte arc-en-ciel et corne seulement).
 	vedetteAnimation = false,
+
+	-- Carte du monde : diamètre en pixels du point qui marque chaque membre de la guilde
+	taillePointCarte = 16,
 }
