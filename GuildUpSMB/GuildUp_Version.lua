@@ -1,6 +1,7 @@
 -- GuildUpSMB : vérification de version.
 -- Chaque GuildUpSMB annonce sa version à la guilde à la connexion ("V~1.3.0", préfixe "GuildUpVer").
--- Si un membre a une version plus récente, une bulle propose de mettre l'addon à jour (CurseForge).
+-- Si un membre a une version plus récente, une bulle propose de mettre l'addon à jour avec le
+-- programme GuildUpSMB Updater (outils/MiseAJour, voir le README).
 -- Si un membre a une version plus ancienne, on lui renvoie la nôtre pour qu'il soit prévenu.
 -- Fenêtre « Nouveautés » (ns.MontrerNouveautes, /smb nouveautes) : notes de chaque version, au style
 -- sombre et doré du kit ns.UI ; elle s'ouvre seule une fois après une mise à jour.
@@ -38,7 +39,7 @@ local plusRecenteVue      -- plus haute version déjà signalée (une seule bull
 local dernierEnvoi = 0
 
 -- version de développement (« 1.6.0-dev » dans le .toc) : on n'annonce rien à la guilde, pour ne pas
--- lui proposer une mise à jour qui n'est pas encore sur CurseForge (on reçoit toujours les leurs)
+-- lui proposer une mise à jour qui n'est pas encore publiée (on reçoit toujours les leurs)
 local DEV = MA_VERSION:find("dev", 1, true) ~= nil
 local function Annoncer()
 	if DEV then return end
@@ -64,7 +65,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			plusRecenteVue = v
 			if ns.Notifier then
 				ns.Notifier("version", "Nouvelle version de SMB Forever",
-					("%s a la %s (toi : %s) — mets à jour via CurseForge"):format(NomCourt(expediteur), v, MA_VERSION),
+					("%s a la %s (toi : %s) — mets à jour avec |cffffd100GuildUpSMB Updater|r"):format(NomCourt(expediteur), v, MA_VERSION),
 					nil, function() end)
 			end
 		end
@@ -88,8 +89,11 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["2.6.1"] = {
+		"La bulle « Nouvelle version » indique de mettre à jour avec |cffffd100GuildUpSMB Updater|r.",
+	},
 	["2.6.0"] = {
 		"|cffffd100Artisanat > Items|r : deux filtres, « Pour ma classe » (armes que tu sais manier, ton type d'armure, capes, bijoux, boucliers et reliques de ta classe) et « Jusqu'à mon niveau ». Ils sont gardés d'une session à l'autre.",
 	},
