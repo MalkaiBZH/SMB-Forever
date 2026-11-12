@@ -5,8 +5,8 @@
 --    Toute la guilde la voit : en canal de guilde chacun lit le message ; ailleurs, l'auteur
 --    prévient la guilde par un message d'addon (préfixe GuildUpGU, message « G »).
 --  * Membre vedette (facultatif) : quand il monte de niveau, la bulle « La guilde progresse » passe
---    en version fête, avec un texte arc-en-ciel qui défile et, si demandé, son animation (pour toute
---    la guilde, via l'annonce de niveau déjà envoyée par GuildUp_Annonces).
+--    en version fête, avec un texte arc-en-ciel qui défile (pour toute la guilde, via l'annonce de
+--    niveau déjà envoyée par GuildUp_Annonces).
 
 local NOM_ADDON, ns = ...
 local MEDIA = ns.MEDIA or ("Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\")
@@ -141,12 +141,11 @@ local function DitGU(msg)
 end
 
 --------------------------------------------------------------------------------
--- Le membre vedette monte de niveau : texte arc-en-ciel qui défile, bordure aux couleurs
--- changeantes et, avec vedetteAnimation, son GIF DANS la bulle de niveau
+-- Le membre vedette monte de niveau : texte arc-en-ciel qui défile et bordure aux couleurs
+-- changeantes dans la bulle de niveau
 --------------------------------------------------------------------------------
 
-local ANIM = { images = 19, colonnes = 8, larg = 115, haut = 128, planche = { 1024, 512 }, fps = 10 }
-local GIF_L, GIF_H = 180, 200    -- GIF sur toute la largeur de la bulle (proportions 115 x 128)
+local LARGEUR = 180 -- largeur du texte de la bulle de fête
 
 -- teinte (0-1) → couleur vive
 local function Teinte(h)
@@ -184,54 +183,32 @@ local function Decorer(bulle, niveau)
 	if not deco then
 		deco = CreateFrame("Frame", nil, bulle)
 		deco:SetAllPoints(bulle)
-		deco.gif = deco:CreateTexture(nil, "ARTWORK")
-		deco.gif:SetSize(GIF_L, GIF_H)
-		deco.gif:SetPoint("TOP", bulle, "TOP", 0, -5)
-		if CFG.vedetteAnimation then
-			deco.gif:SetTexture(MEDIA .. "zaardoz")
-		else
-			-- pas d'image : le texte prend la place (bulle plus basse)
-			deco.gif:SetColorTexture(0, 0, 0, 0)
-			deco.gif:SetHeight(1)
-		end
-		deco.cadreGif = deco:CreateTexture(nil, "BORDER")
-		deco.cadreGif:SetPoint("TOPLEFT", deco.gif, "TOPLEFT", -2, 2)
-		deco.cadreGif:SetPoint("BOTTOMRIGHT", deco.gif, "BOTTOMRIGHT", 2, -2)
-		deco.cadreGif:SetColorTexture(1, 0.82, 0, 1)
-		if not CFG.vedetteAnimation then deco.cadreGif:Hide() end
 		deco:SetScript("OnUpdate", function(self)
 			local t = GetTime() - self.debut
-			-- GIF
-			local i = math.floor(t * ANIM.fps) % ANIM.images
-			local col, rang = i % ANIM.colonnes, math.floor(i / ANIM.colonnes)
-			local L, H = ANIM.planche[1], ANIM.planche[2]
-			self.gif:SetTexCoord(col * ANIM.larg / L, (col + 1) * ANIM.larg / L, rang * ANIM.haut / H, (rang + 1) * ANIM.haut / H)
 			-- couleurs (une dizaine de fois par seconde suffit)
 			if t - (self.derniere or -1) < 0.06 then return end
 			self.derniere = t
 			bulle.texte:SetText(ArcEnCiel(self.ligne1, t) .. "\n\n" .. ArcEnCiel(self.ligne2, t + 0.3, 0.08))
 			local r, g, b = Teinte((t * 0.35) % 1)
 			bulle:SetBackdropBorderColor(r, g, b, 1)
-			self.cadreGif:SetColorTexture(Teinte((t * 0.35 + 0.5) % 1))
 		end)
 	end
 	deco.ligne1 = ("%s a atteint le niveau %s !"):format(VEDETTE_NOM, niveau)
 	deco.ligne2 = CRI and (CRI .. " ! " .. CRI .. " ! " .. CRI .. " !") or "Bravo !"
 	deco.debut = GetTime()
 	deco.derniere = nil
-	-- format vertical : le GIF en haut, les textes centrés dessous
-	-- (pas de titre : seulement le texte, sous le GIF)
+	-- pas de titre : seulement les deux lignes, centrées
 	bulle.titre:Hide()
 	bulle.texte:ClearAllPoints()
-	bulle.texte:SetPoint("TOP", deco.gif, "BOTTOM", 0, -10)
+	bulle.texte:SetPoint("TOP", bulle, "TOP", 0, -16)
 	bulle.texte:SetJustifyH("CENTER")
 	bulle.texte:SetFontObject("GameFontHighlightLarge")
-	-- le texte ne dépasse pas la largeur du GIF (retour à la ligne si besoin)
-	bulle.texte:SetWidth(GIF_L - 8)
+	-- retour à la ligne si le texte dépasse la largeur
+	bulle.texte:SetWidth(LARGEUR - 8)
 	bulle.texte:SetWordWrap(true)
 	bulle.texte:SetText(deco.ligne1 .. "\n\n" .. deco.ligne2)
-	local hauteur = 5 + (CFG.vedetteAnimation and GIF_H or 1) + 10 + bulle.texte:GetStringHeight() + 14
-	bulle:SetSize(GIF_L + 10, hauteur)
+	local hauteur = 16 + bulle.texte:GetStringHeight() + 14
+	bulle:SetSize(LARGEUR + 10, hauteur)
 	deco:Show()
 	-- à la prochaine bulle ordinaire : tout revient comme avant
 	bulle.Reinit = function(self)

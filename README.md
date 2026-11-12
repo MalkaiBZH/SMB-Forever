@@ -105,7 +105,6 @@ nouvelles depuis 30 jours sont oubliées.
 - Provenance des composants (`GuildUp_Sources.lua`) tirée une fois de **QuestieDB** (version Forever,
   GPL-3.0) : merci à ses auteurs. GuildUpSMB n'a pas besoin de Questie pour fonctionner.
 - Images (`GuildUpSMB/media/`) : bannières et anneau de Miko ; chopes du cri de guilde (`gu_emote.tga`,
-  `emote_animee.tga`) dessinées pour cette version ; l'animation de Zaardoz Gu (`zaardoz.tga`, inutilisée ici)
-  appartient à la guilde d'origine et n'est pas couverte par la licence du code sans l'accord des personnes concernées.
+  `emote_animee.tga`) dessinées pour cette version.
 - Portraits (`GuildUp/media/portraits/`) : 56 médaillons Alliance (race, classe, homme et femme), nommés
   `race-classe-sexe.tga`, générés par IA (Nano Banana Pro) pour la guilde. TGA 32 bits 256×256, fond transparent.

@@ -19,12 +19,8 @@ ns.Config = {
 	emoteAnimation = { fichier = "emote_animee", images = 16, colonnes = 8, rangees = 2, ips = 10 },
 
 	-- Membre « vedette » : quand il monte de niveau, la bulle passe en version fête (corne, texte
-	-- arc-en-ciel, animation). Écrire "Prénom-Famille" (ex. "Zaardoz-Gu"), ou false pour rien.
+	-- arc-en-ciel, bordure changeante). Écrire "Prénom-Famille", ou false pour rien.
 	vedette = false,
-
-	-- Animation de la vedette : true = planche media\zaardoz.tga (1024 x 512, 19 images de
-	-- 115 x 128, 8 par rangée). false = fête sans image (texte arc-en-ciel et corne seulement).
-	vedetteAnimation = false,
 
 	-- Carte du monde : diamètre en pixels du point qui marque chaque membre de la guilde
 	taillePointCarte = 16,
