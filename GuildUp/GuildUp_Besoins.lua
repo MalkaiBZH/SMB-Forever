@@ -192,7 +192,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	elseif genre == "V" then
 		local qui, date, mots = reste:match("^([^~]+)~(%d+)~?(.*)$")
 		date = tonumber(date)
-		if not qui or not date or qui == MaCle() then return end
+		if not qui or not date or qui == MaCle() or date > Maintenant() + 60 then return end
 		relayees[qui] = GetTime()
 		local g = Guilde()
 		if not g then return end

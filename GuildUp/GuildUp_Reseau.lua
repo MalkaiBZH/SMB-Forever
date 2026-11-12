@@ -100,6 +100,9 @@ cadre:SetScript("OnEvent", function(_, _, prefixe, msg, canal, expediteur)
 	local e = prefixe and ecouteurs[prefixe]
 	if not e or not msg or not expediteur or expediteur == "" then return end
 	if not e.canaux[canal] then return end
+	-- aucun message d'addon de GuildUp ne contient « | » : on le retire (codes de couleur, liens,
+	-- textures |T…|t qu'un message forgé glisserait dans une bulle ou une infobulle)
+	if msg:find("|", 1, true) then msg = msg:gsub("|", "") end
 	stats.recus = stats.recus + 1
 	local ok, err = pcall(e.fonction, prefixe, msg, canal, expediteur)
 	if not ok then

@@ -89,8 +89,10 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	if cle == Normaliser(UnitName("player")) and not (ns.TestSolo and ns.TestSolo()) then return end
 	local type_, a, b, c, d = strsplit("~", msg)
 	if type_ == "P" then
+		local carte, x, y = tonumber(a), tonumber(b), tonumber(c)
+		if not (carte and x and y) or x < 0 or x > 1 or y < 0 or y > 1 then return end
 		positions[cle] = {
-			nom = expediteur, carte = tonumber(a), x = tonumber(b), y = tonumber(c),
+			nom = expediteur, carte = carte, x = x, y = y,
 			classe = (d and d ~= "") and d or nil, vu = GetTime(),
 		}
 	elseif type_ == "I" then

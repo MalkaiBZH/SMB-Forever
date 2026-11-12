@@ -322,17 +322,26 @@ local function Mercis()
 end
 local function NoterMerci(donneur, de, objet, quand)
 	local t = Mercis()
+	-- un merci par membre, par donneur et par objet et par jour
 	for _, m in ipairs(t) do
-		if m.donneur == donneur and m.de == de and m.objet == objet and math.abs((m.quand or 0) - quand) < 60 then return end
+		if m.donneur == donneur and m.de == de and m.objet == objet and math.abs((m.quand or 0) - quand) < 86400 then return end
 	end
 	t[#t + 1] = { donneur = donneur, de = de, objet = objet, quand = quand }
 end
 -- Les 3 donateurs les plus remerciés ce mois-ci
 local function DonateursDuMois()
 	local mois = date("%Y-%m", GetServerTime and GetServerTime() or time())
-	local compte = {}
+	-- un même membre compte au plus une fois par jour pour un donneur (des mercis en rafale ne
+	-- font pas grimper le classement)
+	local compte, vus = {}, {}
 	for _, m in ipairs(Mercis()) do
-		if date("%Y-%m", m.quand or 0) == mois then compte[m.donneur] = (compte[m.donneur] or 0) + 1 end
+		if date("%Y-%m", m.quand or 0) == mois then
+			local k = tostring(m.donneur) .. "|" .. tostring(m.de) .. "|" .. date("%d", m.quand or 0)
+			if not vus[k] then
+				vus[k] = true
+				compte[m.donneur] = (compte[m.donneur] or 0) + 1
+			end
+		end
 	end
 	local liste = {}
 	for qui, n in pairs(compte) do liste[#liste + 1] = { qui = qui, n = n } end
@@ -531,7 +540,8 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		else
 			qui, date, part, total, mots = reste:match("^([^~]+)~(%d+)~(%d+)~(%d+)~?(.*)$")
 			date = tonumber(date)
-			if not qui or not date or qui == moi then return end
+			-- une date dans le futur gagnerait contre toutes les listes à venir : refusée
+			if not qui or not date or qui == moi or date > Maintenant() + 60 then return end
 		end
 		part, total = tonumber(part), tonumber(total)
 		if not part or not total or total < 1 or total > 30 or part > total then return end
@@ -585,6 +595,9 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		local cible, nomDem, objet, quand = strsplit("~", reste)
 		objet, quand = tonumber(objet), tonumber(quand)
 		if not cible or not nomDem or not objet then return end
+		-- demandeur inconnu de la guilde, ou date dans le futur : ignoré
+		if ns.MembreGuilde and ns.MembreGuilde(Normaliser(nomDem)) == false then return end
+		if quand and quand > Maintenant() + 60 then return end
 		local r = Relais()
 		if r and r[cible] then r[cible][Normaliser(nomDem) .. ":" .. objet .. ":" .. (quand or 0)] = nil end
 		if cible == moi or (TestSolo() and cible == moi .. "#test") then
