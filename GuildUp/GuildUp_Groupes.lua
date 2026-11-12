@@ -117,10 +117,11 @@ end
 local dernierNomRecuDeMoi -- pour /smb diag : comment le serveur écrit mon nom dans les messages
 local finCalme = math.huge -- pas d'alerte avant la connexion + 25 s (voir PLAYER_ENTERING_WORLD)
 
--- texte libre sûr pour un message d'addon : sans séparateur, ni « | », ni retour à la ligne
+-- texte libre sûr pour un message d'addon : sans séparateur, ni « | », ni retour à la ligne,
+-- coupé à max lettres sans couper un caractère accentué
 local function Nettoyer(texte, max)
-	texte = (texte or ""):gsub("[~|,%.\r\n]", " ")
-	return texte:sub(1, max or 50)
+	texte = (texte or ""):gsub("[~|\r\n]", " ")
+	return ns.CouperUTF8 and ns.CouperUTF8(texte, nil, max or 50) or texte:sub(1, max or 50)
 end
 
 local function Decouper(msg, sep)
@@ -491,11 +492,22 @@ local function DiffuserMonAnnonce()
 	dernierEnvoi = GetTime()
 	derniereSignature = signature
 	local b = monAnnonce.besoin
-	Envoyer(table.concat({
-		"A", monAnnonce.id, monAnnonce.code, b.tank, b.heal, b.dps, pris.tank, pris.heal, pris.dps,
-		monAnnonce.taille, #membres, UnitLevel("player") or 0, classe or "", monAnnonce.commentaire,
-		table.concat(liste, ","), monAnnonce.rappel and "1" or "",
-	}, SEP), "GUILD")
+	local function Construire(commentaire, membresTexte)
+		return table.concat({
+			"A", monAnnonce.id, monAnnonce.code, b.tank, b.heal, b.dps, pris.tank, pris.heal, pris.dps,
+			monAnnonce.taille, #membres, UnitLevel("player") or 0, classe or "", commentaire,
+			membresTexte, monAnnonce.rappel and "1" or "",
+		}, SEP)
+	end
+	local max = ns.LONGUEUR_MAX or 255
+	local msg = Construire(monAnnonce.commentaire, table.concat(liste, ","))
+	-- trop long (noms longs ou accentués) : sans la liste des membres, puis commentaire raccourci
+	if #msg > max then msg = Construire(monAnnonce.commentaire, "") end
+	if #msg > max and ns.CouperUTF8 then
+		local place = #monAnnonce.commentaire - (#msg - max)
+		msg = Construire(ns.CouperUTF8(monAnnonce.commentaire, math.max(0, place)), "")
+	end
+	Envoyer(msg, "GUILD")
 end
 
 local function FermerMonAnnonce(raison)
@@ -518,6 +530,9 @@ local function CreerMonAnnonce(code, besoin, commentaire)
 	if not PeutAnnoncer() then erreur("Seul le chef du groupe peut créer une annonce"); return end
 	if not code then erreur("Choisis d'abord un contenu"); return end
 	local e = InfoContenu(code)
+	if not EstPerso(e) and IsInGroup() and (GetNumGroupMembers() or 0) >= (e.taille or 5) then
+		erreur("Ton groupe est déjà complet pour ce contenu"); return
+	end
 	monAnnonce = {
 		id = MonNom() .. ":" .. (GetServerTime and GetServerTime() or math.floor(GetTime())),
 		code = code,

@@ -113,15 +113,21 @@ local pret, dernierEnvoi = false, 0
 local function EnvoyerMoi()
 	local id = MonIdentite()
 	if not (id.pseudo and id.pseudo ~= "") and #id.persos < 2 then return end -- rien à dire
+	local pseudo = Propre(id.pseudo)
+	if ns.CouperUTF8 then pseudo = ns.CouperUTF8(pseudo, 48) end
+	local entete = ("I~%s~%s~"):format(pseudo, id.principal or "")
+	-- la liste des personnages remplit ce qui reste des 255 octets après l'en-tête
+	local budget = (ns.LONGUEUR_MAX or 255) - #entete
 	local persos = {}
 	local long = 0
 	for _, c in ipairs(id.persos) do
-		if long + #c + 1 > 190 then break end
+		local ajout = #c + (long > 0 and 1 or 0)
+		if long + ajout > budget then break end
 		persos[#persos + 1] = c
-		long = long + #c + 1
+		long = long + ajout
 	end
 	dernierEnvoi = GetTime()
-	Envoyer(("I~%s~%s~%s"):format(Propre(id.pseudo), id.principal or "", table.concat(persos, ",")))
+	Envoyer(entete .. table.concat(persos, ","))
 end
 ns.AnnoncerIdentite = function()
 	NoterMonPerso()

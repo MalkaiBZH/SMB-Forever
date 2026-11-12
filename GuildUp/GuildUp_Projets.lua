@@ -200,7 +200,8 @@ ns.CreerProjet = function(nom, entrees)
 	local maintenant = Maintenant()
 	local id = (MaCle():gsub("[^%w]", "")):sub(1, 12) .. maintenant
 	local p = Projet(id, true)
-	p.nom, p.auteur, p.maj, p.cree = nom:sub(1, 40), MaCle(), maintenant, maintenant
+	p.nom = ns.CouperUTF8 and ns.CouperUTF8(nom, nil, 40) or nom:sub(1, 40)
+	p.auteur, p.maj, p.cree = MaCle(), maintenant, maintenant
 	for _, e in ipairs(entrees or {}) do
 		if e.objet and e.objet > 0 then p.entrees[#p.entrees + 1] = { objet = e.objet, qte = e.qte or 1 } end
 	end
