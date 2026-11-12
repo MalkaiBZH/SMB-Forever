@@ -44,33 +44,13 @@ local function Envoyer(texte)
 	if ns.Notifier then ns.Notifier("aide", "Demande d'aide", "Ton appel est parti vers la guilde.", "aucun", function() end) end
 end
 
-StaticPopupDialogs["GUILDUP_AIDE"] = {
-	text = "Besoin d'aide de la guilde ?\nDis en quelques mots pourquoi (facultatif) :",
-	button1 = "Appeler",
-	button2 = "Annuler",
-	hasEditBox = true,
-	maxLetters = 60,
-	timeout = 0,
-	whileDead = true,
-	hideOnEscape = true,
-	OnShow = function(self)
-		local boite = self.editBox or self.EditBox
-		if boite then boite:SetText(""); boite:SetFocus() end
-	end,
-	OnAccept = function(self)
-		local boite = self.editBox or self.EditBox
-		Envoyer(boite and boite:GetText() or "")
-	end,
-	EditBoxOnEnterPressed = function(self)
-		local parent = self:GetParent()
-		Envoyer(self:GetText() or "")
-		parent:Hide()
-	end,
-	EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
-}
-
+-- Fenêtre de saisie du kit : le motif est facultatif
 ns.DemanderAide = function()
-	StaticPopup_Show("GUILDUP_AIDE")
+	ns.UI.DemanderTexte({
+		titre = "Besoin d'aide de la guilde ?", texte = "Dis en quelques mots pourquoi (facultatif) :",
+		maxLettres = 60, vide = true, bouton = "Appeler",
+		valider = function(t) Envoyer(t or "") end,
+	})
 end
 
 -- Repère sur la carte du monde à la position de l'appel

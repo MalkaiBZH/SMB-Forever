@@ -1048,7 +1048,7 @@ local function MenuChoixListe(ancre)
 		items[#items + 1] = { texte = (nom == db.carnetChoisi and "|cfff1cf6b> " or "   ") .. nom .. ("  " .. GRIS .. "(%d)|r"):format(#(c[nom].entrees or {})),
 			action = function() db.carnetChoisi = nom; MajCourses(); MajCarnet() end }
 	end
-	items[#items + 1] = { texte = VERT .. "+ Nouvelle liste…|r", action = function() StaticPopup_Show("GUILDUP_NOUVEAU_CARNET") end }
+	items[#items + 1] = { texte = VERT .. "+ Nouvelle liste…|r", action = function() ns.NouveauCarnet() end }
 	items[#items + 1] = { texte = "|cffff6666Supprimer cette liste|r", action = function()
 		StaticPopup_Show("GUILDUP_SUPPRIMER_CARNET", db.carnetChoisi, nil, db.carnetChoisi) end }
 	for i, it in ipairs(items) do
@@ -1077,7 +1077,7 @@ local function CreerPageCarnets(parent)
 	-- à gauche : mes listes
 	p.nouveau = UI.Bouton(p, "+ Nouvelle liste", "or", LARGEUR_CARNETS - 76, 30)
 	p.nouveau:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -MARGE)
-	p.nouveau:SetScript("OnClick", function() StaticPopup_Show("GUILDUP_NOUVEAU_CARNET") end)
+	p.nouveau:SetScript("OnClick", function() ns.NouveauCarnet() end)
 	p.items = UI.Bouton(p, "Items", "fantome", 70, 30)
 	p.items:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE + LARGEUR_CARNETS - 70, -MARGE)
 	p.items:SetScript("OnClick", function() if ns.OuvrirArtisanat then ns.OuvrirArtisanat(2) end end)
@@ -2104,7 +2104,7 @@ MontrerMenuListes = function(bouton, objet)
 			b.texte:SetText(VERT .. "+ Nouvelle liste…|r")
 			b:SetScript("OnClick", function()
 				m:Hide()
-				StaticPopup_Show("GUILDUP_NOUVEAU_CARNET", nil, nil, objet)
+				ns.NouveauCarnet(objet)
 			end)
 		elseif ch.projet then
 			local p = ch.projet
@@ -2118,7 +2118,7 @@ MontrerMenuListes = function(bouton, objet)
 			b.texte:SetText(VERT .. "+ Nouveau projet…|r")
 			b:SetScript("OnClick", function()
 				m:Hide()
-				StaticPopup_Show("GUILDUP_NOUVEAU_PROJET", nil, nil, { objet = objet })
+				if ns.NouveauProjet then ns.NouveauProjet({ objet = objet }) end
 			end)
 		end
 		b:Show()
@@ -2327,32 +2327,22 @@ MajCarnet = function()
 	if ArtisanatVisible(2) then RendreItems() end
 end
 
-StaticPopupDialogs["GUILDUP_NOUVEAU_CARNET"] = {
-	text = "Nom de la nouvelle liste :",
-	button1 = "Créer",
-	button2 = "Annuler",
-	hasEditBox = true,
-	maxLetters = 30,
-	timeout = 0,
-	whileDead = true,
-	hideOnEscape = true,
-	OnAccept = function(self)
-		local boite = self.editBox or self.EditBox
-		local nom = boite and strtrim(boite:GetText() or "") or ""
-		if nom == "" then return end
-		local c, db = Carnets()
-		c[nom] = c[nom] or { entrees = {}, obtenir = {} }
-		db.carnetChoisi = nom
-		if self.data then AjouterObjet(self.data, 1, nom) end
-		MajCarnet()
-		MajCourses()
-	end,
-	EditBoxOnEnterPressed = function(self)
-		local parent = self:GetParent()
-		StaticPopupDialogs["GUILDUP_NOUVEAU_CARNET"].OnAccept(parent)
-		parent:Hide()
-	end,
-}
+-- Nouvelle liste de courses : demande son nom (fenêtre de saisie du kit) ; objet = à y ajouter tout de suite
+ns.NouveauCarnet = function(objet)
+	UI.DemanderTexte({
+		titre = "Nouvelle liste", texte = "Nom de la nouvelle liste :", maxLettres = 30, bouton = "Créer",
+		valider = function(nom)
+			nom = nom:gsub("[|~]", "")
+			if nom == "" then return end
+			local c, db = Carnets()
+			c[nom] = c[nom] or { entrees = {}, obtenir = {} }
+			db.carnetChoisi = nom
+			if objet then AjouterObjet(objet, 1, nom) end
+			MajCarnet()
+			MajCourses()
+		end,
+	})
+end
 StaticPopupDialogs["GUILDUP_SUPPRIMER_CARNET"] = {
 	text = "Supprimer la liste « %s » ?",
 	button1 = "Supprimer",

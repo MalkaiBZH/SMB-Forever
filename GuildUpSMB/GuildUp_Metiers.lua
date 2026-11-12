@@ -993,41 +993,15 @@ local function Commander(cle, nom, code, qte)
 	end
 end
 
--- Confirmation avant d'envoyer une commande (évite les clics par erreur et les demandes en double)
-StaticPopupDialogs["GUILDUP_CONFIRMER_COMMANDE"] = {
-	text = "%s",
-	button1 = "Commander",
-	button2 = "Annuler",
-	hasEditBox = true,
-	maxLetters = 4,
-	timeout = 0,
-	whileDead = true,
-	hideOnEscape = true,
-	OnShow = function(self)
-		local boite = self.editBox or self.EditBox
-		if boite then
-			boite:SetNumeric(true)
-			boite:SetText(tostring(self.data and self.data.qte or 1))
-			boite:HighlightText()
-		end
-	end,
-	OnAccept = function(self)
-		local d = self.data
-		local boite = self.editBox or self.EditBox
-		if d then Commander(d.cle, d.nom, d.code, boite and tonumber(boite:GetText()) or d.qte) end
-	end,
-	EditBoxOnEnterPressed = function(self)
-		local parent = self:GetParent()
-		local d = parent.data
-		if d then Commander(d.cle, d.nom, d.code, tonumber(self:GetText()) or d.qte) end
-		parent:Hide()
-	end,
-}
-
--- (quantité modifiable : 1 par défaut, ou celle du carnet de craft)
+-- Confirmation avant d'envoyer une commande (évite les clics par erreur et les demandes en double) ;
+-- quantité modifiable : 1 par défaut, ou celle du carnet de craft (fenêtre de saisie du kit)
 local function DemanderConfirmation(cle, nom, code, qte)
-	local texte = ("Commander à |cffffd100%s|r :\n%s\n\nQuantité :"):format(NomCourt(nom), NomRecette(code))
-	StaticPopup_Show("GUILDUP_CONFIRMER_COMMANDE", texte, nil, { cle = cle, nom = nom, code = code, qte = qte })
+	ns.UI.DemanderTexte({
+		titre = "Commander",
+		texte = ("À |cffffd100%s|r : %s\nQuantité :"):format(NomCourt(nom), NomRecette(code)),
+		defaut = tostring(qte or 1), numerique = true, maxLettres = 4, bouton = "Commander",
+		valider = function(t) Commander(cle, nom, code, tonumber(t) or qte) end,
+	})
 end
 -- Pour le carnet de craft : commander un objet (avec une quantité) à un membre
 ns.CommanderObjet = function(cle, nom, objet, qte) DemanderConfirmation(cle, nom, "i" .. objet, qte) end

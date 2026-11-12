@@ -780,7 +780,7 @@ local function MenuNouveau(ancre)
 					if e.objet then entrees[#entrees + 1] = { objet = e.objet, qte = e.qte } end
 				end
 			end
-			StaticPopup_Show("GUILDUP_NOUVEAU_PROJET", nil, nil, { entrees = entrees, nom = c[2] })
+			ns.NouveauProjet({ entrees = entrees, nom = c[2] })
 		end)
 		b:Show()
 	end
@@ -793,34 +793,19 @@ local function MenuNouveau(ancre)
 end
 ns.MenuNouveauProjet = MenuNouveau
 
-StaticPopupDialogs["GUILDUP_NOUVEAU_PROJET"] = {
-	text = "Nom du projet de guilde :",
-	button1 = "Créer",
-	button2 = "Annuler",
-	hasEditBox = true,
-	maxLetters = 40,
-	timeout = 0,
-	whileDead = true,
-	hideOnEscape = true,
-	OnShow = function(self, data)
-		local boite = self.editBox or self.EditBox
-		if boite and data and data.nom then boite:SetText(data.nom) end
-	end,
-	OnAccept = function(self, data)
-		local boite = self.editBox or self.EditBox
-		local nom = boite and strtrim(boite:GetText() or "") or ""
-		if nom == "" then return end
-		data = data or {}
-		local p = ns.CreerProjet(nom, data.entrees)
-		if p and data.objet then ns.AjouterAProjet(p.id, data.objet, 1) end
-		if p then choisi = p.id; ns.OuvrirProjet(p.id) end
-	end,
-	EditBoxOnEnterPressed = function(self)
-		local parent = self:GetParent()
-		StaticPopupDialogs["GUILDUP_NOUVEAU_PROJET"].OnAccept(parent, parent.data)
-		parent:Hide()
-	end,
-}
+-- Nouveau projet de guilde : demande son nom (fenêtre de saisie du kit)
+--   data = { nom (proposé), entrees (d'une liste de courses), objet (à y ajouter) }
+ns.NouveauProjet = function(data)
+	data = data or {}
+	ns.UI.DemanderTexte({
+		titre = "Nouveau projet de guilde", texte = "Nom du projet :", defaut = data.nom, maxLettres = 40, bouton = "Créer",
+		valider = function(nom)
+			local p = ns.CreerProjet(nom, data.entrees)
+			if p and data.objet then ns.AjouterAProjet(p.id, data.objet, 1) end
+			if p then choisi = p.id; ns.OuvrirProjet(p.id) end
+		end,
+	})
+end
 StaticPopupDialogs["GUILDUP_SUPPRIMER_PROJET"] = {
 	text = "Supprimer le projet « %s » pour toute la guilde ?",
 	button1 = "Supprimer",

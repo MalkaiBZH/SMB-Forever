@@ -487,6 +487,72 @@ function UI.Champ(parent, largeur, indice, hauteur)
 	return cadre
 end
 
+-- Petite fenêtre de saisie au style du kit, à la place des fenêtres du jeu avec zone de texte
+-- (StaticPopup + hasEditBox), où l'on ne pouvait pas toujours écrire sur Forever. Le champ prend le
+-- focus à l'ouverture ; Entrée valide, Échap ferme.
+--   o = { titre, texte, defaut, maxLettres (60), numerique, bouton ("Valider"), vide (accepter un texte
+--         vide), valider = function(texte) }
+local demande
+function UI.DemanderTexte(o)
+	if not demande then
+		local f = CreateFrame("Frame", "GuildUpDemande", UIParent, "BackdropTemplate")
+		UI.Habiller(f, C.fond, C.bordFort)
+		f:SetSize(380, 150)
+		f:SetPoint("CENTER", UIParent, "CENTER", 0, 140)
+		f:SetFrameStrata("FULLSCREEN_DIALOG")
+		f:SetToplevel(true)
+		f:SetClampedToScreen(true)
+		f:EnableMouse(true)
+		f:SetMovable(true)
+		f:RegisterForDrag("LeftButton")
+		f:SetScript("OnDragStart", f.StartMoving)
+		f:SetScript("OnDragStop", f.StopMovingOrSizing)
+		f.titre = UI.Texte(f, "GameFontNormal", C.ors)
+		f.titre:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -14)
+		f.titre:SetPoint("RIGHT", f, "RIGHT", -40, 0)
+		local x = UI.Fermer(f, function() f:Hide() end, 22)
+		x:SetPoint("TOPRIGHT", f, "TOPRIGHT", -10, -10)
+		f.texte = UI.Texte(f, "GameFontHighlight", C.texte)
+		f.texte:SetPoint("TOPLEFT", f.titre, "BOTTOMLEFT", 0, -10)
+		f.texte:SetWidth(348)
+		f.texte:SetWordWrap(true)
+		f.champ = UI.Champ(f, 348, "", 30)
+		f.champ:SetPoint("TOPLEFT", f.texte, "BOTTOMLEFT", 0, -10)
+		f.ok = UI.Bouton(f, "Valider", "or", 110, 28)
+		f.ok:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 14)
+		f.annuler = UI.Bouton(f, "Annuler", "fantome", 90, 28)
+		f.annuler:SetPoint("RIGHT", f.ok, "LEFT", -8, 0)
+		local function Valider()
+			local t = strtrim(f.champ.Lire() or "")
+			if t == "" and not (f.o and f.o.vide) then f.champ.saisie:SetFocus(); return end
+			local valider = f.o and f.o.valider
+			f:Hide()
+			if valider then valider(t) end
+		end
+		f.ok:SetScript("OnClick", Valider)
+		f.annuler:SetScript("OnClick", function() f:Hide() end)
+		f.champ.saisie:SetScript("OnEnterPressed", Valider)
+		f.champ.saisie:SetScript("OnEscapePressed", function() f:Hide() end)
+		f:SetScript("OnHide", function(self) self.champ.saisie:ClearFocus() end)
+		tinsert(UISpecialFrames, "GuildUpDemande") -- Échap ferme
+		demande = f
+	end
+	local f = demande
+	f.o = o or {}
+	f.titre:SetText(f.o.titre or "")
+	f.texte:SetText(f.o.texte or "")
+	f.ok:Ecrire(f.o.bouton or "Valider")
+	f.champ.saisie:SetMaxLetters(f.o.maxLettres or 60)
+	f.champ.saisie:SetNumeric(f.o.numerique and true or false)
+	f.champ:Ecrire(f.o.defaut or "")
+	local hTexte = (f.o.texte and f.o.texte ~= "") and (tonumber(f.texte:GetStringHeight()) or 14) or 0
+	f:SetHeight(14 + 16 + 10 + hTexte + 10 + 30 + 16 + 28 + 14)
+	f:Show()
+	f:Raise()
+	f.champ.saisie:SetFocus()
+	f.champ.saisie:HighlightText()
+end
+
 -- Case à cocher : petit carré bordé, coche dorée ; changer(oui) au clic
 function UI.Case(parent, texte, changer)
 	local b = CreateFrame("Button", nil, parent)
