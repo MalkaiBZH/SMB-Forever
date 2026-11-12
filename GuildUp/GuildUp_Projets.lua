@@ -75,27 +75,26 @@ local function Taches(p)
 	local fab, base, ordreF = {}, {}, {}
 	local objectifs = {}
 	for _, e in ipairs(p.entrees) do objectifs[e.objet] = (objectifs[e.objet] or 0) + e.qte end
-	local function Dev(objet, qte, prof, vus)
-		local recs = (prof < 8 and not vus[objet] and O.RecettesDe) and O.RecettesDe(objet)
-		if recs then
-			local r = recs[1]
-			local t = fab[objet]
+	-- même calcul que la liste de courses (GuildUp_Carnet.lua) : boucles de transmutation non
+	-- développées, surplus des fabrications partagé ; le stock part de zéro (projet de guilde)
+	if not (O.Developper and O.NouveauContexte) then return {}, {} end
+	local ctx = O.NouveauContexte(false)
+	local function Parcourir(n, prof)
+		if n.recette then
+			local t = fab[n.objet]
 			if not t then
-				t = { objet = objet, qte = 0, recette = r, prof = prof }
-				fab[objet] = t
+				t = { objet = n.objet, qte = 0, recette = n.recette, prof = prof }
+				fab[n.objet] = t
 				ordreF[#ordreF + 1] = t
 			end
-			t.qte = t.qte + qte
+			t.qte = t.qte + n.manque
 			t.prof = math.min(t.prof, prof)
-			local n = math.ceil(qte / r.rendement)
-			vus[objet] = true
-			for _, c in ipairs(r.composants) do Dev(c[1], c[2] * n, prof + 1, vus) end
-			vus[objet] = nil
-		else
-			base[objet] = (base[objet] or 0) + qte
+			for _, c in ipairs(n.enfants or {}) do Parcourir(c, prof + 1) end
+		elseif n.manque > 0 then
+			base[n.objet] = (base[n.objet] or 0) + n.manque
 		end
 	end
-	for _, e in ipairs(p.entrees) do Dev(e.objet, e.qte, 0, {}) end
+	for _, e in ipairs(p.entrees) do Parcourir(O.Developper(e.objet, e.qte, ctx, 0, {}), 0) end
 	local function Nom(o) return (O.InfoObjet and O.InfoObjet(o)) or "" end
 	table.sort(ordreF, function(a, b)
 		if a.prof ~= b.prof then return a.prof < b.prof end

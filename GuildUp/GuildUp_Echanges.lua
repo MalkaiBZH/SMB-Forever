@@ -207,18 +207,25 @@ local function NbCases(sac)
 		or (GetContainerNumSlots and GetContainerNumSlots(sac)) or 0
 end
 
-local function LireSac(sac, t)
+-- compte les objets d'un sac dans t (avecLies : aussi les objets liés, sinon seulement les échangeables)
+local function LireSac(sac, t, avecLies)
 	for c = 1, NbCases(sac) do
 		local objet, nombre, lie = Case(sac, c)
-		if objet and not lie then t[objet] = (t[objet] or 0) + (nombre or 1) end
+		if objet and (avecLies or not lie) then t[objet] = (t[objet] or 0) + (nombre or 1) end
 	end
+end
+ns.LireConteneur = LireSac
+-- numéros des sacs de la banque (la banque elle-même, puis ses sacs)
+ns.SacsDeBanque = function()
+	local l = { BANK_CONTAINER or -1 }
+	local premier = (NUM_BAG_SLOTS or 4) + 1
+	for sac = premier, premier + (NUM_BANKBAGSLOTS or 7) - 1 do l[#l + 1] = sac end
+	return l
 end
 
 local function LireBanque()
 	local t = {}
-	LireSac(BANK_CONTAINER or -1, t)
-	local premier = (NUM_BAG_SLOTS or 4) + 1
-	for sac = premier, premier + (NUM_BANKBAGSLOTS or 7) - 1 do LireSac(sac, t) end
+	for _, sac in ipairs(ns.SacsDeBanque()) do LireSac(sac, t) end
 	local b = Banque()
 	wipe(b)
 	for objet, n in pairs(t) do b[objet] = n end
