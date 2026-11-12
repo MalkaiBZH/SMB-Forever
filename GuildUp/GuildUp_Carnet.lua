@@ -37,6 +37,50 @@ local recettes        -- [sort] = { sort, metier, niveau, objet, rendement, comp
 local parObjet        -- [objet] = { recette, … } (recettes qui fabriquent cet objet)
 local formuleSort     -- [objet formule] = recette qu'elle apprend
 local parCompo        -- [composant] = { recette, … } (recettes qui l'utilisent)
+local enCycle         -- [objet] = true : fabriqué dans une boucle de recettes (transmutations d'essences…)
+
+-- Boucles de recettes (composantes fortement connexes du graphe objet -> composants, algorithme de
+-- Tarjan) : ces objets se transmutent les uns en les autres (Feu <- Air <- Eau <- Terre <- Feu…).
+-- Ils ne sont jamais développés automatiquement : ils restent des matériaux de base.
+local function CalculerCycles()
+	enCycle = {}
+	local index, bas, pile, surPile, n = {}, {}, {}, {}, 0
+	local function Visiter(v)
+		n = n + 1
+		index[v], bas[v] = n, n
+		pile[#pile + 1] = v
+		surPile[v] = true
+		for _, r in ipairs(parObjet[v] or {}) do
+			for _, c in ipairs(r.composants) do
+				local w = c[1]
+				-- une recette qui utilise son propre objet (recharge, réparation) n'est pas une boucle
+				if w ~= v and parObjet[w] then
+					if not index[w] then
+						Visiter(w)
+						bas[v] = math.min(bas[v], bas[w])
+					elseif surPile[w] then
+						bas[v] = math.min(bas[v], index[w])
+					end
+				end
+			end
+		end
+		if bas[v] == index[v] then
+			local membres = {}
+			repeat
+				local w = table.remove(pile)
+				surPile[w] = nil
+				membres[#membres + 1] = w
+			until w == v
+			if #membres > 1 then
+				for _, w in ipairs(membres) do enCycle[w] = true end
+			end
+		end
+	end
+	for v in pairs(parObjet) do
+		if not index[v] then Visiter(v) end
+	end
+end
+
 local function Recettes()
 	if recettes then return recettes end
 	recettes, parObjet, parCompo = {}, {}, {}
@@ -57,6 +101,7 @@ local function Recettes()
 	end
 	for _, l in pairs(parObjet) do table.sort(l, function(a, b) return a.niveau < b.niveau end) end
 	ns.DONNEES_CRAFT = nil
+	CalculerCycles()
 	-- formules / recettes / plans : l'objet qui apprend chaque recette
 	formuleSort = {}
 	for o, s in (ns.DONNEES_FORMULES or ""):gmatch("(%d+)=(%d+)") do
@@ -72,6 +117,19 @@ local function Recettes()
 	return recettes
 end
 local function RecettesDe(objet) Recettes(); return parObjet[objet] end
+-- Recette à suivre pour fabriquer un objet dans un calcul automatique (liste de courses, projets) :
+-- aucune pour un objet en boucle de transmutation ; sinon la première qui n'utilise pas l'objet lui-même
+local function RecetteADevelopper(objet)
+	Recettes()
+	if enCycle[objet] then return nil end
+	for _, r in ipairs(parObjet[objet] or {}) do
+		local soiMeme = false
+		for _, c in ipairs(r.composants) do
+			if c[1] == objet then soiMeme = true; break end
+		end
+		if not soiMeme then return r end
+	end
+end
 local function UtilisationsDe(objet) Recettes(); return parCompo[objet] end
 -- recette apprise par une formule (objet), ou nil
 local function RecetteDeFormule(objet) Recettes(); return formuleSort[objet] end
@@ -170,21 +228,42 @@ end
 local function Precharger(objet)
 	if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, objet) end
 end
-local function JAi(objet)
-	local f = (C_Item and C_Item.GetItemCount) or GetItemCount
-	if not f then return 0 end
-	local ok, n = pcall(f, objet, true) -- sacs + banque
-	return ok and n or 0
+-- Banque : le jeu ne la connaît qu'une fois ouverte. Son contenu est gardé à chaque visite
+-- (db.banquePerso[perso]) pour les sessions suivantes ; nil = jamais vue sur ce personnage.
+local banqueOuverte = false
+local function ClePerso() return ns.Normaliser and ns.Normaliser(UnitName("player")) end
+local function BanqueGardee()
+	local db = ns.DB and ns.DB()
+	local cle = ClePerso()
+	if not (db and cle and type(db.banquePerso) == "table") then return nil end
+	return db.banquePerso[cle]
 end
--- Où sont mes objets : sacs, banque (la banque est connue du jeu une fois ouverte)
+local function NoterBanque()
+	if not (ns.LireConteneur and ns.SacsDeBanque) then return end
+	local db = ns.DB and ns.DB()
+	local cle = ClePerso()
+	if not (db and cle) then return end
+	local t = {}
+	for _, sac in ipairs(ns.SacsDeBanque()) do ns.LireConteneur(sac, t, true) end
+	if type(db.banquePerso) ~= "table" then db.banquePerso = {} end
+	db.banquePerso[cle] = t
+end
+-- Où sont mes objets : sacs, banque (nil = banque inconnue : jamais ouverte sur ce personnage)
 local function OuSont(objet)
 	local f = (C_Item and C_Item.GetItemCount) or GetItemCount
-	if not f then return 0, 0 end
+	if not f then return 0, nil end
 	local ok1, sacs = pcall(f, objet)
 	local ok2, tout = pcall(f, objet, true)
 	sacs = ok1 and sacs or 0
-	tout = ok2 and tout or sacs
-	return sacs, math.max(0, tout - sacs)
+	local enDirect = math.max(0, (ok2 and tout or sacs) - sacs)
+	if banqueOuverte then return sacs, enDirect end
+	local gardee = BanqueGardee()
+	if not gardee then return sacs, enDirect > 0 and enDirect or nil end
+	return sacs, math.max(enDirect, gardee[objet] or 0)
+end
+local function JAi(objet)
+	local sacs, banque = OuSont(objet)
+	return sacs + (banque or 0)
 end
 local function NomMetier(code) return ns.NomMetierCode and ns.NomMetierCode(code) or code end
 local function NomZone(z)
@@ -443,22 +522,42 @@ end
 -- Calcul : arbre des composants et matériaux de base
 --------------------------------------------------------------------------------
 
--- noeud = { objet, besoin, jai, manque, recette, fabrications, enfants }
-local function Developper(objet, besoin, obtenir, profondeur, dejaVus)
-	local n = { objet = objet, besoin = besoin, jai = JAi(objet) }
-	n.manque = math.max(0, besoin - n.jai)
+-- Contexte d'un calcul : stock restant partagé par toutes les branches (un objet en stock ne sert
+-- qu'une fois, et le surplus d'une fabrication à rendement > 1 profite aux autres branches) et
+-- objets « à obtenir tels quels » (non développés).
+--   avecMesObjets : le stock part de mes sacs + banque (liste de courses) ; sinon de zéro (projets)
+local function NouveauContexte(avecMesObjets, obtenir)
+	local ctx = { obtenir = obtenir or {}, dispo = avecMesObjets and JAi or function() return 0 end }
+	ctx.stock = setmetatable({}, { __index = function(t, objet)
+		local v = ctx.dispo(objet)
+		rawset(t, objet, v)
+		return v
+	end })
+	return ctx
+end
+
+-- noeud = { objet, besoin, jai, manque, recette, fabrications, enfants, cycle }
+-- chemin : objets en cours de développement au-dessus de ce noeud (garde-fou contre les boucles)
+local function Developper(objet, besoin, ctx, profondeur, chemin)
+	local n = { objet = objet, besoin = besoin, jai = ctx.dispo(objet) }
+	local pris = math.min(ctx.stock[objet], besoin)
+	ctx.stock[objet] = ctx.stock[objet] - pris
+	n.manque = besoin - pris
 	local recs = RecettesDe(objet)
 	n.fabricable = recs ~= nil
-	if recs and not obtenir[objet] and n.manque > 0 and profondeur < PROFONDEUR_MAX and not dejaVus[objet] then
-		local r = recs[1]
+	local r = RecetteADevelopper(objet)
+	n.cycle = recs ~= nil and r == nil
+	if r and not ctx.obtenir[objet] and n.manque > 0 and profondeur < PROFONDEUR_MAX and not chemin[objet] then
 		n.recette = r
 		n.fabrications = math.ceil(n.manque / r.rendement)
+		-- surplus de la fabrication : disponible pour les autres branches
+		ctx.stock[objet] = ctx.stock[objet] + n.fabrications * r.rendement - n.manque
 		n.enfants = {}
-		dejaVus[objet] = true
+		chemin[objet] = true
 		for _, c in ipairs(r.composants) do
-			n.enfants[#n.enfants + 1] = Developper(c[1], c[2] * n.fabrications, obtenir, profondeur + 1, dejaVus)
+			n.enfants[#n.enfants + 1] = Developper(c[1], c[2] * n.fabrications, ctx, profondeur + 1, chemin)
 		end
-		dejaVus[objet] = nil
+		chemin[objet] = nil
 	end
 	return n
 end
@@ -467,6 +566,7 @@ local function Calculer()
 	Recettes()
 	local k = Carnet()
 	local arbres, base = {}, {}
+	local ctx = NouveauContexte(true, k.obtenir)
 	for _, e in ipairs(k.entrees) do
 		local r = e.sort and recettes[e.sort]
 		if not r and e.objet then
@@ -479,7 +579,7 @@ local function Calculer()
 			local racine = { recette = r, objet = r.objet, besoin = e.qte, fabrications = fab, enfants = {}, racine = true,
 				entree = e }
 			for _, c in ipairs(r.composants) do
-				racine.enfants[#racine.enfants + 1] = Developper(c[1], c[2] * fab, k.obtenir, 1, {})
+				racine.enfants[#racine.enfants + 1] = Developper(c[1], c[2] * fab, ctx, 1, { [r.objet] = true })
 			end
 			arbres[#arbres + 1] = racine
 		elseif e.objet then
@@ -519,7 +619,11 @@ local function InfobulleObjet(self)
 	local sacs, banque = OuSont(self.objet)
 	GameTooltip:AddLine("|cffffd100Tu en as|r :", 1, 1, 1)
 	GameTooltip:AddLine(("  - %d dans tes sacs"):format(sacs), 1, 1, 1)
-	GameTooltip:AddLine(("  - %d à la banque"):format(banque), 1, 1, 1)
+	if banque then
+		GameTooltip:AddLine(("  - %d à la banque"):format(banque), 1, 1, 1)
+	else
+		GameTooltip:AddLine("  - banque inconnue (ouvre-la une fois)", 0.6, 0.6, 0.6)
+	end
 	GameTooltip:AddLine(" ")
 	GameTooltip:AddLine("Clic : fiche (d'où ça vient, qui le fabrique)", 0.6, 0.6, 0.6)
 	if self.noeud and self.noeud.fabricable and not self.noeud.racine then
@@ -768,7 +872,7 @@ MajCourses = function()
 		-- où sont ceux que j'ai déjà : sacs / banque
 		if not n.racine and (n.jai or 0) > 0 then
 			local sacs, banque = OuSont(n.objet)
-			if banque > 0 then
+			if (banque or 0) > 0 then
 				suffixe = suffixe .. ("  |cff999999(%s%d en banque)|r"):format(sacs > 0 and (sacs .. " en sacs, ") or "", banque)
 			end
 		end
@@ -1450,7 +1554,8 @@ MajFiche = function()
 	local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
 	if qc then fiche.nom:SetTextColor(qc.r, qc.g, qc.b) else fiche.nom:SetTextColor(1, 0.82, 0) end
 	local sacs, banque = OuSont(objet)
-	fiche.jai:SetText(("Tu en as %d dans tes sacs · %d à la banque"):format(sacs, banque))
+	fiche.jai:SetText(banque and ("Tu en as %d dans tes sacs · %d à la banque"):format(sacs, banque)
+		or ("Tu en as %d dans tes sacs · banque inconnue (ouvre-la une fois)"):format(sacs))
 	fiche.ajouter:SetShown(RecettesDe(objet) ~= nil)
 	fiche.retour:SetEnabled(#historique > 0)
 
@@ -2617,6 +2722,7 @@ end
 
 -- outils partagés avec les projets de guilde (GuildUp_Projets.lua)
 ns.OutilsCarnet = { RecettesDe = RecettesDe, InfoObjet = InfoObjet, NomMetier = NomMetier, JAi = JAi,
+	Developper = Developper, NouveauContexte = NouveauContexte,
 	Precharger = Precharger, Sources = Sources, BarreMetier = BarreMetier, Carnets = Carnets }
 
 ns.DiagCarnet2 = function(L)
@@ -2636,11 +2742,22 @@ C_Timer.After(3, function()
 	local db = ns.DB and ns.DB() or {}
 	if db.coursesCompact and ns.MontrerMini then ns.MontrerMini() end
 end)
-for _, nom in ipairs({ "BAG_UPDATE_DELAYED", "GET_ITEM_INFO_RECEIVED", "GUILD_ROSTER_UPDATE" }) do
+for _, nom in ipairs({ "BAG_UPDATE_DELAYED", "GET_ITEM_INFO_RECEIVED", "GUILD_ROSTER_UPDATE",
+	"BANKFRAME_OPENED", "BANKFRAME_CLOSED", "PLAYERBANKSLOTS_CHANGED", "PLAYERBANKBAGSLOTS_CHANGED" }) do
 	pcall(ev.RegisterEvent, ev, nom)
 end
 local prevu = false
-ev:SetScript("OnEvent", function()
+ev:SetScript("OnEvent", function(_, event)
+	if event == "BANKFRAME_OPENED" then
+		banqueOuverte = true
+		C_Timer.After(0.3, function() pcall(NoterBanque) end)
+	elseif event == "BANKFRAME_CLOSED" then
+		if banqueOuverte then pcall(NoterBanque) end
+		banqueOuverte = false
+	elseif (event == "PLAYERBANKSLOTS_CHANGED" or event == "PLAYERBANKBAGSLOTS_CHANGED"
+		or event == "BAG_UPDATE_DELAYED") and banqueOuverte then
+		pcall(NoterBanque)
+	end
 	if prevu then return end
 	if not ((courses and courses:IsShown()) or (page and page:IsVisible()) or (fiche and fiche:IsShown())
 		or (ns.MiniVisible and ns.MiniVisible())) then return end
