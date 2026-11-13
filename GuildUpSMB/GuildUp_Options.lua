@@ -64,6 +64,7 @@ local function Aide()
 	print("  /smb sos — appeler la guilde à l'aide")
 	print("  /smb roll [objet ou mot] — tirage au sort de la guilde")
 	print("  /smb activite — fil d'activité de la guilde et podium de la semaine")
+	print("  /smb stats — statistiques de présence : quand la guilde est en ligne")
 	print("  /smb on | off — bannières de la guilde (" .. OuiNon(db.actif) .. ")")
 	print("  /smb bouton — afficher / cacher le médaillon SMB Forever")
 	print("  /smb noms — nom et guilde des autres joueurs (" .. OuiNon(db.nomsAllies) .. ")")
@@ -653,6 +654,9 @@ SlashCmdList.GUILDUP = function(msg)
 		return
 	elseif cmd == "sos" then
 		if ns.DemanderAide then ns.DemanderAide() end
+		return
+	elseif cmd == "stats" or cmd == "statistiques" or cmd == "presence" or cmd == "présence" then
+		if ns.OuvrirInterface then ns.OuvrirInterface("stats") end
 		return
 	elseif cmd == "activite" or cmd == "activité" or cmd == "fil" or cmd == "podium" then
 		if ns.OuvrirInterface then ns.OuvrirInterface("activite") end

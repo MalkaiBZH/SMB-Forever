@@ -142,6 +142,10 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   remerciés, tirages gagnés). À la connexion, une bulle « Pendant ton absence » résume ce qui a été manqué : un membre
   connecté renvoie les nouveautés à celui qui revient. À côté, le podium des 7 derniers jours (niveaux gagnés, dons
   remerciés, tirages gagnés). Le fil ne contient que ce qu'un membre en ligne avec l'addon a vu passer.
+- **Statistiques** (`/smb stats`) : la présence de la guilde pour choisir le moment des sorties. Toutes les 10 minutes,
+  chaque addon connecté relève le nombre de membres en ligne (liste de guilde du jeu, addon ou pas) ; les relevés sont
+  gardés 8 semaines et partagés entre membres à la connexion. Semaine type (grille jours × heures), cinq meilleurs
+  créneaux, membres en ligne par jour sur 28 jours, courbe d'aujourd'hui.
 - **Événements** : les événements de la guilde et tes invitations des 30 prochains jours, groupés par jour
   (Aujourd'hui, Demain…), avec l'heure, le type (donjon ou raid), l'organisateur, le nombre d'inscrits et ton
   état en couleur. À droite, le détail (description, inscrits avec leur classe et leur état) et les réponses :
@@ -175,6 +179,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 | `/smb projets` | Projets de guilde |
 | `/smb sos` | Appeler la guilde à l'aide |
 | `/smb activite` | Fil d'activité de la guilde et podium des 7 derniers jours |
+| `/smb stats` | Statistiques de présence : semaine type et meilleurs créneaux |
 | `/smb roll [objet ou mot]` | Tirage au sort de la guilde (sans rien : rouvrir la fenêtre du tirage) |
 | `/smb nouveautes` | Nouveautés de la version |
 | `/smb on` / `off` | Activer / couper les bannières |

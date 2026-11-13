@@ -56,7 +56,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   (`GuildUp_Membres.lua`), Groupes (`GuildUp_GroupesFenetre.lua`), Quêtes en commun (`GuildUp_Quetes.lua`), Dons (`GuildUp_Echanges.lua` +
   `GuildUp_Besoins.lua`), Artisanat (`GuildUp_Carnet.lua` ; onglets Registre et Commandes dans `GuildUp_Metiers.lua`, Items dans
   `GuildUp_Carnet.lua`, Projets dans `GuildUp_Projets.lua`), Options
-  (`GuildUp_Options.lua`), Événements (`GuildUp_Evenements.lua`), Activité (`GuildUp_Journal.lua`). Les anciennes fonctions `ns.Ouvrir*` / `ns.Basculer*` ouvrent ces pages
+  (`GuildUp_Options.lua`), Événements (`GuildUp_Evenements.lua`), Activité (`GuildUp_Journal.lua`), Statistiques (`GuildUp_Stats.lua`). Les anciennes fonctions `ns.Ouvrir*` / `ns.Basculer*` ouvrent ces pages
   (`ns.OuvrirInterface(page, ...)`). L'encyclopédie et l'aperçu 3D restent des fenêtres à part.
   Les pages « Jouer ensemble » et « Mes carnets » ont été retirées en 3.7.0 (les anciennes listes restent dans
   `GuildUpDB.carnets`, sans être lues).
@@ -80,7 +80,8 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   `GuildUpAnn` (annonces), `GuildUpAid` (aide), `GuildUpVer` (version), `GuildUpGU` (emote du cri de guilde),
   `GuildUpTir` (tirage au sort, `/smb roll`),
   `GuildUpJrn` (fil d'activité et podium, `GuildUp_Journal.lua` : les autres modules y notent leurs nouvelles avec
-  `ns.NoterActivite(genre, clé, valeur)`).
+  `ns.NoterActivite(genre, clé, valeur)`), `GuildUpSta` (statistiques de présence, `GuildUp_Stats.lua` : un relevé
+  toutes les 10 min, partagé par le relais à la connexion).
   Exception : `GuildUpObj` (`GuildUp_Objectifs.lua`, « ! » des ennemis de quête) passe par `PARTY` / `RAID`.
 - Protocoles texte : champs séparés par `~`, identifiants en base 36, **255 caractères maximum par
   message** (découpage en morceaux de 200 si besoin). Nettoyer `~` et `|` dans les textes saisis.

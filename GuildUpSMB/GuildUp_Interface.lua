@@ -12,7 +12,8 @@
 --   onglets Registre de GuildUp_Metiers.lua, Items, Projets de GuildUp_Projets.lua), Dons
 --   (GuildUp_Echanges.lua + GuildUp_Besoins.lua), Options
 --   (GuildUp_Options.lua), Événements (GuildUp_Evenements.lua), Activité (GuildUp_Journal.lua : fil
---   d'activité et podium ; sa pastille compte les nouveautés depuis la dernière visite).
+--   d'activité et podium ; sa pastille compte les nouveautés depuis la dernière visite), Statistiques
+--   (GuildUp_Stats.lua : présence de la guilde par jour et par heure).
 -- Fournit ns.NouveautesGuilde() (pastille du médaillon), ns.BasculerInterface(), ns.OuvrirInterface(page),
 -- ns.MajInterface(), ns.DistanceMembre(cle) (distance d'un membre sur ma carte). Réglages :
 -- db.interface = { x, y } (position). Aucun message réseau.
@@ -75,6 +76,7 @@ local SECTIONS = {
 	{ id = "evenements", nom = "Événements", icone = "Interface\\Icons\\INV_Misc_PocketWatch_01" },
 	{ id = "activite", nom = "Activité", icone = "Interface\\Icons\\INV_Misc_Note_01", neutre = true,
 		badge = function() return ns.NouveautesActivite and ns.NouveautesActivite() or 0 end },
+	{ id = "stats", nom = "Statistiques", icone = "Interface\\Icons\\INV_Misc_PocketWatch_02" },
 }
 local OPTIONS = { id = "options", nom = "Options", icone = "Interface\\Icons\\Trade_Engineering",
 	ouvrir = function() if ns.BasculerOptions then ns.BasculerOptions() end end }
