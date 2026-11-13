@@ -63,6 +63,7 @@ local function Aide()
 	print("  /smb nouveautes — les nouveautés de cette version")
 	print("  /smb sos — appeler la guilde à l'aide")
 	print("  /smb roll [objet ou mot] — tirage au sort de la guilde")
+	print("  /smb sondage — sondage de la guilde (en cours, ou en poser un)")
 	print("  /smb activite — fil d'activité de la guilde et podium de la semaine")
 	print("  /smb on | off — bannières de la guilde (" .. OuiNon(db.actif) .. ")")
 	print("  /smb bouton — afficher / cacher le médaillon SMB Forever")
@@ -368,11 +369,11 @@ local C = UI.C
 local MARGE, ECART = 16, 12
 local HAUT_CARTE, HAUT_NOTIFS, HAUT_ECRAN = 186, 126, 86
 
--- types de bulles du médaillon (db.notifs[cat] == false : coupées), quatre par ligne
+-- types de bulles du médaillon (db.notifs[cat] == false : coupées), cinq par ligne
 local NOTIFS = {
 	{ "groupes", "Groupes" }, { "candidatures", "Candidatures" }, { "niveaux", "Niveaux" }, { "metiers", "Métiers" },
 	{ "evenements", "Événements" }, { "quetes", "Quêtes" }, { "commandes", "Commandes" }, { "plans", "Échanges" },
-	{ "version", "Version" }, { "aide", "Aide" }, { "tirages", "Tirages" },
+	{ "version", "Version" }, { "aide", "Aide" }, { "tirages", "Tirages" }, { "sondages", "Sondages" },
 	{ "gu", (ns.Config and ns.Config.cri) and (tostring(ns.Config.cri):upper() .. "!") or "Cri" },
 }
 local MES_ROLES = { "auto", "tank", "heal", "dps" }                  -- puces « Mon rôle »
@@ -480,10 +481,10 @@ local function CreerPage(parent)
 	notifs:SetPoint("TOPLEFT", affichage, "BOTTOMLEFT", 0, -ECART)
 	notifs:SetSize(largeur, HAUT_NOTIFS)
 	notifs.compte:SetText("bulles du médaillon")
-	local colonne = (largeur - 28) / 4
+	local colonne = (largeur - 28) / 5
 	for i, n in ipairs(NOTIFS) do
 		local cat = n[1]
-		Case(notifs, 14 + ((i - 1) % 4) * colonne, -40 - math.floor((i - 1) / 4) * 26, n[2],
+		Case(notifs, 14 + ((i - 1) % 5) * colonne, -40 - math.floor((i - 1) / 5) * 26, n[2],
 			function() return not (type(db.notifs) == "table" and db.notifs[cat] == false) end,
 			function(v)
 				if type(db.notifs) ~= "table" then db.notifs = {} end
@@ -660,6 +661,9 @@ SlashCmdList.GUILDUP = function(msg)
 	elseif cmd == "roll" or cmd == "tirage" then
 		-- (la saisie d'origine : « reste » est en minuscules, ce qui abîmerait un lien d'objet)
 		if ns.Tirage then ns.Tirage(((msg or ""):match("^%s*%S+%s*(.-)%s*$"))) end
+		return
+	elseif cmd == "sondage" or cmd == "sondages" or cmd == "vote" then
+		if ns.Sondage then ns.Sondage() end
 		return
 	elseif cmd == "nouveautes" or cmd == "nouveautés" or cmd == "notes" then
 		if ns.MontrerNouveautes then ns.MontrerNouveautes() end

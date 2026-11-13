@@ -138,6 +138,10 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   direct, égalités en tête départagées par un nouveau tour, résultat annoncé en bulle. Il faut l'addon pour participer.
   Avant l'ouverture, l'organisateur choisit qui participe : une case par membre connecté, « Tout cocher », ou
   « Mon groupe » pour réserver le tirage à son groupe ou à son raid.
+- **Sondage** (`/smb sondage`, ou « Sondage » dans le menu rapide du médaillon) : une question, 2 à 5 choix, 1 à
+  10 minutes pour voter. Les membres connectés qui ont l'addon reçoivent une bulle et votent d'un clic ; résultats en
+  direct, changement d'avis possible jusqu'à la fin, votes publics (le survol d'un choix montre qui l'a choisi),
+  résultat en bulle. Un membre qui se connecte pendant le vote ne le voit pas.
 - **Activité** (`/smb activite`) : le fil d'activité de la guilde sur 30 jours (montées de niveau, métiers, dons
   remerciés, tirages gagnés). À la connexion, une bulle « Pendant ton absence » résume ce qui a été manqué : un membre
   connecté renvoie les nouveautés à celui qui revient. À côté, le podium des 7 derniers jours (niveaux gagnés, dons
@@ -176,6 +180,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 | `/smb sos` | Appeler la guilde à l'aide |
 | `/smb activite` | Fil d'activité de la guilde et podium des 7 derniers jours |
 | `/smb roll [objet ou mot]` | Tirage au sort de la guilde (sans rien : rouvrir la fenêtre du tirage) |
+| `/smb sondage` | Sondage de la guilde : celui en cours ou le dernier, sinon en poser un |
 | `/smb nouveautes` | Nouveautés de la version |
 | `/smb on` / `off` | Activer / couper les bannières |
 | `/smb bouton` | Afficher / cacher le médaillon GuildUpSMB |

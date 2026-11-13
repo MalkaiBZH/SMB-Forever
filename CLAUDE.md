@@ -78,7 +78,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   `GuildUpGrp` (groupes), `GuildUpPos` (carte), `GuildUpQst` (quêtes), `GuildUpMet` (métiers),
   `GuildUpEch` (dons), `GuildUpBes` (besoins), `GuildUpPrj` (projets), `GuildUpId` (identité),
   `GuildUpAnn` (annonces), `GuildUpAid` (aide), `GuildUpVer` (version), `GuildUpGU` (emote du cri de guilde),
-  `GuildUpTir` (tirage au sort, `/smb roll`),
+  `GuildUpTir` (tirage au sort, `/smb roll`), `GuildUpSdg` (sondage, `/smb sondage`, `GuildUp_Sondage.lua`),
   `GuildUpJrn` (fil d'activité et podium, `GuildUp_Journal.lua` : les autres modules y notent leurs nouvelles avec
   `ns.NoterActivite(genre, clé, valeur)`).
   Exception : `GuildUpObj` (`GuildUp_Objectifs.lua`, « ! » des ennemis de quête) passe par `PARTY` / `RAID`.
