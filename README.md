@@ -78,8 +78,11 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   prénom à la couleur de la classe, distance) toujours sur le tour de l'écran, comme dans un jeu de tir :
   en haut quand ils sont devant (dans leur direction exacte), sur les côtés quand ils sont à gauche ou à
   droite, en bas quand ils sont derrière, avec une flèche. Clic : chuchoter ; clic droit : menu
-  (chuchoter, inviter dans le groupe, voir dans la page Guilde). Seulement les membres qui
+  (chuchoter, inviter dans le groupe, suivre sa trace, voir dans la page Guilde). Seulement les membres qui
   partagent leur position et ont un portrait, et à plus de 100 m (réglable dans les options, 0 pour toujours). `/smb reperes` pour couper.
+  **Fil d'Ariane** : « Suivre sa trace » guide vers l'étape suivante du chemin pris par le membre ces 10 dernières
+  minutes (repère doré en forme d'empreintes, trace en pointillés sur la carte du monde), jusqu'à le rejoindre.
+  Clic sur le repère doré : arrêter.
 - **Ennemis de quête** : un « ! » à droite de la barre de nom d'un ennemi à tuer ou à dépouiller pour une
   quête en cours : **jaune** pour toi, **bleu** pour un membre de ton groupe, **vert** pour les deux. Il
   disparaît quand l'objectif est terminé. Les monstres de chaque quête viennent de QuestieDB (version Forever),

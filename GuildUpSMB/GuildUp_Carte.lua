@@ -18,6 +18,8 @@
 -- repères déjà créés sont redimensionnés au prochain dessin de la carte. Nom, rôle et âge de la position au
 -- survol. Les membres superposés : la position la plus récente au-dessus. Les positions sont converties
 -- pour s'afficher aussi sur la carte du continent.
+-- Fil d'Ariane : chaque position reçue est aussi passée à ns.NoterTrace (GuildUp_Reperes.lua) ; la trace
+-- suivie (ns.TraceSuivie) est dessinée en points dorés, plus pâles pour les étapes déjà passées.
 
 local NOM_ADDON, ns = ...
 
@@ -141,6 +143,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			classe = (d and d ~= "") and d or nil, vu = GetTime(),
 			portrait = ns.CheminPortrait and ns.CheminPortrait(e) or nil, -- chemin de l'image, ou nil
 		}
+		if ns.NoterTrace then ns.NoterTrace(cle, positions[cle]) end
 	elseif type_ == "I" then
 		positions[cle] = { nom = expediteur, instance = true, vu = GetTime() }
 	elseif type_ == "O" then
@@ -708,6 +711,51 @@ ns.AfficherSurCarte = function(titre, groupes)
 	if MajCarte then MajCarte() end
 end
 
+-- Fil d'Ariane (GuildUp_Reperes.lua) : la trace suivie, en points dorés sur un calque du canevas (sous
+-- les membres) ; étapes passées plus pâles, étape visée plus grosse ; même taille à l'écran à tout zoom
+local calqueTrace
+local pointsTrace = {}
+local function MajTrace(canevas, carte, largeur, hauteur, echelle)
+	local pts, etape
+	if ns.TraceSuivie then pts, etape = ns.TraceSuivie() end
+	if not pts then
+		if calqueTrace then calqueTrace:Hide() end
+		return
+	end
+	calqueTrace = calqueTrace or CreateFrame("Frame", nil, canevas)
+	calqueTrace:SetParent(canevas)
+	calqueTrace:ClearAllPoints()
+	calqueTrace:SetAllPoints(canevas)
+	calqueTrace:SetFrameLevel(NiveauCarte(canevas, 0))
+	local taille = 7 / echelle
+	local n = 0
+	for i, pt in ipairs(pts) do
+		local x, y = PositionSurCarte(pt, carte)
+		if x then
+			n = n + 1
+			local t = pointsTrace[n]
+			if not t then
+				t = calqueTrace:CreateTexture(nil, "OVERLAY")
+				t:SetTexture(ROND)
+				pointsTrace[n] = t
+			end
+			local vise = (i == etape)
+			local s = vise and taille * 1.8 or taille
+			t:SetSize(s, s)
+			t:ClearAllPoints()
+			t:SetPoint("CENTER", calqueTrace, "TOPLEFT", x * largeur, -y * hauteur)
+			if etape and i < etape then t:SetVertexColor(0.85, 0.66, 0.25, 0.35)
+			else t:SetVertexColor(1, 0.82, 0, vise and 1 or 0.85) end
+			t:Show()
+		end
+	end
+	for i = n + 1, #pointsTrace do pointsTrace[i]:Hide() end
+	calqueTrace:Show()
+end
+
+-- redessin au prochain passage du suivi de la carte (début ou fin d'un fil d'Ariane)
+ns.RedessinerCarte = function() aRedessiner = true end
+
 MajCarte = function()
 	if not WorldMapFrame or not WorldMapFrame:IsShown() or not WorldMapFrame.GetCanvas then return end
 	local canevas = WorldMapFrame:GetCanvas()
@@ -756,6 +804,7 @@ MajCarte = function()
 	end
 	for i = n + 1, #epingles do epingles[i].ancre:Hide() end
 	MajRepere(canevas, carte, largeur, hauteur, echelle)
+	pcall(MajTrace, canevas, carte, largeur, hauteur, echelle)
 	pcall(MajZones, canevas, carte, largeur, hauteur, echelle)
 end
 

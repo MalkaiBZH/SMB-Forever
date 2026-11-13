@@ -135,8 +135,12 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["3.11.0"] = {
+		"|cffffd100Fil d'Ariane|r : clic droit sur le portrait d'un membre autour de l'écran, puis |cffffd100Suivre sa trace|r. Un repère doré en forme d'empreintes montre l'étape suivante du chemin qu'il a pris ces 10 dernières minutes : suis-le d'étape en étape jusqu'à le rejoindre. Pratique pour retrouver une entrée de grotte, un PNJ caché ou un chemin de montagne.",
+		"La trace suivie s'affiche aussi en pointillés dorés sur la carte du monde. Un clic sur le repère doré (ou « Arrêter de suivre sa trace » dans le menu) arrête le suivi ; il s'arrête tout seul quand tu as rejoint le membre.",
+	},
 	["3.10.0"] = {
 		"|cffffd100Statistiques de présence|r : nouvelle page |cffffd100Statistiques|r du menu (ou |cffffd100/smb stats|r) pour savoir quand organiser les sorties. L'addon relève toutes les 10 minutes le nombre de membres en ligne (d'après la liste de guilde, addon ou pas) et garde 8 semaines.",
 		"La page montre la |cffffd100semaine type|r (grille jours x heures, plus c'est clair, plus il y a de monde), les cinq meilleurs créneaux, les membres en ligne par jour sur 28 jours et la courbe d'aujourd'hui. Les relevés se partagent entre membres : au bout de quelques jours tout le monde a la même courbe. Rien n'existe avant cette version : il faut deux ou trois semaines pour que la semaine type soit parlante.",

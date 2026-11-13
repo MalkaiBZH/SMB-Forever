@@ -12,8 +12,14 @@
 -- Seuls les membres dont le portrait est connu sont affichés (addon à jour, race avec portrait), et
 -- seulement au-delà d'une distance minimale (db.distanceMinReperes, sinon celle de GuildUp_Config.lua :
 -- plus près, on le voit en jeu ; 0 = toujours).
--- Clic : chuchoter ; clic droit : menu (chuchoter, inviter dans le groupe, voir dans la page Guilde). Réglage db.reperes (/smb reperes, case dans les options) ; hauteur des repères du
--- haut et du bas, distance minimale : curseurs de la page Options, sinon valeurs de GuildUp_Config.lua.
+-- Clic : chuchoter ; clic droit : menu (chuchoter, inviter dans le groupe, suivre sa trace, voir dans la
+-- page Guilde). Réglage db.reperes (/smb reperes, case dans les options) ; hauteur des repères du haut et
+-- du bas, distance minimale : curseurs de la page Options, sinon valeurs de GuildUp_Config.lua.
+-- Fil d'Ariane : chaque position reçue d'un membre (ns.NoterTrace, appelé par GuildUp_Carte.lua) allonge
+-- sa trace (10 dernières minutes, un point tous les 4 m au moins). « Suivre sa trace » montre un repère
+-- « pas » sur l'étape suivante : on part du point de la trace le plus proche, on avance d'étape en étape
+-- (raccourcis compris), jusqu'à rejoindre le membre, ou jusqu'au bout de la trace s'il est entré en
+-- instance ou ne donne plus de nouvelles. La carte du monde dessine la trace suivie (ns.TraceSuivie).
 -- Aucun message réseau propre : tout vient des positions de GuildUp_Carte.lua (une toutes les 6 s
 -- au plus pour un membre qui bouge), d'où des petits sauts quand un membre proche se déplace.
 
@@ -49,27 +55,137 @@ cadre:SetFrameStrata("LOW")
 -- Coordonnées du monde
 --------------------------------------------------------------------------------
 
--- position sur le monde d'un point de carte : nord, ouest (en mètres / yards du jeu), ou nil.
--- (C_Map.GetWorldPosFromMapPos rend un vecteur dont x pointe vers le nord et y vers l'ouest)
+-- position sur le monde d'un point de carte : nord, ouest (en mètres / yards du jeu), continent, ou nil.
+-- (C_Map.GetWorldPosFromMapPos rend le continent et un vecteur dont x pointe vers le nord et y vers l'ouest)
 local function Monde(carte, x, y)
 	if not (C_Map and C_Map.GetWorldPosFromMapPos and CreateVector2D) then return nil end
-	local ok, _, v = pcall(C_Map.GetWorldPosFromMapPos, carte, CreateVector2D(x, y))
+	local ok, continent, v = pcall(C_Map.GetWorldPosFromMapPos, carte, CreateVector2D(x, y))
 	if not ok or not v then return nil end
 	local ok2, nord, ouest = pcall(v.GetXY, v)
 	if not ok2 or not nord or not ouest then return nil end
-	return nord, ouest
+	return nord, ouest, continent
 end
 
 -- position sur le monde des membres, recalculée seulement quand leur position change
-local mondes = {} -- [nom normalisé] = { carte, x, y, nord, ouest }
+local mondes = {} -- [nom normalisé] = { carte, x, y, nord, ouest, continent }
 local function MondeMembre(cle, p)
 	local m = mondes[cle]
 	if not (m and m.carte == p.carte and m.x == p.x and m.y == p.y) then
-		local nord, ouest = Monde(p.carte, p.x, p.y)
-		m = { carte = p.carte, x = p.x, y = p.y, nord = nord, ouest = ouest }
+		local nord, ouest, continent = Monde(p.carte, p.x, p.y)
+		m = { carte = p.carte, x = p.x, y = p.y, nord = nord, ouest = ouest, continent = continent }
 		mondes[cle] = m
 	end
-	return m.nord, m.ouest
+	return m.nord, m.ouest, m.continent
+end
+
+local function Distance(pt, nord, ouest)
+	local dn, dO = pt.nord - nord, pt.ouest - ouest
+	return math.sqrt(dn * dn + dO * dO)
+end
+
+--------------------------------------------------------------------------------
+-- Fil d'Ariane : trace récente de chaque membre, et suivi d'une trace
+--------------------------------------------------------------------------------
+
+local TRACE_DUREE = 600  -- secondes de trace gardées (la trace suivie n'est pas raccourcie en route)
+local TRACE_MAX = 300    -- points au plus par trace
+local TRACE_PAS = 4      -- distance minimale entre deux points (m / yards)
+local ATTEINT = 10       -- une étape est atteinte à cette distance
+local REJOINT = 20       -- le membre est rejoint à cette distance
+
+local traces = {} -- [nom normalisé] = { points = { { carte, x, y, nord, ouest, continent, t, n }, … }, n }
+local suivi       -- { cle, joueur, n = numéro du point visé (nil : pas encore choisi) }
+
+-- position reçue d'un membre (GuildUp_Carte.lua, message P)
+ns.NoterTrace = function(cle, p)
+	if not (cle and p and p.carte and p.x) then return end
+	local nord, ouest, continent = Monde(p.carte, p.x, p.y)
+	if not nord then return end
+	local t = traces[cle]
+	if not t then t = { points = {}, n = 0 }; traces[cle] = t end
+	local pts = t.points
+	local maintenant = GetTime()
+	local dernier = pts[#pts]
+	if dernier and dernier.continent == continent and Distance(dernier, nord, ouest) < TRACE_PAS then
+		dernier.t = maintenant -- (toujours au même endroit)
+		return
+	end
+	t.n = t.n + 1
+	pts[#pts + 1] = { carte = p.carte, x = p.x, y = p.y, nord = nord, ouest = ouest, continent = continent,
+		t = maintenant, n = t.n }
+	local garder = suivi and suivi.cle == cle
+	local limite = maintenant - TRACE_DUREE
+	while #pts > TRACE_MAX or (not garder and #pts > 1 and pts[1].t < limite) do table.remove(pts, 1) end
+end
+
+local function Arreter(texte)
+	suivi = nil
+	if texte and ns.Notifier then ns.Notifier("reperes", "Fil d'Ariane", texte, "aucun") end
+	if ns.RedessinerCarte then ns.RedessinerCarte() end
+end
+
+local function Suivre(cle, joueur)
+	local t = traces[cle]
+	if not (t and #t.points > 0) then
+		if ns.Erreur then ns.Erreur("Pas encore de trace pour " .. NomJoueur(joueur)) end
+		return
+	end
+	suivi = { cle = cle, joueur = joueur } -- (première étape : le point de la trace le plus proche de moi)
+	if ns.RedessinerCarte then ns.RedessinerCarte() end
+end
+
+-- index du premier point de la trace pas encore atteint (trace suivie)
+local function IndexEtape(pts)
+	if not suivi.n then return 1 end
+	local i = 1
+	while i < #pts and pts[i].n < suivi.n do i = i + 1 end
+	return i
+end
+
+-- trace suivie, pour la carte du monde : points, index de l'étape visée (nil sans suivi ou pas encore choisie)
+ns.TraceSuivie = function()
+	local t = suivi and traces[suivi.cle]
+	if not (t and #t.points > 0) then return nil end
+	return t.points, suivi.n and IndexEtape(t.points) or nil
+end
+
+-- Avance sur la trace suivie ; renvoie l'étape visée, sa distance, son rang et le nombre de points,
+-- ou nil quand le suivi s'arrête (membre rejoint, bout de la trace, autre continent)
+local function Avancer(monNord, monOuest, monCont)
+	local nom = NomJoueur(suivi.joueur)
+	local t = traces[suivi.cle]
+	local pts = t and t.points
+	if not (pts and #pts > 0) then Arreter(("La trace de %s a disparu."):format(nom)); return nil end
+	local positions = ns.PositionsMembres and ns.PositionsMembres()
+	local p = positions and positions[suivi.cle]
+	local present = p and not p.instance and p.carte and GetTime() - (p.vu or 0) < DUREE_VIE
+	if present then
+		local nord, ouest, continent = MondeMembre(suivi.cle, p)
+		if nord and continent == monCont and Distance({ nord = nord, ouest = ouest }, monNord, monOuest) < REJOINT then
+			Arreter(("Tu as rejoint %s."):format(nom))
+			return nil
+		end
+	end
+	-- raccourci : le point le plus proche de moi parmi ceux qui restent (au départ : toute la trace)
+	local meilleur, dMeilleur
+	for j = IndexEtape(pts), #pts do
+		local pt = pts[j]
+		if pt.continent == monCont then
+			local d = Distance(pt, monNord, monOuest)
+			if not dMeilleur or d < dMeilleur then meilleur, dMeilleur = j, d end
+		end
+	end
+	if not meilleur then Arreter(("La trace de %s part sur un autre continent."):format(nom)); return nil end
+	local i = meilleur
+	while i < #pts and pts[i + 1].continent == monCont and Distance(pts[i], monNord, monOuest) < ATTEINT do i = i + 1 end
+	local d = Distance(pts[i], monNord, monOuest)
+	if i == #pts and d < ATTEINT and not present then
+		Arreter(p and p.instance and ("Bout de la trace : %s a rejoint une instance à cet endroit."):format(nom)
+			or ("Bout de la trace de %s : plus de nouvelles de sa position."):format(nom))
+		return nil
+	end
+	suivi.n = pts[i].n
+	return pts[i], d, i, #pts
 end
 
 --------------------------------------------------------------------------------
@@ -107,6 +223,8 @@ local function MontrerMenu(repere)
 	local lignes = {
 		{ "Chuchoter", function() Chuchoter(cle, joueur) end },
 		{ "Inviter dans le groupe", function() Inviter(cle, joueur) end },
+		(suivi and suivi.cle == cle) and { "Arrêter de suivre sa trace", function() Arreter() end }
+			or { "Suivre sa trace", function() Suivre(cle, joueur) end },
 		{ "Voir dans la page Guilde", function()
 			if ns.OuvrirInterface then ns.OuvrirInterface("guilde", NomCourt(joueur)) end
 		end },
@@ -208,8 +326,58 @@ local function PlaceAuBord(angle, demiL, yHaut, yBas)
 	return cote * (demiL - (s - lCote)), yBas, "v"
 end
 
+-- Repère « pas » de l'étape suivante du fil d'Ariane (créé au premier suivi)
+local pas
+local function CreerPas()
+	local b = NouveauRepere()
+	b:SetSize(30, 30)
+	b.portrait:SetTexture("Interface\\Icons\\Ability_Tracking")
+	b.portrait:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	local bord = b:CreateTexture(nil, "BACKGROUND")
+	bord:SetPoint("TOPLEFT", b, "TOPLEFT", -2, 2)
+	bord:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 2, -2)
+	bord:SetColorTexture(1, 0.82, 0, 0.9)
+	b.nom:SetTextColor(1, 0.82, 0)
+	b:SetScript("OnClick", function() GameTooltip:Hide(); Arreter() end)
+	b:SetScript("OnEnter", function(self)
+		if not suivi then return end
+		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+		GameTooltip:AddLine("Fil d'Ariane : trace de " .. NomJoueur(suivi.joueur), 1, 0.82, 0)
+		GameTooltip:AddLine(("Étape %d sur %d, à %d %s"):format(self.rang or 0, self.total or 0, self.metres or 0, UNITE), 1, 1, 1)
+		GameTooltip:AddLine("Suis les pas : le repère avance à chaque étape atteinte.", 0.8, 0.8, 0.8, true)
+		GameTooltip:AddLine("Clic : arrêter de suivre", 0.6, 0.6, 0.6)
+		GameTooltip:Show()
+	end)
+	return b
+end
+
 local function ToutCacher(depuis)
 	for i = depuis or 1, #reperes do reperes[i]:Hide() end
+	if not depuis and pas then pas:Hide() end
+end
+
+-- Place un repère sur le tour de l'écran selon son angle (relatif à mon cap, entre -pi et pi)
+local function Placer(r, angle, demi, demiL, yHaut, yBas, tanDemi)
+	r:ClearAllPoints()
+	if math.abs(angle) < CHAMP / 2 then
+		-- devant moi : bord du haut ; projection comme sur l'écran (tangente)
+		Disposer(r, "haut")
+		local px = -math.tan(angle) / tanDemi * demi
+		if px < -demiL then px = -demiL elseif px > demiL then px = demiL end
+		r:SetPoint("CENTER", cadre, "CENTER", px, yHaut)
+	else
+		local px, py, fleche = PlaceAuBord(angle, demiL, yHaut, yBas)
+		Disposer(r, fleche)
+		r:SetPoint("CENTER", cadre, "CENTER", px, py)
+	end
+end
+
+-- angle d'un point du monde vu depuis moi : depuis le nord vers l'ouest (comme GetPlayerFacing),
+-- relatif à mon cap, entre -pi et pi
+local function Angle(nord, ouest, monNord, monOuest, cap)
+	local angle = (atan2(ouest - monOuest, nord - monNord) - cap) % (2 * PI)
+	if angle > PI then angle = angle - 2 * PI end
+	return angle
 end
 
 local visibles = {} -- liste réutilisée à chaque mise à jour
@@ -222,7 +390,7 @@ local function Maj()
 	local carte, x, y = ns.MaPosition()
 	local cap = GetPlayerFacing and GetPlayerFacing()
 	if not (carte and cap) then return ToutCacher() end -- en instance, ou position inconnue
-	local monNord, monOuest = Monde(carte, x, y)
+	local monNord, monOuest, monCont = Monde(carte, x, y)
 	if not monNord then return ToutCacher() end
 
 	-- membres sur ma carte, avec un portrait
@@ -233,11 +401,8 @@ local function Maj()
 		if p.carte == carte and not p.instance and p.portrait and maintenant - (p.vu or 0) < DUREE_VIE then
 			local nord, ouest = MondeMembre(cle, p)
 			if nord then
-				local dn, dO = nord - monNord, ouest - monOuest
-				-- angle depuis le nord vers l'ouest, comme GetPlayerFacing ; relatif à mon cap, entre -pi et pi
-				local angle = (atan2(dO, dn) - cap) % (2 * PI)
-				if angle > PI then angle = angle - 2 * PI end
-				local metres = math.sqrt(dn * dn + dO * dO)
+				local angle = Angle(nord, ouest, monNord, monOuest, cap)
+				local metres = Distance({ nord = nord, ouest = ouest }, monNord, monOuest)
 				if metres >= distanceMin then -- (plus près : visible en jeu)
 					visibles[#visibles + 1] = { cle = cle, p = p, angle = angle, metres = metres }
 				end
@@ -254,18 +419,7 @@ local function Maj()
 	for i, v in ipairs(visibles) do
 		local r = reperes[i]
 		if not r then r = NouveauRepere(); reperes[i] = r end
-		r:ClearAllPoints()
-		if math.abs(v.angle) < CHAMP / 2 then
-			-- devant moi : bord du haut ; projection comme sur l'écran (tangente)
-			Disposer(r, "haut")
-			local px = -math.tan(v.angle) / tanDemi * demi
-			if px < -demiL then px = -demiL elseif px > demiL then px = demiL end
-			r:SetPoint("CENTER", cadre, "CENTER", px, yHaut)
-		else
-			local px, py, fleche = PlaceAuBord(v.angle, demiL, yHaut, yBas)
-			Disposer(r, fleche)
-			r:SetPoint("CENTER", cadre, "CENTER", px, py)
-		end
+		Placer(r, v.angle, demi, demiL, yHaut, yBas, tanDemi)
 		r:SetFrameLevel(cadre:GetFrameLevel() + i) -- le plus proche par-dessus
 		r.cle, r.joueur, r.classe, r.metres = v.cle, v.p.nom, v.p.classe, math.floor(v.metres + 0.5)
 		r.portrait:SetTexture(v.p.portrait)
@@ -275,6 +429,21 @@ local function Maj()
 		r:Show()
 	end
 	ToutCacher(#visibles + 1)
+
+	-- fil d'Ariane : l'étape suivante, par-dessus les membres
+	local etape, metres, rang, total
+	if suivi then etape, metres, rang, total = Avancer(monNord, monOuest, monCont) end
+	if not etape then
+		if pas then pas:Hide() end
+		return
+	end
+	pas = pas or CreerPas()
+	Placer(pas, Angle(etape.nord, etape.ouest, monNord, monOuest, cap), demi, demiL, yHaut, yBas, tanDemi)
+	pas:SetFrameLevel(cadre:GetFrameLevel() + #visibles + 2)
+	pas.metres, pas.rang, pas.total = math.floor(metres + 0.5), rang, total
+	pas.nom:SetText("Trace de " .. NomJoueur(suivi.joueur, true))
+	pas.distance:SetText(pas.metres .. " " .. UNITE)
+	pas:Show()
 end
 
 local attente = 0
