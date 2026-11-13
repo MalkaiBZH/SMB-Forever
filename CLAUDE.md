@@ -141,6 +141,13 @@ Pas de build ni de tests automatisés : on teste **en jeu**, après `/reload`.
 3. Si le changement touche les commandes ou les fonctionnalités, mettre à jour le `README.md` dans le même
    commit.
 
+**Annonce Discord** : dès qu'un push sur `main` change la version du `.toc`, GitHub
+(`.github/workflows/annonce-discord.yml`) lance `python outils/annoncer_version.py`, qui poste dans le salon
+de la guilde un message par nouvelle version, avec ses lignes de `NOTES` (les passages colorés deviennent du
+gras). Les notes sont donc lues telles quelles par toute la guilde : les écrire pour elle. Rien n'est envoyé
+pour une version `-dev`. L'adresse du webhook est le secret `DISCORD_WEBHOOK` du dépôt : ne jamais l'écrire
+dans un fichier. `python outils/annoncer_version.py --depuis 3.3.0 --essai` montre les messages sans rien envoyer.
+
 ## Programme de mise à jour (`outils/MiseAJour/`)
 
 - Windows : `MiseAJour.cs` → `GuildUpSMB-MiseAJour.exe` (`construire.bat`), publié dans une release `miseajour-<version>`.

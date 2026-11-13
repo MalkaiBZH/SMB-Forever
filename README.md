@@ -155,6 +155,8 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   affiche un membre (listes, bulles, infobulles, HUD), il apparaît sous la forme **Pseudo (Prénom)** s'il a choisi
   un pseudo (le prénom est la première partie de son nom en jeu) ; sinon sous son nom en jeu.
 - **Vérification de version** : prévient quand un membre a une version plus récente.
+- **Annonce sur Discord** : chaque nouvelle version est annoncée automatiquement dans le salon de la guilde,
+  avec ses nouveautés (`.github/workflows/annonce-discord.yml`, `outils/annoncer_version.py`).
 - **Spécial guilde** (réglé dans `GuildUpSMB/GuildUp_Config.lua`) : le cri de guilde « 33 », qui fait apparaître à
   l'écran de toute la guilde une chope en bois animée, et, en option, une fête quand un membre « vedette »
   monte de niveau.

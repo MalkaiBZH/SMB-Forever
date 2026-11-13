@@ -1,0 +1,44 @@
+# Annonce chaque nouvelle version de l'addon dans le salon Discord de la guilde.
+# Se lance quand un push sur main change le .toc (donc quand la version monte) ; le message est composé
+# par outils/annoncer_version.py à partir des notes de GuildUp_Version.lua.
+# L'adresse du webhook Discord est le secret DISCORD_WEBHOOK du dépôt (Settings > Secrets and variables >
+# Actions), jamais écrite ici. Sans ce secret, rien n'est envoyé.
+name: Annonce Discord
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - GuildUpSMB/GuildUpSMB.toc
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version à annoncer de nouveau (vide : la version actuelle)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  annoncer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # l'historique, pour lire la version du commit précédent
+      - name: Annoncer la version
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          AVANT: ${{ github.event.before }}
+          VERSION: ${{ github.event.inputs.version }}
+          DECLENCHEUR: ${{ github.event_name }}
+        run: |
+          if [ "$DECLENCHEUR" = "workflow_dispatch" ]; then
+            if [ -n "$VERSION" ]; then
+              python3 outils/annoncer_version.py --version "$VERSION"
+            else
+              python3 outils/annoncer_version.py
+            fi
+          else
+            python3 outils/annoncer_version.py --avant "$AVANT"
+          fi
