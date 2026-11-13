@@ -151,7 +151,13 @@ end
 -- d'après la liste de guilde ; sans liste de guilde lue, un message reçu depuis moins de 10 min.
 ns.MembresActifs = function()
 	local moi = ns.MaCle and ns.MaCle()
-	local maintenant, n = GetTime(), moi and 1 or 0
+	return #ns.ClesMembresActifs() + (moi and 1 or 0)
+end
+
+-- Les clés de ces membres, sans moi (choix des participants d'un tirage au sort, GuildUp_Tirage.lua)
+ns.ClesMembresActifs = function()
+	local moi = ns.MaCle and ns.MaCle()
+	local maintenant, cles = GetTime(), {}
 	for cle in pairs(vus) do
 		if cle ~= moi and not cle:find("#test", 1, true) then
 			local membre = ns.MembreGuilde and ns.MembreGuilde(cle)
@@ -161,10 +167,10 @@ ns.MembresActifs = function()
 			else
 				compte = membre and ns.EnLigneMembre(cle)
 			end
-			if compte then n = n + 1 end
+			if compte then cles[#cles + 1] = cle end
 		end
 	end
-	return n
+	return cles
 end
 
 --------------------------------------------------------------------------------

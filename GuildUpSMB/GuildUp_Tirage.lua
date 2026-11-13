@@ -3,14 +3,22 @@
 -- fenêtre où lancer les dés. Le hasard vient du jeu : le bouton fait le /roll 1-100 du jeu, l'addon lit
 -- le résultat annoncé par le serveur (message système) et le transmet à la guilde. Les joueurs à côté
 -- le voient aussi passer dans leur discussion. Un seul lancer par membre et par tour.
+-- Avant d'ouvrir, l'organisateur choisit qui participe : la liste des membres connectés qui ont l'addon,
+-- avec une case par membre, « Tout cocher » et « Mon groupe ». Tout coché = toute la guilde.
+--   "P~id~clé~clé…"                      participants d'un tirage réservé (un ou plusieurs messages,
+--                                        envoyés avant l'ouverture)
 --   "O~id~secondes~objet~texte"          ouverture (objet = identifiant d'objet, 0 sans objet)
 --   "L~organisateur~id~tour~valeur"      mon lancer (organisateur = sa clé « Nom-Royaume »)
 --   "E~id~tour~secondes~clé~clé…"        égalité en tête : nouveau tour entre les membres cités
 --   "F~id~clé~hasard"                    fin (clé du gagnant, vide = personne ; hasard = 1 : égalité
 --                                        tranchée au sort par l'organisateur après le dernier tour)
 --   "A~id"                               tirage annulé
--- « id » = heure du serveur à l'ouverture, en base 36. Un tirage est repéré par la clé de l'organisateur
--- et son id : seuls les messages de l'organisateur peuvent le prolonger, le finir ou l'annuler.
+-- « id » = heure du serveur à l'ouverture, en base 36, suivie de « R » si le tirage est réservé à
+-- certains membres (sans liste « P » reçue, personne n'est admis). Un tirage est repéré par la clé de
+-- l'organisateur et son id : seuls les messages de l'organisateur peuvent le prolonger, le finir ou l'annuler.
+-- Les autres membres ne reçoivent pas de bulle pour un tirage réservé, mais peuvent le suivre (/smb roll).
+-- (La version 3.5.0 ne connaît pas « P » : elle montre le tirage à tous, et les lancers des membres non
+-- admis sont ignorés par les autres.)
 -- Classement : la valeur du premier tour, puis celle des tours de départage (pas de relance = 0).
 -- C'est l'organisateur qui tient le chrono ; sans nouvelles de lui 20 s après la fin, le tirage est
 -- marqué interrompu (il reprend si un message de l'organisateur finit par arriver). Rien n'est gardé
@@ -35,10 +43,11 @@ local MaCle = ns.MaCle
 local Base36 = ns.Base36
 
 local tirages = {}    -- [organisateur .. "~" .. id] = tirage
+local annonces = {}   -- [organisateur .. "~" .. id] = { cles = { [clé] = true }, quand } : listes « P » reçues
 local vue             -- tirage montré dans la fenêtre
 local attenteDe       -- { tirage, tour, limite } : j'ai cliqué, j'attends le message du jeu
 local dernierOuvert = -math.huge
-local fenetre
+local fenetre, choix
 local MajFenetre = function() end
 
 --------------------------------------------------------------------------------
@@ -106,14 +115,25 @@ local function Oublier()
 			if vue == t then vue = nil end
 		end
 	end
+	for cle, a in pairs(annonces) do
+		if maintenant - a.quand > 60 then annonces[cle] = nil end
+	end
 end
 
-local function Creer(chef, nomChef, id, duree, objet, texte)
+local function Copie(cles)
+	local c = {}
+	for cle in pairs(cles) do c[cle] = true end
+	return c
+end
+
+-- invites : les membres admis d'un tirage réservé ({ [clé] = true }), nil = toute la guilde
+local function Creer(chef, nomChef, id, duree, objet, texte, invites)
 	local cle = chef .. "~" .. id
 	if tirages[cle] then return nil end
 	Oublier()
 	local t = { cle = cle, chef = chef, nomChef = nomChef, id = id, objet = objet, texte = texte or "",
-		tour = 1, fin = GetTime() + duree, lancers = {}, etat = "ouvert" }
+		tour = 1, fin = GetTime() + duree, lancers = {}, etat = "ouvert",
+		invites = invites, admis = invites and Copie(invites) or nil }
 	tirages[cle] = t
 	if objet and ns.Precharger then ns.Precharger(objet) end
 	return t
@@ -201,18 +221,32 @@ local function MonTirageOuvert()
 	end
 end
 
-local function Ouvrir(objet, texte)
-	if not IsInGuild() then Erreur("Tu n'es pas dans une guilde"); return end
-	if MonTirageOuvert() then Erreur("Tu as déjà un tirage en cours"); return end
+local function PeutOuvrir()
+	if not IsInGuild() then Erreur("Tu n'es pas dans une guilde"); return false end
+	if MonTirageOuvert() then Erreur("Tu as déjà un tirage en cours"); return false end
 	local reste = ENTRE_DEUX - (GetTime() - dernierOuvert)
-	if reste > 0 then Erreur(("Attends encore %d s avant un nouveau tirage"):format(math.ceil(reste))); return end
+	if reste > 0 then Erreur(("Attends encore %d s avant un nouveau tirage"):format(math.ceil(reste))); return false end
+	return MaCle() ~= nil
+end
+
+-- invites : { [clé] = true } pour un tirage réservé, nil pour toute la guilde
+local function Ouvrir(objet, texte, invites)
+	if not PeutOuvrir() then return end
 	local moi = MaCle()
-	if not moi then return end
 	texte = (texte or ""):gsub("[~|\r\n]", " "):gsub("%s+", " ")
 	texte = strtrim(ns.CouperUTF8 and ns.CouperUTF8(texte, nil, 60) or texte:sub(1, 60))
-	local t = Creer(moi, moi, Base36(ns.Maintenant()), DUREE, objet, texte)
+	local t = Creer(moi, moi, Base36(ns.Maintenant()) .. (invites and "R" or ""), DUREE, objet, texte, invites)
 	if not t then Erreur("Attends une seconde avant un nouveau tirage"); return end
 	dernierOuvert = GetTime()
+	if invites then
+		-- la liste des participants d'abord, en messages d'au plus 240 octets
+		local msg = "P~" .. t.id
+		for cle in pairs(invites) do
+			if #msg + 1 + #cle > 240 then Envoyer(msg); msg = "P~" .. t.id end
+			msg = msg .. "~" .. cle
+		end
+		Envoyer(msg)
+	end
 	Envoyer(("O~%s~%d~%d~%s"):format(t.id, DUREE, objet or 0, texte))
 	vue = t
 	if ns.MontrerTirage then ns.MontrerTirage() end
@@ -293,15 +327,38 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		local id, duree, objet, texte = suite:match("^(%w+)~(%d+)~(%d+)~(.*)$")
 		if not id then return end
 		duree, objet = math.max(10, math.min(tonumber(duree) or DUREE, 600)), tonumber(objet)
-		local t = Creer(qui, expediteur, id, duree, objet ~= 0 and objet or nil, texte)
+		local invites
+		if id:sub(-1) == "R" then
+			local a = annonces[qui .. "~" .. id]
+			invites = a and a.cles or {}
+		end
+		local t = Creer(qui, expediteur, id, duree, objet ~= 0 and objet or nil, texte, invites)
 		if not t then return end -- (déjà connu : mon propre tirage qui me revient)
-		if not (vue and vue.etat == "ouvert") then vue = t end
+		annonces[t.cle] = nil
+		local pourMoi = not invites or invites[MaCle()]
+		if pourMoi and not (vue and vue.etat == "ouvert") then vue = t end
 		MajFenetre()
-		if ns.Notifier then
+		if pourMoi and ns.Notifier then
 			ns.Notifier("tirages", "Tirage au sort", ("%s ouvre un tirage : |cffffd100%s|r · %d s pour lancer les dés")
 				:format(NomJoueur(expediteur), NomLot(t), duree), "READY_CHECK",
 				function() vue = t; if ns.MontrerTirage then ns.MontrerTirage() end end)
 		end
+	elseif genre == "P" then
+		local id, cles = suite:match("^(%w+)~(.+)$")
+		if not id or id:sub(-1) ~= "R" then return end
+		local cle = qui .. "~" .. id
+		local t = tirages[cle]
+		if t then
+			-- (liste arrivée après l'ouverture : on complète, tant que le premier tour n'est pas fini)
+			if t.chef == MaCle() or not t.invites or t.etat ~= "ouvert" or t.tour ~= 1 then return end
+			for c in cles:gmatch("[^~]+") do t.invites[c] = true; t.admis[c] = true end
+			MajFenetre()
+			return
+		end
+		local a = annonces[cle]
+		if not a then a = { cles = {} }; annonces[cle] = a end
+		a.quand = GetTime()
+		for c in cles:gmatch("[^~]+") do a.cles[c] = true end
 	elseif genre == "L" then
 		local chef, id, tour, valeur = suite:match("^([^~]+)~(%w+)~(%d+)~(%d+)$")
 		local t = chef and tirages[chef .. "~" .. id]
@@ -332,7 +389,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		if not Clore(t, "fini", gagnant ~= "" and gagnant or nil, hasard == "1") then return end
 		MajFenetre()
 		if t.gagnant == MaCle() and ns.PluieEmotes then ns.PluieEmotes(4) end
-		if ns.Notifier then
+		if (not t.invites or t.invites[MaCle()]) and ns.Notifier then
 			local l = t.gagnant and t.lancers[t.gagnant]
 			ns.Notifier("tirages", "Tirage au sort", t.gagnant
 				and ("%s remporte |cffffd100%s|r%s"):format(NomJoueur(t.gagnant), NomLot(t),
@@ -401,8 +458,162 @@ local function DemanderLot()
 	ns.UI.DemanderTexte({
 		titre = "Nouveau tirage au sort", bouton = "Ouvrir", maxLettres = 60, vide = true,
 		texte = "Quel est le lot ? (facultatif)\nPour un objet : écris /smb roll puis Maj + clic sur l'objet.",
-		valider = function(texte) Ouvrir(nil, texte) end,
+		valider = function(texte) if ns.PreparerTirage then ns.PreparerTirage(nil, texte) end end,
 	})
+end
+
+--------------------------------------------------------------------------------
+-- Choix des participants, avant l'ouverture
+--------------------------------------------------------------------------------
+
+local LARGEUR_CHOIX, LIGNES_CHOIX = 300, 10
+
+-- moi d'abord, puis les membres connectés qui ont l'addon, par nom
+local function Presents()
+	local moi = MaCle()
+	local autres = {}
+	for _, cle in ipairs(ns.ClesMembresActifs and ns.ClesMembresActifs() or {}) do
+		if cle ~= moi then autres[#autres + 1] = { cle = cle, nom = NomJoueur(cle) } end
+	end
+	table.sort(autres, function(a, b) return a.nom < b.nom end)
+	table.insert(autres, 1, { cle = moi, nom = NomJoueur(moi) .. " (moi)" })
+	return autres
+end
+
+-- clés des membres de mon groupe ou de mon raid, moi compris (nil si je suis seul)
+local function ClesGroupe()
+	local cles, trouve = {}, false
+	for _, genre in ipairs({ "party", "raid" }) do
+		for i = 1, genre == "raid" and 40 or 4 do
+			local unite = genre .. i
+			if UnitExists(unite) then
+				local cle = ns.NomComplet and ns.NomComplet(unite)
+				if cle then cles[cle] = true; trouve = true end
+			end
+		end
+	end
+	if not trouve then return nil end
+	cles[MaCle()] = true
+	return cles
+end
+
+local function MajChoix()
+	local f = choix
+	if not f or not f:IsShown() then return end
+	local coches = 0
+	for i, m in ipairs(f.membres) do
+		local l = f.lignes[i]
+		if not l then
+			l = ns.UI.Case(f.liste.contenu, "", function(oui)
+				local membre = f.membres[i]
+				if membre then f.coches[membre.cle] = oui or nil end
+				MajChoix()
+			end)
+			l:SetPoint("TOPLEFT", f.liste.contenu, "TOPLEFT", 2, -(i - 1) * HAUT_LIGNE - 1)
+			l:SetWidth(LARGEUR_CHOIX - 44)
+			f.lignes[i] = l
+		end
+		l.texte:SetText(m.nom)
+		l:Poser(f.coches[m.cle])
+		l:Show()
+		if f.coches[m.cle] then coches = coches + 1 end
+	end
+	for i = #f.membres + 1, #f.lignes do f.lignes[i]:Hide() end
+	f.liste:Hauteur(math.max(1, #f.membres * HAUT_LIGNE))
+	if coches == #f.membres then
+		f.compte:SetText("Toute la guilde participe")
+	else
+		f.compte:SetText(("Tirage réservé : |cffffd100%d|r membre%s sur %d"):format(coches, coches > 1 and "s" or "", #f.membres))
+	end
+	f.ouvrir:Activer(coches > 0)
+	f.groupe:Activer(ClesGroupe() ~= nil)
+end
+
+local function CreerChoix()
+	local UI = ns.UI
+	local C = UI.C
+	local f = CreateFrame("Frame", "GuildUpSMBTirageChoix", UIParent, "BackdropTemplate")
+	UI.Habiller(f, C.fond, C.bordFort)
+	f:SetSize(LARGEUR_CHOIX, 172 + LIGNES_CHOIX * HAUT_LIGNE)
+	f:SetPoint("CENTER", UIParent, "CENTER", 0, 80)
+	f:SetFrameStrata("FULLSCREEN_DIALOG")
+	f:SetToplevel(true)
+	f:SetClampedToScreen(true)
+	f:EnableMouse(true)
+	f:SetMovable(true)
+	f:RegisterForDrag("LeftButton")
+	f:SetScript("OnDragStart", f.StartMoving)
+	f:SetScript("OnDragStop", f.StopMovingOrSizing)
+	tinsert(UISpecialFrames, "GuildUpSMBTirageChoix") -- Échap ferme
+	f:Hide()
+	f.membres, f.coches, f.lignes = {}, {}, {}
+
+	f.titre = UI.Texte(f, "GameFontNormal", C.ors)
+	f.titre:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -14)
+	f.titre:SetText("Qui participe au tirage ?")
+	local croix = UI.Fermer(f, function() f:Hide() end, 22)
+	croix:SetPoint("TOPRIGHT", f, "TOPRIGHT", -10, -10)
+	f.lot = UI.Texte(f, "GameFontHighlight", C.texte)
+	f.lot:SetPoint("TOPLEFT", f.titre, "BOTTOMLEFT", 0, -8)
+	f.lot:SetPoint("RIGHT", f, "RIGHT", -16, 0)
+
+	local function Cocher(cles)
+		f.coches = {}
+		for _, m in ipairs(f.membres) do
+			if cles == true or (cles and cles[m.cle]) then f.coches[m.cle] = true end
+		end
+		MajChoix()
+	end
+	f.tout = UI.Bouton(f, "Tout cocher", "fantome", 86, 24)
+	f.tout:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -62)
+	f.tout:SetScript("OnClick", function() Cocher(true) end)
+	f.rien = UI.Bouton(f, "Tout décocher", "fantome", 92, 24)
+	f.rien:SetPoint("LEFT", f.tout, "RIGHT", 4, 0)
+	f.rien:SetScript("OnClick", function() Cocher(nil) end)
+	f.groupe = UI.Bouton(f, "Mon groupe", "fantome", 82, 24)
+	f.groupe:SetPoint("LEFT", f.rien, "RIGHT", 4, 0)
+	f.groupe:SetScript("OnClick", function() Cocher(ClesGroupe()) end)
+	UI.Infobulle(f.groupe, "Mon groupe", "Ne coche que les membres de ton groupe ou de ton raid (ceux qui ont l'addon).")
+
+	f.liste = UI.Liste(f)
+	f.liste:SetPoint("TOPLEFT", f.tout, "BOTTOMLEFT", 0, -8)
+	f.liste:SetSize(LARGEUR_CHOIX - 32, LIGNES_CHOIX * HAUT_LIGNE)
+
+	f.compte = UI.Texte(f, "GameFontHighlightSmall", C.gris)
+	f.compte:SetPoint("TOPLEFT", f.liste, "BOTTOMLEFT", 0, -8)
+	f.ouvrir = UI.Bouton(f, "Ouvrir le tirage", "or", 140, 28)
+	f.ouvrir:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 14)
+	f.ouvrir:SetScript("OnClick", function()
+		local invites, coches = {}, 0
+		for _, m in ipairs(f.membres) do
+			if f.coches[m.cle] then invites[m.cle] = true; coches = coches + 1 end
+		end
+		if coches == 0 then return end
+		f:Hide()
+		-- tout coché : tirage ouvert à toute la guilde, y compris à ceux qui se connectent ensuite
+		Ouvrir(f.objet, f.texte, coches < #f.membres and invites or nil)
+	end)
+	f.annuler = UI.Bouton(f, "Annuler", "fantome", 90, 28)
+	f.annuler:SetPoint("RIGHT", f.ouvrir, "LEFT", -8, 0)
+	f.annuler:SetScript("OnClick", function() f:Hide() end)
+	return f
+end
+
+-- Montre la liste des membres connectés (tous cochés) avant d'ouvrir le tirage
+ns.PreparerTirage = function(objet, texte)
+	if not ns.UI or not PeutOuvrir() then return end
+	choix = choix or CreerChoix()
+	local f = choix
+	f.objet, f.texte = objet, texte or ""
+	f.membres, f.coches = Presents(), {}
+	for _, m in ipairs(f.membres) do f.coches[m.cle] = true end
+	local nom = objet and (select(2, ns.InfoObjet(objet)) or ns.InfoObjet(objet) or ("objet n° " .. objet))
+	local mot = strtrim(((texte or ""):gsub("[~|\r\n]", " ")))
+	f.lot:SetText("Lot : " .. (nom and (mot ~= "" and (nom .. " · " .. mot) or nom) or (mot ~= "" and mot or "un lot")))
+	f.liste:Haut()
+	f:Show()
+	f:Raise()
+	MajChoix()
 end
 
 local function CreerFenetre()
@@ -545,7 +756,10 @@ MajFenetre = function()
 	f.lot.nom:SetPoint("LEFT", f.lot, "LEFT", icone and 36 or 0, 0)
 	f.lot.nom:SetPoint("RIGHT", f.lot, "RIGHT", 0, 0)
 	f.lot.nom:SetText(NomLot(t))
-	f.chef:SetText("Ouvert par " .. NomJoueur(t.nomChef))
+	local invites = 0
+	for _ in pairs(t.invites or {}) do invites = invites + 1 end
+	f.chef:SetText("Ouvert par " .. NomJoueur(t.nomChef) .. (t.invites
+		and (" · réservé à %d membre%s"):format(invites, invites > 1 and "s" or "") or " · toute la guilde"))
 
 	-- l'état et le bouton principal
 	local classement = Classement(t)
@@ -567,6 +781,8 @@ MajFenetre = function()
 			f.lancer:Ecrire("Les dés roulent…")
 		elseif l and l.tours[t.tour] then
 			f.lancer:Ecrire(("Tu as fait %d"):format(l.tours[t.tour]))
+		elseif t.invites and not t.invites[moi] then
+			f.lancer:Ecrire("Tu ne participes pas à ce tirage")
 		elseif t.admis and not t.admis[moi] then
 			f.lancer:Ecrire(l and "Tu n'es plus en lice" or "Départage en cours")
 		else
@@ -617,14 +833,14 @@ ns.MontrerTirage = function()
 	MajFenetre()
 end
 
--- /smb roll : la fenêtre ; /smb roll <texte ou lien d'objet> : ouvre un tirage tout de suite
+-- /smb roll : la fenêtre ; /smb roll <texte ou lien d'objet> : choix des participants, puis ouverture
 ns.Tirage = function(saisie)
 	saisie = strtrim(saisie or "")
 	if saisie == "" then ns.MontrerTirage(); return end
 	local objet = tonumber(saisie:match("item:(%d+)"))
 	-- le lien retiré, il reste le commentaire
 	local texte = saisie:gsub("|c%x+|H.-|h.-|h|r", ""):gsub("|H.-|h.-|h", "")
-	Ouvrir(objet, texte)
+	ns.PreparerTirage(objet, texte)
 end
 
 ns.Ecouter(PREFIXE, Recevoir)

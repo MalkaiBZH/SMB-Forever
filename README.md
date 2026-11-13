@@ -148,6 +148,8 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 - **Tirage au sort** (`/smb roll`) : un membre ouvre un tirage sur un objet ou un lot, toute la guilde reçoit une
   bulle et lance les dés d'un clic (le `/roll` 1-100 du jeu, lu par l'addon et transmis à la guilde). Classement en
   direct, égalités en tête départagées par un nouveau tour, résultat annoncé en bulle. Il faut l'addon pour participer.
+  Avant l'ouverture, l'organisateur choisit qui participe : une case par membre connecté, « Tout cocher », ou
+  « Mon groupe » pour réserver le tirage à son groupe ou à son raid.
 - **Événements** : les événements de la guilde et tes invitations des 30 prochains jours, groupés par jour
   (Aujourd'hui, Demain…), avec l'heure, le type (donjon ou raid), l'organisateur, le nombre d'inscrits et ton
   état en couleur. À droite, le détail (description, inscrits avec leur classe et leur état) et les réponses :
