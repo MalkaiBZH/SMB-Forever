@@ -145,6 +145,9 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 - **Annonces** en bulle : montées de niveau (« Nom a up ! », avec des chopes à l'écran : 4, 8 aux paliers 10, 20,
   30… et 12 au niveau maximum ; celui qui monte voit aussi les siennes), nouveaux métiers, paliers de métier.
 - **À l'aide !** (`/smb sos`) : appel à la guilde avec sa position.
+- **Tirage au sort** (`/smb roll`) : un membre ouvre un tirage sur un objet ou un lot, toute la guilde reçoit une
+  bulle et lance les dés d'un clic (le `/roll` 1-100 du jeu, lu par l'addon et transmis à la guilde). Classement en
+  direct, égalités en tête départagées par un nouveau tour, résultat annoncé en bulle. Il faut l'addon pour participer.
 - **Événements** : les événements de la guilde et tes invitations des 30 prochains jours, groupés par jour
   (Aujourd'hui, Demain…), avec l'heure, le type (donjon ou raid), l'organisateur, le nombre d'inscrits et ton
   état en couleur. À droite, le détail (description, inscrits avec leur classe et leur état) et les réponses :
@@ -180,6 +183,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 | `/smb items` | Tous les objets fabricables |
 | `/smb projets` | Projets de guilde |
 | `/smb sos` | Appeler la guilde à l'aide |
+| `/smb roll [objet ou mot]` | Tirage au sort de la guilde (sans rien : rouvrir la fenêtre du tirage) |
 | `/smb nouveautes` | Nouveautés de la version |
 | `/smb on` / `off` | Activer / couper les bannières |
 | `/smb bouton` | Afficher / cacher le médaillon GuildUpSMB |

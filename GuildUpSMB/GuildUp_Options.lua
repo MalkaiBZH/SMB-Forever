@@ -63,6 +63,7 @@ local function Aide()
 	print("  /smb projets — projets de guilde")
 	print("  /smb nouveautes — les nouveautés de cette version")
 	print("  /smb sos — appeler la guilde à l'aide")
+	print("  /smb roll [objet ou mot] — tirage au sort de la guilde")
 	print("  /smb on | off — bannières de la guilde (" .. OuiNon(db.actif) .. ")")
 	print("  /smb bouton — afficher / cacher le médaillon SMB Forever")
 	print("  /smb noms — nom et guilde des autres joueurs (" .. OuiNon(db.nomsAllies) .. ")")
@@ -371,7 +372,7 @@ local HAUT_CARTE, HAUT_NOTIFS, HAUT_ECRAN = 186, 126, 58
 local NOTIFS = {
 	{ "groupes", "Groupes" }, { "candidatures", "Candidatures" }, { "niveaux", "Niveaux" }, { "metiers", "Métiers" },
 	{ "evenements", "Événements" }, { "quetes", "Quêtes" }, { "commandes", "Commandes" }, { "plans", "Échanges" },
-	{ "version", "Version" }, { "aide", "Aide" },
+	{ "version", "Version" }, { "aide", "Aide" }, { "tirages", "Tirages" },
 	{ "gu", (ns.Config and ns.Config.cri) and (tostring(ns.Config.cri):upper() .. "!") or "Cri" },
 }
 local MES_ROLES = { "auto", "tank", "heal", "dps" }                  -- puces « Mon rôle »
@@ -645,6 +646,10 @@ SlashCmdList.GUILDUP = function(msg)
 		return
 	elseif cmd == "sos" then
 		if ns.DemanderAide then ns.DemanderAide() end
+		return
+	elseif cmd == "roll" or cmd == "tirage" then
+		-- (la saisie d'origine : « reste » est en minuscules, ce qui abîmerait un lien d'objet)
+		if ns.Tirage then ns.Tirage(((msg or ""):match("^%s*%S+%s*(.-)%s*$"))) end
 		return
 	elseif cmd == "nouveautes" or cmd == "nouveautés" or cmd == "notes" then
 		if ns.MontrerNouveautes then ns.MontrerNouveautes() end
