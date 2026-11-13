@@ -7,6 +7,13 @@ compare la version du .toc avec celle du commit précédent, et envoie au webhoo
 par nouvelle version, avec ses nouveautés tirées de GuildUp_Version.lua (tables ORDRE et NOTES).
 Rien n'est envoyé si la version n'a pas changé, ni pour une version « -dev ».
 
+Avant toute annonce, le dépôt est vérifié (--verifier pour ne faire que ça, avant de pousser) :
+  - la version du .toc est la première de ORDRE et a ses NOTES ;
+  - ORDRE ne monte que d'un cran à la fois (3.5.2 → 3.5.3, 3.6.0 ou 4.0.0, jamais 3.5.0 → 5.1.0) ;
+  - la version ne redescend pas par rapport au commit précédent ;
+  - chaque fichier .lua de GuildUpSMB/ est dans le .toc, et chaque fichier du .toc existe.
+Au moindre problème, rien n'est envoyé et le script s'arrête en erreur (la tâche GitHub échoue).
+
 L'adresse du webhook n'est jamais écrite dans le dépôt : elle vient de la variable d'environnement
 DISCORD_WEBHOOK (secret du dépôt GitHub). Adresse Discord telle quelle, sans « /github » à la fin.
 
@@ -14,6 +21,7 @@ Utilisation :
   python outils/annoncer_version.py --avant <commit>    versions parues depuis ce commit (GitHub)
   python outils/annoncer_version.py --depuis 3.3.0      versions parues après la 3.3.0
   python outils/annoncer_version.py --version 3.4.0     cette version seulement
+  python outils/annoncer_version.py --verifier          vérifier le dépôt, sans rien annoncer
   --essai   affiche les messages au lieu de les envoyer (aucun webhook nécessaire)
 Python 3.6 ou plus, bibliothèque standard seulement.
 """
@@ -28,6 +36,7 @@ import urllib.error
 import urllib.request
 
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ADDON = "GuildUpSMB"
 TOC = "GuildUpSMB/GuildUpSMB.toc"
 NOTES = "GuildUpSMB/GuildUp_Version.lua"
 NOM = "SMB Forever"
@@ -84,6 +93,72 @@ def propre(ligne):
 	return ligne.replace("||", "|").strip()
 
 
+def base(version):
+	"""« 3.6.0-dev » → « 3.6.0 »."""
+	return version.split("-")[0]
+
+
+def triplet(version):
+	"""« 3.6 » → (3, 6, 0) : majeur, mineur, correctif."""
+	n = list(cle(base(version))) + [0, 0, 0]
+	return tuple(n[:3])
+
+
+def un_cran(ancienne, nouvelle):
+	"""Vrai si « nouvelle » suit « ancienne » d'un seul cran semver : correctif, mineur ou majeur."""
+	a, n = triplet(ancienne), triplet(nouvelle)
+	return (n == (a[0], a[1], a[2] + 1)
+		or n == (a[0], a[1] + 1, 0)
+		or n == (a[0] + 1, 0, 0))
+
+
+def fichiers_du_toc(texte):
+	"""Les fichiers chargés par le .toc (lignes qui ne sont ni vides ni des commentaires « # »)."""
+	return [l.strip() for l in texte.splitlines() if l.strip() and not l.strip().startswith("#")]
+
+
+def verifier(precedente=None):
+	"""Liste des problèmes du dépôt (vide si tout va bien). « precedente » : version du commit d'avant."""
+	erreurs = []
+	toc = lire(TOC)
+	actuelle = version_du_toc(toc)
+	ordre, notes = lire_notes()
+	if not actuelle:
+		return ["Version introuvable dans " + TOC + "."]
+	if not ordre:
+		return ["Table ORDRE introuvable dans " + NOTES + "."]
+
+	if ordre[0] != base(actuelle):
+		erreurs.append("La version du .toc ({0}) n'est pas la première de ORDRE dans {1} ({2}).".format(
+			actuelle, NOTES, ordre[0]))
+	if not notes.get(base(actuelle)):
+		erreurs.append("Pas de NOTES pour la {0} dans {1}.".format(base(actuelle), NOTES))
+	vues = set()
+	for v in ordre:
+		if v in vues:
+			erreurs.append("La {0} apparaît deux fois dans ORDRE.".format(v))
+		vues.add(v)
+	for nouvelle, ancienne in zip(ordre, ordre[1:]):
+		if not un_cran(ancienne, nouvelle):
+			erreurs.append("ORDRE passe de la {0} à la {1} : une version ne monte que d'un cran "
+				"(correctif, mineur ou majeur).".format(ancienne, nouvelle))
+	if precedente:
+		if cle(base(actuelle)) < cle(base(precedente)):
+			erreurs.append("La version redescend : {0} au commit précédent, {1} maintenant.".format(
+				precedente, actuelle))
+		elif base(precedente) not in ordre:
+			erreurs.append("La version du commit précédent ({0}) n'est pas dans ORDRE.".format(precedente))
+
+	charges = fichiers_du_toc(toc)
+	for f in charges:
+		if not os.path.isfile(os.path.join(RACINE, ADDON, f)):
+			erreurs.append("Le .toc charge {0}, qui n'existe pas.".format(f))
+	for f in sorted(os.listdir(os.path.join(RACINE, ADDON))):
+		if f.endswith(".lua") and f not in charges:
+			erreurs.append("{0} n'est pas dans le .toc : le jeu ne le chargera pas.".format(f))
+	return erreurs
+
+
 def message(version, lignes):
 	description = "\n".join("• " + l for l in lignes) if lignes else "Petites corrections."
 	if len(description) > MAX_DESCRIPTION:
@@ -113,6 +188,7 @@ def principal():
 	p.add_argument("--depuis", help="annoncer les versions parues après celle-ci")
 	p.add_argument("--version", help="annoncer cette version seulement")
 	p.add_argument("--essai", action="store_true", help="afficher au lieu d'envoyer")
+	p.add_argument("--verifier", action="store_true", help="vérifier le dépôt seulement, sans rien annoncer")
 	a = p.parse_args()
 
 	actuelle = version_du_toc(lire(TOC))
@@ -120,11 +196,22 @@ def principal():
 		print("Version introuvable dans " + TOC)
 		return 1
 	ordre, notes = lire_notes()
+	precedente = None if a.version else (a.depuis or version_avant(a.avant))
+
+	# jamais d'annonce d'un dépôt incohérent (version sautée ou redescendue, fichier oublié dans le .toc)
+	erreurs = verifier(precedente)
+	if erreurs:
+		print("Vérification échouée, rien n'est annoncé :")
+		for e in erreurs:
+			print("  - " + e)
+		return 1
+	if a.verifier:
+		print("Vérification réussie : version {0}, .toc et notes cohérents.".format(actuelle))
+		return 0
 
 	if a.version:
 		versions = [a.version]
 	else:
-		precedente = a.depuis or version_avant(a.avant)
 		if precedente and cle(precedente) >= cle(actuelle):
 			print("Pas de nouvelle version ({0}) : rien à annoncer.".format(actuelle))
 			return 0

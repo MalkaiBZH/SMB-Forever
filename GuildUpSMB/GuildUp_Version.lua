@@ -135,12 +135,17 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "3.6.0", "3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["3.6.0"] = {
+		"|cffffd100Fil d'activité|r : la page |cffffd100Activité|r du menu (ou |cffffd100/smb activite|r) fonctionne enfin (en 3.5.2, elle n'était pas chargée et refermait la fenêtre). Elle garde ce qui se passe dans la guilde pendant 30 jours : montées de niveau, métiers, dons remerciés et tirages au sort gagnés. À ta connexion, une bulle résume ce que tu as manqué, et un point doré marque les nouveautés depuis ta dernière visite.",
+		"|cffffd100Podium|r des 7 derniers jours sur la même page : les membres qui ont gagné le plus de niveaux, ceux dont les dons ont été le plus remerciés, et les plus chanceux aux tirages. Le fil commence avec cette version : rien de ce qui s'est passé avant n'y figure.",
+		"|cffffd100Tirage au sort|r : avant d'ouvrir un tirage, tu choisis qui participe (une case par membre connecté, « Tout cocher » ou « Mon groupe »). Seuls les membres choisis reçoivent la bulle et lancent les dés ; tout coché, le tirage reste ouvert à toute la guilde.",
+		"|cffffd100Options > Carte et repères|r : les trois curseurs sont bien plus larges, avec leur nom au-dessus.",
+		"La « version 5.1.0 » annoncée ce matin était une erreur de numéro : c'était la 3.5.1.",
+	},
 	["3.5.2"] = {
-		"|cffffd100Fil d'activité|r : la nouvelle page |cffffd100Activité|r du menu (ou |cffffd100/smb activite|r) garde ce qui se passe dans la guilde pendant 30 jours : montées de niveau, métiers, dons remerciés et tirages au sort gagnés. À ta connexion, une bulle résume ce que tu as manqué, et un point doré marque les nouveautés depuis ta dernière visite.",
-		"|cffffd100Podium|r des 7 derniers jours sur la même page : les membres qui ont gagné le plus de niveaux, ceux dont les dons ont été le plus remerciés, et les plus chanceux aux tirages.",
-		"Le fil commence avec cette version : rien de ce qui s'est passé avant n'y figure.",
+		"Préparation du fil d'activité et du podium (page Activité), activés en 3.6.0.",
 	},
 	["3.5.1"] = {
 		"|cffffd100Tirage au sort|r : avant d'ouvrir un tirage, tu choisis qui participe. La liste montre les membres connectés qui ont l'addon, avec une case par membre, « Tout cocher » et « Mon groupe » (ton groupe ou ton raid, pratique pour un butin de donjon). Tout coché, le tirage reste ouvert à toute la guilde.",

@@ -143,6 +143,12 @@ Pas de build ni de tests automatisés : on teste **en jeu**, après `/reload`.
 3. Si le changement touche les commandes ou les fonctionnalités, mettre à jour le `README.md` dans le même
    commit.
 
+**Avant de pousser** : `python outils/annoncer_version.py --verifier`. Il vérifie que la version du `.toc` est la
+première de `ORDRE` et a ses `NOTES`, que `ORDRE` ne monte que d'un cran à la fois (jamais 3.5.0 → 5.1.0), que la
+version ne redescend pas, et que chaque fichier `.lua` de `GuildUpSMB/` est dans le `.toc`. GitHub refait cette
+vérification à chaque push sur `main` qui touche l'addon : en cas d'échec, rien n'est annoncé et la tâche échoue.
+Une version déjà poussée ne se renumérote pas : on corrige dans la suivante.
+
 **Annonce Discord** : dès qu'un push sur `main` change la version du `.toc`, GitHub
 (`.github/workflows/annonce-discord.yml`) lance `python outils/annoncer_version.py`, qui poste dans le salon
 de la guilde un message par nouvelle version, avec ses lignes de `NOTES` (les passages colorés deviennent du

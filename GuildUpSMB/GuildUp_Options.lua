@@ -367,7 +367,7 @@ end
 local UI = ns.UI
 local C = UI.C
 local MARGE, ECART = 16, 12
-local HAUT_CARTE, HAUT_NOTIFS, HAUT_ECRAN = 186, 126, 58
+local HAUT_CARTE, HAUT_NOTIFS, HAUT_ECRAN = 186, 126, 86
 
 -- types de bulles du médaillon (db.notifs[cat] == false : coupées), quatre par ligne
 local NOTIFS = {
@@ -493,7 +493,8 @@ local function CreerPage(parent)
 	end
 
 	-- Carte et repères : réglages personnels (GuildUpDB), à défaut ceux de GuildUp_Config.lua. Trois
-	-- curseurs sur une ligne : { réglage, libellé, min, max, pas, valeur de la guilde, infobulle }
+	-- colonnes, le libellé au-dessus de son curseur : { réglage, libellé, min, max, pas, valeur de la
+	-- guilde, infobulle }
 	local ecran = UI.Carte(p, "Carte et repères")
 	ecran:SetPoint("TOPLEFT", notifs, "BOTTOMLEFT", 0, -ECART)
 	ecran:SetSize(largeur, HAUT_ECRAN)
@@ -513,14 +514,15 @@ local function CreerPage(parent)
 		local cle, libelle, min, max, pas, guilde, aide = reg[1], reg[2], reg[3], reg[4], reg[5], reg[6], reg[7]
 		local x = 14 + (i - 1) * colonneEcran
 		local t = UI.Texte(ecran, "GameFontHighlight", C.texte)
-		t:SetPoint("TOPLEFT", ecran, "TOPLEFT", x, -34)
+		t:SetPoint("TOPLEFT", ecran, "TOPLEFT", x, -36)
 		t:SetText(libelle)
-		local curseur = UI.Curseur(ecran, colonneEcran - 142 - 44, min, max, pas, function(v)
+		-- (place laissée à droite : la valeur écrite par le curseur, puis l'écart avec la colonne suivante)
+		local curseur = UI.Curseur(ecran, colonneEcran - 24 - 46, min, max, pas, function(v)
 			db[cle] = v
 			if ns.MajReperes then ns.MajReperes() end
 		end)
 		curseur.Format = function(v) return ("%d"):format(v) end
-		curseur:SetPoint("LEFT", t, "LEFT", 142, 0)
+		curseur:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -8)
 		UI.Infobulle(curseur, libelle, aide .. ("\nRéglage de la guilde : %d."):format(guilde))
 		curseursEcran[#curseursEcran + 1] = { curseur, function() return tonumber(db[cle]) or guilde end }
 	end
@@ -556,10 +558,11 @@ local function CreerPage(parent)
 	end)
 	rolesDebug:SetPoint("TOPLEFT", carteDebug, "TOPLEFT", xDroite, -64)
 	local noteDebug = UI.Texte(carteDebug, "GameFontHighlightSmall", C.gris)
-	noteDebug:SetPoint("TOPLEFT", carteDebug, "TOPLEFT", xDroite, -100)
-	noteDebug:SetText("Remis en Auto à chaque connexion.")
+	noteDebug:SetPoint("LEFT", tAffiche, "RIGHT", 10, 0)
+	noteDebug:SetText("(remis en Auto à chaque connexion)")
 
-	-- Réinitialiser : seulement les réglages, sous la dernière carte affichée
+	-- Réinitialiser : seulement les réglages, sous la dernière carte ; avec la carte Debug, la page serait
+	-- trop haute : le bouton passe alors dans le coin bas droit de cette carte, sans sa phrase
 	local reset = UI.Bouton(p, "Réinitialiser les réglages", "fantome", 190, 26)
 	reset:SetScript("OnClick", function()
 		ReinitialiserReglages()
@@ -587,7 +590,12 @@ local function CreerPage(parent)
 		for _, cle in ipairs(ROLES_DEBUG) do if db.role == cle then role = cle end end
 		for i, cle in ipairs(ROLES_DEBUG) do if cle == role then rolesDebug:Choisir(i) end end
 		reset:ClearAllPoints()
-		reset:SetPoint("TOPRIGHT", avecDebug and carteDebug or ecran, "BOTTOMRIGHT", 0, -ECART)
+		if avecDebug then
+			reset:SetPoint("BOTTOMRIGHT", carteDebug, "BOTTOMRIGHT", -14, 10)
+		else
+			reset:SetPoint("TOPRIGHT", ecran, "BOTTOMRIGHT", 0, -ECART)
+		end
+		phrase:SetShown(not avecDebug)
 	end
 	page = p
 	return p
