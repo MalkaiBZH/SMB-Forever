@@ -77,7 +77,8 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 - **Repères dans le HUD** : les membres de la guilde présents sur la même carte ont un repère (portrait,
   prénom à la couleur de la classe, distance) toujours sur le tour de l'écran, comme dans un jeu de tir :
   en haut quand ils sont devant (dans leur direction exacte), sur les côtés quand ils sont à gauche ou à
-  droite, en bas quand ils sont derrière, avec une flèche. Clic : chuchoter. Seulement les membres qui
+  droite, en bas quand ils sont derrière, avec une flèche. Clic : chuchoter ; clic droit : menu
+  (chuchoter, inviter dans le groupe, voir dans la page Guilde). Seulement les membres qui
   partagent leur position et ont un portrait. `/smb reperes` pour couper.
 - **Ennemis de quête** : un « ! » à droite de la barre de nom d'un ennemi à tuer ou à dépouiller pour une
   quête en cours : **jaune** pour toi, **bleu** pour un membre de ton groupe, **vert** pour les deux. Il

@@ -10,7 +10,7 @@
 --   - hors du champ de vision : bord de gauche ou de droite, de plus en plus bas à mesure qu'il passe
 --     derrière moi, puis bord du bas, au centre quand il est juste derrière ; avec une flèche.
 -- Seuls les membres dont le portrait est connu sont affichés (addon à jour, race avec portrait).
--- Clic : chuchoter. Réglage db.reperes (/smb reperes, case dans les options) ; hauteur des repères du
+-- Clic : chuchoter ; clic droit : menu (chuchoter, inviter dans le groupe, voir dans la page Guilde). Réglage db.reperes (/smb reperes, case dans les options) ; hauteur des repères du
 -- haut et du bas : curseurs de la page Options, sinon valeurs de GuildUp_Config.lua.
 -- Aucun message réseau propre : tout vient des positions de GuildUp_Carte.lua (une toutes les 6 s
 -- au plus pour un membre qui bouge), d'où des petits sauts quand un membre proche se déplace.
@@ -75,10 +75,62 @@ end
 
 local reperes = {} -- boutons réutilisés
 
-local function NomChuchotement(r)
-	local nom = (ns.NomListeGuilde and ns.NomListeGuilde(r.cle)) or NomCourt(r.joueur)
-	if r.cle and r.cle:find("#test", 1, true) then nom = UnitName("player") end
+-- nom à donner au jeu (chuchoter, inviter) : celui de la liste de guilde
+local function NomJeu(cle, joueur)
+	local nom = (ns.NomListeGuilde and ns.NomListeGuilde(cle)) or NomCourt(joueur)
+	if cle and cle:find("#test", 1, true) then nom = UnitName("player") end -- (membres factices du mode test)
 	return nom
+end
+
+local function Chuchoter(cle, joueur)
+	local nom = NomJeu(cle, joueur)
+	if ChatFrame_SendTell then ChatFrame_SendTell(nom)
+	elseif ChatFrame_OpenChat then ChatFrame_OpenChat("/w " .. nom .. " ") end
+end
+
+local function Inviter(cle, joueur)
+	local inviter = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
+	if inviter then pcall(inviter, NomJeu(cle, joueur)) end
+end
+
+-- Menu du clic droit (même cadre que celui de la page Guilde : ns.CadreMenu). Le membre est retenu
+-- au moment du clic : les repères sont réutilisés et peuvent changer de membre pendant que le menu
+-- est ouvert.
+local menu
+local function MontrerMenu(repere)
+	if not ns.CadreMenu then return end
+	menu = menu or ns.CadreMenu("GuildUpMenuRepere")
+	local cle, joueur = repere.cle, repere.joueur
+	local lignes = {
+		{ "Chuchoter", function() Chuchoter(cle, joueur) end },
+		{ "Inviter dans le groupe", function() Inviter(cle, joueur) end },
+		{ "Voir dans la page Guilde", function()
+			if ns.OuvrirInterface then ns.OuvrirInterface("guilde", NomCourt(joueur)) end
+		end },
+	}
+	for i, l in ipairs(lignes) do
+		local b = ns.BoutonMenu(menu, i)
+		b:ClearAllPoints()
+		b:SetPoint("TOPLEFT", menu, "TOPLEFT", 6, -6 - (i - 1) * 20)
+		b:SetPoint("RIGHT", menu, "RIGHT", -6, 0)
+		b.texte:SetText(l[1])
+		b:SetScript("OnClick", function() menu:Hide(); l[2]() end)
+		b:Show()
+	end
+	for i = #lignes + 1, #menu.boutons do menu.boutons[i]:Hide() end
+	menu:SetSize(190, #lignes * 20 + 12)
+	menu.ancre = repere
+	menu:ClearAllPoints()
+	-- sous le curseur (le menu se garde à l'écran : SetClampedToScreen)
+	local x, y = GetCursorPosition()
+	local echelle = tonumber(UIParent:GetEffectiveScale()) or 1
+	x, y = tonumber(x), tonumber(y)
+	if x and y and echelle > 0 then
+		menu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x / echelle - 8, y / echelle + 8)
+	else
+		menu:SetPoint("TOP", repere, "BOTTOM", 0, -30)
+	end
+	menu:Show()
 end
 
 local function NouveauRepere()
@@ -97,18 +149,22 @@ local function NouveauRepere()
 	b.fleche = b:CreateFontString(nil, "OVERLAY")
 	b.fleche:SetFont(POLICE, 22, "OUTLINE")
 	b.fleche:SetTextColor(1, 0.82, 0)
-	b:RegisterForClicks("LeftButtonUp")
-	b:SetScript("OnClick", function(self)
-		local nom = NomChuchotement(self)
-		if ChatFrame_SendTell then ChatFrame_SendTell(nom)
-		elseif ChatFrame_OpenChat then ChatFrame_OpenChat("/w " .. nom .. " ") end
+	b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	b:SetScript("OnClick", function(self, bouton)
+		if not self.cle then return end
+		if bouton == "RightButton" then
+			GameTooltip:Hide()
+			MontrerMenu(self)
+		else
+			Chuchoter(self.cle, self.joueur)
+		end
 	end)
 	b:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
 		local r, g, bl = CouleurClasse(self.classe)
 		GameTooltip:AddLine(NomJoueur(self.joueur), r, g, bl)
 		GameTooltip:AddLine(("à %d %s"):format(self.metres or 0, UNITE), 1, 1, 1)
-		GameTooltip:AddLine("Clic : chuchoter", 0.6, 0.6, 0.6)
+		GameTooltip:AddLine("Clic : chuchoter · Clic droit : menu", 0.6, 0.6, 0.6)
 		GameTooltip:Show()
 	end)
 	b:SetScript("OnLeave", function() GameTooltip:Hide() end)

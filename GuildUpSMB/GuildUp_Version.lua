@@ -135,8 +135,11 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["3.8.0"] = {
+		"|cffffd100Repères à l'écran|r : un clic droit sur le portrait d'un membre ouvre un menu pour le chuchoter, l'|cffffd100inviter dans le groupe|r ou le retrouver dans la page |cffffd100Guilde|r. Le clic gauche chuchote toujours.",
+	},
 	["3.7.0"] = {
 		"Les pages |cffffd100Jouer ensemble|r et |cffffd100Mes carnets|r sont retirées pour alléger SMB Forever. Avec elles disparaissent le statut « Dispo pour grouper », les listes de courses et leur mini-liste à l'écran, ainsi que les commandes /smb ensemble, /smb dispo et /smb carnet.",
 		"Pour grouper, il reste les pages |cffffd100Groupes|r et |cffffd100Quêtes en commun|r. Dans Artisanat > Items et dans l'encyclopédie, le bouton |cffffd100Ajouter|r met maintenant l'objet dans un projet de guilde.",
