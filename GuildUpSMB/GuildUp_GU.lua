@@ -4,6 +4,7 @@
 --    (comme les pluies d'emotes de Twitch, en discret). Elle peut être animée (planche d'images).
 --    Toute la guilde la voit : en canal de guilde chacun lit le message ; ailleurs, l'auteur
 --    prévient la guilde par un message d'addon (préfixe GuildUpGU, message « G »).
+--    La montée de niveau d'un membre en fait tomber plusieurs (ns.PluieEmotes, GuildUp_Annonces.lua).
 --  * Membre vedette (facultatif) : quand il monte de niveau, la bulle « La guilde progresse » passe
 --    en version fête, avec un texte arc-en-ciel qui défile (pour toute la guilde, via l'annonce de
 --    niveau déjà envoyée par GuildUp_Annonces).
@@ -119,6 +120,15 @@ local function Emote(cle)
 	diag.refus = ""
 end
 ns.EmoteGU = Emote
+-- plusieurs emotes à la suite, espacées d'un quart de seconde (montée de niveau d'un membre,
+-- GuildUp_Annonces.lua) ; rien si l'emote est coupée
+ns.PluieEmotes = function(nombre)
+	if Coupee() then return end
+	for i = 1, nombre or 1 do
+		if i == 1 or not (C_Timer and C_Timer.After) then Emote(nil)
+		else C_Timer.After((i - 1) * 0.25, function() Emote(nil) end) end
+	end
+end
 ns.DiagGU = function(L)
 	local n = 0
 	for _, e in ipairs(pool) do if e:IsShown() then n = n + 1 end end

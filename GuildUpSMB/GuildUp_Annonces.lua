@@ -4,6 +4,10 @@
 --   "M~nom du métier"   j'ai appris un métier
 --   "P~nom~palier"      j'ai franchi un palier de métier (75, 150, 225, 300…)
 -- Les autres membres voient une bulle à côté du médaillon GuildUpSMB. /smb annonces les coupe.
+-- Montée de niveau : titre « Nom a up ! », texte « Nom a atteint le niveau 24 ! », sonnette, et quatre
+-- emotes du cri de guilde à l'écran (ns.PluieEmotes, GuildUp_GU.lua ; aucune si l'emote est coupée dans
+-- les notifications). Les emotes sont affichées par l'addon de chaque membre à la réception de « N » :
+-- aucun message de plus, rien dans le chat.
 
 local NOM_ADDON, ns = ...
 
@@ -11,6 +15,7 @@ local PREFIXE = "GuildUpAnn"
 local debut = GetTime()
 local CALME = 20 -- rien juste après la connexion
 local dejaEntre = false
+local EMOTES_NIVEAU = 4 -- emotes du cri de guilde à l'écran pour une montée de niveau
 
 local Normaliser = ns.Normaliser
 local NomCourt = ns.NomCourt
@@ -38,9 +43,10 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	if genre == "N" and tonumber(a) and ns.NiveauSpecial and ns.NiveauSpecial(expediteur, a) then
 		-- montée de niveau spéciale (membre vedette : bulle en fête, GuildUp_GU.lua)
 	elseif genre == "N" and tonumber(a) then
-		-- petite sonnette (media/ding.mp3)
-		ns.Notifier("niveaux", "La guilde progresse", ("%s a atteint le niveau |cffffd100%s|r !"):format(qui, a),
+		-- petite sonnette (media/ding.mp3), puis les emotes du cri de guilde
+		local montree = ns.Notifier("niveaux", ("%s a up !"):format(qui), ("%s a atteint le niveau |cffffd100%s|r !"):format(qui, a),
 			(ns.MEDIA or ("Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\")) .. "ding.mp3", function() end)
+		if montree and ns.PluieEmotes then ns.PluieEmotes(EMOTES_NIVEAU) end
 	elseif genre == "M" and a then
 		ns.Notifier("metiers", "Nouveau métier", ("%s a appris |cffffd100%s|r"):format(qui, a), nil, function()
 			if ns.BasculerMetiers then ns.BasculerMetiers() end
