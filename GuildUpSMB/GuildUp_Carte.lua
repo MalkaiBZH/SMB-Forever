@@ -20,6 +20,8 @@
 -- pour s'afficher aussi sur la carte du continent.
 -- Fil d'Ariane : chaque position reçue est aussi passée à ns.NoterTrace (GuildUp_Reperes.lua) ; la trace
 -- suivie (ns.TraceSuivie) est dessinée en points dorés, plus pâles pour les étapes déjà passées.
+-- Souvenirs de la guilde (GuildUp_Souvenirs.lua, ns.SouvenirsCarte) : un symbole de raid par souvenir de
+-- la zone affichée (étoile : niveau ; rond : métier ; losange : tirage), sous les membres.
 
 local NOM_ADDON, ns = ...
 
@@ -753,7 +755,50 @@ local function MajTrace(canevas, carte, largeur, hauteur, echelle)
 	calqueTrace:Show()
 end
 
--- redessin au prochain passage du suivi de la carte (début ou fin d'un fil d'Ariane)
+-- Souvenirs de la guilde : un symbole par souvenir de la zone affichée, sur un calque du canevas
+local calqueSouvenirs
+local epinglesSouvenirs = {}
+local SYMBOLES = { N = 1, M = 2, P = 2, T = 3 } -- étoile, rond, losange (symboles de raid du jeu)
+local function MajSouvenirs(canevas, carte, largeur, hauteur, echelle)
+	local liste = ns.SouvenirsCarte and ns.SouvenirsCarte(carte)
+	if not liste or #liste == 0 then
+		if calqueSouvenirs then calqueSouvenirs:Hide() end
+		return
+	end
+	calqueSouvenirs = calqueSouvenirs or CreateFrame("Frame", nil, canevas)
+	calqueSouvenirs:SetParent(canevas)
+	calqueSouvenirs:ClearAllPoints()
+	calqueSouvenirs:SetAllPoints(canevas)
+	calqueSouvenirs:SetFrameLevel(NiveauCarte(canevas, 0))
+	local taille = 16 / echelle -- (même taille à l'écran à tout zoom)
+	for i, s in ipairs(liste) do
+		local e = epinglesSouvenirs[i]
+		if not e then
+			e = CreateFrame("Button", nil, calqueSouvenirs)
+			e.icone = e:CreateTexture(nil, "ARTWORK")
+			e.icone:SetAllPoints(e)
+			e:SetScript("OnEnter", function(self)
+				if not self.s then return end
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				if ns.InfobulleSouvenir then ns.InfobulleSouvenir(self.s) end
+				GameTooltip:Show()
+			end)
+			e:SetScript("OnLeave", function() GameTooltip:Hide() end)
+			epinglesSouvenirs[i] = e
+		end
+		e.s = s
+		e:SetSize(taille, taille)
+		e.icone:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_" .. (SYMBOLES[s.g] or 1))
+		e:ClearAllPoints()
+		e:SetPoint("CENTER", calqueSouvenirs, "TOPLEFT", s.x * largeur, -s.y * hauteur)
+		e:SetFrameLevel(NiveauCarte(canevas, 0))
+		e:Show()
+	end
+	for i = #liste + 1, #epinglesSouvenirs do epinglesSouvenirs[i]:Hide() end
+	calqueSouvenirs:Show()
+end
+
+-- redessin au prochain passage du suivi de la carte (fil d'Ariane, nouveaux souvenirs)
 ns.RedessinerCarte = function() aRedessiner = true end
 
 MajCarte = function()
@@ -804,6 +849,7 @@ MajCarte = function()
 	end
 	for i = n + 1, #epingles do epingles[i].ancre:Hide() end
 	MajRepere(canevas, carte, largeur, hauteur, echelle)
+	pcall(MajSouvenirs, canevas, carte, largeur, hauteur, echelle)
 	pcall(MajTrace, canevas, carte, largeur, hauteur, echelle)
 	pcall(MajZones, canevas, carte, largeur, hauteur, echelle)
 end

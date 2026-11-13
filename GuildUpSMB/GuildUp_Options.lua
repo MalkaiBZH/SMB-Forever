@@ -65,6 +65,7 @@ local function Aide()
 	print("  /smb roll [objet ou mot] — tirage au sort de la guilde")
 	print("  /smb sondage — sondage de la guilde (en cours, ou en poser un)")
 	print("  /smb activite — fil d'activité de la guilde et podium de la semaine")
+	print("  /smb souvenirs — souvenirs de la guilde sur la carte du monde (" .. OuiNon(db.souvenirsCarte ~= false) .. ")")
 	print("  /smb stats — statistiques de présence : quand la guilde est en ligne")
 	print("  /smb on | off — bannières de la guilde (" .. OuiNon(db.actif) .. ")")
 	print("  /smb bouton — afficher / cacher le médaillon SMB Forever")
@@ -665,6 +666,9 @@ SlashCmdList.GUILDUP = function(msg)
 	elseif cmd == "roll" or cmd == "tirage" then
 		-- (la saisie d'origine : « reste » est en minuscules, ce qui abîmerait un lien d'objet)
 		if ns.Tirage then ns.Tirage(((msg or ""):match("^%s*%S+%s*(.-)%s*$"))) end
+		return
+	elseif cmd == "souvenirs" or cmd == "souvenir" then
+		if ns.BasculerSouvenirs then ns.BasculerSouvenirs() end
 		return
 	elseif cmd == "sondage" or cmd == "sondages" or cmd == "vote" then
 		if ns.Sondage then ns.Sondage() end

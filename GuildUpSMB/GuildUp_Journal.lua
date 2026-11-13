@@ -17,6 +17,8 @@
 -- /smb annonces coupé) ; la pastille du menu les compte jusqu'à l'ouverture de la page.
 -- Podium des 7 derniers jours, calculé sur le journal : progression (niveaux gagnés), générosité (dons
 -- remerciés, un par membre remerciant et par jour), chance (tirages gagnés).
+-- Mes propres nouvelles notées en direct partent aussi à la carte des souvenirs (ns.MonSouvenir,
+-- GuildUp_Souvenirs.lua), qui ne garde que les grands moments.
 
 local NOM_ADDON, ns = ...
 
@@ -101,10 +103,18 @@ local function Ajouter(t, g, q, v)
 	return true
 end
 
+-- Une de mes nouvelles entre dans le fil : la carte des souvenirs la garde si elle le mérite
+-- (GuildUp_Souvenirs.lua : niveaux ronds, métiers, paliers, tirages gagnés, à ma position)
+local function Souvenir(genre, cle, valeur)
+	if cle == MaCle() and ns.MonSouvenir then ns.MonSouvenir(genre, valeur) end
+end
+
 -- Pour les autres modules : ns.NoterActivite("T", clé du gagnant, lot)
 ns.NoterActivite = function(genre, cle, valeur)
 	cle = cle and (cle:gsub("#test$", ""))
-	return Ajouter(Maintenant(), genre, cle, valeur)
+	local nouveau = Ajouter(Maintenant(), genre, cle, valeur)
+	if nouveau then Souvenir(genre, cle, valeur) end
+	return nouveau
 end
 
 -- Une annonce de GuildUp_Annonces.lua ("N~niveau", "M~métier", "P~métier~palier"), la mienne comprise
@@ -112,13 +122,15 @@ ns.ActiviteAnnonce = function(msg, expediteur)
 	local qui = expediteur and Normaliser(expediteur)
 	if not qui or type(msg) ~= "string" then return end
 	local genre, a, b = strsplit("~", msg)
+	local valeur
 	if genre == "N" and tonumber(a) then
-		Ajouter(Maintenant(), "N", qui, tostring(tonumber(a)))
+		valeur = tostring(tonumber(a))
 	elseif genre == "M" and a and a ~= "" then
-		Ajouter(Maintenant(), "M", qui, a)
+		valeur = a
 	elseif genre == "P" and a and tonumber(b) then
-		Ajouter(Maintenant(), "P", qui, tonumber(b) .. " " .. a)
+		valeur = tonumber(b) .. " " .. a
 	end
+	if valeur and Ajouter(Maintenant(), genre, qui, valeur) then Souvenir(genre, qui, valeur) end
 end
 
 -- nouveautés depuis ma dernière visite de la page (les miennes ne comptent pas)
@@ -222,6 +234,7 @@ local function NomObjet(objet)
 	return lien or nom or ("l'objet n° " .. objet)
 end
 
+-- phrase d'une entrée { g, q, v } (aussi pour l'infobulle des souvenirs : ns.PhraseActivite)
 local function Phrase(e)
 	local qui = NomJoueur(e.q)
 	if e.g == "N" then
@@ -242,6 +255,7 @@ local function Phrase(e)
 	end
 	return qui
 end
+ns.PhraseActivite = Phrase
 
 -- « 3 montées de niveau, 1 don, 1 tirage gagné »
 local function Resume(liste)

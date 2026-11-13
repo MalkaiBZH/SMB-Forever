@@ -145,6 +145,10 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   10 minutes pour voter. Les membres connectés qui ont l'addon reçoivent une bulle et votent d'un clic ; résultats en
   direct, changement d'avis possible jusqu'à la fin, votes publics (le survol d'un choix montre qui l'a choisi),
   résultat en bulle. Un membre qui se connecte pendant le vote ne le voit pas.
+- **Carte des souvenirs** : les grands moments de chaque membre (niveau 10, 20… et niveau maximum, nouveau métier,
+  palier de métier, tirage gagné) sont épinglés sur la carte du monde, à l'endroit où ils sont arrivés : étoile,
+  rond ou losange, avec qui, quoi et quand au survol. Gardés sans limite de durée (400 au plus) et échangés à la
+  connexion. Seulement pour les membres qui partagent leur position, hors instance. `/smb souvenirs` pour les cacher.
 - **Activité** (`/smb activite`) : le fil d'activité de la guilde sur 30 jours (montées de niveau, métiers, dons
   remerciés, tirages gagnés). À la connexion, une bulle « Pendant ton absence » résume ce qui a été manqué : un membre
   connecté renvoie les nouveautés à celui qui revient. À côté, le podium des 7 derniers jours (niveaux gagnés, dons
@@ -188,6 +192,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 | `/smb activite` | Fil d'activité de la guilde et podium des 7 derniers jours |
 | `/smb stats` | Statistiques de présence : semaine type et meilleurs créneaux |
 | `/smb roll [objet ou mot]` | Tirage au sort de la guilde (sans rien : rouvrir la fenêtre du tirage) |
+| `/smb souvenirs` | Montrer / cacher les souvenirs de la guilde sur la carte du monde |
 | `/smb sondage` | Sondage de la guilde : celui en cours ou le dernier, sinon en poser un |
 | `/smb nouveautes` | Nouveautés de la version |
 | `/smb on` / `off` | Activer / couper les bannières |
