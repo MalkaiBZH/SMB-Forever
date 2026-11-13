@@ -83,6 +83,10 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   **Fil d'Ariane** : « Suivre sa trace » guide vers l'étape suivante du chemin pris par le membre ces 10 dernières
   minutes (repère doré en forme d'empreintes, trace en pointillés sur la carte du monde), jusqu'à le rejoindre.
   Clic sur le repère doré : arrêter.
+  **Layers** : l'addon déduit ton layer (la copie de la zone où tu es) des PNJ que tu survoles, cibles ou dont la
+  barre de nom apparaît, et le partage avec la guilde. Un membre de ta zone sur un autre layer porte « autre layer »
+  en orange à côté de sa distance (et dans les infobulles) ; « Demander à rejoindre son layer » (clic droit) lui
+  envoie une bulle pour t'inviter dans son groupe, ce qui te fait passer sur son layer. `/smb layer` pour vérifier.
 - **Ennemis de quête** : un « ! » à droite de la barre de nom d'un ennemi à tuer ou à dépouiller pour une
   quête en cours : **jaune** pour toi, **bleu** pour un membre de ton groupe, **vert** pour les deux. Il
   disparaît quand l'objectif est terminé. Les monstres de chaque quête viennent de QuestieDB (version Forever),
@@ -192,6 +196,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 | `/smb activite` | Fil d'activité de la guilde et podium des 7 derniers jours |
 | `/smb stats` | Statistiques de présence : semaine type et meilleurs créneaux |
 | `/smb roll [objet ou mot]` | Tirage au sort de la guilde (sans rien : rouvrir la fenêtre du tirage) |
+| `/smb layer` | Ton layer (d'après les PNJ observés) et les membres sur le même layer ou un autre |
 | `/smb souvenirs` | Montrer / cacher les souvenirs de la guilde sur la carte du monde |
 | `/smb sondage` | Sondage de la guilde : celui en cours ou le dernier, sinon en poser un |
 | `/smb nouveautes` | Nouveautés de la version |

@@ -12,6 +12,8 @@
 -- Seuls les membres dont le portrait est connu sont affichés (addon à jour, race avec portrait), et
 -- seulement au-delà d'une distance minimale (db.distanceMinReperes, sinon celle de GuildUp_Config.lua :
 -- plus près, on le voit en jeu ; 0 = toujours).
+-- Layer (GuildUp_Layers.lua) : « · autre layer » en orange après la distance, ligne dans l'infobulle, et
+-- « Demander à rejoindre son layer » dans le menu quand on sait qu'il est sur un autre layer.
 -- Clic : chuchoter ; clic droit : menu (chuchoter, inviter dans le groupe, suivre sa trace, voir dans la
 -- page Guilde). Réglage db.reperes (/smb reperes, case dans les options) ; hauteur des repères du haut et
 -- du bas, distance minimale : curseurs de la page Options, sinon valeurs de GuildUp_Config.lua.
@@ -229,6 +231,10 @@ local function MontrerMenu(repere)
 			if ns.OuvrirInterface then ns.OuvrirInterface("guilde", NomCourt(joueur)) end
 		end },
 	}
+	-- sur un autre layer (GuildUp_Layers.lua) : lui demander de m'inviter pour passer sur le sien
+	if ns.MemeLayer and ns.DemanderLayer and ns.MemeLayer(cle) == false then
+		table.insert(lignes, 3, { "Demander à rejoindre son layer", function() ns.DemanderLayer(cle, joueur) end })
+	end
 	for i, l in ipairs(lignes) do
 		local b = ns.BoutonMenu(menu, i)
 		b:ClearAllPoints()
@@ -285,6 +291,8 @@ local function NouveauRepere()
 		local r, g, bl = CouleurClasse(self.classe)
 		GameTooltip:AddLine(NomJoueur(self.joueur), r, g, bl)
 		GameTooltip:AddLine(("à %d %s"):format(self.metres or 0, UNITE), 1, 1, 1)
+		local layer = ns.TexteLayer and ns.TexteLayer(self.cle)
+		if layer then GameTooltip:AddLine(layer, 1, 1, 1) end
 		GameTooltip:AddLine("Clic : chuchoter · Clic droit : menu", 0.6, 0.6, 0.6)
 		GameTooltip:Show()
 	end)
@@ -425,7 +433,10 @@ local function Maj()
 		r.portrait:SetTexture(v.p.portrait)
 		r.nom:SetText(NomJoueur(v.p.nom, true)) -- « Pseudo (Prénom) », ou le prénom seul
 		r.nom:SetTextColor(CouleurClasse(v.p.classe))
-		r.distance:SetText(r.metres .. " " .. UNITE)
+		-- (autre layer : en orange, le membre n'est pas visible même tout près)
+		local autre = ns.MemeLayer and ns.MemeLayer(v.cle) == false
+		r.distance:SetText(r.metres .. " " .. UNITE .. (autre and " · autre layer" or ""))
+		if autre then r.distance:SetTextColor(1, 0.62, 0.25) else r.distance:SetTextColor(0.85, 0.85, 0.85) end
 		r:Show()
 	end
 	ToutCacher(#visibles + 1)

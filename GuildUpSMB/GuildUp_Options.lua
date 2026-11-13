@@ -64,6 +64,7 @@ local function Aide()
 	print("  /smb sos — appeler la guilde à l'aide")
 	print("  /smb roll [objet ou mot] — tirage au sort de la guilde")
 	print("  /smb sondage — sondage de la guilde (en cours, ou en poser un)")
+	print("  /smb layer — ton layer et les membres sur le même layer ou un autre")
 	print("  /smb activite — fil d'activité de la guilde et podium de la semaine")
 	print("  /smb souvenirs — souvenirs de la guilde sur la carte du monde (" .. OuiNon(db.souvenirsCarte ~= false) .. ")")
 	print("  /smb stats — statistiques de présence : quand la guilde est en ligne")
@@ -353,7 +354,7 @@ local function Diag()
 		if not ok then L("carte : ERREUR " .. tostring(err)) end
 	end
 	for _, d in ipairs({ { "métiers", ns.DiagMetiers }, { "version", ns.DiagVersion }, { "quêtes", ns.DiagQuetes }, { "objectifs", ns.DiagObjectifs },
-		{ "événements", ns.DiagEvenements }, { "recherche", ns.DiagRecherche }, { "besoins", ns.DiagBesoins }, { "échanges", ns.DiagEchanges }, { "discord", ns.DiagDiscord }, { "carnet", ns.DiagCarnet }, { "carnet2", ns.DiagCarnet2 }, { "projets", ns.DiagProjets }, { "identité", ns.DiagIdentite }, { "gu", ns.DiagGU } }) do
+		{ "événements", ns.DiagEvenements }, { "recherche", ns.DiagRecherche }, { "besoins", ns.DiagBesoins }, { "échanges", ns.DiagEchanges }, { "discord", ns.DiagDiscord }, { "carnet", ns.DiagCarnet }, { "carnet2", ns.DiagCarnet2 }, { "projets", ns.DiagProjets }, { "identité", ns.DiagIdentite }, { "gu", ns.DiagGU }, { "layers", ns.DiagLayers } }) do
 		if d[2] then
 			local ok, err = pcall(d[2], L)
 			if not ok then L(d[1] .. " : ERREUR " .. tostring(err)) end
@@ -666,6 +667,9 @@ SlashCmdList.GUILDUP = function(msg)
 	elseif cmd == "roll" or cmd == "tirage" then
 		-- (la saisie d'origine : « reste » est en minuscules, ce qui abîmerait un lien d'objet)
 		if ns.Tirage then ns.Tirage(((msg or ""):match("^%s*%S+%s*(.-)%s*$"))) end
+		return
+	elseif cmd == "layer" or cmd == "layers" then
+		if ns.MontrerLayer then ns.MontrerLayer() end
 		return
 	elseif cmd == "souvenirs" or cmd == "souvenir" then
 		if ns.BasculerSouvenirs then ns.BasculerSouvenirs() end

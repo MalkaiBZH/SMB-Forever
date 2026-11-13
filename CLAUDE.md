@@ -82,7 +82,9 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   `GuildUpJrn` (fil d'activité et podium, `GuildUp_Journal.lua` : les autres modules y notent leurs nouvelles avec
   `ns.NoterActivite(genre, clé, valeur)`), `GuildUpSta` (statistiques de présence, `GuildUp_Stats.lua` : un relevé
   toutes les 10 min, partagé par le relais à la connexion), `GuildUpSvn` (carte des souvenirs, `GuildUp_Souvenirs.lua` :
-  les grands moments de chacun, à sa position, gardés sans limite de durée, dessinés par `GuildUp_Carte.lua`).
+  les grands moments de chacun, à sa position, gardés sans limite de durée, dessinés par `GuildUp_Carte.lua`),
+  `GuildUpLay` (layers, `GuildUp_Layers.lua` : signature des GUID des PNJ observés, comparée entre membres de la
+  même carte ; demande d'invitation en chuchotement d'addon).
   Exception : `GuildUpObj` (`GuildUp_Objectifs.lua`, « ! » des ennemis de quête) passe par `PARTY` / `RAID`.
 - Protocoles texte : champs séparés par `~`, identifiants en base 36, **255 caractères maximum par
   message** (découpage en morceaux de 200 si besoin). Nettoyer `~` et `|` dans les textes saisis.

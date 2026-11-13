@@ -464,6 +464,8 @@ local function Infobulle(self)
 			local carte = NomCarte(m.position.carte)
 			tt:AddLine("Position : " .. (carte or "partagée")
 				.. (m.distance and (" · à " .. math.floor(m.distance + 0.5) .. " " .. (m.unite or "m")) or ""), 0.8, 0.8, 0.8)
+			local layer = ns.TexteLayer and ns.TexteLayer(m.cle) -- (GuildUp_Layers.lua)
+			if layer then tt:AddLine(layer, 1, 1, 1) end
 		end
 	end
 	if e.note and e.note ~= "" then
