@@ -9,6 +9,8 @@
 -- les notifications) : 4 pour un niveau ordinaire, 8 pour un palier (10, 20, 30…), 12 au niveau
 -- maximum. Les emotes sont affichées par l'addon de chaque membre à la réception de « N » (aucun
 -- message de plus, rien dans le chat) ; celui qui monte de niveau voit les siennes, sans bulle.
+-- Chaque annonce envoyée ou reçue est aussi notée dans le fil d'activité (ns.ActiviteAnnonce,
+-- GuildUp_Journal.lua), même quand les bulles sont coupées.
 
 local NOM_ADDON, ns = ...
 
@@ -40,7 +42,10 @@ end
 local Normaliser = ns.Normaliser
 local NomCourt = ns.NomCourt
 local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
-local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end end
+local function Envoyer(msg)
+	if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg, "GUILD") end
+	if ns.ActiviteAnnonce then ns.ActiviteAnnonce(msg, UnitName("player")) end
+end
 local function Nettoyer(t) return ((t or ""):gsub("[~|]", " ")) end
 
 -- appelé par GuildUp_Metiers.lua : genre = "nouveau" ou "palier"
@@ -54,6 +59,7 @@ end
 
 local function Recevoir(prefixe, msg, canal, expediteur)
 	if prefixe ~= PREFIXE or canal ~= "GUILD" or not msg or not expediteur then return end
+	if ns.ActiviteAnnonce then ns.ActiviteAnnonce(msg, expediteur) end
 	local db = ns.DB and ns.DB()
 	if not db or db.annoncesGuilde == false or not ns.Notifier then return end
 	if Normaliser(expediteur) == Normaliser(UnitName("player")) and not (ns.TestSolo and ns.TestSolo()) then return end

@@ -163,6 +163,10 @@ end
 local function Clore(t, etat, gagnant, hasard)
 	if t.etat ~= "ouvert" then return false end
 	t.etat, t.gagnant, t.hasard, t.clos = etat, gagnant, hasard, GetTime()
+	-- le fil d'activité garde le nom du gagnant (GuildUp_Journal.lua)
+	if etat == "fini" and gagnant and ns.NoterActivite then
+		ns.NoterActivite("T", gagnant, t.objet and ("i" .. t.objet) or t.texte)
+	end
 	if attenteDe and attenteDe.tirage == t then attenteDe = nil end
 	return true
 end

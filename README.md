@@ -150,6 +150,10 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   direct, égalités en tête départagées par un nouveau tour, résultat annoncé en bulle. Il faut l'addon pour participer.
   Avant l'ouverture, l'organisateur choisit qui participe : une case par membre connecté, « Tout cocher », ou
   « Mon groupe » pour réserver le tirage à son groupe ou à son raid.
+- **Activité** (`/smb activite`) : le fil d'activité de la guilde sur 30 jours (montées de niveau, métiers, dons
+  remerciés, tirages gagnés). À la connexion, une bulle « Pendant ton absence » résume ce qui a été manqué : un membre
+  connecté renvoie les nouveautés à celui qui revient. À côté, le podium des 7 derniers jours (niveaux gagnés, dons
+  remerciés, tirages gagnés). Le fil ne contient que ce qu'un membre en ligne avec l'addon a vu passer.
 - **Événements** : les événements de la guilde et tes invitations des 30 prochains jours, groupés par jour
   (Aujourd'hui, Demain…), avec l'heure, le type (donjon ou raid), l'organisateur, le nombre d'inscrits et ton
   état en couleur. À droite, le détail (description, inscrits avec leur classe et leur état) et les réponses :
@@ -185,6 +189,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 | `/smb items` | Tous les objets fabricables |
 | `/smb projets` | Projets de guilde |
 | `/smb sos` | Appeler la guilde à l'aide |
+| `/smb activite` | Fil d'activité de la guilde et podium des 7 derniers jours |
 | `/smb roll [objet ou mot]` | Tirage au sort de la guilde (sans rien : rouvrir la fenêtre du tirage) |
 | `/smb nouveautes` | Nouveautés de la version |
 | `/smb on` / `off` | Activer / couper les bannières |

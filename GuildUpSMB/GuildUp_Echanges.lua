@@ -663,6 +663,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		objet = tonumber(objet)
 		if not donneur or not objet then return end
 		NoterMerci(donneur, cle, objet, Maintenant())
+		if ns.NoterActivite then ns.NoterActivite("D", donneur, objet .. ":" .. cle) end -- (fil d'activité)
 		if (donneur == moi or (TestSolo() and donneur == moi .. "#test")) and ns.Notifier then
 			local nomO, lien = InfoObjet(objet)
 			ns.Notifier("plans", "Merci !", ("%s te remercie pour %s"):format(NomJoueur(nom), lien or nomO or ("l'objet " .. objet)),
@@ -1050,6 +1051,7 @@ local function CreerRangeeDon(parent)
 		if demande and not demande.merci then
 			demande.merci = true
 			Envoyer(("M~%s~%d"):format(d.cle, d.objet))
+			if ns.NoterActivite and ns.MaCle then ns.NoterActivite("D", d.cle, d.objet .. ":" .. ns.MaCle()) end -- (fil d'activité)
 			if MajTout then MajTout() end
 		end
 	end)
