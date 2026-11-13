@@ -9,11 +9,13 @@
 -- existent pour la même tranche, on garde le plus grand.
 --   "Q~depuis"                je reviens : envoyez-moi les relevés depuis cette tranche (base 36)
 --   "R~tranche:enLigne,addon;…"   relevés (240 octets au plus par message ; 600 tranches au plus par
---                             demande, les plus récentes d'abord)
+--                             demande, les plus récentes d'abord ; un message toutes les 1,5 s pour ne
+--                             pas bloquer la file d'envoi commune aux autres modules)
 -- Page : semaine type (grille 7 jours x 24 heures, moyenne des membres en ligne, clair = beaucoup de
--- monde), les cinq meilleurs créneaux, membres actifs par jour (barres) sur les semaines gardées,
+-- monde), les cinq meilleurs créneaux, pic de membres en ligne par jour (barres) sur 28 jours,
 -- et aujourd'hui (barres par heure). Les heures sont celles de l'ordinateur du joueur (heure locale)
--- pour la grille et le jour : les relevés sont datés en heure du serveur.
+-- pour la grille et le jour : les relevés sont datés en heure du serveur. Les calculs de la page ne
+-- sont refaits que si les relevés ont changé (ou à l'heure suivante), pas à chaque rafraîchissement.
 -- Rien n'existe avant l'installation ; une tranche sans aucun membre à l'addon reste vide (comptée 0).
 
 local NOM_ADDON, ns = ...
@@ -22,6 +24,7 @@ local PREFIXE = "GuildUpSta"
 local TRANCHE = 600                     -- secondes
 local GARDE = 8 * 7 * 86400             -- 8 semaines
 local MAX_RELAIS = 600                  -- tranches renvoyées à un membre qui revient (≈ 4 jours)
+local ENTRE_MESSAGES = 1.5              -- secondes entre deux messages du relais
 local PREMIER_RELEVE = 60               -- secondes après la connexion
 local JOURS = { "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim" }
 
@@ -32,6 +35,7 @@ local MaCle = ns.MaCle
 
 local pret = false
 local majPrevue = false
+local version = 0 -- change à chaque relevé noté ou oublié : la page ne recalcule que dans ce cas
 
 --------------------------------------------------------------------------------
 -- Relevés
@@ -75,6 +79,7 @@ local function Noter(tranche, enLigne, addon)
 	end
 	if actuel and enLigne <= aE and addon <= aA then return false end
 	s.r[cle] = ("%d,%d"):format(math.max(enLigne, aE), math.max(addon, aA))
+	version = version + 1
 	Rafraichir()
 	return true
 end
@@ -86,7 +91,7 @@ local function Purger()
 	local limite = math.floor((Maintenant() - GARDE) / TRANCHE)
 	for cle in pairs(s.r) do
 		local t = tonumber(cle, 36)
-		if not t or t < limite then s.r[cle] = nil end
+		if not t or t < limite then s.r[cle] = nil; version = version + 1 end
 	end
 end
 
@@ -125,14 +130,19 @@ local function Relayer(depuis)
 		if t and t > depuis then cles[#cles + 1] = t end
 	end
 	table.sort(cles, function(a, b) return a > b end)
-	local msg = "R~"
+	-- les messages d'abord, puis un toutes les 1,5 s (jusqu'à une trentaine : la file d'envoi est commune
+	-- à tout l'addon, une rafale ferait attendre les groupes, votes, appels à l'aide…)
+	local messages, msg = {}, "R~"
 	for i = 1, math.min(#cles, MAX_RELAIS) do
 		local cle = Base36(cles[i])
 		local mot = cle .. ":" .. s.r[cle]
-		if #msg + #mot + 1 > 240 and #msg > 2 then Envoyer(msg); msg = "R~" end
+		if #msg + #mot + 1 > 240 and #msg > 2 then messages[#messages + 1] = msg; msg = "R~" end
 		msg = msg .. (#msg > 2 and ";" or "") .. mot
 	end
-	if #msg > 2 then Envoyer(msg) end
+	if #msg > 2 then messages[#messages + 1] = msg end
+	for i, m in ipairs(messages) do
+		if i == 1 then Envoyer(m) else C_Timer.After((i - 1) * ENTRE_MESSAGES, function() Envoyer(m) end) end
+	end
 end
 
 local function Recevoir(prefixe, msg, canal, expediteur)
@@ -324,6 +334,7 @@ local function CreerPage(parent)
 		semaine.cases[j] = {}
 		for h = 0, 23 do
 			local c = CreateFrame("Frame", nil, semaine)
+			c:EnableMouse(true) -- (sans quoi un simple cadre ne reçoit pas le survol : pas d'infobulle)
 			c:SetSize(caseL - 2, caseH)
 			c:SetPoint("TOPLEFT", semaine, "TOPLEFT", 14 + ETQ + h * caseL, -54 - (j - 1) * (caseH + 2))
 			c.fond = c:CreateTexture(nil, "ARTWORK")
@@ -386,6 +397,11 @@ local function CreerPage(parent)
 			p.sous:SetText("Tu n'es pas dans une guilde.")
 			return
 		end
+		-- (calculs sur tous les relevés, jusqu'à 8 000 : refaits seulement si les relevés ont changé,
+		-- ou à l'heure suivante pour les barres d'aujourd'hui et des jours)
+		local etat = ("%d:%s:%s"):format(version, tostring(GetGuildInfo and GetGuildInfo("player")), date("%Y%m%d%H"))
+		if etat == p.etat then return end
+		p.etat = etat
 		local grille, maxi, nbJours = SemaineType()
 		local nbReleves = 0
 		for _ in pairs(s.r) do nbReleves = nbReleves + 1 end

@@ -135,8 +135,12 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["3.13.1"] = {
+		"|cffffd100Statistiques|r : le survol d'une case de la semaine type affiche enfin le nombre moyen de membres en ligne à cette heure-là.",
+		"Les relevés de présence envoyés à un membre qui se connecte partent petit à petit : ils ne retardent plus les groupes, votes et appels à l'aide. La page Statistiques ne refait plus tous ses calculs à chaque rafraîchissement de la fenêtre.",
+	},
 	["3.13.0"] = {
 		"|cffffd100Layers|r : SMB Forever repère sur quelle copie de la zone (layer) tu es, en lisant les PNJ que tu survoles ou cibles, et le partage avec la guilde. Autour de l'écran, un membre sur un autre layer porte « |cffff9f40autre layer|r » à côté de sa distance : tu ne le verras pas, même tout près. L'infobulle des repères et celle de la page Guilde le disent aussi.",
 		"Clic droit sur son portrait, puis |cffffd100Demander à rejoindre son layer|r : il reçoit une bulle pour t'inviter dans son groupe, et le jeu te fait passer sur son layer. |cffffd100/smb layer|r montre ton layer et qui est avec toi. C'est une première version : dis-nous si l'indication se trompe.",
