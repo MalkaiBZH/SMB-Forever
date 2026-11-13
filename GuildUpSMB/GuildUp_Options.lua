@@ -28,6 +28,7 @@ local REGLAGES_HORS_DEFAUT = {
 	"notifs", "bouton", "barre", "interface", "annoncesGuilde", "emoteGU", "voletNotifs", "coursesCompact",
 	"afficherDebug", "tousNiveaux", "itemsClasse", "itemsNiveau", "itemsGuilde", "itemsNivMin", "itemsNivMax", "styleJeu", "rappelGroupe", "portee", "rolesPerso",
 	"taillePointCarte", "hautReperes", "basReperes", -- (sans valeur ici : celles de GuildUp_Config.lua)
+	-- (coursesCompact : mini-liste de « Mes carnets », retirée en 3.7.0 ; gardé ici pour effacer l'ancien réglage)
 }
 
 -- Bouton « Réinitialiser » et /smb reset : seulement les réglages
@@ -52,12 +53,9 @@ local function Aide()
 	print("  /smb taille 1.2 — taille de la fenêtre SMB Forever (de 0.7 à 1.6)")
 	print("  /smb groupes — recherche de groupe de la guilde")
 	print("  /smb metiers — registre des métiers de la guilde")
-	print("  /smb ensemble [donjons] — Jouer ensemble : suggestions de groupe, membres dispo, donjons")
-	print("  /smb dispo — dispo pour grouper (" .. OuiNon(ns.EstDispo and ns.EstDispo()) .. ")")
 	print("  /smb quetes — quêtes en commun avec la guilde")
 	print("  /smb evenements — ouvrir la page Événements (calendrier de la guilde)")
 	print("  /smb echanges — dons et besoins de la guilde")
-	print("  /smb carnet — carnet de craft (tes listes de courses)")
 	print("  /smb encyclo — encyclopédie (ou Alt + clic sur un objet)")
 	print("  /smb items — tous les objets fabricables")
 	print("  /smb projets — projets de guilde")
@@ -350,7 +348,7 @@ local function Diag()
 		local ok, err = pcall(ns.DiagCarte, L)
 		if not ok then L("carte : ERREUR " .. tostring(err)) end
 	end
-	for _, d in ipairs({ { "métiers", ns.DiagMetiers }, { "version", ns.DiagVersion }, { "quêtes", ns.DiagQuetes }, { "objectifs", ns.DiagObjectifs }, { "ensemble", ns.DiagEnsemble },
+	for _, d in ipairs({ { "métiers", ns.DiagMetiers }, { "version", ns.DiagVersion }, { "quêtes", ns.DiagQuetes }, { "objectifs", ns.DiagObjectifs },
 		{ "événements", ns.DiagEvenements }, { "recherche", ns.DiagRecherche }, { "besoins", ns.DiagBesoins }, { "échanges", ns.DiagEchanges }, { "discord", ns.DiagDiscord }, { "carnet", ns.DiagCarnet }, { "carnet2", ns.DiagCarnet2 }, { "projets", ns.DiagProjets }, { "identité", ns.DiagIdentite }, { "gu", ns.DiagGU } }) do
 		if d[2] then
 			local ok, err = pcall(d[2], L)
@@ -571,7 +569,7 @@ local function CreerPage(parent)
 	local phrase = UI.Texte(p, "GameFontHighlightSmall", C.gris)
 	phrase:SetPoint("RIGHT", reset, "LEFT", -12, 0)
 	phrase:SetJustifyH("RIGHT")
-	phrase:SetText("Tes carnets, dons, besoins et projets sont gardés si tu réinitialises.")
+	phrase:SetText("Tes dons, besoins et projets sont gardés si tu réinitialises.")
 
 	p.Maj = function()
 		if not ns.DB() then return end
@@ -633,9 +631,6 @@ SlashCmdList.GUILDUP = function(msg)
 	elseif cmd == "metiers" or cmd == "métiers" or cmd == "metier" then
 		if ns.BasculerMetiers then ns.BasculerMetiers() end
 		return
-	elseif cmd == "carnet" or cmd == "liste" or cmd == "craft" then
-		if ns.BasculerCourses then ns.BasculerCourses() end
-		return
 	elseif cmd == "encyclo" or cmd == "encyclopedie" or cmd == "encyclopédie" then
 		local fi = ns.FicheCadre and ns.FicheCadre()
 		if fi and fi:IsShown() then fi:Hide() elseif ns.OuvrirFiche then ns.OuvrirFiche(nil) end
@@ -668,12 +663,6 @@ SlashCmdList.GUILDUP = function(msg)
 		return
 	elseif cmd == "echanges" or cmd == "échanges" or cmd == "dons" then
 		if ns.BasculerEchanges then ns.BasculerEchanges() end
-		return
-	elseif cmd == "ensemble" or cmd == "jouer" then
-		if ns.OuvrirEnsemble then ns.OuvrirEnsemble((reste and reste:find("^donj")) and "donjons" or nil) end
-		return
-	elseif cmd == "dispo" then
-		if ns.BasculerDispo then ns.BasculerDispo() end
 		return
 	elseif cmd == "quetes" or cmd == "quêtes" then
 		if ns.BasculerQuetes then ns.BasculerQuetes() end
@@ -756,7 +745,7 @@ SlashCmdList.GUILDUP = function(msg)
 		db.a = math.max(0, math.min(a, 1)); Message(("opacité : %.2f"):format(db.a))
 	elseif cmd == "reset" then
 		ReinitialiserReglages()
-		Message("réglages par défaut (tes carnets, dons, besoins et projets sont gardés)")
+		Message("réglages par défaut (tes dons, besoins et projets sont gardés)")
 	else
 		if cmd == "" then
 			if ns.BasculerInterface then ns.BasculerInterface() else ns.BasculerOptions() end

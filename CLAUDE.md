@@ -53,11 +53,13 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
 - `GuildUp_Options.lua` : fenêtre d'options, `/smb diag`, réinitialisation, commandes `/smb`.
 - Les fichiers découpés accèdent à `GuildUpDB` par un mandataire `db` (même nom qu'avant) et reprennent les fonctions partagées en tête de fichier (`local Message = ns.Coeur.Message`).
 - Pages de la fenêtre GuildUpSMB (chacune enregistrée par son module avec `ns.AjouterPage`) : Guilde
-  (`GuildUp_Membres.lua`), Jouer ensemble (`GuildUp_Ensemble.lua`), Groupes (`GuildUp_GroupesFenetre.lua`), Quêtes en commun (`GuildUp_Quetes.lua`), Dons (`GuildUp_Echanges.lua` +
+  (`GuildUp_Membres.lua`), Groupes (`GuildUp_GroupesFenetre.lua`), Quêtes en commun (`GuildUp_Quetes.lua`), Dons (`GuildUp_Echanges.lua` +
   `GuildUp_Besoins.lua`), Artisanat (`GuildUp_Carnet.lua` ; onglets Registre et Commandes dans `GuildUp_Metiers.lua`, Items dans
-  `GuildUp_Carnet.lua`, Projets dans `GuildUp_Projets.lua`), Mes carnets (`GuildUp_Carnet.lua`), Options
-  (`GuildUp_Options.lua`), Événements (`GuildUp_Evenements.lua`). Les anciennes fonctions `ns.Ouvrir*` / `ns.Basculer*` ouvrent ces pages
-  (`ns.OuvrirInterface(page, ...)`). L'encyclopédie, la mini-liste du carnet et l'aperçu 3D restent des fenêtres à part.
+  `GuildUp_Carnet.lua`, Projets dans `GuildUp_Projets.lua`), Options
+  (`GuildUp_Options.lua`), Événements (`GuildUp_Evenements.lua`), Activité (`GuildUp_Journal.lua`). Les anciennes fonctions `ns.Ouvrir*` / `ns.Basculer*` ouvrent ces pages
+  (`ns.OuvrirInterface(page, ...)`). L'encyclopédie et l'aperçu 3D restent des fenêtres à part.
+  Les pages « Jouer ensemble » et « Mes carnets » ont été retirées en 3.7.0 (les anciennes listes restent dans
+  `GuildUpDB.carnets`, sans être lues).
 - Groupes : `GuildUp_Catalogue.lua` (contenus de la recherche de groupe), `GuildUp_Groupes.lua` (protocole, état partagé `ns.Groupes.etat`, actions), `GuildUp_GroupesFenetre.lua` (page Groupes de la fenêtre GuildUpSMB).
 - `GuildUp_Reperes.lua` : repères des membres de la même carte à l'écran (HUD : au-dessus de la tête, en haut, ou au bord), calculés à partir des
   positions de `GuildUp_Carte.lua` (`ns.PositionsMembres`, `ns.MaPosition`, portrait dans le message `P`) ; pas de préfixe propre.
@@ -76,7 +78,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   `GuildUpGrp` (groupes), `GuildUpPos` (carte), `GuildUpQst` (quêtes), `GuildUpMet` (métiers),
   `GuildUpEch` (dons), `GuildUpBes` (besoins), `GuildUpPrj` (projets), `GuildUpId` (identité),
   `GuildUpAnn` (annonces), `GuildUpAid` (aide), `GuildUpVer` (version), `GuildUpGU` (emote du cri de guilde),
-  `GuildUpEns` (statut « Dispo pour grouper », page Jouer ensemble), `GuildUpTir` (tirage au sort, `/smb roll`),
+  `GuildUpTir` (tirage au sort, `/smb roll`),
   `GuildUpJrn` (fil d'activité et podium, `GuildUp_Journal.lua` : les autres modules y notent leurs nouvelles avec
   `ns.NoterActivite(genre, clé, valeur)`).
   Exception : `GuildUpObj` (`GuildUp_Objectifs.lua`, « ! » des ennemis de quête) passe par `PARTY` / `RAID`.
@@ -107,7 +109,8 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   depuis QuestieDB (`data/Forever` du dépôt Questie/QuestieDB, GPL-3.0 ; `--ref` pour une version précise,
   cache dans `outils/cache/questiedb/`, même `--verifier`). Lu par `GuildUp_Objectifs.lua`. Le même fichier contient
   `ns.DONJONS_QUETES` (quêtes de chaque donjon, par numéro de zone) et `ns.SUITES_QUETES` (suites de quêtes :
-  première quête, étape, nombre d'étapes), lus par `GuildUp_Ensemble.lua`.
+  première quête, étape, nombre d'étapes), qui ne sont plus lus depuis le retrait de « Jouer ensemble » (3.7.0) :
+  à retirer de `generer_objectifs.py` à la prochaine régénération.
 - Ces fichiers font plusieurs milliers de lignes : **ne pas les lire en entier**, utiliser Grep.
 
 ## Particularités de Forever

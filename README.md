@@ -90,7 +90,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   Halo doré quand des groupes sont ouverts, anneau vert quand on est en attente. Clic : la fenêtre
   GuildUpSMB ; clic droit : menu rapide (rôle, partage de position, groupes, appel à l'aide, options).
 - **Fenêtre GuildUpSMB** (style sombre et doré) : menu à gauche (Accueil, Guilde, Groupes, Quêtes en
-  commun, Artisanat, Mes carnets, Dons, Événements, À l'aide !, Options) et choix du rôle en haut. L'accueil
+  commun, Artisanat, Dons, Événements, Activité, À l'aide !, Options) et choix du rôle en haut. L'accueil
   résume la guilde : membres sur ta carte, groupes ouverts (postuler en un clic), appels à l'aide,
   demandes de dons, besoins que tu sais fabriquer, avancement du dernier projet.
 - **Page Guilde** : tous les membres de la guilde, en ligne et hors ligne, avec tout ce que l'addon sait
@@ -118,18 +118,6 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   désactivable dans les options ou le menu rapide du médaillon). Chaque membre y apparaît avec son médaillon
   (son portrait), entouré d'un anneau à la couleur de sa classe ; un point de couleur s'il n'a pas de portrait.
   Quand plusieurs membres se chevauchent, la position la plus récente est au-dessus.
-- **Jouer ensemble** (3.0) : ce que tu peux faire maintenant avec la guilde. Onglet **Maintenant**, suggestions
-  classées par intérêt : tes quêtes en commun regroupées par zone avec les membres en ligne qui les ont
-  (« Former le groupe » les invite), les donjons à ton niveau où des membres ont des quêtes (« Les Mortemines :
-  il ne manque qu'un soigneur », « Monter le groupe »), les membres qui font la même suite de quêtes que toi
-  (au même point ou à une ou deux étapes près), les membres dispo proches de ton niveau (« Inviter »), les
-  groupes de la guilde qui cherchent ton rôle ou montés pour une de tes quêtes (« Postuler »). Clic droit :
-  ignorer une suggestion. Onglet **Donjons** : chaque donjon avec ses quêtes (les tiennes et celles des membres),
-  qui les a, les rôles qu'on pourrait réunir, « Monter le groupe » (un tank, un soigneur, trois DPS, en
-  commençant par ceux qui ont des quêtes dedans) et « Créer l'annonce » ; filtres à ton niveau, où il y a des
-  quêtes, tous. À droite, « Dispo
-  maintenant » : les membres qui ont coché **Dispo pour grouper** (case de la page, menu rapide du médaillon ou
-  `/smb dispo` ; valable jusqu'à la déconnexion). Clic : chuchoter, clic droit : inviter.
 - **Quêtes en commun** : les quêtes que d'autres membres font aussi, avec « Créer un groupe ». Si tu es déjà
   en groupe, le bouton devient « Inviter » (les membres en ligne qui ont la quête et ne sont pas encore avec
   toi), ou « Déjà groupés » quand ils sont tous dans ton groupe ; « (groupe) » marque ceux qui y sont.
@@ -137,7 +125,6 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   - *Registre* des métiers et recettes de chaque membre, commande en un clic ;
   - *Commandes* : les commandes reçues et passées, gardées 30 jours, avec leur état (en attente, acceptée, refusée, faite, annulée). L'artisan accepte, refuse ou marque « Fait » ; le client annule ou marque « Reçue ». Chaque changement prévient l'autre par une bulle (envoyé à son retour s'il est hors ligne). Le nombre de commandes reçues en attente s'affiche sur l'onglet ;
   - *Items* : tous les objets fabricables, par catégorie, avec des filtres (ma classe, mon niveau, niveau requis, fabricable par la guilde) ; un clic sur un objet montre à droite qui, dans la guilde, sait le fabriquer (chuchoter, commander) ;
-  - *Carnet de craft* et liste de courses (sous-recettes, sacs et banque, provenance des composants) ;
   - *Encyclopédie* des objets (Alt + clic sur un objet) ; « Voir dans Items » montre qui sait fabriquer l'objet ;
   - *Dons* (un hôtel des ventes gratuit), *Demandes* et *Besoins* ;
   - *Dons et besoins croisés* : quand un membre met en don un objet de tes besoins, une bulle te prévient (une seule fois par donneur et par objet ; clic : la page Dons sur cet objet). Dans l'onglet Dons, ces dons portent la marque « Dans tes besoins », passent en tête, et la case « Mes besoins » ne montre qu'eux. Dans l'onglet Besoins, chacun de tes besoins mis en don indique « donné par X » avec un bouton Demander ; dans « Besoins de la guilde », ce que tu as dans tes sacs ou ta banque est marqué « tu en as N » ;
@@ -179,12 +166,9 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 | `/smb taille 1.2` | Taille de la fenêtre GuildUpSMB (de 0.7 à 1.6, 1.1 par défaut) |
 | `/smb groupes` | Recherche de groupe de la guilde |
 | `/smb metiers` | Registre des métiers |
-| `/smb ensemble [donjons]` | Jouer ensemble (onglet Donjons) |
-| `/smb dispo` | Dispo pour grouper (oui / non) |
 | `/smb quetes` | Quêtes en commun |
 | `/smb evenements` | Créer un événement de guilde |
 | `/smb echanges` | Dons et besoins |
-| `/smb carnet` | Carnet de craft (listes de courses) |
 | `/smb encyclo` | Encyclopédie |
 | `/smb items` | Tous les objets fabricables |
 | `/smb projets` | Projets de guilde |

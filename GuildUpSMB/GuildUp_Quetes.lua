@@ -217,10 +217,6 @@ local function Partages()
 	return res
 end
 ns.QuetesEnCommun = Partages -- mes quêtes faites aussi par d'autres membres (accueil de la fenêtre GuildUpSMB)
--- Pour « Jouer ensemble » (GuildUp_Ensemble.lua), en lecture seule : mes quêtes ([id] = { titre, zone,
--- niveau }) et les listes reçues des autres membres ([clé] = { nom, quetes = { [id] = true } })
-ns.MesQuetesEnCours = function() return mesQuetes end
-ns.QuetesDesMembres = function() return autres end
 
 -- Ouvre le journal de quêtes du jeu sur cette quête
 local function OuvrirJournal(id)

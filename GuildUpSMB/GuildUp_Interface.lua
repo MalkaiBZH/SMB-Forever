@@ -9,8 +9,8 @@
 --   Les autres sections sont des pages fournies par leur module (ns.AjouterPage), avec le kit
 --   d'interface ns.UI (GuildUp_Style.lua) : Guilde (GuildUp_Membres.lua), Groupes
 --   (GuildUp_GroupesFenetre.lua), Quêtes en commun (GuildUp_Quetes.lua), Artisanat (GuildUp_Carnet.lua,
---   onglets Registre de GuildUp_Metiers.lua, Items, Projets de GuildUp_Projets.lua), Mes carnets
---   (GuildUp_Carnet.lua), Dons (GuildUp_Echanges.lua + GuildUp_Besoins.lua), Options
+--   onglets Registre de GuildUp_Metiers.lua, Items, Projets de GuildUp_Projets.lua), Dons
+--   (GuildUp_Echanges.lua + GuildUp_Besoins.lua), Options
 --   (GuildUp_Options.lua), Événements (GuildUp_Evenements.lua), Activité (GuildUp_Journal.lua : fil
 --   d'activité et podium ; sa pastille compte les nouveautés depuis la dernière visite).
 -- Fournit ns.NouveautesGuilde() (pastille du médaillon), ns.BasculerInterface(), ns.OuvrirInterface(page),
@@ -60,8 +60,6 @@ local Aller -- (défini plus bas)
 
 local SECTIONS = {
 	{ id = "accueil", nom = "Accueil", icone = "Interface\\Icons\\INV_Misc_Book_09" },
-	{ id = "ensemble", nom = "Jouer ensemble", icone = "Interface\\Icons\\INV_Misc_GroupNeedMore", neutre = true,
-		badge = function() return ns.NombreSuggestions and ns.NombreSuggestions() or 0 end },
 	{ id = "guilde", nom = "Guilde", icone = "Interface\\Icons\\INV_Shirt_GuildTabard_01" },
 	{ id = "groupes", nom = "Groupes", icone = "Interface\\Icons\\INV_Sword_04",
 		ouvrir = function() if ns.OuvrirGroupes then ns.OuvrirGroupes() end end,
@@ -71,8 +69,6 @@ local SECTIONS = {
 		badge = function() return ns.QuetesEnCommun and #ns.QuetesEnCommun() or 0 end },
 	{ id = "artisanat", nom = "Artisanat", icone = "Interface\\Icons\\Trade_BlackSmithing",
 		ouvrir = function() if ns.OuvrirArtisanat then ns.OuvrirArtisanat(1) end end },
-	{ id = "carnets", nom = "Mes carnets", icone = "Interface\\Icons\\INV_Scroll_03",
-		ouvrir = function() if ns.OuvrirCourses then ns.OuvrirCourses() end end },
 	{ id = "dons", nom = "Dons", icone = "Interface\\Icons\\INV_Misc_Gift_01",
 		ouvrir = function() if ns.OuvrirEchanges then ns.OuvrirEchanges(nil, 1) end end,
 		badge = function() return ns.NombreDemandesDons and ns.NombreDemandesDons() or 0 end },

@@ -1,15 +1,15 @@
--- GuildUpSMB : artisanat et carnet de craft, dans la fenêtre GuildUpSMB (kit ns.UI, GuildUp_Style.lua).
--- Pages fournies ici (ns.AjouterPage) :
+-- GuildUpSMB : artisanat, dans la fenêtre GuildUpSMB (kit ns.UI, GuildUp_Style.lua).
+-- Page fournie ici (ns.AjouterPage) :
 --   « artisanat » : onglets Registre (GuildUp_Metiers.lua), Items (ici : tous les objets fabricables,
 --     catégories et sous-catégories, recherche, filtres « Pour ma classe », « Jusqu'à mon niveau », niveau requis min / max et « Fabricable par la
---     guilde », tri ; « Besoin », « Ajouter » à une liste ou à un projet), Projets de guilde
+--     guilde », tri ; « Besoin », « Ajouter » à un projet), Projets de guilde
 --     (GuildUp_Projets.lua) et Commandes (GuildUp_Metiers.lua : commandes reçues et passées).
---   « carnets » (Mes carnets) : mes listes à gauche ; à droite la liste de courses de la liste choisie,
---     qui calcule tout ce qu'il faut, sous-recettes comprises, compare avec les sacs et la banque, et
---     dit d'où viennent les composants ; « Réduire » la remplace par une mini-liste sur l'écran.
 -- Fenêtres à part, aux couleurs du kit : l'encyclopédie (fiche d'un objet, Alt + clic sur un objet du
 -- jeu ; collée à droite de la fenêtre GuildUpSMB ; « Voir dans Items » ouvre l'onglet Items sur un objet
--- fabricable, avec ses artisans), la mini-liste et la bulle 3D des PNJ.
+-- fabricable, avec ses artisans) et la bulle 3D des PNJ.
+-- Calcul des composants (sous-recettes comprises) pour les projets de guilde : ns.OutilsCarnet.
+-- (La page « Mes carnets », listes de courses et mini-liste, a été retirée en 3.7.0 ; les anciennes
+-- listes restent dans GuildUpDB.carnets, sans être lues.)
 -- Données : GuildUp_Craft.lua (recettes du client Forever) et GuildUp_Sources.lua (sources tirées
 -- une fois de QuestieDB). Rien ne dépend d'un autre addon. Aucun message réseau ici.
 
@@ -121,7 +121,7 @@ local function Recettes()
 	return recettes
 end
 local function RecettesDe(objet) Recettes(); return parObjet[objet] end
--- Recette à suivre pour fabriquer un objet dans un calcul automatique (liste de courses, projets) :
+-- Recette à suivre pour fabriquer un objet dans un calcul automatique (projets de guilde) :
 -- aucune pour un objet en boucle de transmutation ; sinon la première qui n'utilise pas l'objet lui-même
 local function RecetteADevelopper(objet)
 	Recettes()
@@ -314,54 +314,6 @@ local function IndicationType(objet)
 	return nil
 end
 
-
---------------------------------------------------------------------------------
--- Listes (sauvegardées) : db.carnets = { [nom] = { entrees = { {objet, qte} ou {sort, qte} },
--- obtenir = { [objet] = true } } } — une entrée est un objet (fabriqué ou non) ; {sort} = ancienne
--- entrée « recette » (encore lue)
---------------------------------------------------------------------------------
-
-local function Carnets()
-	local db = ns.DB and ns.DB() or {}
-	if type(db.carnets) ~= "table" then db.carnets = {} end
-	if not next(db.carnets) then db.carnets["Mon carnet"] = { entrees = {}, obtenir = {} } end
-	if not db.carnetChoisi or not db.carnets[db.carnetChoisi] then db.carnetChoisi = next(db.carnets) end
-	return db.carnets, db
-end
-local function Carnet()
-	local c, db = Carnets()
-	local k = c[db.carnetChoisi]
-	k.entrees = k.entrees or {}
-	k.obtenir = k.obtenir or {}
-	return k, db.carnetChoisi
-end
-
-local MajCarnet, MajCourses
-
--- Ajoute un objet à une liste (nom : liste existante ou nouvelle ; par défaut la liste choisie)
-local function AjouterObjet(objet, qte, nomListe)
-	local c, db = Carnets()
-	nomListe = nomListe or db.carnetChoisi
-	c[nomListe] = c[nomListe] or { entrees = {}, obtenir = {} }
-	local k = c[nomListe]
-	k.entrees = k.entrees or {}
-	db.carnetChoisi = nomListe
-	for _, e in ipairs(k.entrees) do
-		if e.objet == objet then e.qte = e.qte + (qte or 1); MajCarnet(); MajCourses(); return end
-	end
-	k.entrees[#k.entrees + 1] = { objet = objet, qte = qte or 1 }
-	MajCarnet()
-	MajCourses()
-end
-local function AjouterRecette(sort, qte)
-	local r = Recettes()[sort]
-	if r and r.objet > 0 then return AjouterObjet(r.objet, qte) end
-	local k = Carnet()
-	k.entrees[#k.entrees + 1] = { sort = sort, qte = qte or 1 }
-	MajCarnet()
-	MajCourses()
-end
-
 --------------------------------------------------------------------------------
 -- Habillage : kit d'interface ns.UI (GuildUp_Style.lua), et ce qui manque au kit pour le carnet
 -- (barre d'avancement, croix, fenêtre à part, menus, cadres de section)
@@ -372,7 +324,7 @@ local C = UI.C
 local MARGE = 16
 local PISTE = { 0.165, 0.137, 0.094, 1 }          -- piste des barres, filets légers entre les lignes
 local FOND_MENU = { 0.05, 0.043, 0.035, 0.98 }
-local VERT, MANQUE, GRIS = "|cff6fd08c", "|cffffb39f", "|cff9c937f"  -- réuni / à trouver / discret
+local VERT, GRIS = "|cff6fd08c", "|cff9c937f"  -- réuni / discret
 local ICONE_INCONNUE = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 -- Barre d'avancement plate (piste sombre, remplissage doré) : SetMinMaxValues / SetValue
@@ -447,7 +399,7 @@ local function LigneMenu(m, i)
 	return b
 end
 
--- Cadre autour d'une section (encyclopédie, liste de courses) : une carte du kit, sous les lignes
+-- Cadre autour d'une section (encyclopédie) : une carte du kit, sous les lignes
 local function CadreSection(pool, parent, i)
 	local c = pool[i]
 	if not c then
@@ -476,16 +428,13 @@ local function StylerTitre(l, actif)
 	l.trait:SetShown(actif)
 end
 
--- Pages de la fenêtre GuildUpSMB : est-ce que celle-ci est à l'écran ?
-local pageArtisanat, pageCarnets
+-- Page Artisanat de la fenêtre GuildUpSMB : est-elle à l'écran (et sur cet onglet) ?
+local pageArtisanat
 local function ArtisanatVisible(onglet)
 	if not (ns.PageInterface and ns.PageInterface() == "artisanat" and pageArtisanat) then return false end
 	return not onglet or pageArtisanat.onglet == onglet
 end
 ns.ArtisanatVisible = ArtisanatVisible
-local function CarnetsVisible()
-	return ns.PageInterface ~= nil and ns.PageInterface() == "carnets" and pageCarnets ~= nil
-end
 
 --------------------------------------------------------------------------------
 -- Calcul : arbre des composants et matériaux de base
@@ -494,7 +443,7 @@ end
 -- Contexte d'un calcul : stock restant partagé par toutes les branches (un objet en stock ne sert
 -- qu'une fois, et le surplus d'une fabrication à rendement > 1 profite aux autres branches) et
 -- objets « à obtenir tels quels » (non développés).
---   avecMesObjets : le stock part de mes sacs + banque (liste de courses) ; sinon de zéro (projets)
+--   avecMesObjets : le stock part de mes sacs + banque ; sinon de zéro (projets de guilde)
 local function NouveauContexte(avecMesObjets, obtenir)
 	local ctx = { obtenir = obtenir or {}, dispo = avecMesObjets and JAi or function() return 0 end }
 	ctx.stock = setmetatable({}, { __index = function(t, objet)
@@ -529,769 +478,6 @@ local function Developper(objet, besoin, ctx, profondeur, chemin)
 		chemin[objet] = nil
 	end
 	return n
-end
-
-local CalculerSansMemoire
-local memoireCalcul, imageCalcul -- résultat du dernier calcul et moment (GetTime : un par image)
-local function Calculer()
-	-- plusieurs affichages (liste, mini-liste, carnets) le demandent dans la même image : un seul calcul
-	if memoireCalcul and imageCalcul == GetTime() then return memoireCalcul[1], memoireCalcul[2] end
-	local arbres, base = CalculerSansMemoire()
-	memoireCalcul, imageCalcul = { arbres, base }, GetTime()
-	return arbres, base
-end
-CalculerSansMemoire = function()
-	Recettes()
-	local k = Carnet()
-	local arbres, base = {}, {}
-	local ctx = NouveauContexte(true, k.obtenir)
-	for _, e in ipairs(k.entrees) do
-		local r = e.sort and recettes[e.sort]
-		if not r and e.objet then
-			local recs = RecettesDe(e.objet)
-			r = recs and recs[1]
-		end
-		if r then
-			-- objet fabriqué : quantité voulue = objets ; fabrications arrondies
-			local fab = math.ceil(e.qte / r.rendement)
-			local racine = { recette = r, objet = r.objet, besoin = e.qte, fabrications = fab, enfants = {}, racine = true,
-				entree = e }
-			for _, c in ipairs(r.composants) do
-				racine.enfants[#racine.enfants + 1] = Developper(c[1], c[2] * fab, ctx, 1, { [r.objet] = true })
-			end
-			arbres[#arbres + 1] = racine
-		elseif e.objet then
-			-- objet qui ne se fabrique pas : il va directement dans les matériaux de base
-			arbres[#arbres + 1] = { objet = e.objet, besoin = e.qte, enfants = {}, racine = true, entree = e,
-				jai = JAi(e.objet) }
-			base[e.objet] = (base[e.objet] or 0) + e.qte
-		end
-	end
-	-- matériaux de base : les feuilles (composants non fabriqués, ou à obtenir tels quels)
-	local function Cumuler(n)
-		if n.enfants and not n.racine then
-			for _, c in ipairs(n.enfants) do Cumuler(c) end
-		elseif n.racine then
-			for _, c in ipairs(n.enfants) do Cumuler(c) end
-		else
-			base[n.objet] = (base[n.objet] or 0) + n.besoin
-		end
-	end
-	for _, a in ipairs(arbres) do Cumuler(a) end
-	return arbres, base
-end
-
---------------------------------------------------------------------------------
--- Page « Mes carnets » de la fenêtre GuildUpSMB : à gauche mes listes (arbre listes / objets), à
--- droite la liste de courses de la liste choisie (matériaux de base, recettes développées)
---------------------------------------------------------------------------------
-
-local LARGEUR_CARNETS = 230
-local lignes = {}        -- lignes de la liste de courses (réutilisées)
-local cartes = {}        -- cadres « Matériaux de base » / « Recettes »
-local MajCarnets         -- colonne « Mes carnets » (définie plus bas)
-
-local function InfobulleObjet(self)
-	if not self.objet then return end
-	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	pcall(GameTooltip.SetItemByID, GameTooltip, self.objet)
-	GameTooltip:AddLine(" ")
-	local sacs, banque = OuSont(self.objet)
-	GameTooltip:AddLine("|cffffd100Tu en as|r :", 1, 1, 1)
-	GameTooltip:AddLine(("  - %d dans tes sacs"):format(sacs), 1, 1, 1)
-	if banque then
-		GameTooltip:AddLine(("  - %d à la banque"):format(banque), 1, 1, 1)
-	else
-		GameTooltip:AddLine("  - banque inconnue (ouvre-la une fois)", 0.6, 0.6, 0.6)
-	end
-	GameTooltip:AddLine(" ")
-	GameTooltip:AddLine("Clic : fiche (d'où ça vient, qui le fabrique)", 0.6, 0.6, 0.6)
-	if self.noeud and self.noeud.fabricable and not self.noeud.racine then
-		GameTooltip:AddLine(Carnet().obtenir[self.objet] and "Clic droit ou +/- : le fabriquer (déplier)"
-			or "Clic droit ou +/- : l'obtenir tel quel (ne pas déplier)", 0.6, 0.6, 0.6)
-	end
-	GameTooltip:AddLine("Maj-clic : lien dans la discussion", 0.6, 0.6, 0.6)
-	GameTooltip:Show()
-end
-
--- « (12 en sacs, 4 en banque) » : où sont ceux que j'ai déjà
-local function OuTexte(objet, jai)
-	if (jai or 0) <= 0 then return "" end
-	local sacs, banque = OuSont(objet)
-	local t = {}
-	if sacs > 0 then t[#t + 1] = sacs .. " en sacs" end
-	if (banque or 0) > 0 then t[#t + 1] = banque .. " en banque" end
-	if #t == 0 then return "" end
-	return "  " .. GRIS .. "(" .. table.concat(t, ", ") .. ")|r"
-end
-
--- Nom, couleur de qualité et icône d'un objet de la liste (nom de la recette en secours)
-local function NomObjet(objet, recette)
-	local nom, _, qualite, icone = InfoObjet(objet)
-	if not nom and recette then nom, icone = NomSort(recette.sort) end
-	if not nom and objet then nom = ns.NomObjetListe and ns.NomObjetListe(objet) end
-	if not nom and objet then Precharger(objet) end
-	local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
-	return nom, (qc and qc.hex or "|cffe8e2d4"), icone
-end
-
-local function CreerLigne(parent)
-	local l = CreateFrame("Button", nil, parent)
-	l:SetHeight(26)
-	UI.Survol(l, 0.05)
-	l.filet = l:CreateTexture(nil, "BORDER")
-	l.filet:SetColorTexture(unpack(PISTE))
-	l.filet:SetHeight(1)
-	l.filet:SetPoint("BOTTOMLEFT", l, "BOTTOMLEFT", 0, 0)
-	l.filet:SetPoint("BOTTOMRIGHT", l, "BOTTOMRIGHT", 0, 0)
-	-- « + / - » : le fabriquer (déplier) ou l'obtenir tel quel
-	l.signe = CreateFrame("Button", nil, l)
-	l.signe:SetSize(16, 16)
-	l.signe.texte = UI.Texte(l.signe, "GameFontNormal", C.ors)
-	l.signe.texte:SetPoint("CENTER", l.signe, "CENTER", 0, 0)
-	l.signe:SetScript("OnClick", function()
-		local n = l.noeud
-		if not n or n.racine or not n.fabricable then return end
-		local o = Carnet().obtenir
-		o[l.objet] = not o[l.objet] or nil
-		MajCourses()
-	end)
-	l.icone = l:CreateTexture(nil, "ARTWORK")
-	l.icone:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-	l.compte = UI.Texte(l, "GameFontHighlight", C.texte)
-	l.compte:SetPoint("RIGHT", l, "RIGHT", -6, 0)
-	l.compte:SetJustifyH("RIGHT")
-	l.texte = UI.Texte(l, "GameFontHighlight", C.texte)
-	l.sous = UI.Texte(l, "GameFontHighlightSmall", C.gris)
-	l.qte = false -- (quantité et retrait : créés à la première racine, voir Quantite)
-	l:SetScript("OnEnter", InfobulleObjet)
-	l:SetScript("OnLeave", function() GameTooltip:Hide() end)
-	l:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-	l:SetScript("OnClick", function(self, bouton)
-		local n = self.noeud
-		if not n then return end
-		if IsModifiedClick and IsModifiedClick("CHATLINK") then
-			local _, lien = InfoObjet(self.objet)
-			if lien and ChatEdit_InsertLink then ChatEdit_InsertLink(lien) end
-			return
-		end
-		if bouton == "RightButton" then
-			if n.racine or not n.fabricable then return end
-			local o = Carnet().obtenir
-			o[self.objet] = not o[self.objet] or nil
-			MajCourses()
-			return
-		end
-		if ns.OuvrirFiche then ns.OuvrirFiche(self.objet, n.racine and n.besoin or n.manque) end
-	end)
-	l.noeud, l.objet = false, false
-	return l
-end
-
--- objets de la liste (racines) : champ de quantité modifiable et croix de retrait (créés à la demande)
-local function Quantite(l)
-	if l.qte then return end
-	l.retirer = Croix(l, 26)
-	l.retirer:SetPoint("RIGHT", l, "RIGHT", -4, 0)
-	UI.Infobulle(l.retirer, "Retirer", "Retire cet objet de la liste.")
-	l.qte = UI.Champ(l, 48, "", 26)
-	l.qte:SetPoint("RIGHT", l.retirer, "LEFT", -6, 0)
-	l.qte.saisie:SetNumeric(true)
-	l.qte.saisie:SetMaxLetters(4)
-	l.qte.saisie:SetJustifyH("CENTER")
-	l.qteTexte = UI.Texte(l, "GameFontHighlightSmall", C.gris)
-	l.qteTexte:SetPoint("RIGHT", l.qte, "LEFT", -6, 0)
-	l.qteTexte:SetText("Quantité")
-end
-
-local function RendreCourses()
-	local p = pageCarnets
-	if not p then return end
-	local arbres, base = Calculer()
-	local _, nomCarnet = Carnet()
-	p.titreCarnet:SetText(nomCarnet)
-	p.choix:SetWidth(math.min(p.titreCarnet:GetStringWidth() + 28, 300))
-	local contenu = p.liste.contenu
-	local y, i, nCartes, debutCarte = 0, 0, 0, 0
-
-	local function OuvrirCarte()
-		debutCarte = y
-		y = y + 6
-	end
-	local function FermerCarte()
-		nCartes = nCartes + 1
-		local c = CadreSection(cartes, contenu, nCartes)
-		c:ClearAllPoints()
-		c:SetPoint("TOPLEFT", contenu, "TOPLEFT", 0, -debutCarte)
-		c:SetPoint("RIGHT", contenu, "RIGHT", 0, 0)
-		c:SetHeight(y - debutCarte + 8)
-		y = y + 8 + 12
-	end
-	-- ligne réutilisée, remise à zéro (retrait : décalage à gauche dans la carte)
-	local function Ligne(h, retrait)
-		i = i + 1
-		local l = lignes[i] or CreerLigne(contenu)
-		lignes[i] = l
-		l:SetFrameLevel(contenu:GetFrameLevel() + 3)
-		l:ClearAllPoints()
-		l:SetPoint("TOPLEFT", contenu, "TOPLEFT", 10 + (retrait or 0), -y)
-		l:SetPoint("RIGHT", contenu, "RIGHT", -10, 0)
-		l:SetHeight(h)
-		l.noeud, l.objet = false, false
-		l.signe:Hide(); l.sous:Hide(); l.filet:Hide()
-		if l.qte then l.qte:Hide(); l.qteTexte:Hide(); l.retirer:Hide() end
-		l.icone:Show(); l.icone:SetAlpha(1); l.icone:SetDesaturated(false)
-		l.compte:SetText("")
-		l.texte:SetFontObject("GameFontHighlight")
-		l.texte:SetTextColor(unpack(C.texte))
-		l.texte:SetWordWrap(false)
-		l:EnableMouse(true)
-		l:Show()
-		y = y + h
-		return l
-	end
-	local function Titre(texte)
-		local l = Ligne(28)
-		l:EnableMouse(false)
-		l.icone:Hide()
-		l.texte:SetFontObject("GameFontNormal")
-		l.texte:SetTextColor(unpack(C.ors))
-		l.texte:ClearAllPoints()
-		l.texte:SetPoint("LEFT", l, "LEFT", 2, 0)
-		l.texte:SetPoint("RIGHT", l, "RIGHT", -2, 0)
-		l.texte:SetText(texte)
-	end
-	local function Compte(l, jai, besoin)
-		local ok = jai >= besoin
-		l.compte:SetText(("%s%d / %d|r"):format(ok and VERT or MANQUE, math.min(jai, besoin), besoin))
-	end
-	-- un matériau de base : icône, nom, où sont ceux que j'ai, j'ai / il faut (réunis : grisés)
-	local function Materiau(m, dernier)
-		local l = Ligne(32)
-		l.noeud = { objet = m.objet, besoin = m.besoin, jai = m.jai, manque = math.max(0, m.besoin - m.jai),
-			fabricable = false, base = true }
-		l.objet = m.objet
-		local nom, couleur, icone = NomObjet(m.objet)
-		local fini = m.jai >= m.besoin
-		l.icone:SetSize(24, 24)
-		l.icone:ClearAllPoints()
-		l.icone:SetPoint("LEFT", l, "LEFT", 2, 0)
-		l.icone:SetTexture(icone or ICONE_INCONNUE)
-		l.icone:SetDesaturated(fini)
-		l.icone:SetAlpha(fini and 0.5 or 1)
-		l.texte:ClearAllPoints()
-		l.texte:SetPoint("LEFT", l.icone, "RIGHT", 10, 0)
-		l.texte:SetPoint("RIGHT", l.compte, "LEFT", -10, 0)
-		l.texte:SetText((fini and GRIS or couleur) .. (nom or "chargement…") .. "|r" .. OuTexte(m.objet, m.jai))
-		Compte(l, m.jai, m.besoin)
-		l.filet:SetShown(not dernier)
-	end
-	-- sous-composant d'une recette (arbre), « + / - » s'il se fabrique
-	local function Noeud(n, prof)
-		local l = Ligne(26, 40 + (prof - 1) * 16)
-		l.noeud, l.objet = n, n.objet
-		if n.fabricable then
-			l.signe:ClearAllPoints()
-			l.signe:SetPoint("LEFT", l, "LEFT", -2, 0)
-			l.signe.texte:SetText(n.enfants and "-" or "+")
-			l.signe:Show()
-		end
-		local nom, couleur, icone = NomObjet(n.objet)
-		l.icone:SetSize(16, 16)
-		l.icone:ClearAllPoints()
-		l.icone:SetPoint("LEFT", l, "LEFT", 18, 0)
-		l.icone:SetTexture(icone or ICONE_INCONNUE)
-		l.texte:ClearAllPoints()
-		l.texte:SetPoint("LEFT", l.icone, "RIGHT", 6, 0)
-		l.texte:SetPoint("RIGHT", l.compte, "LEFT", -10, 0)
-		local suffixe = ""
-		if n.fabricable and n.enfants then
-			suffixe = ("  %s(%d fabrication%s)|r"):format(GRIS, n.fabrications, n.fabrications > 1 and "s" or "")
-		elseif n.fabricable then
-			suffixe = "  " .. GRIS .. "(à obtenir)|r"
-		end
-		l.texte:SetText(couleur .. (nom or "chargement…") .. "|r" .. suffixe .. OuTexte(n.objet, n.jai))
-		Compte(l, n.jai, n.besoin)
-		for _, c in ipairs(n.enfants or {}) do Noeud(c, prof + 1) end
-	end
-	-- objet de la liste : icône, nom, recette, quantité voulue (modifiable), retrait
-	local function Racine(n)
-		local l = Ligne(46)
-		l.noeud, l.objet = n, n.objet
-		Quantite(l)
-		local nom, couleur, icone = NomObjet(n.objet, n.recette)
-		l.icone:SetSize(30, 30)
-		l.icone:ClearAllPoints()
-		l.icone:SetPoint("LEFT", l, "LEFT", 2, 0)
-		l.icone:SetTexture(icone or ICONE_INCONNUE)
-		l.texte:SetFontObject("GameFontNormal")
-		l.texte:ClearAllPoints()
-		l.texte:SetPoint("TOPLEFT", l.icone, "TOPRIGHT", 10, -1)
-		l.texte:SetPoint("RIGHT", l.qteTexte, "LEFT", -10, 0)
-		l.texte:SetText(couleur .. (nom or "chargement…") .. "|r")
-		l.sous:ClearAllPoints()
-		l.sous:SetPoint("TOPLEFT", l.texte, "BOTTOMLEFT", 0, -4)
-		l.sous:SetPoint("RIGHT", l.qteTexte, "LEFT", -10, 0)
-		if n.recette then
-			l.sous:SetText(("%s · %d fabrication%s"):format(TexteRecette(n.recette), n.fabrications, n.fabrications > 1 and "s" or ""))
-		else
-			l.sous:SetText("ne se fabrique pas : à obtenir" .. OuTexte(n.objet, n.jai))
-		end
-		l.sous:Show()
-		if not l.qte.saisie:HasFocus() then l.qte:Ecrire(tostring(n.besoin)) end
-		l.qte.SurTexte = function(t)
-			local v = tonumber(t)
-			if v and v > 0 and n.entree then n.entree.qte = v end
-		end
-		l.qte.SurValider = function() MajCourses() end
-		l.qte:Show()
-		l.qteTexte:Show()
-		l.retirer:SetScript("OnClick", function()
-			local k = Carnet()
-			for idx, e in ipairs(k.entrees) do
-				if e == n.entree then table.remove(k.entrees, idx); break end
-			end
-			MajCourses()
-			MajCarnet()
-		end)
-		l.retirer:Show()
-	end
-
-	if #arbres == 0 then
-		OuvrirCarte()
-		Titre("Recettes")
-		local l = Ligne(44)
-		l:EnableMouse(false)
-		l.icone:Hide()
-		l.texte:ClearAllPoints()
-		l.texte:SetPoint("TOPLEFT", l, "TOPLEFT", 2, -4)
-		l.texte:SetPoint("RIGHT", l, "RIGHT", -2, 0)
-		l.texte:SetWordWrap(true)
-		l.texte:SetTextColor(unpack(C.gris))
-		l.texte:SetText("Cette liste est vide : ajoute des objets depuis Artisanat, onglet Items (bouton « Ajouter »), ou depuis l'encyclopédie.")
-		FermerCarte()
-		p.barre:SetMinMaxValues(0, 1)
-		p.barre:SetValue(0)
-		p.reunis:SetText("")
-		p.resume:SetText(GRIS .. "Liste vide|r")
-	else
-		-- matériaux de base d'abord (ce qu'il faut réunir, les manquants en tête), puis les recettes
-		local liste = {}
-		for o, n in pairs(base) do
-			local nom = InfoObjet(o)
-			liste[#liste + 1] = { objet = o, besoin = n, jai = JAi(o), nom = nom or "" }
-		end
-		table.sort(liste, function(a, b)
-			local fa, fb = a.jai >= a.besoin, b.jai >= b.besoin
-			if fa ~= fb then return not fa end
-			return a.nom < b.nom
-		end)
-		local reunis = 0
-		for _, m in ipairs(liste) do if m.jai >= m.besoin then reunis = reunis + 1 end end
-		OuvrirCarte()
-		Titre(("Matériaux de base · %d / %d réunis"):format(reunis, #liste))
-		for idx, m in ipairs(liste) do Materiau(m, idx == #liste) end
-		FermerCarte()
-		OuvrirCarte()
-		Titre("Recettes")
-		for j, a in ipairs(arbres) do
-			if j > 1 then y = y + 6 end
-			Racine(a)
-			for _, c in ipairs(a.enfants or {}) do Noeud(c, 1) end
-		end
-		FermerCarte()
-		p.barre:SetMinMaxValues(0, math.max(1, #liste))
-		p.barre:SetValue(reunis)
-		p.reunis:SetText(("%d / %d matériaux réunis"):format(reunis, #liste))
-		local manquants = #liste - reunis
-		p.resume:SetText(manquants == 0 and (VERT .. "Tout est réuni !|r")
-			or (MANQUE .. ("%d matériau%s à trouver"):format(manquants, manquants > 1 and "x" or "") .. "|r"))
-	end
-	for j = nCartes + 1, #cartes do cartes[j]:Hide() end
-	for j = i + 1, #lignes do lignes[j]:Hide() end
-	p.liste:Hauteur(y)
-end
-
--- Colonne « Mes carnets » : toutes mes listes et leurs objets
-local lignesCarnets = {}
-local carnetsOuverts = {} -- [nom] = true : listes dépliées
-
-local function LigneCarnet(i)
-	local l = lignesCarnets[i]
-	if l then return l end
-	l = UI.Rangee(pageCarnets.carnets.contenu, 36)
-	l.signe = UI.Texte(l, "GameFontNormal", C.ors)
-	l.signe:SetPoint("LEFT", l, "LEFT", 10, 0)
-	l.icone = l:CreateTexture(nil, "ARTWORK")
-	l.icone:SetSize(20, 20)
-	l.icone:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-	l.compte = UI.Texte(l, "GameFontHighlightSmall", C.gris)
-	l.compte:SetPoint("RIGHT", l, "RIGHT", -10, 0)
-	l.compte:SetJustifyH("RIGHT")
-	l.texte = UI.Texte(l, "GameFontHighlight", C.texte)
-	l:SetScript("OnClick", function(self) if self.action then self.action() end end)
-	l:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		if self.objet then
-			pcall(GameTooltip.SetItemByID, GameTooltip, self.objet)
-			GameTooltip:AddLine(" ")
-			GameTooltip:AddLine("Clic : fiche dans l'encyclopédie", 0.6, 0.6, 0.6)
-		elseif self.liste then
-			GameTooltip:SetText(self.liste)
-			GameTooltip:AddLine(self.choisi and "Clic : replier / déplier" or "Clic : choisir cette liste", 1, 1, 1, true)
-		end
-		GameTooltip:Show()
-	end)
-	l:SetScript("OnLeave", function() GameTooltip:Hide() end)
-	l.objet, l.liste, l.action, l.choisi = false, false, false, false
-	lignesCarnets[i] = l
-	return l
-end
-
-MajCarnets = function()
-	if not pageCarnets then return end
-	local c, db = Carnets()
-	local noms = {}
-	for nom in pairs(c) do noms[#noms + 1] = nom end
-	table.sort(noms)
-	local contenu = pageCarnets.carnets.contenu
-	local y, i = 0, 0
-	for _, nom in ipairs(noms) do
-		local choisi = nom == db.carnetChoisi
-		local ouvert = carnetsOuverts[nom] or choisi
-		i = i + 1
-		local l = LigneCarnet(i)
-		l:ClearAllPoints()
-		l:SetPoint("TOPLEFT", contenu, "TOPLEFT", 0, -y)
-		l:SetPoint("RIGHT", contenu, "RIGHT", 0, 0)
-		l:SetHeight(36)
-		l:SetBackdropColor(unpack(choisi and C.actif or C.carte))
-		l:SetBackdropBorderColor(unpack(choisi and C.orFonce or C.bord))
-		l.signe:SetText(ouvert and "-" or "+")
-		l.signe:Show()
-		l.icone:Hide()
-		l.texte:ClearAllPoints()
-		l.texte:SetPoint("LEFT", l, "LEFT", 26, 0)
-		l.texte:SetPoint("RIGHT", l.compte, "LEFT", -6, 0)
-		l.texte:SetText(nom)
-		l.texte:SetTextColor(unpack(choisi and C.ors or C.texte))
-		l.compte:SetText(tostring(#(c[nom].entrees or {})))
-		l.objet, l.liste, l.choisi = false, nom, choisi
-		-- clic : choisir cette liste (et la déplier) ; sur la liste déjà choisie : replier / déplier
-		l.action = function()
-			if choisi then carnetsOuverts[nom] = not ouvert or nil
-			else db.carnetChoisi = nom; carnetsOuverts[nom] = true end
-			MajCourses() -- (refait aussi cette colonne)
-		end
-		l:Show()
-		y = y + 40
-		if ouvert then
-			for _, e in ipairs(c[nom].entrees or {}) do
-				local objet = e.objet or (e.sort and Recettes()[e.sort] and Recettes()[e.sort].objet)
-				i = i + 1
-				local li = LigneCarnet(i)
-				li:ClearAllPoints()
-				li:SetPoint("TOPLEFT", contenu, "TOPLEFT", 0, -y)
-				li:SetPoint("RIGHT", contenu, "RIGHT", 0, 0)
-				li:SetHeight(26)
-				li:SetBackdropColor(0, 0, 0, 0)
-				li:SetBackdropBorderColor(0, 0, 0, 0)
-				li.signe:Hide()
-				local nomO, couleur, icone
-				if objet and objet > 0 then nomO, couleur, icone = NomObjet(objet) end
-				if not nomO and e.sort then nomO, icone = NomSort(e.sort) end
-				couleur = couleur or "|cffe8e2d4"
-				li.icone:ClearAllPoints()
-				li.icone:SetPoint("LEFT", li, "LEFT", 26, 0)
-				li.icone:SetTexture(icone or ICONE_INCONNUE)
-				li.icone:Show()
-				li.texte:ClearAllPoints()
-				li.texte:SetPoint("LEFT", li.icone, "RIGHT", 8, 0)
-				li.texte:SetPoint("RIGHT", li.compte, "LEFT", -6, 0)
-				li.texte:SetText(couleur .. (nomO or "…") .. "|r")
-				li.compte:SetText("x" .. (e.qte or 1))
-				li.objet = (objet and objet > 0) and objet or false
-				li.liste, li.choisi = false, false
-				li.action = li.objet and function()
-					if db.carnetChoisi ~= nom then db.carnetChoisi = nom; MajCourses() end
-					ns.OuvrirFiche(li.objet, e.qte)
-				end or false
-				li:Show()
-				y = y + 28
-			end
-			y = y + 4
-		end
-	end
-	for j = i + 1, #lignesCarnets do lignesCarnets[j]:Hide() end
-	pageCarnets.carnets:Hauteur(y)
-end
-ns.MajCarnets = function() if CarnetsVisible() then MajCarnets() end end
-
--- Rafraîchit ce qui affiche la liste choisie : la mini-liste, et la page si elle est à l'écran
-MajCourses = function()
-	if ns.MajMini then ns.MajMini() end
-	if not CarnetsVisible() then return end
-	RendreCourses()
-	MajCarnets()
-end
-
--- menu du nom de la liste : changer de liste, en créer une, supprimer celle-ci
-local menuChoix
-local function MenuChoixListe(ancre)
-	menuChoix = menuChoix or Menu("GuildUpMenuChoixListe")
-	local m = menuChoix
-	local c, db = Carnets()
-	local items = {}
-	local noms = {}
-	for nom in pairs(c) do noms[#noms + 1] = nom end
-	table.sort(noms)
-	for _, nom in ipairs(noms) do
-		items[#items + 1] = { texte = (nom == db.carnetChoisi and "|cfff1cf6b> " or "   ") .. nom .. ("  " .. GRIS .. "(%d)|r"):format(#(c[nom].entrees or {})),
-			action = function() db.carnetChoisi = nom; MajCourses(); MajCarnet() end }
-	end
-	items[#items + 1] = { texte = VERT .. "+ Nouvelle liste…|r", action = function() ns.NouveauCarnet() end }
-	items[#items + 1] = { texte = "|cffff6666Supprimer cette liste|r", action = function()
-		StaticPopup_Show("GUILDUP_SUPPRIMER_CARNET", db.carnetChoisi, nil, db.carnetChoisi) end }
-	for i, it in ipairs(items) do
-		local b = LigneMenu(m, i)
-		b:ClearAllPoints()
-		b:SetPoint("TOPLEFT", m, "TOPLEFT", 4, -4 - (i - 1) * 20)
-		b:SetPoint("RIGHT", m, "RIGHT", -4, 0)
-		b.texte:SetText(it.texte)
-		b:SetScript("OnClick", function() m:Hide(); it.action() end)
-		b:Show()
-	end
-	for i = #items + 1, #m.boutons do m.boutons[i]:Hide() end
-	m:SetSize(240, 8 + #items * 20)
-	m.ancre = ancre
-	m:ClearAllPoints()
-	m:SetPoint("TOPLEFT", ancre, "BOTTOMLEFT", 0, -2)
-	m:Show()
-end
-
-local function CreerPageCarnets(parent)
-	local p = CreateFrame("Frame", nil, parent)
-	p:SetAllPoints()
-	p.rafraichirAuto = false -- page lourde : rafraîchie sur ses évènements (sacs, banque, objets)
-	pageCarnets = p
-
-	-- à gauche : mes listes
-	p.nouveau = UI.Bouton(p, "+ Nouvelle liste", "or", LARGEUR_CARNETS - 76, 30)
-	p.nouveau:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -MARGE)
-	p.nouveau:SetScript("OnClick", function() ns.NouveauCarnet() end)
-	p.items = UI.Bouton(p, "Items", "fantome", 70, 30)
-	p.items:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE + LARGEUR_CARNETS - 70, -MARGE)
-	p.items:SetScript("OnClick", function() if ns.OuvrirArtisanat then ns.OuvrirArtisanat(2) end end)
-	UI.Infobulle(p.items, "Ajouter des objets", "Ouvre la liste de tous les objets fabricables (Artisanat, onglet Items).")
-	p.carnets = UI.Liste(p)
-	p.carnets:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -56)
-	p.carnets:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", MARGE, MARGE)
-	p.carnets:SetWidth(LARGEUR_CARNETS + 8)
-
-	-- à droite : nom de la liste (clic : menu), Encyclopédie, Réduire
-	local x0 = MARGE + LARGEUR_CARNETS + 8 + 10
-	p.choix = CreateFrame("Button", nil, p)
-	p.choix:SetPoint("TOPLEFT", p, "TOPLEFT", x0, -MARGE)
-	p.choix:SetSize(260, 30)
-	p.titreCarnet = UI.Texte(p.choix, "GameFontNormalLarge", C.ors)
-	p.titreCarnet:SetPoint("LEFT", p.choix, "LEFT", 2, 0)
-	p.titreCarnet:SetPoint("RIGHT", p.choix, "RIGHT", -22, 0)
-	local fl = p.choix:CreateTexture(nil, "OVERLAY")
-	fl:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up")
-	fl:SetSize(16, 16)
-	fl:SetPoint("RIGHT", p.choix, "RIGHT", -2, 0)
-	UI.Survol(p.choix, 0.05)
-	if ns.SonsSurBoutons then ns.SonsSurBoutons(p.choix) end
-	p.choix:SetScript("OnClick", function(self) MenuChoixListe(self) end)
-	UI.Infobulle(p.choix, "Mes listes", "Clic : changer de liste, en créer une, ou supprimer celle-ci.")
-	p.reduire = UI.Bouton(p, "Réduire", "fantome", 80, 28)
-	p.reduire:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -MARGE - 1)
-	p.reduire:SetScript("OnClick", function()
-		local db = ns.DB and ns.DB() or {}
-		db.coursesCompact = true
-		local f = _G.GuildUpInterface
-		if f then f:Hide() end
-		if ns.MontrerMini then ns.MontrerMini() end
-	end)
-	UI.Infobulle(p.reduire, "Réduire", "Ne garder que les composants, sur l'écran, sans fenêtre.")
-	p.encyclo = UI.Bouton(p, "Encyclopédie", "fantome", 110, 28)
-	p.encyclo:SetPoint("RIGHT", p.reduire, "LEFT", -6, 0)
-	p.encyclo:SetScript("OnClick", function()
-		local fi = ns.FicheCadre and ns.FicheCadre()
-		if fi and fi:IsShown() then fi:Hide() else ns.OuvrirFiche(nil) end
-	end)
-	UI.Infobulle(p.encyclo, "Encyclopédie", "Ouvre ou ferme l'encyclopédie (fiche d'un objet : d'où il vient, qui le fabrique).")
-
-	-- avancement : résumé, barre, matériaux réunis
-	p.resume = UI.Texte(p, "GameFontHighlight", C.texte)
-	p.resume:SetPoint("LEFT", p, "TOPLEFT", x0, -66)
-	p.resume:SetWidth(180)
-	p.reunis = UI.Texte(p, "GameFontHighlightSmall", C.gris)
-	p.reunis:SetPoint("RIGHT", p, "TOPRIGHT", -MARGE, -66)
-	p.reunis:SetJustifyH("RIGHT")
-	p.barre = Barre(p, 8)
-	p.barre:SetPoint("LEFT", p, "TOPLEFT", x0 + 190, -66)
-	p.barre:SetPoint("RIGHT", p.reunis, "LEFT", -12, 0)
-
-	-- la liste de courses
-	p.liste = UI.Liste(p)
-	p.liste:SetPoint("TOPLEFT", p, "TOPLEFT", x0, -86)
-	p.liste:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE + 6, MARGE)
-
-	p.Maj = function()
-		-- la page est à l'écran : fin du mode réduit
-		if ns.MiniVisible and ns.MiniVisible() then
-			local db = ns.DB and ns.DB() or {}
-			db.coursesCompact = nil
-			if ns.CacherMini then ns.CacherMini() end
-		end
-		RendreCourses()
-		MajCarnets()
-	end
-	return p
-end
-if ns.AjouterPage then ns.AjouterPage("carnets", CreerPageCarnets) end
-
---------------------------------------------------------------------------------
--- Mini-liste (carnet réduit) : seulement les composants à réunir, en direct, sur fond transparent ;
--- glisser par le titre ; « + » rouvre la page Mes carnets
---------------------------------------------------------------------------------
-
-local mini
-local lignesMini = {}
-local LARGEUR_MINI = 250
-
-local function Contour(fs, police)
-	fs:SetFontObject(police or "GameFontHighlightSmall")
-	local fichier, taille = fs:GetFont()
-	if fichier then fs:SetFont(fichier, taille, "OUTLINE") end
-	fs:SetShadowOffset(1, -1)
-	fs:SetShadowColor(0, 0, 0, 1)
-end
-
-local function CreerMini()
-	mini = CreateFrame("Frame", "GuildUpCoursesMini", UIParent)
-	mini:SetSize(LARGEUR_MINI, 40)
-	mini:SetPoint("RIGHT", UIParent, "RIGHT", -260, 80)
-	mini:SetMovable(true)
-	mini:SetClampedToScreen(true)
-	mini:SetFrameStrata("MEDIUM")
-	mini:EnableMouse(false) -- les lignes laissent passer les clics vers le jeu
-	-- titre : poignée pour déplacer, nom de la liste et avancement
-	local tete = CreateFrame("Button", nil, mini)
-	tete:SetPoint("TOPLEFT", mini, "TOPLEFT", 0, 0)
-	tete:SetPoint("TOPRIGHT", mini, "TOPRIGHT", -48, 0)
-	tete:SetHeight(20)
-	tete:RegisterForDrag("LeftButton")
-	tete:SetScript("OnDragStart", function() mini:StartMoving() end)
-	tete:SetScript("OnDragStop", function() mini:StopMovingOrSizing() end)
-	tete:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:SetText("Carnet de craft (réduit)")
-		GameTooltip:AddLine("Glisser : déplacer · « + » : rouvrir Mes carnets", 1, 1, 1, true)
-		GameTooltip:Show()
-	end)
-	tete:SetScript("OnLeave", function() GameTooltip:Hide() end)
-	mini.titre = tete:CreateFontString(nil, "OVERLAY")
-	Contour(mini.titre, "GameFontNormal")
-	mini.titre:SetTextColor(unpack(C.ors))
-	mini.titre:SetPoint("LEFT", tete, "LEFT", 2, 0)
-	mini.titre:SetPoint("RIGHT", tete, "RIGHT", 0, 0)
-	mini.titre:SetJustifyH("LEFT")
-	mini.titre:SetWordWrap(false)
-	local ouvrir = UI.Bouton(mini, "+", "fantome", 20, 18)
-	ouvrir:SetPoint("TOPRIGHT", mini, "TOPRIGHT", -24, -1)
-	ouvrir:SetScript("OnClick", function() ns.OuvrirCourses() end)
-	UI.Infobulle(ouvrir, "Rouvrir Mes carnets")
-	local fermer = Croix(mini, 18)
-	fermer:SetPoint("LEFT", ouvrir, "RIGHT", 3, 0)
-	fermer:SetScript("OnClick", function()
-		local db = ns.DB and ns.DB() or {}
-		db.coursesCompact = nil
-		mini:Hide()
-	end)
-	UI.Infobulle(fermer, "Fermer la mini-liste")
-	mini:Hide()
-end
-
-local function MajMini()
-	if not mini or not mini:IsShown() then return end
-	local _, base = Calculer()
-	local _, nomCarnet = Carnet()
-	local liste = {}
-	for o, n in pairs(base) do
-		local nom = InfoObjet(o)
-		if not nom then Precharger(o) end
-		liste[#liste + 1] = { objet = o, besoin = n, jai = JAi(o), nom = nom or "" }
-	end
-	table.sort(liste, function(a, b)
-		local fa, fb = a.jai >= a.besoin, b.jai >= b.besoin
-		if fa ~= fb then return not fa end
-		return a.nom < b.nom
-	end)
-	local reunis = 0
-	for _, m in ipairs(liste) do if m.jai >= m.besoin then reunis = reunis + 1 end end
-	mini.titre:SetText(("%s  %s%d / %d|r"):format(nomCarnet or "Carnet",
-		(reunis == #liste and #liste > 0) and VERT or "|cffffffff", reunis, #liste))
-	local y = 22
-	for i, m in ipairs(liste) do
-		local l = lignesMini[i]
-		if not l then
-			l = CreateFrame("Frame", nil, mini)
-			l:SetSize(LARGEUR_MINI, 17)
-			l.icone = l:CreateTexture(nil, "ARTWORK")
-			l.icone:SetSize(15, 15)
-			l.icone:SetPoint("LEFT", l, "LEFT", 2, 0)
-			l.compte = l:CreateFontString(nil, "OVERLAY")
-			Contour(l.compte)
-			l.compte:SetPoint("RIGHT", l, "RIGHT", -2, 0)
-			l.texte = l:CreateFontString(nil, "OVERLAY")
-			Contour(l.texte)
-			l.texte:SetPoint("LEFT", l.icone, "RIGHT", 4, 0)
-			l.texte:SetPoint("RIGHT", l.compte, "LEFT", -6, 0)
-			l.texte:SetJustifyH("LEFT")
-			l.texte:SetWordWrap(false)
-			lignesMini[i] = l
-		end
-		l:ClearAllPoints()
-		l:SetPoint("TOPLEFT", mini, "TOPLEFT", 0, -y)
-		local _, _, qualite, icone = InfoObjet(m.objet)
-		l.icone:SetTexture(icone or ICONE_INCONNUE)
-		local fini = m.jai >= m.besoin
-		local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
-		l.texte:SetText((fini and "|cff888888" or (qc and qc.hex or "|cffffffff")) .. (m.nom ~= "" and m.nom or "…") .. "|r")
-		l.compte:SetText(("%s%d / %d|r"):format(fini and VERT or MANQUE, math.min(m.jai, m.besoin), m.besoin))
-		l.icone:SetDesaturated(fini)
-		l:SetAlpha(fini and 0.7 or 1)
-		l:Show()
-		y = y + 17
-	end
-	for i = #liste + 1, #lignesMini do lignesMini[i]:Hide() end
-	if #liste == 0 then
-		mini.titre:SetText((nomCarnet or "Carnet") .. "  " .. GRIS .. "(vide)|r")
-	end
-	mini:SetHeight(y + 2)
-end
-ns.MajMini = MajMini
-ns.MontrerMini = function()
-	if not mini then CreerMini() end
-	mini:Show()
-	MajMini()
-end
-ns.CacherMini = function() if mini then mini:Hide() end end
-ns.MiniVisible = function() return mini ~= nil and mini:IsShown() end
-
--- Page « Mes carnets » de la fenêtre GuildUpSMB (bulles, menu, /smb carnet…)
-ns.OuvrirCourses = function()
-	if ns.OuvrirInterface then ns.OuvrirInterface("carnets") end
-end
--- /smb carnet : ouvre la page, ou ferme la fenêtre si elle y est déjà (réduit : la rouvre)
-ns.BasculerCourses = function()
-	if CarnetsVisible() then
-		if ns.BasculerInterface then ns.BasculerInterface() end
-	else
-		ns.OuvrirCourses()
-	end
 end
 
 --------------------------------------------------------------------------------
@@ -1863,9 +1049,9 @@ CreerFiche = function()
 	f.ajouter = UI.Bouton(f, "Ajouter", "or", 76, 26)
 	f.ajouter:SetPoint("LEFT", f.besoin, "RIGHT", 6, 0)
 	f.ajouter:SetScript("OnClick", function(self)
-		if ns.MontrerMenuListes and f.objet then ns.MontrerMenuListes(self, f.objet) end
+		if ns.MontrerMenuProjets and f.objet then ns.MontrerMenuProjets(self, f.objet) end
 	end)
-	UI.Infobulle(f.ajouter, "Ajouter à une liste de courses", "Choisis une de tes listes ou un de tes projets de guilde, ou crée-en un nouveau.")
+	UI.Infobulle(f.ajouter, "Ajouter à un projet", "Choisis un de tes projets de guilde, ou crée-en un nouveau.")
 	f.lien = UI.Bouton(f, "Lien", "fantome", 50, 26)
 	f.lien:SetPoint("LEFT", f.ajouter, "RIGHT", 6, 0)
 	f.lien:SetScript("OnClick", function()
@@ -2061,20 +1247,12 @@ local function SousCategories(i)
 end
 
 
--- menu « Ajouter à une liste » : mes listes + nouvelle liste, mes projets de guilde + nouveau projet
-local menuListes
-local MontrerMenuListes
-MontrerMenuListes = function(bouton, objet)
-	menuListes = menuListes or Menu("GuildUpMenuListes")
-	local m = menuListes
-	local c = Carnets()
-	local choix = { { titre = "Mes carnets" } }
-	local nomsC = {}
-	for nom in pairs(c) do nomsC[#nomsC + 1] = nom end
-	table.sort(nomsC)
-	for _, nom in ipairs(nomsC) do choix[#choix + 1] = { liste = nom } end
-	choix[#choix + 1] = { nouvelleListe = true }
-	choix[#choix + 1] = { titre = "Projets de guilde" }
+-- menu « Ajouter à un projet » : mes projets de guilde + nouveau projet
+local menuProjets
+local function MontrerMenuProjets(bouton, objet)
+	menuProjets = menuProjets or Menu("GuildUpMenuProjets")
+	local m = menuProjets
+	local choix = { { titre = "Projets de guilde" } }
 	local moi = ns.Normaliser and ns.Normaliser(UnitName("player")) or UnitName("player")
 	for _, p in ipairs(ns.ListeProjets and ns.ListeProjets() or {}) do
 		if p.auteur == moi then choix[#choix + 1] = { projet = p } end
@@ -2093,20 +1271,6 @@ MontrerMenuListes = function(bouton, objet)
 			b.texte:SetText(ch.titre)
 			b:SetScript("OnClick", nil)
 			b:Disable()
-		elseif ch.liste then
-			local nom = ch.liste
-			b.texte:SetText(nom)
-			b:SetScript("OnClick", function()
-				m:Hide()
-				AjouterObjet(objet, 1, nom)
-				if ns.Notifier then ns.Notifier(nil, "Liste de courses", nomObjet .. " ajouté à « " .. nom .. " »", "aucun", function() ns.OuvrirCourses() end) end
-			end)
-		elseif ch.nouvelleListe then
-			b.texte:SetText(VERT .. "+ Nouvelle liste…|r")
-			b:SetScript("OnClick", function()
-				m:Hide()
-				ns.NouveauCarnet(objet)
-			end)
 		elseif ch.projet then
 			local p = ch.projet
 			b.texte:SetText(p.nom)
@@ -2131,7 +1295,7 @@ MontrerMenuListes = function(bouton, objet)
 	m:SetPoint("TOPLEFT", bouton, "BOTTOMLEFT", 0, -2)
 	m:Show()
 end
-ns.MontrerMenuListes = MontrerMenuListes
+ns.MontrerMenuProjets = MontrerMenuProjets -- (bouton « Ajouter » de l'encyclopédie, plus haut)
 
 -- Rangée d'un objet : icône, nom (qualité), niveau et fabrication, « Besoin », « Ajouter »
 local HAUTEUR_ITEM, ECART_ITEM = 52, 6
@@ -2323,44 +1487,6 @@ RendreItems = function()
 	if page.MajDetail then page.MajDetail() end
 end
 
--- (données changées : listes, objets reçus) l'onglet Items, s'il est à l'écran
-MajCarnet = function()
-	if ArtisanatVisible(2) then RendreItems() end
-end
-
--- Nouvelle liste de courses : demande son nom (fenêtre de saisie du kit) ; objet = à y ajouter tout de suite
-ns.NouveauCarnet = function(objet)
-	UI.DemanderTexte({
-		titre = "Nouvelle liste", texte = "Nom de la nouvelle liste :", maxLettres = 30, bouton = "Créer",
-		valider = function(nom)
-			nom = nom:gsub("[|~]", "")
-			if nom == "" then return end
-			local c, db = Carnets()
-			c[nom] = c[nom] or { entrees = {}, obtenir = {} }
-			db.carnetChoisi = nom
-			if objet then AjouterObjet(objet, 1, nom) end
-			MajCarnet()
-			MajCourses()
-		end,
-	})
-end
-StaticPopupDialogs["GUILDUP_SUPPRIMER_CARNET"] = {
-	text = "Supprimer la liste « %s » ?",
-	button1 = "Supprimer",
-	button2 = "Annuler",
-	timeout = 0,
-	whileDead = true,
-	hideOnEscape = true,
-	OnAccept = function(self)
-		local c, db = Carnets()
-		c[self.data] = nil
-		db.carnetChoisi = nil
-		Carnets()
-		MajCarnet()
-		MajCourses()
-	end,
-}
-
 local LARGEUR_CATS = 160
 local function CreerPageItems(parent)
 	local p = CreateFrame("Frame", nil, parent)
@@ -2463,14 +1589,10 @@ local function CreerPageItems(parent)
 		p.cats:Hauteur(y)
 	end
 
-	-- droite : recherche, tri, mes listes, compte, liste des objets
+	-- droite : recherche, tri, compte, liste des objets
 	local x0 = MARGE + LARGEUR_CATS + 8 + 10
-	p.listes = UI.Bouton(p, "Mes listes", "fantome", 100, 30)
-	p.listes:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -56)
-	p.listes:SetScript("OnClick", function() ns.OuvrirCourses() end)
-	UI.Infobulle(p.listes, "Mes listes", "Ouvre la page Mes carnets (listes de courses).")
 	p.tri = UI.Bouton(p, TRIS[triItems], "fantome", 110, 30)
-	p.tri:SetPoint("RIGHT", p.listes, "LEFT", -6, 0)
+	p.tri:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -56)
 	p.tri:SetScript("OnClick", function(self)
 		triItems = triItems % #TRIS + 1
 		self:Ecrire(TRIS[triItems])
@@ -2578,8 +1700,8 @@ local function CreerPageItems(parent)
 	local largeurBouton = (LARGEUR_DETAIL - 24 - 6) / 2
 	d.ajouter = UI.Bouton(d, "Ajouter", "or", largeurBouton, 26)
 	d.ajouter:SetPoint("TOPLEFT", d, "TOPLEFT", 12, -94)
-	d.ajouter:SetScript("OnClick", function(self) if objetChoisi then MontrerMenuListes(self, objetChoisi) end end)
-	UI.Infobulle(d.ajouter, "Ajouter à une liste", "Choisis une de tes listes ou un de tes projets de guilde, ou crée-en un nouveau.")
+	d.ajouter:SetScript("OnClick", function(self) if objetChoisi then MontrerMenuProjets(self, objetChoisi) end end)
+	UI.Infobulle(d.ajouter, "Ajouter à un projet", "Choisis un de tes projets de guilde, ou crée-en un nouveau.")
 	d.besoin = UI.Bouton(d, "Besoin", "fantome", largeurBouton, 26)
 	d.besoin:SetPoint("LEFT", d.ajouter, "RIGHT", 6, 0)
 	d.besoin:SetScript("OnClick", function()
@@ -2785,7 +1907,7 @@ end
 ns.OutilsCarnet = { RecettesDe = RecettesDe, InfoObjet = InfoObjet, NomMetier = NomMetier, JAi = JAi,
 	TexteRecette = TexteRecette,
 	Developper = Developper, NouveauContexte = NouveauContexte,
-	Precharger = Precharger, Sources = Sources, Carnets = Carnets,
+	Precharger = Precharger, Sources = Sources,
 	Barre = Barre, Croix = Croix, Menu = Menu, LigneMenu = LigneMenu }
 
 ns.DiagCarnet2 = function(L)
@@ -2797,16 +1919,11 @@ ns.DiagCarnet2 = function(L)
 end
 
 --------------------------------------------------------------------------------
--- Évènements : la liste de courses (page, mini-liste), l'onglet Items et l'encyclopédie suivent les
--- sacs, la banque et les objets reçus du serveur en direct
+-- Évènements : l'onglet Items et l'encyclopédie suivent les sacs, la banque et les objets reçus du
+-- serveur en direct
 --------------------------------------------------------------------------------
 
 local ev = CreateFrame("Frame")
--- le carnet était réduit avant le /reload : la mini-liste revient
-C_Timer.After(3, function()
-	local db = ns.DB and ns.DB() or {}
-	if db.coursesCompact and ns.MontrerMini then ns.MontrerMini() end
-end)
 for _, nom in ipairs({ "BAG_UPDATE_DELAYED", "GET_ITEM_INFO_RECEIVED", "GUILD_ROSTER_UPDATE",
 	"BANKFRAME_OPENED", "BANKFRAME_CLOSED", "PLAYERBANKSLOTS_CHANGED", "PLAYERBANKBAGSLOTS_CHANGED" }) do
 	pcall(ev.RegisterEvent, ev, nom)
@@ -2824,13 +1941,11 @@ ev:SetScript("OnEvent", function(_, event)
 		pcall(NoterBanque)
 	end
 	if prevu then return end
-	if not (CarnetsVisible() or ArtisanatVisible(2) or (fiche and fiche:IsShown())
-		or (ns.MiniVisible and ns.MiniVisible())) then return end
+	if not (ArtisanatVisible(2) or (fiche and fiche:IsShown())) then return end
 	prevu = true
 	C_Timer.After(0.4, function()
 		prevu = false
-		if ns.MajMini then ns.MajMini() end
-		if (CarnetsVisible() or ArtisanatVisible(2)) and ns.MajInterface then ns.MajInterface() end
+		if ArtisanatVisible(2) and ns.MajInterface then ns.MajInterface() end
 		MajFiche()
 	end)
 end)

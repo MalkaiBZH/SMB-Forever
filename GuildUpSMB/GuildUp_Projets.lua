@@ -96,7 +96,7 @@ local function Taches(p)
 	local fab, base, ordreF = {}, {}, {}
 	local objectifs = {}
 	for _, e in ipairs(p.entrees) do objectifs[e.objet] = (objectifs[e.objet] or 0) + e.qte end
-	-- même calcul que la liste de courses (GuildUp_Carnet.lua) : boucles de transmutation non
+	-- calcul de GuildUp_Carnet.lua (ns.OutilsCarnet) : boucles de transmutation non
 	-- développées, surplus des fabrications partagé ; le stock part de zéro (projet de guilde)
 	if not (O.Developper and O.NouveauContexte) then return {}, {} end
 	local ctx = O.NouveauContexte(false)
@@ -755,47 +755,8 @@ MajPage = function()
 	page.liste:Hauteur(yy)
 end
 
--- menu « Nouveau projet » : vide, ou copie d'une de mes listes
-local menuNouveau
-local function MenuNouveau(ancre)
-	local O = Outils()
-	menuNouveau = menuNouveau or (O.Menu and O.Menu("GuildUpMenuNouveauProjet")) or ns.CadreMenu("GuildUpMenuNouveauProjet")
-	local m = menuNouveau
-	local choix = { { VERT .. "Projet vide…|r", nil } }
-	local carnets = O.Carnets and O.Carnets() or {}
-	local noms = {}
-	for nom in pairs(carnets) do noms[#noms + 1] = nom end
-	table.sort(noms)
-	for _, nom in ipairs(noms) do choix[#choix + 1] = { "À partir de « " .. nom .. " »", nom } end
-	for i, c in ipairs(choix) do
-		local b = O.LigneMenu and O.LigneMenu(m, i) or ns.BoutonMenu(m, i)
-		b:ClearAllPoints()
-		b:SetPoint("TOPLEFT", m, "TOPLEFT", 4, -4 - (i - 1) * 20)
-		b:SetPoint("RIGHT", m, "RIGHT", -4, 0)
-		b.texte:SetText(c[1])
-		b:SetScript("OnClick", function()
-			m:Hide()
-			local entrees = {}
-			if c[2] then
-				for _, e in ipairs(carnets[c[2]].entrees or {}) do
-					if e.objet then entrees[#entrees + 1] = { objet = e.objet, qte = e.qte } end
-				end
-			end
-			ns.NouveauProjet({ entrees = entrees, nom = c[2] })
-		end)
-		b:Show()
-	end
-	for i = #choix + 1, #m.boutons do m.boutons[i]:Hide() end
-	m:SetSize(240, 8 + #choix * 20)
-	m.ancre = ancre
-	m:ClearAllPoints()
-	m:SetPoint("TOPRIGHT", ancre, "BOTTOMRIGHT", 0, -2)
-	m:Show()
-end
-ns.MenuNouveauProjet = MenuNouveau
-
 -- Nouveau projet de guilde : demande son nom (fenêtre de saisie du kit)
---   data = { nom (proposé), entrees (d'une liste de courses), objet (à y ajouter) }
+--   data = { nom (proposé), entrees ({ { objet, qte }, … } à y mettre), objet (à y ajouter) }
 ns.NouveauProjet = function(data)
 	data = data or {}
 	ns.UI.DemanderTexte({
@@ -826,8 +787,8 @@ ns.CreerPageProjets = function(parent)
 	-- à droite des onglets : « + Nouveau projet »
 	p.nouveau = UI.Bouton(p, "+ Nouveau projet", "or", 150, 28)
 	p.nouveau:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -12)
-	p.nouveau:SetScript("OnClick", function(self) MenuNouveau(self) end)
-	UI.Infobulle(p.nouveau, "Nouveau projet de guilde", "Une liste partagée avec toute la guilde : chacun prend une tâche qu'il sait faire. Projet vide, ou à partir d'une de tes listes.")
+	p.nouveau:SetScript("OnClick", function() ns.NouveauProjet() end)
+	UI.Infobulle(p.nouveau, "Nouveau projet de guilde", "Une liste partagée avec toute la guilde : chacun prend une tâche qu'il sait faire.")
 
 	-- colonne de gauche : les projets
 	p.projets = UI.Liste(p)

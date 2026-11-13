@@ -117,10 +117,6 @@ local function MontrerMenu()
 	end
 	lignes[#lignes + 1] = { (db.partagePosition and "|TInterface\\Buttons\\UI-CheckBox-Check:16:16|t " or "|TInterface\\Buttons\\UI-CheckBox-Up:16:16|t ") .. "Partager ma position",
 		ns.BasculerPartagePosition }
-	local dispo = ns.EstDispo and ns.EstDispo()
-	lignes[#lignes + 1] = { (dispo and "|TInterface\\Buttons\\UI-CheckBox-Check:16:16|t " or "|TInterface\\Buttons\\UI-CheckBox-Up:16:16|t ") .. "Dispo pour grouper",
-		function() if ns.BasculerDispo then ns.BasculerDispo() end end }
-	lignes[#lignes + 1] = { "Jouer ensemble", function() if ns.OuvrirEnsemble then ns.OuvrirEnsemble() end end }
 	lignes[#lignes + 1] = { "Groupes", function() if ns.OuvrirInterface then ns.OuvrirInterface("groupes") elseif ns.BasculerGroupes then ns.BasculerGroupes() end end }
 	lignes[#lignes + 1] = { "|cffff9f80À l'aide !|r", function() if ns.DemanderAide then ns.DemanderAide() end end }
 	lignes[#lignes + 1] = { "Options", function() if ns.OuvrirInterface then ns.OuvrirInterface("options") elseif ns.BasculerOptions then ns.BasculerOptions() end end }
