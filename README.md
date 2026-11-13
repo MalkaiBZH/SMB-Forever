@@ -155,7 +155,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   un pseudo (le prénom est la première partie de son nom en jeu) ; sinon sous son nom en jeu.
 - **Vérification de version** : prévient quand un membre a une version plus récente.
 - **Spécial guilde** (réglé dans `GuildUpSMB/GuildUp_Config.lua`) : le cri de guilde « 33 », qui fait apparaître à
-  l'écran de toute la guilde deux chopes qui trinquent, et, en option, une fête quand un membre « vedette »
+  l'écran de toute la guilde une chope en bois animée, et, en option, une fête quand un membre « vedette »
   monte de niveau.
 
 ## Commandes
@@ -212,7 +212,8 @@ nouvelles depuis 30 jours sont oubliées.
 - Provenance des composants (`GuildUp_Sources.lua`) et objectifs des quêtes (`GuildUp_ObjectifsQuetes.lua`,
   `python outils/generer_objectifs.py`) tirés de **QuestieDB** (version Forever, GPL-3.0) :
   merci à ses auteurs. GuildUpSMB n'a pas besoin de Questie pour fonctionner.
-- Images (`GuildUpSMB/media/`) : bannières et anneau de Miko ; chopes du cri de guilde (`gu_emote.tga`,
-  `emote_animee.tga`) dessinées pour cette version.
+- Images (`GuildUpSMB/media/`) : anneau de Miko ; chope en bois du cri de guilde (`gu_emote.tga`,
+  `emote_animee.tga`), disque de la carte (`point.tga`) et bannières au nain (`M_DC_Banner_*.tga`, qui ne sont
+  plus affichées) propres à cette version.
 - Portraits (`GuildUp/media/portraits/`) : 56 médaillons Alliance (race, classe, homme et femme), nommés
   `race-classe-sexe.tga`, générés par IA (Nano Banana Pro) pour la guilde. TGA 32 bits 256×256, fond transparent.
