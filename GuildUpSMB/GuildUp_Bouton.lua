@@ -103,7 +103,7 @@ local function Infobulle(self)
 	GameTooltip:Show()
 end
 
--- Menu rapide (clic droit) : rôle, position, groupes, appel à l'aide, options
+-- Menu rapide (clic droit) : rôle, position, groupes, sondage, appel à l'aide, options
 local menu
 local function MontrerMenu()
 	menu = menu or ns.CadreMenu("GuildUpMenuRapide")
@@ -118,6 +118,7 @@ local function MontrerMenu()
 	lignes[#lignes + 1] = { (db.partagePosition and "|TInterface\\Buttons\\UI-CheckBox-Check:16:16|t " or "|TInterface\\Buttons\\UI-CheckBox-Up:16:16|t ") .. "Partager ma position",
 		ns.BasculerPartagePosition }
 	lignes[#lignes + 1] = { "Groupes", function() if ns.OuvrirInterface then ns.OuvrirInterface("groupes") elseif ns.BasculerGroupes then ns.BasculerGroupes() end end }
+	lignes[#lignes + 1] = { "Sondage", function() if ns.Sondage then ns.Sondage() end end }
 	lignes[#lignes + 1] = { "|cffff9f80À l'aide !|r", function() if ns.DemanderAide then ns.DemanderAide() end end }
 	lignes[#lignes + 1] = { "Options", function() if ns.OuvrirInterface then ns.OuvrirInterface("options") elseif ns.BasculerOptions then ns.BasculerOptions() end end }
 	for i, l in ipairs(lignes) do
