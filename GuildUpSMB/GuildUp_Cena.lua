@@ -4,19 +4,20 @@
 -- BOUM : éclair, boule de feu, ondes de choc, gerbe d'étincelles, et le nom du membre qui s'écrase à
 -- l'écran en tremblant, suivi de son niveau. Le tout s'efface au bout d'une dizaine de secondes.
 -- Aucun message réseau : s'appuie sur l'annonce de niveau déjà envoyée par GuildUp_Annonces.lua.
--- Musique : le fichier que le joueur a posé lui-même, Interface\AddOns\GuildUpSMB_Sons\levelup.mp3 (ou
--- .ogg), hors du dossier de l'addon pour que le programme de mise à jour ne l'efface pas (le jeu ne voit
--- un nouveau fichier qu'après avoir été relancé) ; sans fichier, la corne de guerre naine du jeu au boum.
+-- Musique : media\levelup.mp3 de l'addon (sample de 5 s). Un joueur peut la remplacer par la sienne dans
+-- Interface\AddOns\GuildUpSMB_Sons\levelup.mp3 (ou .ogg), hors du dossier de l'addon pour que le programme
+-- de mise à jour ne l'efface pas. Le jeu ne voit un nouveau fichier qu'après avoir été relancé : en attendant,
+-- la corne de guerre naine du jeu au boum.
 -- La musique est coupée en fondu après MUSIQUE secondes.
 -- Case « Surprise » des notifications (db.notifs.cena == false : coupée). /smb cena [niveau] : essai.
--- Mise à jour secrète (3.14.1) : ni la case, ni l'aide de /smb, ni les notes de version ne disent ce que c'est.
+-- Surprise : ni la case, ni l'aide de /smb, ni les notes de version, ni le README ne disent ce que c'est.
 -- Plusieurs montées de niveau en même temps : à la suite (3 en attente au plus).
 
 local NOM_ADDON, ns = ...
 
 local MEDIA = ns.MEDIA or ("Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\")
 local DOSSIER_SONS = "Interface\\AddOns\\GuildUpSMB_Sons\\"
-local SONS_JOUEUR = { DOSSIER_SONS .. "levelup.mp3", DOSSIER_SONS .. "levelup.ogg" }
+local SONS_JOUEUR = { DOSSIER_SONS .. "levelup.mp3", DOSSIER_SONS .. "levelup.ogg", MEDIA .. "levelup.mp3" }
 local CORNES = { 566064, 567386 } -- sound/doodad/dwarfhorn.ogg, sound/events/scourge_horn.ogg
 local POLICE = "Fonts\\FRIZQT__.TTF"
 
@@ -45,7 +46,7 @@ end
 -- Son
 --------------------------------------------------------------------------------
 
--- musique du joueur ; son chemin si elle joue, sinon nil
+-- musique (celle du joueur, sinon celle de l'addon) ; son chemin si elle joue, sinon nil
 local function Musique()
 	if sonEnCours and StopSound then pcall(StopSound, sonEnCours, 500) end -- (la précédente, en fondu court)
 	sonEnCours = nil
@@ -326,6 +327,6 @@ ns.EssaiExplosion = function(niveau)
 		return
 	end
 	Message(cadre.musique and ("explosion : musique = %s"):format(cadre.musique)
-		or ("explosion : pas de fichier de musique trouvé (%slevelup.mp3 ou .ogg ; relance le jeu après l'avoir ajouté), corne de guerre à la place."):format(DOSSIER_SONS))
+		or "explosion : musique introuvable (relance le jeu après une mise à jour qui ajoute des fichiers), corne de guerre à la place.")
 	if Coupee() then Message("(la case « Surprise » des notifications est décochée : les vraies montées de niveau n'ont pas d'explosion.)") end
 end

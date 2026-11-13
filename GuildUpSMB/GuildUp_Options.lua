@@ -377,7 +377,7 @@ local NOTIFS = {
 	{ "groupes", "Groupes" }, { "candidatures", "Candidatures" }, { "niveaux", "Niveaux" }, { "metiers", "Métiers" },
 	{ "evenements", "Événements" }, { "quetes", "Quêtes" }, { "commandes", "Commandes" }, { "plans", "Échanges" },
 	{ "version", "Version" }, { "aide", "Aide" }, { "tirages", "Tirages" }, { "sondages", "Sondages" },
-	{ "cena", "Surprise" }, -- (explosion des montées de niveau, GuildUp_Cena.lua : mise à jour secrète)
+	{ "cena", "Surprise" }, -- (explosion des montées de niveau, GuildUp_Cena.lua : surprise)
 	{ "gu", (ns.Config and ns.Config.cri) and (tostring(ns.Config.cri):upper() .. "!") or "Cri" },
 }
 local MES_ROLES = { "auto", "tank", "heal", "dps" }                  -- puces « Mon rôle »
