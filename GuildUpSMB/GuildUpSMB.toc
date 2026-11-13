@@ -39,6 +39,7 @@ GuildUp_Besoins.lua
 GuildUp_Echanges.lua
 GuildUp_Aide.lua
 GuildUp_Tirage.lua
+GuildUp_Journal.lua
 GuildUp_Craft.lua
 GuildUp_Sources.lua
 GuildUp_Carnet.lua
