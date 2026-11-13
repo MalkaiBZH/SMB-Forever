@@ -10,7 +10,8 @@
 --   - hors du champ de vision : bord de gauche ou de droite, de plus en plus bas à mesure qu'il passe
 --     derrière moi, puis bord du bas, au centre quand il est juste derrière ; avec une flèche.
 -- Seuls les membres dont le portrait est connu sont affichés (addon à jour, race avec portrait).
--- Clic : chuchoter. Réglage db.reperes (/smb reperes, case dans les options).
+-- Clic : chuchoter. Réglage db.reperes (/smb reperes, case dans les options) ; hauteur des repères du
+-- haut et du bas : curseurs de la page Options, sinon valeurs de GuildUp_Config.lua.
 -- Aucun message réseau propre : tout vient des positions de GuildUp_Carte.lua (une toutes les 6 s
 -- au plus pour un membre qui bouge), d'où des petits sauts quand un membre proche se déplace.
 
@@ -21,6 +22,8 @@ local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
 local CouleurClasse = ns.CouleurClasse
 
 local CHAMP = math.rad((ns.Config and tonumber(ns.Config.champVisionReperes)) or 90) -- largeur de l'écran (angle)
+-- Position proposée par la guilde ; chaque membre peut la changer (page Options : GuildUpDB.hautReperes
+-- et GuildUpDB.basReperes, lus à chaque mise à jour)
 local HAUT = (ns.Config and tonumber(ns.Config.hautReperes)) or 34 -- centre des repères du haut, sous le haut de l'écran
 local BAS = (ns.Config and tonumber(ns.Config.basReperes)) or 150 -- centre des repères du bas (au-dessus des barres d'action)
 local TAILLE = 40        -- diamètre du portrait (pixels)
@@ -182,8 +185,8 @@ local function Maj()
 
 	local demi = cadre:GetWidth() / 2
 	local demiL = math.max(0, demi - MARGE)
-	local yHaut = cadre:GetHeight() / 2 - HAUT -- centre des portraits du haut, depuis le centre de l'écran
-	local yBas = -cadre:GetHeight() / 2 + BAS
+	local yHaut = cadre:GetHeight() / 2 - (tonumber(db.hautReperes) or HAUT) -- centre des portraits du haut, depuis le centre de l'écran
+	local yBas = -cadre:GetHeight() / 2 + (tonumber(db.basReperes) or BAS)
 	local tanDemi = math.tan(CHAMP / 2)
 	for i, v in ipairs(visibles) do
 		local r = reperes[i]

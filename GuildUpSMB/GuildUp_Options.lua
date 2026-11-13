@@ -1,6 +1,8 @@
 -- GuildUpSMB : page « Options » de la fenêtre GuildUpSMB, diagnostic (/smb diag), réinitialisation et
 -- commandes /smb.
--- Page Options (ns.AjouterPage("options"), kit ns.UI de GuildUp_Style.lua) : cartes « Affichage »
+-- Page Options (ns.AjouterPage("options"), kit ns.UI de GuildUp_Style.lua) : cartes « Carte et repères »
+-- (taille des membres sur la carte du monde, hauteur des repères du haut et du bas : réglages personnels
+-- GuildUpDB.taillePointCarte / hautReperes / basReperes, à défaut ceux de GuildUp_Config.lua), « Affichage »
 -- (bannières, portraits, repères, médaillon, taille de la fenêtre), « Moi » (pseudo, persos, partage de
 -- position, mon rôle), « Notifications » (une case par type de bulle), « Debug » (seulement avec
 -- /smb debug) et bouton « Réinitialiser les réglages ».
@@ -25,6 +27,7 @@ local ToutRafraichir, SurActivation, MajBarre, Bordures, DeplacerAuras, PlacerIn
 local REGLAGES_HORS_DEFAUT = {
 	"notifs", "bouton", "barre", "interface", "annoncesGuilde", "emoteGU", "voletNotifs", "coursesCompact",
 	"afficherDebug", "tousNiveaux", "itemsClasse", "itemsNiveau", "itemsGuilde", "itemsNivMin", "itemsNivMax", "styleJeu", "rappelGroupe", "portee", "rolesPerso",
+	"taillePointCarte", "hautReperes", "basReperes", -- (sans valeur ici : celles de GuildUp_Config.lua)
 }
 
 -- Bouton « Réinitialiser » et /smb reset : seulement les réglages
@@ -362,7 +365,7 @@ end
 local UI = ns.UI
 local C = UI.C
 local MARGE, ECART = 16, 12
-local HAUT_CARTE, HAUT_NOTIFS = 186, 126
+local HAUT_CARTE, HAUT_NOTIFS, HAUT_ECRAN = 186, 126, 58
 
 -- types de bulles du médaillon (db.notifs[cat] == false : coupées), quatre par ligne
 local NOTIFS = {
@@ -487,9 +490,42 @@ local function CreerPage(parent)
 			end)
 	end
 
+	-- Carte et repères : réglages personnels (GuildUpDB), à défaut ceux de GuildUp_Config.lua. Trois
+	-- curseurs sur une ligne : { réglage, libellé, min, max, pas, valeur de la guilde, infobulle }
+	local ecran = UI.Carte(p, "Carte et repères")
+	ecran:SetPoint("TOPLEFT", notifs, "BOTTOMLEFT", 0, -ECART)
+	ecran:SetSize(largeur, HAUT_ECRAN)
+	ecran.compte:SetText("en pixels")
+	local CFG = ns.Config or {}
+	local REGLAGES_ECRAN = {
+		{ "taillePointCarte", "Membres sur la carte", 8, 40, 1, tonumber(CFG.taillePointCarte) or 16,
+			"Taille du point des membres sur la carte du monde (leur portrait est un peu plus grand). Visible à la prochaine ouverture de la carte." },
+		{ "hautReperes", "Repères du haut", 10, 200, 2, tonumber(CFG.hautReperes) or 34,
+			"Distance entre le haut de l'écran et les repères des membres qui sont devant toi." },
+		{ "basReperes", "Repères du bas", 60, 400, 5, tonumber(CFG.basReperes) or 150,
+			"Distance entre le bas de l'écran et les repères des membres qui sont derrière toi (au-dessus de tes barres d'action)." },
+	}
+	local curseursEcran = {}
+	local colonneEcran = (largeur - 28) / #REGLAGES_ECRAN
+	for i, reg in ipairs(REGLAGES_ECRAN) do
+		local cle, libelle, min, max, pas, guilde, aide = reg[1], reg[2], reg[3], reg[4], reg[5], reg[6], reg[7]
+		local x = 14 + (i - 1) * colonneEcran
+		local t = UI.Texte(ecran, "GameFontHighlight", C.texte)
+		t:SetPoint("TOPLEFT", ecran, "TOPLEFT", x, -34)
+		t:SetText(libelle)
+		local curseur = UI.Curseur(ecran, colonneEcran - 142 - 44, min, max, pas, function(v)
+			db[cle] = v
+			if ns.MajReperes then ns.MajReperes() end
+		end)
+		curseur.Format = function(v) return ("%d"):format(v) end
+		curseur:SetPoint("LEFT", t, "LEFT", 142, 0)
+		UI.Infobulle(curseur, libelle, aide .. ("\nRéglage de la guilde : %d."):format(guilde))
+		curseursEcran[#curseursEcran + 1] = { curseur, function() return tonumber(db[cle]) or guilde end }
+	end
+
 	-- Debug : seulement avec /smb debug (pour tester l'addon)
 	local carteDebug = UI.Carte(p, "Debug")
-	carteDebug:SetPoint("TOPLEFT", notifs, "BOTTOMLEFT", 0, -ECART)
+	carteDebug:SetPoint("TOPLEFT", ecran, "BOTTOMLEFT", 0, -ECART)
 	carteDebug:SetSize(largeur, HAUT_NOTIFS)
 	carteDebug.compte:SetText("/smb debug pour cacher")
 	Case(carteDebug, 14, -40, "Debug (tous les joueurs = guilde)",
@@ -536,6 +572,7 @@ local function CreerPage(parent)
 		if not ns.DB() then return end
 		for _, c in ipairs(cases) do c[1]:Poser(c[2]()) end
 		taille:Poser(ns.EchelleInterface and ns.EchelleInterface() or 1.1)
+		for _, ce in ipairs(curseursEcran) do ce[1]:Poser(ce[2]()) end
 		if not pseudo.saisie:HasFocus() then pseudo:Ecrire(db.pseudo or "") end
 		local manuel = RoleManuel() or "auto"
 		for i, cle in ipairs(MES_ROLES) do if cle == manuel then roles:Choisir(i) end end
@@ -548,7 +585,7 @@ local function CreerPage(parent)
 		for _, cle in ipairs(ROLES_DEBUG) do if db.role == cle then role = cle end end
 		for i, cle in ipairs(ROLES_DEBUG) do if cle == role then rolesDebug:Choisir(i) end end
 		reset:ClearAllPoints()
-		reset:SetPoint("TOPRIGHT", avecDebug and carteDebug or notifs, "BOTTOMRIGHT", 0, -ECART)
+		reset:SetPoint("TOPRIGHT", avecDebug and carteDebug or ecran, "BOTTOMRIGHT", 0, -ECART)
 	end
 	page = p
 	return p

@@ -11,9 +11,11 @@
 -- (message « jetable » : un seul en attente dans la file d'envoi).
 -- Sur la carte : le médaillon de chaque membre (son portrait rond, media\portraits) dans un fin anneau à la
 -- couleur de sa classe, cerclé de noir ; s'il n'a pas de portrait connu, un point à la couleur de sa
--- classe, cerclé de blanc et de noir (image media\point.tga de l'addon). Taille du point réglée dans
--- GuildUp_Config.lua (taillePointCarte), médaillon 1,6 fois plus grand (taillePortraitCarte pour le
--- régler à part, portraitsCarte = false pour garder les points). Nom, rôle et âge de la position au
+-- classe, cerclé de blanc et de noir (image media\point.tga de l'addon). Taille du point : réglage
+-- personnel GuildUpDB.taillePointCarte (page Options, curseur « Membres sur la carte »), sinon celle de
+-- GuildUp_Config.lua (taillePointCarte) ; médaillon 1,6 fois plus grand (taillePortraitCarte dans
+-- GuildUp_Config.lua pour une autre proportion, portraitsCarte = false pour garder les points). Les
+-- repères déjà créés sont redimensionnés au prochain dessin de la carte. Nom, rôle et âge de la position au
 -- survol. Les membres superposés : la position la plus récente au-dessus. Les positions sont converties
 -- pour s'afficher aussi sur la carte du continent.
 
@@ -23,9 +25,11 @@ local PREFIXE = "GuildUpPos"
 local INTERVALLE = 6     -- secondes entre deux vérifications de ma position
 local BATTEMENT = 20     -- envoi même sans bouger, pour dire « je suis toujours là »
 local DUREE_VIE = 45     -- secondes sans nouvelles avant d'effacer un membre (plus de deux battements)
-local TAILLE_POINT = (ns.Config and tonumber(ns.Config.taillePointCarte)) or 16 -- diamètre du point (pixels)
+-- diamètre du point (pixels) proposé par la guilde ; chaque membre peut le changer (page Options)
+local TAILLE_POINT_GUILDE = (ns.Config and tonumber(ns.Config.taillePointCarte)) or 16
 -- médaillon (portrait) : un peu plus grand que le point, pour qu'on reconnaisse le visage
-local TAILLE_PORTRAIT = (ns.Config and tonumber(ns.Config.taillePortraitCarte)) or math.floor(TAILLE_POINT * 1.6 + 0.5)
+local RAPPORT_PORTRAIT = (ns.Config and tonumber(ns.Config.taillePortraitCarte)
+	and tonumber(ns.Config.taillePortraitCarte) / TAILLE_POINT_GUILDE) or 1.6
 local PORTRAITS = not (ns.Config and ns.Config.portraitsCarte == false)
 -- Dans l'image d'un portrait (256 × 256), le disque occupe environ 86 % de la largeur, un peu sous le
 -- centre (la tête et les accessoires débordent en haut) : l'anneau de classe suit ce disque
@@ -51,6 +55,15 @@ local MajCarte
 local aRedessiner = true -- une position a changé depuis le dernier dessin de la carte
 
 local function DB() return ns.DB and ns.DB() end
+
+-- diamètre du point : mon réglage (GuildUpDB.taillePointCarte), sinon celui de la guilde ; de 8 à 40 pixels
+local function TaillePoint()
+	local db = DB()
+	local t = (db and tonumber(db.taillePointCarte)) or TAILLE_POINT_GUILDE
+	return math.max(8, math.min(40, t))
+end
+local function TaillePortrait() return math.floor(TaillePoint() * RAPPORT_PORTRAIT + 0.5) end
+ns.TaillePointCarte = TaillePoint -- (curseur de la page Options)
 
 local function Partage()
 	local db = DB()
@@ -167,6 +180,28 @@ local CouleurClasse = ns.CouleurClasse
 
 local NOMS_ROLES = ns.NOMS_ROLES
 
+-- Tailles du point et du médaillon d'un repère, d'après le réglage du moment ; renvoie true si elles
+-- ont changé (curseur de la page Options déplacé depuis le dernier dessin)
+local function Dimensionner(e)
+	local point = TaillePoint()
+	if e.taille == point then return false end
+	e.taille = point
+	local function Poser(t, taille, dy)
+		t:SetSize(taille, taille)
+		t:ClearAllPoints()
+		t:SetPoint("CENTER", e, "CENTER", 0, dy or 0)
+	end
+	Poser(e.contour, point + 6)
+	Poser(e.lisere, point + 3)
+	Poser(e.point, point)
+	local portrait = TaillePortrait()
+	local disque, dy = portrait * DISQUE, portrait * DECALAGE
+	Poser(e.contourP, disque + 5, dy)
+	Poser(e.anneau, disque + 3, dy)
+	Poser(e.portrait, portrait)
+	return true
+end
+
 -- Un repère de membre = un ancrage (taille 1, à l'échelle de la carte) + le repère lui-même, à échelle
 -- compensée pour garder la même taille à l'écran quel que soit le zoom. Il porte les deux apparences
 -- (point et médaillon), créées une fois : PoserApparence montre l'une ou l'autre.
@@ -174,29 +209,23 @@ local function CreerEpingle(canevas)
 	local ancre = CreateFrame("Frame", nil, canevas)
 	ancre:SetSize(1, 1)
 	local e = CreateFrame("Button", nil, ancre)
-	e:SetSize(TAILLE_POINT + 8, TAILLE_POINT + 8) -- zone de survol un peu plus large que le point
 	e:SetPoint("CENTER", ancre, "CENTER", 0, 0)
 	e.ancre = ancre
-	local function Disque(couche, taille, r, g, b, a, dy)
+	local function Disque(couche, r, g, b, a)
 		local t = e:CreateTexture(nil, couche)
-		t:SetSize(taille, taille)
-		t:SetPoint("CENTER", e, "CENTER", 0, dy or 0)
 		t:SetTexture(ROND)
 		t:SetVertexColor(r, g, b, a)
 		return t
 	end
 	-- point : trois disques empilés, contour noir, liseré blanc (visible sur toutes les cartes), couleur de classe
-	e.contour = Disque("BACKGROUND", TAILLE_POINT + 6, 0, 0, 0, 0.9)
-	e.lisere = Disque("BORDER", TAILLE_POINT + 3, 1, 1, 1, 1)
-	e.point = Disque("ARTWORK", TAILLE_POINT, 1, 1, 1, 1)
+	e.contour = Disque("BACKGROUND", 0, 0, 0, 0.9)
+	e.lisere = Disque("BORDER", 1, 1, 1, 1)
+	e.point = Disque("ARTWORK", 1, 1, 1, 1)
 	-- médaillon : contour noir et anneau de classe derrière le disque du portrait, puis le portrait
-	local disque = TAILLE_PORTRAIT * DISQUE
-	local dy = TAILLE_PORTRAIT * DECALAGE
-	e.contourP = Disque("BACKGROUND", disque + 5, 0, 0, 0, 0.9, dy)
-	e.anneau = Disque("BORDER", disque + 3, 1, 1, 1, 1, dy)
+	e.contourP = Disque("BACKGROUND", 0, 0, 0, 0.9)
+	e.anneau = Disque("BORDER", 1, 1, 1, 1)
 	e.portrait = e:CreateTexture(nil, "ARTWORK")
-	e.portrait:SetSize(TAILLE_PORTRAIT, TAILLE_PORTRAIT)
-	e.portrait:SetPoint("CENTER", e, "CENTER", 0, 0)
+	Dimensionner(e)
 	e.contourP:Hide(); e.anneau:Hide(); e.portrait:Hide()
 	e:SetScript("OnEnter", function(self)
 		local p = self.p
@@ -219,17 +248,18 @@ end
 local function PoserApparence(e, p)
 	local chemin = PORTRAITS and p.portrait or nil
 	local r, g, b = CouleurClasse(p.classe)
-	if e.pose and chemin == e.chemin and r == e.r and g == e.g and b == e.b then return end
-	e.pose = true
-	if chemin ~= e.chemin then
+	local redimensionne = Dimensionner(e)
+	if e.pose and not redimensionne and chemin == e.chemin and r == e.r and g == e.g and b == e.b then return end
+	if not e.pose or redimensionne or chemin ~= e.chemin then
 		local medaillon = chemin ~= nil
 		if medaillon then e.portrait:SetTexture(chemin) end
 		e.portrait:SetShown(medaillon); e.anneau:SetShown(medaillon); e.contourP:SetShown(medaillon)
 		e.point:SetShown(not medaillon); e.lisere:SetShown(not medaillon); e.contour:SetShown(not medaillon)
-		local zone = (medaillon and TAILLE_PORTRAIT or TAILLE_POINT) + 8 -- zone de survol
+		local zone = (medaillon and TaillePortrait() or TaillePoint()) + 8 -- zone de survol un peu plus large
 		e:SetSize(zone, zone)
 		e.chemin = chemin
 	end
+	e.pose = true
 	e.r, e.g, e.b = r, g, b
 	if chemin then e.anneau:SetVertexColor(r, g, b, 1) else e.point:SetVertexColor(r, g, b, 1) end
 end
@@ -765,7 +795,7 @@ ns.DiagCarte = function(L)
 	end
 	L(("carte de la guilde : partage %s, %d membre(s) reçu(s) dont %d en instance et %d avec portrait, carte du monde %s, %d repère(s) au dernier dessin (médaillons %s, %d px)"):format(
 		Partage() and "activé" or "coupé", n, enInstance, portraits, tostring(WorldMapFrame ~= nil), #visibles,
-		PORTRAITS and "oui" or "non", TAILLE_PORTRAIT))
+		PORTRAITS and "oui" or "non", TaillePortrait()))
 end
 
 --------------------------------------------------------------------------------

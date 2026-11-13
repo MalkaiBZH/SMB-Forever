@@ -22,14 +22,16 @@ ns.Config = {
 	-- arc-en-ciel, bordure changeante). Écrire "Prénom-Famille", ou false pour rien.
 	vedette = false,
 
-	-- Carte du monde : diamètre en pixels du point qui marque chaque membre de la guilde
+	-- Carte du monde : diamètre en pixels du point qui marque chaque membre de la guilde. C'est la valeur
+	-- de départ : chacun peut la changer pour lui dans la page Options (/smb options), sans toucher ce fichier.
 	taillePointCarte = 16,
 
 	-- Repères des membres sur le tour de l'écran (GuildUp_Reperes.lua) : angle de vue (degrés) qui
 	-- correspond à toute la largeur de l'écran (à ajuster si les repères du haut ne tombent pas dans la
 	-- direction des joueurs), position des repères du haut, membres devant soi (pixels sous le haut de
 	-- l'écran) et du bas, membres derrière soi (pixels au-dessus du bas de l'écran, au-dessus des
-	-- barres d'action).
+	-- barres d'action). Les deux positions sont les valeurs de départ : chacun peut les changer pour lui
+	-- dans la page Options.
 	champVisionReperes = 90,
 	hautReperes = 34,
 	basReperes = 150,
