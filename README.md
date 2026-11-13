@@ -79,7 +79,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   en haut quand ils sont devant (dans leur direction exacte), sur les côtés quand ils sont à gauche ou à
   droite, en bas quand ils sont derrière, avec une flèche. Clic : chuchoter ; clic droit : menu
   (chuchoter, inviter dans le groupe, voir dans la page Guilde). Seulement les membres qui
-  partagent leur position et ont un portrait. `/smb reperes` pour couper.
+  partagent leur position et ont un portrait, et à plus de 100 m (réglable dans les options, 0 pour toujours). `/smb reperes` pour couper.
 - **Ennemis de quête** : un « ! » à droite de la barre de nom d'un ennemi à tuer ou à dépouiller pour une
   quête en cours : **jaune** pour toi, **bleu** pour un membre de ton groupe, **vert** pour les deux. Il
   disparaît quand l'objectif est terminé. Les monstres de chaque quête viennent de QuestieDB (version Forever),
@@ -163,7 +163,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 | Commande | Effet |
 |---|---|
 | `/smb` | Fenêtre GuildUpSMB |
-| `/smb options` | Page Options (pseudo, rôle, notifications, taille de la fenêtre, taille des membres sur la carte, hauteur des repères…) |
+| `/smb options` | Page Options (pseudo, rôle, notifications, taille de la fenêtre, taille des membres sur la carte, hauteur et distance minimale des repères…) |
 | `/smb taille 1.2` | Taille de la fenêtre GuildUpSMB (de 0.7 à 1.6, 1.1 par défaut) |
 | `/smb groupes` | Recherche de groupe de la guilde |
 | `/smb metiers` | Registre des métiers |

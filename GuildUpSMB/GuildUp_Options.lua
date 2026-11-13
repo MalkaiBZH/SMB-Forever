@@ -1,8 +1,9 @@
 -- GuildUpSMB : page « Options » de la fenêtre GuildUpSMB, diagnostic (/smb diag), réinitialisation et
 -- commandes /smb.
 -- Page Options (ns.AjouterPage("options"), kit ns.UI de GuildUp_Style.lua) : cartes « Carte et repères »
--- (taille des membres sur la carte du monde, hauteur des repères du haut et du bas : réglages personnels
--- GuildUpDB.taillePointCarte / hautReperes / basReperes, à défaut ceux de GuildUp_Config.lua), « Affichage »
+-- (taille des membres sur la carte du monde, hauteur des repères du haut et du bas, distance minimale des
+-- repères : réglages personnels GuildUpDB.taillePointCarte / hautReperes / basReperes / distanceMinReperes,
+-- à défaut ceux de GuildUp_Config.lua), « Affichage »
 -- (bannières, portraits, repères, médaillon, taille de la fenêtre), « Moi » (pseudo, persos, partage de
 -- position, mon rôle), « Notifications » (une case par type de bulle), « Debug » (seulement avec
 -- /smb debug) et bouton « Réinitialiser les réglages ».
@@ -27,7 +28,7 @@ local ToutRafraichir, SurActivation, MajBarre, Bordures, DeplacerAuras, PlacerIn
 local REGLAGES_HORS_DEFAUT = {
 	"notifs", "bouton", "barre", "interface", "annoncesGuilde", "emoteGU", "voletNotifs", "coursesCompact",
 	"afficherDebug", "tousNiveaux", "itemsClasse", "itemsNiveau", "itemsGuilde", "itemsNivMin", "itemsNivMax", "styleJeu", "rappelGroupe", "portee", "rolesPerso",
-	"taillePointCarte", "hautReperes", "basReperes", -- (sans valeur ici : celles de GuildUp_Config.lua)
+	"taillePointCarte", "hautReperes", "basReperes", "distanceMinReperes", -- (sans valeur ici : celles de GuildUp_Config.lua)
 	-- (coursesCompact : mini-liste de « Mes carnets », retirée en 3.7.0 ; gardé ici pour effacer l'ancien réglage)
 }
 
@@ -490,38 +491,40 @@ local function CreerPage(parent)
 			end)
 	end
 
-	-- Carte et repères : réglages personnels (GuildUpDB), à défaut ceux de GuildUp_Config.lua. Trois
-	-- colonnes, le libellé au-dessus de son curseur : { réglage, libellé, min, max, pas, valeur de la
-	-- guilde, infobulle }
+	-- Carte et repères : réglages personnels (GuildUpDB), à défaut ceux de GuildUp_Config.lua. Une
+	-- colonne par réglage, le libellé au-dessus de son curseur : { réglage, libellé, min, max, pas, valeur
+	-- de la guilde, unité, infobulle }
 	local ecran = UI.Carte(p, "Carte et repères")
 	ecran:SetPoint("TOPLEFT", notifs, "BOTTOMLEFT", 0, -ECART)
 	ecran:SetSize(largeur, HAUT_ECRAN)
-	ecran.compte:SetText("en pixels")
 	local CFG = ns.Config or {}
+	local UNITE = (GetLocale() == "enUS" or GetLocale() == "enGB") and "yd" or "m"
 	local REGLAGES_ECRAN = {
-		{ "taillePointCarte", "Membres sur la carte", 8, 40, 1, tonumber(CFG.taillePointCarte) or 16,
+		{ "taillePointCarte", "Membres sur la carte", 8, 40, 1, tonumber(CFG.taillePointCarte) or 16, "px",
 			"Taille du point des membres sur la carte du monde (leur portrait est un peu plus grand). Visible à la prochaine ouverture de la carte." },
-		{ "hautReperes", "Repères du haut", 10, 200, 2, tonumber(CFG.hautReperes) or 34,
+		{ "hautReperes", "Repères du haut", 10, 200, 2, tonumber(CFG.hautReperes) or 34, "px",
 			"Distance entre le haut de l'écran et les repères des membres qui sont devant toi." },
-		{ "basReperes", "Repères du bas", 60, 400, 5, tonumber(CFG.basReperes) or 150,
+		{ "basReperes", "Repères du bas", 60, 400, 5, tonumber(CFG.basReperes) or 150, "px",
 			"Distance entre le bas de l'écran et les repères des membres qui sont derrière toi (au-dessus de tes barres d'action)." },
+		{ "distanceMinReperes", "Repères au-delà de", 0, 500, 10, tonumber(CFG.distanceMinReperes) or 100, UNITE,
+			"Un membre plus proche que cette distance n'a pas de repère : tu le vois déjà en jeu. 0 : toujours un repère." },
 	}
 	local curseursEcran = {}
 	local colonneEcran = (largeur - 28) / #REGLAGES_ECRAN
 	for i, reg in ipairs(REGLAGES_ECRAN) do
-		local cle, libelle, min, max, pas, guilde, aide = reg[1], reg[2], reg[3], reg[4], reg[5], reg[6], reg[7]
+		local cle, libelle, min, max, pas, guilde, unite, aide = reg[1], reg[2], reg[3], reg[4], reg[5], reg[6], reg[7], reg[8]
 		local x = 14 + (i - 1) * colonneEcran
 		local t = UI.Texte(ecran, "GameFontHighlight", C.texte)
 		t:SetPoint("TOPLEFT", ecran, "TOPLEFT", x, -36)
 		t:SetText(libelle)
 		-- (place laissée à droite : la valeur écrite par le curseur, puis l'écart avec la colonne suivante)
-		local curseur = UI.Curseur(ecran, colonneEcran - 24 - 46, min, max, pas, function(v)
+		local curseur = UI.Curseur(ecran, colonneEcran - 24 - 50, min, max, pas, function(v)
 			db[cle] = v
 			if ns.MajReperes then ns.MajReperes() end
 		end)
-		curseur.Format = function(v) return ("%d"):format(v) end
+		curseur.Format = function(v) return ("%d %s"):format(v, unite) end
 		curseur:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -8)
-		UI.Infobulle(curseur, libelle, aide .. ("\nRéglage de la guilde : %d."):format(guilde))
+		UI.Infobulle(curseur, libelle, aide .. ("\nRéglage de la guilde : %d %s."):format(guilde, unite))
 		curseursEcran[#curseursEcran + 1] = { curseur, function() return tonumber(db[cle]) or guilde end }
 	end
 

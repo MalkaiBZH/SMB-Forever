@@ -30,9 +30,11 @@ ns.Config = {
 	-- correspond à toute la largeur de l'écran (à ajuster si les repères du haut ne tombent pas dans la
 	-- direction des joueurs), position des repères du haut, membres devant soi (pixels sous le haut de
 	-- l'écran) et du bas, membres derrière soi (pixels au-dessus du bas de l'écran, au-dessus des
-	-- barres d'action). Les deux positions sont les valeurs de départ : chacun peut les changer pour lui
-	-- dans la page Options.
+	-- barres d'action), distance en dessous de laquelle un membre n'a pas de repère (il est assez près
+	-- pour être vu en jeu ; 0 : toujours un repère). Ces trois réglages sont les valeurs de départ :
+	-- chacun peut les changer pour lui dans la page Options.
 	champVisionReperes = 90,
 	hautReperes = 34,
 	basReperes = 150,
+	distanceMinReperes = 100,
 }

@@ -9,9 +9,11 @@
 --     (projection comme sur l'écran) ;
 --   - hors du champ de vision : bord de gauche ou de droite, de plus en plus bas à mesure qu'il passe
 --     derrière moi, puis bord du bas, au centre quand il est juste derrière ; avec une flèche.
--- Seuls les membres dont le portrait est connu sont affichés (addon à jour, race avec portrait).
+-- Seuls les membres dont le portrait est connu sont affichés (addon à jour, race avec portrait), et
+-- seulement au-delà d'une distance minimale (db.distanceMinReperes, sinon celle de GuildUp_Config.lua :
+-- plus près, on le voit en jeu ; 0 = toujours).
 -- Clic : chuchoter ; clic droit : menu (chuchoter, inviter dans le groupe, voir dans la page Guilde). Réglage db.reperes (/smb reperes, case dans les options) ; hauteur des repères du
--- haut et du bas : curseurs de la page Options, sinon valeurs de GuildUp_Config.lua.
+-- haut et du bas, distance minimale : curseurs de la page Options, sinon valeurs de GuildUp_Config.lua.
 -- Aucun message réseau propre : tout vient des positions de GuildUp_Carte.lua (une toutes les 6 s
 -- au plus pour un membre qui bouge), d'où des petits sauts quand un membre proche se déplace.
 
@@ -26,6 +28,7 @@ local CHAMP = math.rad((ns.Config and tonumber(ns.Config.champVisionReperes)) or
 -- et GuildUpDB.basReperes, lus à chaque mise à jour)
 local HAUT = (ns.Config and tonumber(ns.Config.hautReperes)) or 34 -- centre des repères du haut, sous le haut de l'écran
 local BAS = (ns.Config and tonumber(ns.Config.basReperes)) or 150 -- centre des repères du bas (au-dessus des barres d'action)
+local DISTANCE_MIN = (ns.Config and tonumber(ns.Config.distanceMinReperes)) or 100 -- pas de repère plus près (m / yards)
 local TAILLE = 40        -- diamètre du portrait (pixels)
 local MARGE = 50         -- distance minimale au bord de l'écran (côtés)
 local DUREE_VIE = 45     -- secondes sans nouvelles d'un membre avant de cacher son repère
@@ -224,6 +227,7 @@ local function Maj()
 
 	-- membres sur ma carte, avec un portrait
 	local maintenant = GetTime()
+	local distanceMin = tonumber(db.distanceMinReperes) or DISTANCE_MIN
 	for i = #visibles, 1, -1 do visibles[i] = nil end
 	for cle, p in pairs(positions) do
 		if p.carte == carte and not p.instance and p.portrait and maintenant - (p.vu or 0) < DUREE_VIE then
@@ -233,7 +237,10 @@ local function Maj()
 				-- angle depuis le nord vers l'ouest, comme GetPlayerFacing ; relatif à mon cap, entre -pi et pi
 				local angle = (atan2(dO, dn) - cap) % (2 * PI)
 				if angle > PI then angle = angle - 2 * PI end
-				visibles[#visibles + 1] = { cle = cle, p = p, angle = angle, metres = math.sqrt(dn * dn + dO * dO) }
+				local metres = math.sqrt(dn * dn + dO * dO)
+				if metres >= distanceMin then -- (plus près : visible en jeu)
+					visibles[#visibles + 1] = { cle = cle, p = p, angle = angle, metres = metres }
+				end
 			end
 		end
 	end
