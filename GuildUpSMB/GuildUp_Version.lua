@@ -135,8 +135,11 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["3.14.1"] = {
+		"|cffffd100Mise à jour secrète|r… La guilde comprendra bien assez tôt.",
+	},
 	["3.14.0"] = {
 		"|cffffd100Connexions plus fluides|r : quand tu te connectes, un membre te renvoie tout ce que tu as manqué (dons, projets, événements, fil d'activité, souvenirs, présence…), ce qui faisait des dizaines de messages à la suite. Pendant ce temps, un appel à l'aide ou un vote attendait son tour, parfois une quinzaine de secondes. Ces longs envois passent maintenant en arrière-plan : ce qui est urgent part tout de suite, le rattrapage suit tranquillement.",
 		"Quand plusieurs membres se connectent coup sur coup, le même rattrapage n'est plus répété pour chacun : tout le monde le reçoit du premier envoi. |cffffd100/smb diag|r compte les messages de rattrapage et ceux évités.",

@@ -9,6 +9,8 @@
 -- les notifications) : 4 pour un niveau ordinaire, 8 pour un palier (10, 20, 30…), 12 au niveau
 -- maximum. Les emotes sont affichées par l'addon de chaque membre à la réception de « N » (aucun
 -- message de plus, rien dans le chat) ; celui qui monte de niveau voit les siennes, sans bulle.
+-- Toute montée de niveau (la mienne aussi) lance l'explosion « Et son nom est… » (ns.ExplosionNiveau,
+-- GuildUp_Cena.lua), même pour le membre vedette.
 -- Chaque annonce envoyée ou reçue est aussi notée dans le fil d'activité (ns.ActiviteAnnonce,
 -- GuildUp_Journal.lua), même quand les bulles sont coupées.
 
@@ -66,6 +68,8 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	if GetTime() - debut < CALME then return end
 	local genre, a, b = strsplit("~", msg)
 	local qui = NomJoueur(expediteur)
+	-- explosion à l'écran et musique (GuildUp_Cena.lua ; case « Surprise » des notifications)
+	if genre == "N" and tonumber(a) and ns.ExplosionNiveau then ns.ExplosionNiveau(expediteur, a) end
 	if genre == "N" and tonumber(a) and ns.NiveauSpecial and ns.NiveauSpecial(expediteur, a) then
 		-- montée de niveau spéciale (membre vedette : bulle en fête, GuildUp_GU.lua)
 	elseif genre == "N" and tonumber(a) then
@@ -95,6 +99,7 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 			Envoyer("N~" .. tostring(a1))
 			-- mes propres chopes (les autres membres les voient à la réception de l'annonce)
 			if ns.PluieEmotes then ns.PluieEmotes(EmotesPour(a1)) end
+			if ns.ExplosionNiveau then ns.ExplosionNiveau(UnitName("player"), a1) end
 		end
 	elseif event == "PLAYER_ENTERING_WORLD" and not dejaEntre then
 		-- calme seulement après la connexion, pas après chaque écran de chargement (instance, bateau)

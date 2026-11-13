@@ -377,6 +377,7 @@ local NOTIFS = {
 	{ "groupes", "Groupes" }, { "candidatures", "Candidatures" }, { "niveaux", "Niveaux" }, { "metiers", "Métiers" },
 	{ "evenements", "Événements" }, { "quetes", "Quêtes" }, { "commandes", "Commandes" }, { "plans", "Échanges" },
 	{ "version", "Version" }, { "aide", "Aide" }, { "tirages", "Tirages" }, { "sondages", "Sondages" },
+	{ "cena", "Surprise" }, -- (explosion des montées de niveau, GuildUp_Cena.lua : mise à jour secrète)
 	{ "gu", (ns.Config and ns.Config.cri) and (tostring(ns.Config.cri):upper() .. "!") or "Cri" },
 }
 local MES_ROLES = { "auto", "tank", "heal", "dps" }                  -- puces « Mon rôle »
@@ -667,6 +668,9 @@ SlashCmdList.GUILDUP = function(msg)
 	elseif cmd == "roll" or cmd == "tirage" then
 		-- (la saisie d'origine : « reste » est en minuscules, ce qui abîmerait un lien d'objet)
 		if ns.Tirage then ns.Tirage(((msg or ""):match("^%s*%S+%s*(.-)%s*$"))) end
+		return
+	elseif cmd == "cena" or cmd == "explosion" then
+		if ns.EssaiExplosion then ns.EssaiExplosion(((msg or ""):match("^%s*%S+%s+(%d+)"))) end
 		return
 	elseif cmd == "layer" or cmd == "layers" then
 		if ns.MontrerLayer then ns.MontrerLayer() end

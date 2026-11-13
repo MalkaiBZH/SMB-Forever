@@ -63,6 +63,11 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
 - Groupes : `GuildUp_Catalogue.lua` (contenus de la recherche de groupe), `GuildUp_Groupes.lua` (protocole, état partagé `ns.Groupes.etat`, actions), `GuildUp_GroupesFenetre.lua` (page Groupes de la fenêtre GuildUpSMB).
 - `GuildUp_Reperes.lua` : repères des membres de la même carte à l'écran (HUD : au-dessus de la tête, en haut, ou au bord), calculés à partir des
   positions de `GuildUp_Carte.lua` (`ns.PositionsMembres`, `ns.MaPosition`, portrait dans le message `P`) ; pas de préfixe propre.
+- `GuildUp_Cena.lua` : explosion « Et son nom est… » et musique à chaque montée de niveau d'un membre
+  (`ns.ExplosionNiveau`, appelé par `GuildUp_Annonces.lua` ; pas de préfixe propre). **Mise à jour secrète** : la case
+  des notifications s'appelle « Surprise », `/smb cena` n'est pas dans l'aide, rien dans le `README.md` ni les notes.
+  La musique est un fichier que chaque joueur pose lui-même (`Interface\AddOns\GuildUpSMB_Sons\levelup.mp3`, hors du
+  dossier de l'addon : le programme de mise à jour l'effacerait) ; pas de musique dans le dépôt (droits d'auteur).
 - `GuildUp_Objectifs.lua` : « ! » sur les barres de nom des ennemis de quête (jaune moi, bleu groupe, vert les deux).
   Croise `ns.OBJECTIFS_QUETES` (données générées) avec le journal de quêtes, par numéro de PNJ (GUID) ; complété par
   l'infobulle du jeu (`C_TooltipInfo.GetUnit`) ; listes des coéquipiers reçues sur `PARTY` / `RAID` (`GuildUpObj`).
