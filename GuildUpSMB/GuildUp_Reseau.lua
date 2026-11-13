@@ -1,5 +1,6 @@
 -- GuildUpSMB : réseau commun à tous les modules (chargé juste après GuildUp_Outils.lua, voir le .toc).
---   * une seule file d'envoi des messages d'addon (le jeu en limite le nombre par seconde) ;
+--   * une seule file d'envoi des messages d'addon (le jeu en limite le nombre par seconde), en deux
+--     voies : les messages courants d'abord, les longs envois de rattrapage derrière (voir plus bas) ;
 --   * une seule réception (ns.Ecouter) : inscription du préfixe, canal vérifié, aiguillage par préfixe ;
 --   * découpage d'une longue liste en morceaux (ns.Morceaux) et réassemblage (ns.Reassembleur).
 
@@ -9,7 +10,8 @@ local NOM_ADDON, ns = ...
 local LONGUEUR_MAX = 255
 ns.LONGUEUR_MAX = LONGUEUR_MAX
 
-local stats = { envoyes = 0, bloques = 0, echecs = 0, jetes = 0, recus = 0, maxFile = 0 }
+local stats = { envoyes = 0, bloques = 0, echecs = 0, jetes = 0, recus = 0, maxFile = 0,
+	fond = 0, doublons = 0, debordes = 0 }
 
 -- Message d'addon qui n'a pas pu partir : prévenu à l'écran (au plus une fois toutes les 30 s)
 local dernierAvertissement = -math.huge
@@ -24,18 +26,42 @@ end
 
 --------------------------------------------------------------------------------
 -- Envoi : un message toutes les 0,3 s ; nouvel essai (jusqu'à 6) si le jeu refuse (trop de messages)
+--
+-- Deux voies. À la connexion d'un membre, le relais (ns.EstLeRelais) lui renvoie ce qu'il a manqué :
+-- dons, besoins, projets, événements, groupes, quêtes, identités, fil d'activité, souvenirs, relevés
+-- de présence. Cela fait des dizaines de messages, et tant qu'ils défilent, un appel à l'aide ou un
+-- vote attend derrière. Ces longs envois passent donc en « fond » : un module qui met plus de
+-- RAFALE_MAX messages du même préfixe dans la file en moins de RAFALE_FENETRE secondes est en train de
+-- relayer, et le reste de son envoi part plus lentement (DELAI_FOND), toujours après les messages
+-- courants. Un module peut aussi le dire lui-même avec options.fond. Comme tout part sur le canal de
+-- guilde et que tout le monde le lit, un message de fond identique envoyé il y a moins de DOUBLON
+-- secondes n'est pas renvoyé : deux membres qui se connectent coup sur coup ne font pas tout répéter.
 --------------------------------------------------------------------------------
 
-local file, attente = {}, 0
+local DELAI, DELAI_FOND = 0.3, 1.2
+local RAFALE_MAX, RAFALE_FENETRE = 3, 10
+local FILE_CHARGEE = 6   -- au-delà, plusieurs modules relaient en même temps : on resserre le seuil
+local DOUBLON = 90       -- secondes : un même message de fond n'est pas renvoyé avant
+local MAX_FOND = 200     -- messages de fond en attente au plus (au-delà, les plus anciens sont jetés)
+
+local file, fond = {}, {}
+local pause, dernierEnvoi = 0, 0
+local rafales = {}       -- [préfixe] = { n, depuis } : messages mis en file récemment
+local envoyes = {}       -- [préfixe .. msg] = heure du dernier envoi en fond
+
 local pompe = CreateFrame("Frame")
 pompe:Hide()
-pompe:SetScript("OnUpdate", function(self, ecoule)
-	attente = attente - ecoule
-	if attente > 0 then return end
-	local m = file[1]
+pompe:SetScript("OnUpdate", function(self)
+	local maintenant = GetTime()
+	if maintenant < pause then return end
+	-- les messages courants d'abord ; le fond seulement quand ils sont tous partis
+	local m, defond = file[1], false
+	if not m then m, defond = fond[1], true end
 	if not m then self:Hide(); return end
+	if maintenant - dernierEnvoi < (defond and DELAI_FOND or DELAI) then return end
+	local voie = defond and fond or file
 	if (m.canal or "GUILD") == "GUILD" and not IsInGuild() then
-		table.remove(file, 1)
+		table.remove(voie, 1)
 		return
 	end
 	local envoi = (C_ChatInfo and C_ChatInfo.SendAddonMessage) or SendAddonMessage
@@ -46,7 +72,7 @@ pompe:SetScript("OnUpdate", function(self, ecoule)
 	if bloque and m.essais < 6 and not m.jetable then
 		m.essais = m.essais + 1
 		stats.bloques = stats.bloques + 1
-		attente = 1.5
+		pause = maintenant + 1.5
 	else
 		if not ok then
 			AvertirEchec(m.prefixe, tostring(res))
@@ -54,15 +80,39 @@ pompe:SetScript("OnUpdate", function(self, ecoule)
 			if m.jetable then stats.jetes = stats.jetes + 1 else AvertirEchec(m.prefixe, "trop de messages") end
 		else
 			stats.envoyes = stats.envoyes + 1
+			if defond then
+				stats.fond = stats.fond + 1
+				envoyes[m.prefixe .. m.msg] = maintenant
+			end
 		end
-		table.remove(file, 1)
-		attente = 0.3
+		table.remove(voie, 1)
+		dernierEnvoi = maintenant
 	end
 end)
+
+-- Ce préfixe est-il en train d'envoyer une longue liste ? (plus de RAFALE_MAX messages d'affilée)
+-- À la connexion d'un membre, dix modules relaient en même temps : si chacun avait droit à ses trois
+-- messages courants, la file en compterait trente avant le premier message de fond. Quand elle est
+-- déjà chargée, le deuxième message d'un même préfixe suffit donc à reconnaître un relais.
+local function EnRafale(prefixe)
+	local maintenant = GetTime()
+	local r = rafales[prefixe]
+	if not r or maintenant - r.depuis > RAFALE_FENETRE then
+		r = { n = 0, depuis = maintenant }
+		rafales[prefixe] = r
+	end
+	r.n = r.n + 1
+	r.depuis = maintenant
+	return r.n > (#file > FILE_CHARGEE and 1 or RAFALE_MAX)
+end
 
 -- ns.EnvoyerAddon(préfixe, message, canal = "GUILD", cible, options)
 --   options.jetable : message périodique (position…) : remplace celui du même préfixe encore en
 --   attente, n'est jamais réessayé (le suivant le remplacera)
+--   options.fond : long envoi de rattrapage, sans urgence : part après les messages courants, plus
+--   lentement, et pas du tout s'il vient d'être envoyé (voir plus haut). Un envoi en rafale est
+--   reconnu tout seul : les modules n'ont rien à déclarer. false : jamais en fond, même en rafale
+--   (message attendu tout de suite). Les chuchotements d'addon ne passent jamais en fond.
 ns.EnvoyerAddon = function(prefixe, msg, canal, cible, options)
 	canal = canal or "GUILD"
 	if canal == "GUILD" and not IsInGuild() then return end
@@ -78,15 +128,40 @@ ns.EnvoyerAddon = function(prefixe, msg, canal, cible, options)
 			if file[i].jetable and file[i].prefixe == prefixe then table.remove(file, i) end
 		end
 	end
-	file[#file + 1] = { prefixe = prefixe, msg = msg, canal = canal, cible = cible, essais = 0, jetable = jetable }
-	if #file > stats.maxFile then stats.maxFile = #file end
+	-- seuls les envois sur la guilde passent en fond : un chuchotement d'addon est un échange direct
+	-- (commande d'artisanat, demande de layer) qu'on ne fait pas attendre
+	local defond = false
+	if not jetable and canal == "GUILD" and not (options and options.fond == false) then
+		defond = (options and options.fond) or EnRafale(prefixe)
+	end
+	local m = { prefixe = prefixe, msg = msg, canal = canal, cible = cible, essais = 0, jetable = jetable }
+	if defond then
+		-- déjà parti il y a peu : tout le monde l'a reçu sur le canal de guilde
+		local vu = envoyes[prefixe .. msg]
+		local maintenant = GetTime()
+		if vu and maintenant - vu < DOUBLON then stats.doublons = stats.doublons + 1; return end
+		if vu == nil then
+			-- ménage de temps en temps, pour ne pas garder tous les messages de la session
+			local n = 0
+			for _ in pairs(envoyes) do n = n + 1 end
+			if n > 400 then
+				for k, t in pairs(envoyes) do if maintenant - t > DOUBLON then envoyes[k] = nil end end
+			end
+		end
+		fond[#fond + 1] = m
+		while #fond > MAX_FOND do table.remove(fond, 1); stats.debordes = stats.debordes + 1 end
+	else
+		file[#file + 1] = m
+	end
+	if #file + #fond > stats.maxFile then stats.maxFile = #file + #fond end
 	pompe:Show()
 end
 
 -- Pour /smb diag
 ns.StatsReseau = function()
-	return ("messages : %d envoyé(s), %d reçu(s), %d bloqué(s) puis réessayé(s), %d jeté(s), %d échec(s), %d en attente (max %d)")
-		:format(stats.envoyes, stats.recus, stats.bloques, stats.jetes, stats.echecs, #file, stats.maxFile)
+	return ("messages : %d envoyé(s) dont %d de rattrapage, %d reçu(s), %d bloqué(s) puis réessayé(s), %d jeté(s), %d déjà envoyé(s), %d débordé(s), %d échec(s), %d en attente dont %d de rattrapage (max %d)")
+		:format(stats.envoyes, stats.fond, stats.recus, stats.bloques, stats.jetes, stats.doublons,
+			stats.debordes, stats.echecs, #file + #fond, #fond, stats.maxFile)
 end
 
 --------------------------------------------------------------------------------
