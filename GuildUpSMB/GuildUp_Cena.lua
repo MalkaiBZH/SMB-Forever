@@ -10,9 +10,12 @@
 -- Interface\AddOns\GuildUpSMB_Sons\levelup.mp3 (ou .ogg), hors du dossier de l'addon pour que le programme
 -- de mise à jour ne l'efface pas. Le jeu ne voit un nouveau fichier qu'après avoir été relancé : en attendant,
 -- la corne de guerre naine du jeu au boum. La musique est coupée en fondu après MUSIQUE secondes.
--- Case « Surprise » des notifications (db.notifs.cena == false : coupée). /smb cena [niveau] : essai.
+-- Case « Surprise » des notifications (db.notifs.cena == false : coupée). /smb cena [niveau] [calme] : essai.
 -- Surprise : ni la case, ni l'aide de /smb, ni les notes de version, ni le README ne disent ce que c'est.
 -- Plusieurs montées de niveau en même temps : à la suite (3 en attente au plus).
+-- Joueur en combat : version calme chez lui (la musique, l'annonce, le portrait, le nom et le niveau, plus
+-- petits, en haut de l'écran, sans tremblement ni effets plein écran) ; la fête en cours passe en calme s'il
+-- entre en combat. Les autres membres la voient en entier.
 
 local NOM_ADDON, ns = ...
 
@@ -36,6 +39,10 @@ local ETINCELLES = 30
 local RAYONS = 10
 local CONFETTIS = 90
 local FUSEES, ECLATS = 8, 26
+-- version calme (je suis en combat) : centre en haut de l'écran, plus petit, un peu transparent
+local CALME_ECHELLE = 0.55
+local CALME_HAUTEUR = 0.3 -- part de la hauteur de l'écran au-dessus du milieu
+local CALME_ALPHA = 0.85
 local BORDS = 0.6        -- force des bords dorés
 
 local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
@@ -49,6 +56,11 @@ local sonEnCours           -- poignée de la musique (StopSound)
 local function Coupee()
 	local db = ns.DB and ns.DB()
 	return db and type(db.notifs) == "table" and db.notifs.cena == false or false
+end
+
+-- je suis en combat : fête en version calme chez moi (les autres membres la voient en entier)
+local function EnCombat()
+	return (InCombatLockdown and InCombatLockdown()) or (UnitAffectingCombat and UnitAffectingCombat("player")) or false
 end
 
 --------------------------------------------------------------------------------
@@ -118,6 +130,7 @@ local function Ecrase(b)
 	local x = b - 0.16
 	return 1 + 0.22 * math.exp(-6 * x) * math.sin(22 * x)
 end
+local function Fixe() return 1 end -- (version calme : ni écrasement ni rebond)
 
 -- teinte (0-1) → couleur vive, un peu éclaircie
 local function Teinte(h)
@@ -308,18 +321,36 @@ local function Placer(c, f, s, y)
 	c:SetPoint("CENTER", f.centre, "CENTER", 0, y / s)
 end
 
+-- version calme : effets plein écran cachés (éclair, rayons, étincelles, bords, confettis, fusées)
+local function CacherEffets(f)
+	f.eclair:Hide()
+	for _, liste in ipairs({ f.rayons, f.etincelles, f.bords, f.confettis }) do
+		for _, x in ipairs(liste) do x:Hide() end
+	end
+	for _, fu in ipairs(f.feux) do
+		fu.tete:Hide()
+		for _, x in ipairs(fu.eclats) do x:Hide() end
+	end
+end
+
 local function Animer(f)
 	local t = GetTime() - f.debut
 	local fin = ANNONCE + TENUE + FONDU
 	if t >= fin then Terminer(); return end
 	local b = t - ANNONCE -- temps depuis le boum (négatif avant)
-	f:SetAlpha(t > ANNONCE + TENUE and (fin - t) / FONDU or 1)
+	local calme = f.calme
+	f:SetAlpha((t > ANNONCE + TENUE and (fin - t) / FONDU or 1) * (calme and CALME_ALPHA or 1))
 	local L, H = f.L, f.H
+	-- calme : les textes et le portrait apparaissent sans s'écraser ni rebondir
+	local Ecrase = calme and Fixe or Ecrase
 
-	-- tremblement : léger qui monte pendant l'annonce, plus fort au boum puis qui s'amortit
-	local amp = b < 0 and (1 + 4 * t / ANNONCE) or TREMBLE * math.exp(-3.5 * b)
+	-- tremblement : léger qui monte pendant l'annonce, plus fort au boum puis qui s'amortit (pas en calme)
+	local amp = calme and 0 or (b < 0 and (1 + 4 * t / ANNONCE) or TREMBLE * math.exp(-3.5 * b))
+	local echelle = calme and CALME_ECHELLE or 1
+	f.centre:SetScale(echelle)
 	f.centre:ClearAllPoints()
-	f.centre:SetPoint("CENTER", f, "CENTER", (math.random() * 2 - 1) * amp, HAUTEUR + (math.random() * 2 - 1) * amp)
+	f.centre:SetPoint("CENTER", f, "CENTER", (math.random() * 2 - 1) * amp,
+		(calme and H * CALME_HAUTEUR or HAUTEUR) / echelle + (math.random() * 2 - 1) * amp)
 
 	-- « ET SON NOM EST… »
 	if b < 0 then
@@ -334,25 +365,10 @@ local function Animer(f)
 		if not f.musique then Corne() end
 	end
 
-	-- éclair
-	local a = ECLAIR * (1 - b / 0.5)
-	if a > 0 then f.eclair:SetAlpha(a); f.eclair:Show() else f.eclair:Hide() end
-
-	-- rayons qui tournent derrière le portrait
-	for _, r in ipairs(f.rayons) do
-		Tourner(r, r.angle + t * 0.25)
-		r:SetAlpha(0.16 * math.min(1, b / 0.6))
-		r:ClearAllPoints()
-		r:SetPoint("CENTER", f.centre, "CENTER", 0, 30)
-		r:Show()
-	end
-
-	-- étincelles
-	for _, e in ipairs(f.etincelles) do Particule(e, f.centre, false, 0, 30, b, e.vie) end
-
-	-- portrait : arrive en zoom, puis rebondit
+	-- portrait : arrive en zoom, puis rebondit (calme : apparaît en fondu)
 	local c = f.cadrePortrait
-	local s = math.max(0.01, b < 0.16 and (b / 0.16) * 1.15 or Ecrase(b + 0.05))
+	local s = calme and 1 or math.max(0.01, b < 0.16 and (b / 0.16) * 1.15 or Ecrase(b + 0.05))
+	c:SetAlpha(calme and math.min(1, b / 0.3) or 1)
 	c:SetScale(s)
 	c:ClearAllPoints()
 	c:SetPoint("CENTER", f.centre, "CENTER", 0, 30 / s)
@@ -389,6 +405,24 @@ local function Animer(f)
 		f.cadreNiveau:Hide()
 		f.cadrePlus:Hide()
 	end
+
+	if calme then CacherEffets(f); return end
+
+	-- éclair
+	local a = ECLAIR * (1 - b / 0.5)
+	if a > 0 then f.eclair:SetAlpha(a); f.eclair:Show() else f.eclair:Hide() end
+
+	-- rayons qui tournent derrière le portrait
+	for _, r in ipairs(f.rayons) do
+		Tourner(r, r.angle + t * 0.25)
+		r:SetAlpha(0.16 * math.min(1, b / 0.6))
+		r:ClearAllPoints()
+		r:SetPoint("CENTER", f.centre, "CENTER", 0, 30)
+		r:Show()
+	end
+
+	-- étincelles
+	for _, e in ipairs(f.etincelles) do Particule(e, f.centre, false, 0, 30, b, e.vie) end
 
 	-- bords dorés qui pulsent
 	for _, bd in ipairs(f.bords) do
@@ -462,9 +496,11 @@ local function PoserPortrait(f, nom)
 	end
 end
 
-local function Lancer(nom, niveau)
+-- calme : version calme forcée (/smb cena calme) ; sinon calme si je suis en combat
+local function Lancer(nom, niveau, calme)
 	cadre = cadre or Creer()
 	local f = cadre
+	f.calme = calme or EnCombat()
 	-- (réglages des essais de variantes, retirés : effacés)
 	local db = ns.DB and ns.DB()
 	if db then db.cena = nil end
@@ -499,6 +535,13 @@ Terminer = function()
 	if suivant then Lancer(suivant[1], suivant[2]) end
 end
 
+-- j'entre en combat pendant la fête : elle continue en version calme (la musique aussi)
+local combat = CreateFrame("Frame")
+combat:RegisterEvent("PLAYER_REGEN_DISABLED")
+combat:SetScript("OnEvent", function()
+	if enCours and cadre then cadre.calme = true end
+end)
+
 --------------------------------------------------------------------------------
 -- Pour les autres modules
 --------------------------------------------------------------------------------
@@ -527,7 +570,7 @@ ns.EssaiExplosion = function(saisie)
 		if cadre then cadre:SetScript("OnUpdate", nil); cadre:Hide() end
 		enCours = false
 	end
-	local ok, err = pcall(Lancer, UnitName("player"), niveau)
+	local ok, err = pcall(Lancer, UnitName("player"), niveau, (saisie or ""):find("calme") ~= nil)
 	if not ok then
 		enCours = false
 		if cadre then cadre:SetScript("OnUpdate", nil); cadre:Hide() end
