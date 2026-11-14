@@ -141,7 +141,8 @@ local function Envoyer(msg) if ns.EnvoyerAddon then ns.EnvoyerAddon(PREFIXE, msg
 -- Le cri suivi d'un point d'exclamation (« 33! », « 33 ! », toute casse), ou le cri tout seul,
 -- en mot entier, tout en majuscules ou tout en minuscules (« 33 », mais pas « 133 » ni « 333 »)
 local function DitGU(msg)
-	if not CRI or type(msg) ~= "string" then return false end
+	-- message secret (combat, instance) : illisible, on l'ignore
+	if not CRI or type(msg) ~= "string" or (ns.Secrete and ns.Secrete(msg)) then return false end
 	if (" " .. msg:upper() .. " "):find("[^%w\128-\255]" .. CRI_MOTIF .. "%s*!") then return true end
 	local minuscules = CRI:lower()
 	for mot in msg:gmatch("[%w\128-\255]+") do
@@ -282,7 +283,7 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 		end
 		return
 	end
-	if not (DitGU(a1) and a2) then return end
+	if not (DitGU(a1) and a2) or (ns.Secrete and ns.Secrete(a2)) then return end
 	local cle = Normaliser(a2)
 	-- c'est moi, hors du canal de guilde : je préviens la guilde (au plus une fois toutes les 3 s)
 	if cle == MaCle() and event ~= "CHAT_MSG_GUILD" and IsInGuild() and GetTime() - (derniere["envoi"] or 0) > 3 then

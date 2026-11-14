@@ -16,7 +16,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
 - **Ordre de chargement** = ordre des fichiers dans `GuildUpSMB/GuildUpSMB.toc`. Tout nouveau fichier doit y être ajouté.
 - **Outils communs** : `GuildUp_Outils.lua` (chargé juste après `GuildUp.lua`) contient la seule version de chaque
   petite fonction : `ns.NomCourt`, `ns.NomJoueur` (nom à afficher : « Pseudo (Prénom) » ; jamais pour chuchoter,
-  inviter ou comparer), `ns.MaCle`, `ns.Maintenant` (heure du serveur), `ns.Simplifier` (recherche sans
+  inviter ou comparer), `ns.MaCle`, `ns.Secrete` (valeur cachée par le jeu, à vérifier avant de lire un texte reçu d'un évènement), `ns.Maintenant` (heure du serveur), `ns.Simplifier` (recherche sans
   accents), `ns.Depuis`, `ns.Base36`, `ns.CouleurClasse` / `ns.CouleurClasseTexte`, `ns.NOMS_ROLES`, `ns.InfoObjet`,
   `ns.Precharger`, `ns.AtlasExiste`, `ns.PoserAtlas`, `ns.CadreMenu` / `ns.BoutonMenu`, `ns.BrancherDepot`,
   `ns.FenetreDeplacable`. Le cœur fournit `ns.Normaliser`, `ns.TestSolo`, `ns.Erreur`, `ns.CouperUTF8`.

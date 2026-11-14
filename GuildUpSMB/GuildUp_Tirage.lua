@@ -288,7 +288,7 @@ local function EstMoi(qui)
 end
 
 local function LireLancer(texte)
-	if not attenteDe or type(texte) ~= "string" then return end
+	if not attenteDe or type(texte) ~= "string" or (ns.Secrete and ns.Secrete(texte)) then return end
 	local m, o = Motif()
 	local c = { texte:match(m) }
 	if #c < 4 then return end

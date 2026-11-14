@@ -13,6 +13,13 @@ local NOM_ADDON, ns = ...
 -- Heure du serveur (secondes) : la même pour tous les membres, contrairement à l'horloge du PC
 ns.Maintenant = function() return GetServerTime and GetServerTime() or time() end
 
+-- Valeur « secrète » : le jeu masque certaines valeurs aux addons (messages de discussion et leur auteur
+-- en combat ou en instance, temps de recharge…). Elle passe type() == "string" mais toute lecture
+-- (:upper, :find, comparaison) lève une erreur : vérifier avant de lire un texte reçu d'un évènement.
+ns.Secrete = function(v)
+	return issecretvalue ~= nil and issecretvalue(v) == true
+end
+
 -- Ma clé de joueur « Nom-Royaume » (voir ns.Normaliser)
 ns.MaCle = function() return ns.Normaliser(UnitName("player")) end
 
