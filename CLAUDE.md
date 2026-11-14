@@ -72,7 +72,8 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   `ns.SacsDeBanque`, `ns.Jai`). `ns.OuvrirDemandes(objet, genre, qte)` ouvre la page, formulaire rempli.
 - `GuildUp_Reperes.lua` : repères des membres de la même carte à l'écran (HUD : au-dessus de la tête, en haut, ou au bord), calculés à partir des
   positions de `GuildUp_Carte.lua` (`ns.PositionsMembres`, `ns.MaPosition`, portrait dans le message `P`) ; pas de préfixe propre.
-- `GuildUp_Cena.lua` : explosion « Et son nom est… » et musique à chaque montée de niveau d'un membre
+- `GuildUp_Cena.lua` : « Et son nom est… », musique et fête à l'écran (portrait, nom arc-en-ciel, compteur de niveau,
+  confettis, feux d'artifice, bords dorés ; 4 s après le boum) à chaque montée de niveau d'un membre
   (`ns.ExplosionNiveau`, appelé par `GuildUp_Annonces.lua` ; pas de préfixe propre). **Surprise pour la guilde** : la case
   des notifications s'appelle « Surprise », `/smb cena` n'est pas dans l'aide, rien dans le `README.md`, et les notes de
   version n'en disent rien (pas même « secrète »). Musique : `media/levelup.mp3` (sample de 5 s) ; un joueur peut la

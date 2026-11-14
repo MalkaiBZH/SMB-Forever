@@ -660,7 +660,7 @@ SlashCmdList.GUILDUP = function(msg)
 		if ns.Tirage then ns.Tirage(((msg or ""):match("^%s*%S+%s*(.-)%s*$"))) end
 		return
 	elseif cmd == "cena" or cmd == "explosion" then
-		if ns.EssaiExplosion then ns.EssaiExplosion(((msg or ""):match("^%s*%S+%s+(%d+)"))) end
+		if ns.EssaiExplosion then ns.EssaiExplosion(((msg or ""):match("^%s*%S+%s*(.-)%s*$"))) end
 		return
 	elseif cmd == "layer" or cmd == "layers" then
 		if ns.MontrerLayer then ns.MontrerLayer() end
