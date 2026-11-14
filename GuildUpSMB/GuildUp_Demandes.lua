@@ -746,7 +746,7 @@ end
 --              [case objet] [recherche dans tous les objets du jeu   x]
 --              Quantité [ 1 ]                               [Publier]
 local function CreerAjout(carte)
-	local z = CreateFrame("Frame", nil, carte)
+	local z = CreateFrame("Button", nil, carte) -- (bouton : on y dépose un objet, ns.BrancherDepot)
 	z:SetPoint("TOPLEFT", carte, "TOPLEFT", 14, -40)
 	z:SetPoint("RIGHT", carte, "RIGHT", -14, 0)
 	z:SetHeight(120)
