@@ -1,8 +1,9 @@
 -- GuildUpSMB : fil d'activité de la guilde et podium (page « Activité », /smb activite ; préfixe "GuildUpJrn").
 -- Le journal garde ce qui se passe dans la guilde, pour le retrouver après une absence :
 --   N  montée de niveau (valeur = niveau)          M  nouveau métier (valeur = nom)
---   P  palier de métier (valeur = « 150 Forge »)   D  don remercié (membre = le donneur,
---   T  tirage au sort gagné (valeur = « i<objet> » ou le lot)   valeur = « objet:clé de celui qui remercie »)
+--   P  palier de métier (valeur = « 150 Forge »)   D  demande honorée (membre = celui qui l'a honorée,
+--   T  tirage au sort gagné (valeur = « i<objet> » ou le lot)   valeur = « objet:clé de l'auteur » ;
+--                                                  GuildUp_Demandes.lua ; avant la 4.0.0 : don remercié)
 -- Chaque addon note ce qu'il voit passer (les autres modules appellent ns.NoterActivite ou
 -- ns.ActiviteAnnonce) dans GuildUpDB.journal[guilde] = { e = { { t, g, q, v }, … }, present, vu } :
 -- 300 entrées au plus, oubliées après 30 jours ; « present » = dernière fois où un de mes personnages
@@ -15,8 +16,8 @@
 -- de cette version, et une heure où personne n'était connecté reste vide.
 -- Une minute après la connexion, une bulle « Pendant ton absence » résume les nouveautés (sauf
 -- /smb annonces coupé) ; la pastille du menu les compte jusqu'à l'ouverture de la page.
--- Podium des 7 derniers jours, calculé sur le journal : progression (niveaux gagnés), générosité (dons
--- remerciés, un par membre remerciant et par jour), chance (tirages gagnés).
+-- Podium des 7 derniers jours, calculé sur le journal : progression (niveaux gagnés), générosité (demandes
+-- honorées, une par auteur et par jour), chance (tirages gagnés).
 -- Mes propres nouvelles notées en direct partent aussi à la carte des souvenirs (ns.MonSouvenir,
 -- GuildUp_Souvenirs.lua), qui ne garde que les grands moments.
 
@@ -162,7 +163,7 @@ local function Podium()
 			elseif e.g == "T" then
 				tirages[e.q] = (tirages[e.q] or 0) + 1
 			elseif e.g == "D" then
-				-- un même membre ne compte qu'une fois par jour pour un donneur
+				-- un même auteur ne compte qu'une fois par jour pour un membre
 				local k = e.q .. "|" .. (e.v:match(":(.+)$") or "?") .. "|" .. date("%j", e.t)
 				if not vus[k] then
 					vus[k] = true
@@ -246,7 +247,7 @@ local function Phrase(e)
 		return ("%s est passé à %s%s|r en %s"):format(qui, OR, palier or "?", metier or e.v)
 	elseif e.g == "D" then
 		local objet, de = e.v:match("^(%d+):(.+)$")
-		return ("%s a donné %s à %s"):format(qui, objet and NomObjet(tonumber(objet)) or "un objet",
+		return ("%s a fourni %s à %s"):format(qui, objet and NomObjet(tonumber(objet)) or "un objet",
 			de and NomJoueur((de:gsub("#test$", ""))) or "un membre")
 	elseif e.g == "T" then
 		local objet = e.v:match("^i(%d+)$")
@@ -267,7 +268,7 @@ local function Resume(liste)
 	end
 	Mot(n.N, "montée de niveau", "montées de niveau")
 	Mot(n.M + n.P, "progrès de métier", "progrès de métier")
-	Mot(n.D, "don", "dons")
+	Mot(n.D, "demande honorée", "demandes honorées")
 	Mot(n.T, "tirage gagné", "tirages gagnés")
 	return table.concat(mots, ", ")
 end
@@ -298,7 +299,7 @@ local function CreerPage(parent)
 	local fil = UI.Carte(p, "Fil d'activité")
 	fil:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -60)
 	fil:SetSize(largeurFil, hauteur - 60 - MARGE)
-	fil.vide:SetText("Rien pour l'instant. Le fil se remplit avec les montées de niveau, les métiers, les dons remerciés et les tirages au sort, à partir de maintenant.")
+	fil.vide:SetText("Rien pour l'instant. Le fil se remplit avec les montées de niveau, les métiers, les demandes honorées et les tirages au sort, à partir de maintenant.")
 	fil.liste = UI.Liste(fil)
 	fil.liste:SetPoint("TOPLEFT", fil, "TOPLEFT", 12, -38)
 	fil.liste:SetPoint("BOTTOMRIGHT", fil, "BOTTOMRIGHT", -8, 10)
@@ -336,7 +337,7 @@ local function CreerPage(parent)
 	podium.vide:Hide()
 	local BLOCS = {
 		{ "Progression", "niveau gagné", "niveaux gagnés", "Personne n'a monté de niveau." },
-		{ "Générosité", "don remercié", "dons remerciés", "Aucun don remercié." },
+		{ "Générosité", "demande honorée", "demandes honorées", "Aucune demande honorée." },
 		{ "Chance", "tirage gagné", "tirages gagnés", "Aucun tirage au sort gagné." },
 	}
 	podium.blocs = {}

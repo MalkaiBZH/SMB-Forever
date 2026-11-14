@@ -1,13 +1,13 @@
 -- GuildUpSMB : artisanat, dans la fenêtre GuildUpSMB (kit ns.UI, GuildUp_Style.lua).
 -- Page fournie ici (ns.AjouterPage) :
---   « artisanat » : onglets Registre (GuildUp_Metiers.lua), Items (ici : tous les objets fabricables,
---     catégories et sous-catégories, recherche, filtres « Pour ma classe », « Jusqu'à mon niveau », niveau requis min / max et « Fabricable par la
---     guilde », tri ; « Besoin », « Ajouter » à un projet), Projets de guilde
---     (GuildUp_Projets.lua) et Commandes (GuildUp_Metiers.lua : commandes reçues et passées).
+--   « artisanat » : onglets Registre (GuildUp_Metiers.lua) et Crafts (ici : tous les objets fabricables,
+--     catégories et sous-catégories, recherche, filtres « Pour ma classe », « Jusqu'à mon niveau », niveau
+--     requis min / max et « Fabricable par la guilde », tri ; « Demander » : formulaire de la page Demandes).
+--     (Les onglets Projets de guilde et Commandes ont été retirés en 4.0.0 : les demandes les remplacent.)
 -- Fenêtres à part, aux couleurs du kit : l'encyclopédie (fiche d'un objet, Alt + clic sur un objet du
--- jeu ; collée à droite de la fenêtre GuildUpSMB ; « Voir dans Items » ouvre l'onglet Items sur un objet
+-- jeu ; collée à droite de la fenêtre GuildUpSMB ; « Voir dans Crafts » ouvre l'onglet Crafts sur un objet
 -- fabricable, avec ses artisans) et la bulle 3D des PNJ.
--- Calcul des composants (sous-recettes comprises) pour les projets de guilde : ns.OutilsCarnet.
+-- Calcul des composants (sous-recettes comprises) : ns.OutilsCarnet.
 -- (La page « Mes carnets », listes de courses et mini-liste, a été retirée en 3.7.0 ; les anciennes
 -- listes restent dans GuildUpDB.carnets, sans être lues.)
 -- Données : GuildUp_Craft.lua (recettes du client Forever) et GuildUp_Sources.lua (sources tirées
@@ -549,7 +549,6 @@ MajFiche = function()
 		fiche.jai:SetText("Alt + clic sur un objet du jeu pour voir sa fiche.")
 		fiche.icone:SetTexture("Interface\\Icons\\INV_Misc_Book_09")
 		fiche.besoin:Hide()
-		fiche.ajouter:Hide()
 		fiche.lien:Hide()
 		fiche.items:Hide()
 		for _, l in ipairs(lignesFiche) do l:Hide() end
@@ -569,7 +568,6 @@ MajFiche = function()
 		or ("Tu en as %d dans tes sacs · banque inconnue (ouvre-la une fois)"):format(sacs))
 	fiche.besoin:Show()
 	local fabricable = RecettesDe(objet) ~= nil
-	fiche.ajouter:SetShown(fabricable)
 	fiche.lien:Show()
 	fiche.items:SetShown(fabricable)
 
@@ -750,10 +748,8 @@ MajFiche = function()
 			for _, a in ipairs(artisans) do
 				local etat = a.moi and "|cff33dd55toi|r" or a.enLigne and "|cff33dd55en ligne|r" or "|cff999999hors ligne|r"
 				Ajouter(("- %s (%s %s) · %s"):format(NomJoueur(a.nom), NomMetier(a.metier), a.niveau or "?", etat), 2, {
-					action = (a.enLigne and not a.moi) and function()
-						if ns.CommanderObjet then ns.CommanderObjet(a.cle, a.nom, objet, fiche.qte) end
-					end or nil,
-					bulle = (a.enLigne and not a.moi) and ("Clic : commander à " .. NomJoueur(a.nom)) or nil })
+					action = (a.enLigne and not a.moi) and function() UI.Chuchoter(a.cle, a.nom) end or nil,
+					bulle = (a.enLigne and not a.moi) and ("Clic : chuchoter à " .. NomJoueur(a.nom)) or nil })
 			end
 		end
 		Espace()
@@ -1036,24 +1032,16 @@ CreerFiche = function()
 	f.jai:SetPoint("TOPLEFT", f.nom, "BOTTOMLEFT", 0, -5)
 	f.jai:SetPoint("RIGHT", f, "RIGHT", -14, 0)
 	f.jai:SetWordWrap(true)
-	-- actions : besoin de la guilde, ajouter à une liste (objets fabricables), lien dans la discussion,
-	-- voir dans l'onglet Items (objets fabricables : qui sait le fabriquer, commander)
-	f.besoin = UI.Bouton(f, "Besoin", "fantome", 66, 26)
+	-- actions : demander l'objet à la guilde (page Demandes, formulaire rempli : artisanat s'il se
+	-- fabrique), lien dans la discussion, voir dans l'onglet Crafts (objets fabricables : qui sait le fabriquer)
+	f.besoin = UI.Bouton(f, "Demander", "or", 84, 26)
 	f.besoin:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -94)
-	UI.Infobulle(f.besoin, "Ajouter aux besoins", "La guilde verra que tu cherches cet objet.")
+	UI.Infobulle(f.besoin, "Demander à la guilde", "Ouvre la page Demandes avec cet objet : tu choisis la quantité, puis Publier.")
 	f.besoin:SetScript("OnClick", function()
-		if f.objet and ns.AjouterBesoin and ns.AjouterBesoin(f.objet, f.qte or 1) and ns.Notifier then
-			ns.Notifier(nil, "Besoin ajouté", (InfoObjet(f.objet) or "Objet") .. " est dans tes besoins : la guilde le voit.", "aucun", function() end)
-		end
+		if f.objet and ns.OuvrirDemandes then ns.OuvrirDemandes(f.objet, RecettesDe(f.objet) and "A" or "R", f.qte or 1) end
 	end)
-	f.ajouter = UI.Bouton(f, "Ajouter", "or", 76, 26)
-	f.ajouter:SetPoint("LEFT", f.besoin, "RIGHT", 6, 0)
-	f.ajouter:SetScript("OnClick", function(self)
-		if ns.MontrerMenuProjets and f.objet then ns.MontrerMenuProjets(self, f.objet) end
-	end)
-	UI.Infobulle(f.ajouter, "Ajouter à un projet", "Choisis un de tes projets de guilde, ou crée-en un nouveau.")
 	f.lien = UI.Bouton(f, "Lien", "fantome", 50, 26)
-	f.lien:SetPoint("LEFT", f.ajouter, "RIGHT", 6, 0)
+	f.lien:SetPoint("LEFT", f.besoin, "RIGHT", 6, 0)
 	f.lien:SetScript("OnClick", function()
 		local _, lien = InfoObjet(f.objet)
 		if lien then
@@ -1062,12 +1050,12 @@ CreerFiche = function()
 		end
 	end)
 	UI.Infobulle(f.lien, "Lien", "Met le lien de l'objet dans la discussion.")
-	f.items = UI.Bouton(f, "Voir dans Items", "fantome", 110, 26)
+	f.items = UI.Bouton(f, "Voir dans Crafts", "fantome", 116, 26)
 	f.items:SetPoint("LEFT", f.lien, "RIGHT", 6, 0)
 	f.items:SetScript("OnClick", function()
 		if f.objet and ns.MontrerObjetItems then ns.MontrerObjetItems(f.objet) end
 	end)
-	UI.Infobulle(f.items, "Voir dans Items", "Ouvre l'onglet Items de la page Artisanat sur cet objet : qui, dans la guilde, sait le fabriquer, et le bouton Commander.")
+	UI.Infobulle(f.items, "Voir dans Crafts", "Ouvre l'onglet Crafts de la page Artisanat sur cet objet : qui, dans la guilde, sait le fabriquer.")
 	local filet = UI.Filet(f)
 	filet:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -130)
 	filet:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -130)
@@ -1083,7 +1071,7 @@ CreerFiche = function()
 	return f
 end
 
--- Ouvre la fiche d'un objet (qte : quantité proposée pour les commandes et les besoins)
+-- Ouvre la fiche d'un objet (qte : quantité proposée pour une demande)
 ns.FicheCadre = function() return fiche end
 -- où poser l'encyclopédie quand on l'ouvre : collée à droite de la fenêtre GuildUpSMB si elle est
 -- ouverte (elle la suit tant qu'on ne la déplace pas), sinon à droite de l'écran
@@ -1113,9 +1101,9 @@ ns.OuvrirFiche = function(objet, qte, origine)
 end
 
 --------------------------------------------------------------------------------
--- Onglet « Items » de la page Artisanat : tous les objets fabricables, catégories à gauche (et
--- sous-catégories de la choisie), recherche, tri ; boutons « Besoin » (ajoute aux besoins de la
--- guilde) et « Ajouter » (à une de mes listes ou un de mes projets, ou à un nouveau)
+-- Onglet « Crafts » de la page Artisanat : tous les objets fabricables, catégories à gauche (et
+-- sous-catégories de la choisie), recherche, tri ; détail de l'objet choisi à droite (« Demander » :
+-- formulaire de la page Demandes, Encyclopédie, artisans de la guilde)
 --------------------------------------------------------------------------------
 
 local page
@@ -1247,57 +1235,7 @@ local function SousCategories(i)
 end
 
 
--- menu « Ajouter à un projet » : mes projets de guilde + nouveau projet
-local menuProjets
-local function MontrerMenuProjets(bouton, objet)
-	menuProjets = menuProjets or Menu("GuildUpMenuProjets")
-	local m = menuProjets
-	local choix = { { titre = "Projets de guilde" } }
-	local moi = ns.Normaliser and ns.Normaliser(UnitName("player")) or UnitName("player")
-	for _, p in ipairs(ns.ListeProjets and ns.ListeProjets() or {}) do
-		if p.auteur == moi then choix[#choix + 1] = { projet = p } end
-	end
-	choix[#choix + 1] = { nouveauProjet = true }
-	local nomObjet = (InfoObjet(objet)) or "Objet"
-	for i, ch in ipairs(choix) do
-		local b = LigneMenu(m, i)
-		b:ClearAllPoints()
-		b:SetPoint("TOPLEFT", m, "TOPLEFT", 4, -4 - (i - 1) * 20)
-		b:SetPoint("RIGHT", m, "RIGHT", -4, 0)
-		b:Enable()
-		b.texte:SetPoint("LEFT", b, "LEFT", ch.titre and 4 or 12, 0)
-		b.texte:SetFontObject(ch.titre and "GameFontNormal" or "GameFontHighlightSmall")
-		if ch.titre then
-			b.texte:SetText(ch.titre)
-			b:SetScript("OnClick", nil)
-			b:Disable()
-		elseif ch.projet then
-			local p = ch.projet
-			b.texte:SetText(p.nom)
-			b:SetScript("OnClick", function()
-				m:Hide()
-				if ns.AjouterAProjet then ns.AjouterAProjet(p.id, objet, 1) end
-				if ns.Notifier then ns.Notifier("commandes", "Projet de guilde", nomObjet .. " ajouté au projet « " .. p.nom .. " »", "aucun", function() ns.OuvrirProjet(p.id) end) end
-			end)
-		else
-			b.texte:SetText(VERT .. "+ Nouveau projet…|r")
-			b:SetScript("OnClick", function()
-				m:Hide()
-				if ns.NouveauProjet then ns.NouveauProjet({ objet = objet }) end
-			end)
-		end
-		b:Show()
-	end
-	for i = #choix + 1, #m.boutons do m.boutons[i]:Hide() end
-	m:SetSize(210, 8 + #choix * 20)
-	m.ancre = bouton
-	m:ClearAllPoints()
-	m:SetPoint("TOPLEFT", bouton, "BOTTOMLEFT", 0, -2)
-	m:Show()
-end
-ns.MontrerMenuProjets = MontrerMenuProjets -- (bouton « Ajouter » de l'encyclopédie, plus haut)
-
--- Rangée d'un objet : icône, nom (qualité), niveau et fabrication, « Besoin », « Ajouter »
+-- Rangée d'un objet : icône, nom (qualité), niveau et fabrication
 local HAUTEUR_ITEM, ECART_ITEM = 52, 6
 local objetChoisi, objetChoisiLie -- objet montré dans le panneau de détail (et s'il est lié quand ramassé)
 local RendreItems -- (défini plus bas)
@@ -1407,7 +1345,7 @@ local function FabricableParLaGuilde(id)
 	return false
 end
 
--- Onglet Items : la liste (150 objets au plus) selon la catégorie, la recherche, les filtres et le tri
+-- Onglet Crafts : la liste (150 objets au plus) selon la catégorie, la recherche, les filtres et le tri
 RendreItems = function()
 	if not page then return end
 	local cat = CATEGORIES_ITEMS[categorieItems]
@@ -1452,7 +1390,7 @@ RendreItems = function()
 		b:ClearAllPoints()
 		b:SetPoint("TOPLEFT", contenu, "TOPLEFT", 0, -y)
 		b:SetPoint("RIGHT", contenu, "RIGHT", 0, 0)
-		b.objet, b.lie = o[1], o[7] -- (lié quand ramassé : pas de « Besoin » dans le détail)
+		b.objet, b.lie = o[1], o[7] -- (lié quand ramassé)
 		local choisi = (o[1] == objetChoisi)
 		b:SetBackdropColor(unpack(choisi and C.actif or C.carte))
 		b:Fort(choisi)
@@ -1698,26 +1636,18 @@ local function CreerPageItems(parent)
 	d.sous:SetPoint("RIGHT", d, "RIGHT", -10, 0)
 	d.sous:SetWordWrap(true)
 	local largeurBouton = (LARGEUR_DETAIL - 24 - 6) / 2
-	d.ajouter = UI.Bouton(d, "Ajouter", "or", largeurBouton, 26)
-	d.ajouter:SetPoint("TOPLEFT", d, "TOPLEFT", 12, -94)
-	d.ajouter:SetScript("OnClick", function(self) if objetChoisi then MontrerMenuProjets(self, objetChoisi) end end)
-	UI.Infobulle(d.ajouter, "Ajouter à un projet", "Choisis un de tes projets de guilde, ou crée-en un nouveau.")
-	d.besoin = UI.Bouton(d, "Besoin", "fantome", largeurBouton, 26)
-	d.besoin:SetPoint("LEFT", d.ajouter, "RIGHT", 6, 0)
-	d.besoin:SetScript("OnClick", function()
-		local o = objetChoisi
-		if o and ns.AjouterBesoin and ns.AjouterBesoin(o, 1) and ns.Notifier then
-			ns.Notifier(nil, "Besoin ajouté", ((InfoObjet(o)) or "Objet") .. " est dans tes besoins : la guilde le voit.", "aucun",
-				function() if ns.OuvrirBesoins then ns.OuvrirBesoins() end end)
-		end
+	d.demander = UI.Bouton(d, "Demander", "or", largeurBouton, 26)
+	d.demander:SetPoint("TOPLEFT", d, "TOPLEFT", 12, -94)
+	d.demander:SetScript("OnClick", function()
+		if objetChoisi and ns.OuvrirDemandes then ns.OuvrirDemandes(objetChoisi, "A", 1) end
 	end)
-	UI.Infobulle(d.besoin, "Ajouter à mes besoins", "La guilde voit que tu cherches cet objet (onglet Besoins de la page Dons).")
-	d.fiche = UI.Bouton(d, "Encyclopédie", "fantome", LARGEUR_DETAIL - 24, 26)
-	d.fiche:SetPoint("TOPLEFT", d.ajouter, "BOTTOMLEFT", 0, -6)
+	UI.Infobulle(d.demander, "Demander à la guilde", "Ouvre la page Demandes avec cet objet (artisanat) : tu choisis la quantité, puis Publier. Ceux qui ont la recette sont prévenus.")
+	d.fiche = UI.Bouton(d, "Encyclopédie", "fantome", largeurBouton, 26)
+	d.fiche:SetPoint("LEFT", d.demander, "RIGHT", 6, 0)
 	d.fiche:SetScript("OnClick", function() if objetChoisi and ns.OuvrirFiche then ns.OuvrirFiche(objetChoisi) end end)
 	UI.Infobulle(d.fiche, "Encyclopédie", "D'où vient l'objet, ses composants, où le trouver sur la carte.")
 	d.titreArtisans = UI.Texte(d, "GameFontNormal", C.ors)
-	d.titreArtisans:SetPoint("TOPLEFT", d.fiche, "BOTTOMLEFT", 0, -14)
+	d.titreArtisans:SetPoint("TOPLEFT", d.demander, "BOTTOMLEFT", 0, -14)
 	d.artisans = UI.Liste(d)
 	d.artisans:SetPoint("TOPLEFT", d.titreArtisans, "BOTTOMLEFT", 0, -8)
 	d.artisans:SetPoint("BOTTOMRIGHT", d, "BOTTOMRIGHT", -4, 10)
@@ -1732,9 +1662,9 @@ local function CreerPageItems(parent)
 		local l = UI.Rangee(d.artisans.contenu, HAUTEUR_ARTISAN - 4)
 		l.portrait = UI.Portrait(l, 28)
 		l.portrait:SetPoint("LEFT", l, "LEFT", 6, 0)
-		l.commander = UI.Bouton(l, "Commander", "or", 84, 24)
+		l.commander = UI.Bouton(l, "Chuchoter", "fantome", 84, 24)
 		l.commander:SetPoint("RIGHT", l, "RIGHT", -6, 0)
-		UI.Infobulle(l.commander, "Commander", "Demande-lui de te fabriquer cet objet (tu choisis la quantité). Tu la suis dans l'onglet Commandes.")
+		UI.Infobulle(l.commander, "Chuchoter", "Lui écrire. Pour que toute la guilde voie ta demande, utilise plutôt « Demander » au-dessus.")
 		l.nom = UI.Texte(l, "GameFontHighlight")
 		l.nom:SetPoint("TOPLEFT", l.portrait, "TOPRIGHT", 8, 1)
 		l.nom:SetPoint("RIGHT", l.commander, "LEFT", -6, 0)
@@ -1764,7 +1694,7 @@ local function CreerPageItems(parent)
 		local o = objetChoisi
 		local montre = o ~= nil
 		d.vide:SetShown(not montre)
-		for _, e in ipairs({ d.icone, d.nom, d.sous, d.ajouter, d.besoin, d.fiche, d.titreArtisans, d.artisans }) do e:SetShown(montre) end
+		for _, e in ipairs({ d.icone, d.nom, d.sous, d.demander, d.fiche, d.titreArtisans, d.artisans }) do e:SetShown(montre) end
 		if not montre then
 			d.aucun:Hide()
 			return
@@ -1778,7 +1708,6 @@ local function CreerPageItems(parent)
 		local recs = RecettesDe(o)
 		d.sous:SetText(((requis or 0) > 1 and ("Niveau requis " .. requis .. " · ") or "")
 			.. (recs and recs[1] and ("Fabriqué : " .. TexteRecette(recs[1])) or ""))
-		d.besoin:Activer(not objetChoisiLie)
 		-- les membres qui savent le fabriquer : moi, puis en ligne, puis les autres
 		local artisans = ns.ArtisansDe and ns.ArtisansDe(o) or {}
 		local enLigne = 0
@@ -1795,9 +1724,7 @@ local function CreerPageItems(parent)
 				.. (a.moi and "toi" or a.enLigne and "|cff6fd08cen ligne|r" or "hors ligne"))
 			l.commander:SetShown(not a.moi)
 			l.commander:Activer(a.enLigne and true or false)
-			l.commander:SetScript("OnClick", function()
-				if ns.CommanderObjet then ns.CommanderObjet(a.cle, a.nom, o, 1) end
-			end)
+			l.commander:SetScript("OnClick", function() UI.Chuchoter(a.cle, a.nom) end)
 			l:SetAlpha((a.enLigne or a.moi) and 1 or 0.6)
 			l:ClearAllPoints()
 			l:SetPoint("TOPLEFT", d.artisans.contenu, "TOPLEFT", 0, -y)
@@ -1813,10 +1740,10 @@ local function CreerPageItems(parent)
 	return p
 end
 
--- Ouvre Artisanat > Items sur un objet (son détail et ses artisans à droite)
+-- Ouvre Artisanat > Crafts sur un objet (son détail et ses artisans à droite)
 ns.MontrerObjetItems = function(objet)
 	objetChoisi, objetChoisiLie = objet, nil
-	-- lié quand ramassé ? (pas de « Besoin » dans le détail)
+	-- lié quand ramassé ?
 	for _, o in ipairs(Catalogue()) do
 		if o[1] == objet then objetChoisiLie = o[7]; break end
 	end
@@ -1825,9 +1752,8 @@ ns.MontrerObjetItems = function(objet)
 end
 
 --------------------------------------------------------------------------------
--- Page « Artisanat » de la fenêtre GuildUpSMB : onglets Registre (GuildUp_Metiers.lua), Items (ici),
--- Projets de guilde (GuildUp_Projets.lua) et Commandes (GuildUp_Metiers.lua ; compteur des commandes
--- reçues en attente, ns.MajCompteCommandes). Chaque onglet est créé à sa première ouverture ; la
+-- Page « Artisanat » de la fenêtre GuildUpSMB : onglets Registre (GuildUp_Metiers.lua) et Crafts (ici).
+-- Chaque onglet est créé à sa première ouverture ; la
 -- page ne suit pas le rafraîchissement automatique de la fenêtre (rafraichirAuto = false) : chaque
 -- module la rafraîchit sur ses évènements.
 --------------------------------------------------------------------------------
@@ -1836,23 +1762,14 @@ local ongletVoulu
 local CREER_ONGLETS = {
 	function(q) return ns.CreerPageRegistre and ns.CreerPageRegistre(q) end,
 	function(q) return CreerPageItems(q) end,
-	function(q) return ns.CreerPageProjets and ns.CreerPageProjets(q) end,
-	function(q) return ns.CreerPageCommandes and ns.CreerPageCommandes(q) end,
 }
-
--- compteur de l'onglet Commandes : commandes reçues qui attendent ma réponse (GuildUp_Metiers.lua)
-ns.MajCompteCommandes = function()
-	if pageArtisanat and pageArtisanat.onglets then
-		pageArtisanat.onglets:Compte(4, ns.CommandesEnAttente and ns.CommandesEnAttente() or 0)
-	end
-end
 
 local function CreerPageArtisanat(parent)
 	local p = CreateFrame("Frame", nil, parent)
 	p:SetAllPoints()
 	p.rafraichirAuto = false
 	p.sousPages = {}
-	p.onglets = UI.Onglets(p, { "Registre", "Items", "Projets de guilde", "Commandes" }, function(i)
+	p.onglets = UI.Onglets(p, { "Registre", "Crafts" }, function(i)
 		p.Selectionner(i)
 		p.Maj()
 	end)
@@ -1873,7 +1790,6 @@ local function CreerPageArtisanat(parent)
 	p.Maj = function()
 		local sp = p.sousPages[p.onglet]
 		if sp and sp.Maj then sp.Maj() end
-		ns.MajCompteCommandes()
 	end
 	-- ns.OuvrirInterface("artisanat", onglet)
 	p.Ouvrir = function(onglet)
@@ -1882,12 +1798,11 @@ local function CreerPageArtisanat(parent)
 	end
 	pageArtisanat = p
 	p.Selectionner(ongletVoulu or 1)
-	ns.MajCompteCommandes()
 	return p
 end
 if ns.AjouterPage then ns.AjouterPage("artisanat", CreerPageArtisanat) end
 
--- onglet 1 Registre, 2 Items, 3 Projets, 4 Commandes (sans onglet : le dernier montré)
+-- onglet 1 Registre, 2 Crafts (sans onglet : le dernier montré)
 ns.OuvrirArtisanat = function(onglet)
 	ongletVoulu = onglet or (pageArtisanat and pageArtisanat.onglet) or 1
 	if pageArtisanat then pageArtisanat.Selectionner(ongletVoulu) end
@@ -1903,7 +1818,7 @@ ns.BasculerArtisanat = function(onglet)
 	end
 end
 
--- outils partagés avec le registre (GuildUp_Metiers.lua) et les projets de guilde (GuildUp_Projets.lua)
+-- outils partagés avec le registre (GuildUp_Metiers.lua)
 ns.OutilsCarnet = { RecettesDe = RecettesDe, InfoObjet = InfoObjet, NomMetier = NomMetier, JAi = JAi,
 	TexteRecette = TexteRecette,
 	Developper = Developper, NouveauContexte = NouveauContexte,
@@ -1919,7 +1834,7 @@ ns.DiagCarnet2 = function(L)
 end
 
 --------------------------------------------------------------------------------
--- Évènements : l'onglet Items et l'encyclopédie suivent les sacs, la banque et les objets reçus du
+-- Évènements : l'onglet Crafts et l'encyclopédie suivent les sacs, la banque et les objets reçus du
 -- serveur en direct
 --------------------------------------------------------------------------------
 

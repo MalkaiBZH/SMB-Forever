@@ -94,13 +94,22 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   monstres dont ils ont besoin. L'infobulle du jeu complète quand elle le peut. `/smb objectifs` pour couper
   (ou la case dans Options).
 - **Médaillon GuildUpSMB** : bouton rond à placer où l'on veut sur l'écran (glisser), anneau à la
-  couleur de son rôle, pastille des nouveautés (groupes ouverts, appels à l'aide, demandes de dons).
-  Halo doré quand des groupes sont ouverts, anneau vert quand on est en attente. Clic : la fenêtre
-  GuildUpSMB ; clic droit : menu rapide (rôle, partage de position, groupes, appel à l'aide, options).
-- **Fenêtre GuildUpSMB** (style sombre et doré) : menu à gauche (Accueil, Guilde, Groupes, Quêtes en
-  commun, Artisanat, Dons, Événements, Activité, À l'aide !, Options) et choix du rôle en haut. L'accueil
-  résume la guilde : membres sur ta carte, groupes ouverts (postuler en un clic), appels à l'aide,
-  demandes de dons, besoins que tu sais fabriquer, avancement du dernier projet.
+  couleur de son rôle, pastille des nouveautés (appels à l'aide, demandes que tu peux honorer, tirage au sort
+  qui attend tes dés). Halo doré quand un tirage au sort t'attend. Clic : la fenêtre GuildUpSMB ; clic droit :
+  menu rapide (rôle, partage de position, demandes, tirage au sort, sondage, appel à l'aide, options).
+- **Fenêtre GuildUpSMB** (style sombre et doré) : un menu par fonction à gauche (Accueil, Demandes, Artisanat,
+  Quêtes, Guilde, Jeux, Événements, Activité, Statistiques, puis À l'aide ! et Options) et choix du rôle en
+  haut. L'accueil résume la guilde : membres sur ta carte, demandes que tu peux honorer (« Je m'en occupe » en
+  un clic), appels à l'aide, tes demandes en cours, les deux prochains événements.
+- **Demandes** (`/smb demandes`) : chacun publie ce qu'il lui faut, une *ressource* (« 20 Étoffe de lin ») ou de
+  l'*artisanat* (un objet à fabriquer), avec une quantité (objet à chercher dans tout le jeu ou à glisser).
+  Toute la guilde voit la liste, même quand son auteur est hors ligne. Un membre la prend (« Je m'en occupe ») :
+  son nom s'affiche et l'auteur est prévenu ; puis il l'honore (« C'est fait ! », ou « Reçu ! » côté auteur)
+  ou la libère. Filtres Toutes / Je peux aider / Prises par moi ; « tu en as N » (sacs et banque) et « tu sais le
+  fabriquer » sur chaque demande. Bulle pour une nouvelle demande que tu peux honorer ; ligne « X demande cet
+  objet » dans les infobulles d'objets. 20 demandes en cours au plus par membre ; les demandes honorées ou
+  retirées sont oubliées après 3 jours, les autres après 30 jours sans changement. Les demandes honorées
+  entrent dans le fil d'activité. (Remplacent depuis la 4.0.0 les dons, besoins, commandes et projets de guilde.)
 - **Page Guilde** : tous les membres de la guilde, en ligne et hors ligne, avec tout ce que l'addon sait
   d'eux : niveau, classe, rang, zone ou dernière connexion, pseudo et personnage principal, rôle,
   SMB Forever et sa version (verte si à jour, bleue si plus ancienne que la tienne, dorée si plus récente ;
@@ -115,36 +124,26 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   main) manque, une alerte « Profil incomplet » s'affiche en haut de la fenêtre ; elle ouvre la fenêtre
   « Complète ton profil » (qui s'ouvre aussi d'elle-même la première fois que tu ouvres la fenêtre dans
   la session). Aussi par le bouton « Mon profil » de la page Guilde.
-- **Recherche de groupe de la guilde** : places Tank / Heal / DPS, groupes jusqu'à 40, et bouton
-  « Rendre public » pour inscrire le groupe dans la recherche du jeu.
-  - **Groupes programmés** : dans « Mon groupe », choisis un départ aujourd'hui ou demain (par pas de 15 min)
-    au lieu de « Maintenant ». Les membres s'inscrivent à l'avance depuis Parcourir (puce « Programmés », heure
-    affichée dans l'heure de chacun). Bulle 10 min avant le départ pour le chef et les inscrits, bulle « C'est
-    l'heure » au chef, et bouton « Inviter tous les inscrits » (passage en raid compris). L'annonce survit à un
-    /reload du chef ; elle se ferme seule 1 h après le départ si personne n'est venu.
 - **Carte de la guilde** : position des membres sur la carte du monde (partage activé par défaut,
   désactivable dans les options ou le menu rapide du médaillon). Chaque membre y apparaît avec son médaillon
   (son portrait), entouré d'un anneau à la couleur de sa classe ; un point de couleur s'il n'a pas de portrait.
   Quand plusieurs membres se chevauchent, la position la plus récente est au-dessus.
-- **Quêtes en commun** : les quêtes que d'autres membres font aussi, avec « Créer un groupe ». Si tu es déjà
-  en groupe, le bouton devient « Inviter » (les membres en ligne qui ont la quête et ne sont pas encore avec
-  toi), ou « Déjà groupés » quand ils sont tous dans ton groupe ; « (groupe) » marque ceux qui y sont.
+- **Quêtes** : les quêtes que d'autres membres font aussi, avec « Inviter » (les membres en ligne qui ont la
+  quête et ne sont pas encore avec toi ; seul, l'invitation crée le groupe), « Déjà groupés » quand ils sont tous
+  dans ton groupe, « Hors ligne » quand personne n'est connecté ; « (groupe) » marque ceux qui y sont.
 - **Artisanat** :
-  - *Registre* des métiers et recettes de chaque membre, commande en un clic ;
-  - *Commandes* : les commandes reçues et passées, gardées 30 jours, avec leur état (en attente, acceptée, refusée, faite, annulée). L'artisan accepte, refuse ou marque « Fait » ; le client annule ou marque « Reçue ». Chaque changement prévient l'autre par une bulle (envoyé à son retour s'il est hors ligne). Le nombre de commandes reçues en attente s'affiche sur l'onglet ;
-  - *Items* : tous les objets fabricables, par catégorie, avec des filtres (ma classe, mon niveau, niveau requis, fabricable par la guilde) ; un clic sur un objet montre à droite qui, dans la guilde, sait le fabriquer (chuchoter, commander) ;
-  - *Encyclopédie* des objets (Alt + clic sur un objet) ; « Voir dans Items » montre qui sait fabriquer l'objet ;
-  - *Dons* (un hôtel des ventes gratuit), *Demandes* et *Besoins* ;
-  - *Dons et besoins croisés* : quand un membre met en don un objet de tes besoins, une bulle te prévient (une seule fois par donneur et par objet ; clic : la page Dons sur cet objet). Dans l'onglet Dons, ces dons portent la marque « Dans tes besoins », passent en tête, et la case « Mes besoins » ne montre qu'eux. Dans l'onglet Besoins, chacun de tes besoins mis en don indique « donné par X » avec un bouton Demander ; dans « Besoins de la guilde », ce que tu as dans tes sacs ou ta banque est marqué « tu en as N » ;
-  - *Projets de guilde* : une liste d'objets à fabriquer, découpée en tâches à prendre.
+  - *Registre* des métiers et recettes de chaque membre ; clic sur une recette d'un membre : demande d'artisanat ;
+  - *Crafts* : tous les objets fabricables, par catégorie, avec des filtres (ma classe, mon niveau, niveau requis, fabricable par la guilde) ; un clic sur un objet montre à droite qui, dans la guilde, sait le fabriquer (chuchoter), et « Demander » prépare une demande d'artisanat ;
+  - *Encyclopédie* des objets (Alt + clic sur un objet) ; « Demander » (page Demandes) et « Voir dans Crafts ».
 - **Annonces** en bulle : montées de niveau (« Nom a up ! », avec des chopes à l'écran : 4, 8 aux paliers 10, 20,
   30… et 12 au niveau maximum ; celui qui monte voit aussi les siennes), nouveaux métiers, paliers de métier.
 - **À l'aide !** (`/smb sos`) : appel à la guilde avec sa position.
-- **Tirage au sort** (`/smb roll`) : un membre ouvre un tirage sur un objet ou un lot, toute la guilde reçoit une
-  bulle et lance les dés d'un clic (le `/roll` 1-100 du jeu, lu par l'addon et transmis à la guilde). Classement en
-  direct, égalités en tête départagées par un nouveau tour, résultat annoncé en bulle. Il faut l'addon pour participer.
-  Avant l'ouverture, l'organisateur choisit qui participe : une case par membre connecté, « Tout cocher », ou
-  « Mon groupe » pour réserver le tirage à son groupe ou à son raid.
+- **Jeux** (`/smb jeux`) : une page, un onglet par jeu.
+  - *Tirage au sort* (`/smb roll`) : à droite, on prépare le tirage (un objet glissé dans la case et / ou un lot
+    écrit, les participants : une case par membre connecté, « Tout cocher », ou « Mon groupe » pour le réserver à
+    son groupe ou à son raid), puis « Ouvrir le tirage ». Toute la guilde reçoit une bulle et lance les dés d'un clic
+    sur la page (le `/roll` 1-100 du jeu, lu par l'addon et transmis à la guilde). À gauche, le classement en direct ;
+    égalités en tête départagées par un nouveau tour, résultat annoncé en bulle. Il faut l'addon pour participer.
 - **Sondage** (`/smb sondage`, ou « Sondage » dans le menu rapide du médaillon) : une question, 2 à 5 choix, 1 à
   10 minutes pour voter. Les membres connectés qui ont l'addon reçoivent une bulle et votent d'un clic ; résultats en
   direct, changement d'avis possible jusqu'à la fin, votes publics (le survol d'un choix montre qui l'a choisi),
@@ -153,10 +152,10 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   palier de métier, tirage gagné) sont épinglés sur la carte du monde, à l'endroit où ils sont arrivés : étoile,
   rond ou losange, avec qui, quoi et quand au survol. Gardés sans limite de durée (400 au plus) et échangés à la
   connexion. Seulement pour les membres qui partagent leur position, hors instance. `/smb souvenirs` pour les cacher.
-- **Activité** (`/smb activite`) : le fil d'activité de la guilde sur 30 jours (montées de niveau, métiers, dons
-  remerciés, tirages gagnés). À la connexion, une bulle « Pendant ton absence » résume ce qui a été manqué : un membre
-  connecté renvoie les nouveautés à celui qui revient. À côté, le podium des 7 derniers jours (niveaux gagnés, dons
-  remerciés, tirages gagnés). Le fil ne contient que ce qu'un membre en ligne avec l'addon a vu passer.
+- **Activité** (`/smb activite`) : le fil d'activité de la guilde sur 30 jours (montées de niveau, métiers, demandes
+  honorées, tirages gagnés). À la connexion, une bulle « Pendant ton absence » résume ce qui a été manqué : un membre
+  connecté renvoie les nouveautés à celui qui revient. À côté, le podium des 7 derniers jours (niveaux gagnés, demandes
+  honorées, tirages gagnés). Le fil ne contient que ce qu'un membre en ligne avec l'addon a vu passer.
 - **Statistiques** (`/smb stats`) : la présence de la guilde pour choisir le moment des sorties. Toutes les 10 minutes,
   chaque addon connecté relève le nombre de membres en ligne (liste de guilde du jeu, addon ou pas) ; les relevés sont
   gardés 8 semaines et partagés entre membres à la connexion. Semaine type (grille jours × heures), cinq meilleurs
@@ -166,7 +165,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   état en couleur. À droite, le détail (description, inscrits avec leur classe et leur état) et les réponses :
   S'inscrire / Peut-être / Se désinscrire (ou Accepter / Refuser pour une invitation), sans ouvrir le calendrier
   du jeu. Boutons « Créer un événement de guilde » et « Ouvrir le calendrier ». Une bulle prévient d'un nouvel
-  événement de guilde ; un clic ouvre la page. Le prochain événement est aussi rappelé sur l'accueil.
+  événement de guilde ; un clic ouvre la page. Les deux prochains événements sont aussi rappelés sur l'accueil.
 - **Identité** : un pseudo commun à tous ses personnages et son personnage principal. Partout où l'addon
   affiche un membre (listes, bulles, infobulles, HUD), il apparaît sous la forme **Pseudo (Prénom)** s'il a choisi
   un pseudo (le prénom est la première partie de son nom en jeu) ; sinon sous son nom en jeu.
@@ -184,18 +183,17 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 | `/smb` | Fenêtre GuildUpSMB |
 | `/smb options` | Page Options (pseudo, rôle, notifications, taille de la fenêtre, taille des membres sur la carte, hauteur et distance minimale des repères…) |
 | `/smb taille 1.2` | Taille de la fenêtre GuildUpSMB (de 0.7 à 1.6, 1.1 par défaut) |
-| `/smb groupes` | Recherche de groupe de la guilde |
-| `/smb metiers` | Registre des métiers |
+| `/smb demandes` | Demandes de la guilde (ressources, artisanat) |
+| `/smb metiers` | Artisanat : registre des métiers |
+| `/smb crafts` | Artisanat : tous les objets fabricables |
 | `/smb quetes` | Quêtes en commun |
+| `/smb jeux` | Jeux de la guilde (tirage au sort) |
 | `/smb evenements` | Créer un événement de guilde |
-| `/smb echanges` | Dons et besoins |
 | `/smb encyclo` | Encyclopédie |
-| `/smb items` | Tous les objets fabricables |
-| `/smb projets` | Projets de guilde |
 | `/smb sos` | Appeler la guilde à l'aide |
 | `/smb activite` | Fil d'activité de la guilde et podium des 7 derniers jours |
 | `/smb stats` | Statistiques de présence : semaine type et meilleurs créneaux |
-| `/smb roll [objet ou mot]` | Tirage au sort de la guilde (sans rien : rouvrir la fenêtre du tirage) |
+| `/smb roll [objet ou mot]` | Tirage au sort de la guilde (page Jeux ; avec un objet ou un mot : le lot déjà rempli) |
 | `/smb layer` | Ton layer (d'après les PNJ observés) et les membres sur le même layer ou un autre |
 | `/smb souvenirs` | Montrer / cacher les souvenirs de la guilde sur la carte du monde |
 | `/smb sondage` | Sondage de la guilde : celui en cours ou le dernier, sinon en poser un |
@@ -218,10 +216,9 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 
 ## Données enregistrées
 
-- `GuildUpDB` (par compte) : réglages, dons, besoins, projets, identité, listes reçues des autres membres,
-  dernière version de SMB Forever vue de chaque membre (`versionsVues`, oubliée après 60 jours),
-  groupes programmés (`groupesProgrammes` : ton annonce programmée, ses inscrits et tes inscriptions, oubliés
-  1 h après le départ).
+- `GuildUpDB` (par compte) : réglages, demandes de la guilde (`demandes`), objets de ta banque (`banque`, pour
+  « tu en as N »), identité, listes reçues des autres membres, dernière version de SMB Forever vue de chaque membre
+  (`versionsVues`, oubliée après 60 jours).
 - `GuildUpMetiersDB` (par compte) : métiers et recettes de ses personnages et des membres de la guilde.
 
 Les listes des membres hors ligne sont gardées et relayées par les membres connectés ; celles sans

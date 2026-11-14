@@ -52,15 +52,24 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   sans l'addon, versions en retard) ; seul envoi : le chuchotement « Rappeler » (pas de message d'addon).
 - `GuildUp_Options.lua` : fenêtre d'options, `/smb diag`, réinitialisation, commandes `/smb`.
 - Les fichiers découpés accèdent à `GuildUpDB` par un mandataire `db` (même nom qu'avant) et reprennent les fonctions partagées en tête de fichier (`local Message = ns.Coeur.Message`).
-- Pages de la fenêtre GuildUpSMB (chacune enregistrée par son module avec `ns.AjouterPage`) : Guilde
-  (`GuildUp_Membres.lua`), Groupes (`GuildUp_GroupesFenetre.lua`), Quêtes en commun (`GuildUp_Quetes.lua`), Dons (`GuildUp_Echanges.lua` +
-  `GuildUp_Besoins.lua`), Artisanat (`GuildUp_Carnet.lua` ; onglets Registre et Commandes dans `GuildUp_Metiers.lua`, Items dans
-  `GuildUp_Carnet.lua`, Projets dans `GuildUp_Projets.lua`), Options
-  (`GuildUp_Options.lua`), Événements (`GuildUp_Evenements.lua`), Activité (`GuildUp_Journal.lua`), Statistiques (`GuildUp_Stats.lua`). Les anciennes fonctions `ns.Ouvrir*` / `ns.Basculer*` ouvrent ces pages
-  (`ns.OuvrirInterface(page, ...)`). L'encyclopédie et l'aperçu 3D restent des fenêtres à part.
-  Les pages « Jouer ensemble » et « Mes carnets » ont été retirées en 3.7.0 (les anciennes listes restent dans
-  `GuildUpDB.carnets`, sans être lues).
-- Groupes : `GuildUp_Catalogue.lua` (contenus de la recherche de groupe), `GuildUp_Groupes.lua` (protocole, état partagé `ns.Groupes.etat`, actions), `GuildUp_GroupesFenetre.lua` (page Groupes de la fenêtre GuildUpSMB).
+- Pages de la fenêtre GuildUpSMB (chacune enregistrée par son module avec `ns.AjouterPage`), **un menu par fonction**,
+  dans cet ordre (4.0.0) : Accueil (`GuildUp_Interface.lua`), Demandes (`GuildUp_Demandes.lua`), Artisanat
+  (`GuildUp_Carnet.lua` : onglets Registre dans `GuildUp_Metiers.lua` et Crafts dans `GuildUp_Carnet.lua`), Quêtes
+  (`GuildUp_Quetes.lua`), Guilde (`GuildUp_Membres.lua`), Jeux (`GuildUp_Tirage.lua` : onglet Tirage au sort ; un jeu de
+  plus = un onglet de plus), Événements (`GuildUp_Evenements.lua`), Activité (`GuildUp_Journal.lua`), Statistiques
+  (`GuildUp_Stats.lua`) ; Options (`GuildUp_Options.lua`) en bas du menu. Les anciennes fonctions `ns.Ouvrir*` /
+  `ns.Basculer*` ouvrent ces pages (`ns.OuvrirInterface(page, ...)`). L'encyclopédie et l'aperçu 3D restent des
+  fenêtres à part. Ne pas éparpiller : une nouvelle fonction trouve sa place dans une section existante (onglet) avant
+  d'en créer une.
+  Retirés : « Jouer ensemble » et « Mes carnets » en 3.7.0 (anciennes listes dans `GuildUpDB.carnets`, sans être lues) ;
+  en 4.0.0, la recherche de groupe (`GuildUp_Catalogue`, `GuildUp_Groupes`, `GuildUp_GroupesFenetre`, `GuildUp_Recherche`),
+  les dons et besoins (`GuildUp_Echanges`, `GuildUp_Besoins`), les projets de guilde (`GuildUp_Projets`) et les commandes
+  d'artisanat (dans `GuildUp_Metiers`) : les demandes les remplacent. Leurs données sont effacées à la connexion
+  (`Migrer` dans `GuildUp_Demandes.lua` ; mes anciens besoins y deviennent des demandes de ressources).
+- `GuildUp_Demandes.lua` : demandes de la guilde (ressource ou artisanat), qu'un membre prend puis honore. Fournit
+  aussi les outils d'objets communs (`ns.IconeObjet`, `ns.InfobulleObjet`, `ns.EcrireNomObjet`, `ns.NomMembreColore`,
+  `ns.ChercherObjets`, `ns.IndexObjets`, `ns.NomObjetListe`) et la lecture des sacs et de la banque (`ns.LireConteneur`,
+  `ns.SacsDeBanque`, `ns.Jai`). `ns.OuvrirDemandes(objet, genre, qte)` ouvre la page, formulaire rempli.
 - `GuildUp_Reperes.lua` : repères des membres de la même carte à l'écran (HUD : au-dessus de la tête, en haut, ou au bord), calculés à partir des
   positions de `GuildUp_Carte.lua` (`ns.PositionsMembres`, `ns.MaPosition`, portrait dans le message `P`) ; pas de préfixe propre.
 - `GuildUp_Cena.lua` : explosion « Et son nom est… » et musique à chaque montée de niveau d'un membre
@@ -81,8 +90,8 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   - `ns.StatsReseau()` donne les compteurs pour `/smb diag`.
   - Ne jamais appeler `SendAddonMessage` ni écouter `CHAT_MSG_ADDON` ailleurs.
 - Un fichier par fonctionnalité, chacun avec **son préfixe de message d'addon** sur le canal `GUILD` :
-  `GuildUpGrp` (groupes), `GuildUpPos` (carte), `GuildUpQst` (quêtes), `GuildUpMet` (métiers),
-  `GuildUpEch` (dons), `GuildUpBes` (besoins), `GuildUpPrj` (projets), `GuildUpId` (identité),
+  `GuildUpPos` (carte), `GuildUpQst` (quêtes), `GuildUpMet` (métiers), `GuildUpDem` (demandes,
+  `GuildUp_Demandes.lua` : une demande entière par message, la date la plus récente gagne), `GuildUpId` (identité),
   `GuildUpAnn` (annonces), `GuildUpAid` (aide), `GuildUpVer` (version), `GuildUpGU` (emote du cri de guilde),
   `GuildUpTir` (tirage au sort, `/smb roll`), `GuildUpSdg` (sondage, `/smb sondage`, `GuildUp_Sondage.lua`),
   `GuildUpJrn` (fil d'activité et podium, `GuildUp_Journal.lua` : les autres modules y notent leurs nouvelles avec

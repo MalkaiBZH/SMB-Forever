@@ -1,9 +1,9 @@
 ## Interface: 16001
 ## Title: SMB Forever
-## Notes: Outils de guilde : bannières par rôle, groupes et quêtes, artisanat et dons, calendrier, carte.|n|n/smb pour ouvrir la fenêtre SMB Forever
+## Notes: Outils de guilde : bannières par rôle, demandes et artisanat, quêtes, jeux, calendrier, carte.|n|n/smb pour ouvrir la fenêtre SMB Forever
 ## Author: Miko
 ## IconTexture: Interface\AddOns\GuildUpSMB\media\gu_emote
-## Version: 3.14.2
+## Version: 4.0.0
 ## SavedVariables: GuildUpDB, GuildUpMetiersDB
 
 GuildUp_Config.lua
@@ -16,9 +16,6 @@ GuildUp_Bouton.lua
 GuildUp_Interface.lua
 GuildUp_Options.lua
 GuildUp_Identite.lua
-GuildUp_Catalogue.lua
-GuildUp_Groupes.lua
-GuildUp_GroupesFenetre.lua
 GuildUp_Carte.lua
 GuildUp_Reperes.lua
 GuildUp_Layers.lua
@@ -33,11 +30,9 @@ GuildUp_Evenements.lua
 GuildUp_Annonces.lua
 GuildUp_GU.lua
 GuildUp_Cena.lua
-GuildUp_Recherche.lua
 GuildUp_Objets.lua
 GuildUp_Objets_enUS.lua
-GuildUp_Besoins.lua
-GuildUp_Echanges.lua
+GuildUp_Demandes.lua
 GuildUp_Aide.lua
 GuildUp_Tirage.lua
 GuildUp_Sondage.lua
@@ -47,5 +42,4 @@ GuildUp_Stats.lua
 GuildUp_Craft.lua
 GuildUp_Sources.lua
 GuildUp_Carnet.lua
-GuildUp_Projets.lua
 GuildUp_Diag.lua

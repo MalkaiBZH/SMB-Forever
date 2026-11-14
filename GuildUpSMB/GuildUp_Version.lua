@@ -135,8 +135,17 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["4.0.0"] = {
+		"|cffffd100SMB Forever se réorganise|r : un menu par fonction, dans cet ordre : Accueil, Demandes, Artisanat, Quêtes, Guilde, Jeux, Événements, Activité, Statistiques. Tout le monde doit passer à cette version : les dons, besoins, commandes et projets des anciennes versions ne passent plus.",
+		"|cffffd100Demandes|r (nouveau) : publie ce qu'il te faut, une ressource (« 20 Étoffe de lin ») ou un objet à fabriquer. Toute la guilde voit la liste, même quand tu es hors ligne. Un membre clique « Je m'en occupe » : son nom s'affiche, tu es prévenu. Puis « C'est fait ! » (ou « Reçu ! » de ton côté). Ceux qui ont l'objet dans leurs sacs ou leur banque, ou qui savent le fabriquer, reçoivent une bulle. Tes anciens besoins deviennent des demandes.",
+		"Les demandes remplacent les |cffffd100dons|r, les |cffffd100besoins|r, les |cffffd100commandes d'artisanat|r et les |cffffd100projets de guilde|r, qui disparaissent. Les demandes honorées comptent pour la générosité du podium.",
+		"|cffffd100Artisanat|r simplifié : deux onglets, Registre et Crafts (l'ancien onglet Items). Le bouton « Demander » (Crafts, encyclopédie, clic sur une recette dans le Registre) prépare une demande d'artisanat.",
+		"|cffffd100Jeux|r (nouveau) : le tirage au sort a sa page, avec le tirage en cours à gauche et la préparation du suivant à droite (lot, participants). D'autres jeux pourront s'y ajouter.",
+		"La |cffffd100recherche de groupe|r de la guilde est retirée. Sur la page Quêtes, « Inviter » invite directement les membres en ligne qui ont la même quête.",
+		"L'accueil montre les demandes que tu peux honorer, tes demandes en cours et les deux prochains événements.",
+	},
 	["3.14.2"] = {
 		"Petits réglages.",
 	},

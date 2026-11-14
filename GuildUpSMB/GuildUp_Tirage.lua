@@ -1,6 +1,6 @@
 -- GuildUpSMB : tirage au sort de la guilde (/smb roll, préfixe "GuildUpTir").
--- Un membre (l'organisateur) ouvre un tirage sur un lot ; les autres ont une bulle, puis une petite
--- fenêtre où lancer les dés. Le hasard vient du jeu : le bouton fait le /roll 1-100 du jeu, l'addon lit
+-- Un membre (l'organisateur) ouvre un tirage sur un lot ; les autres ont une bulle, qui ouvre la page Jeux
+-- (onglet « Tirage au sort ») où lancer les dés. Le hasard vient du jeu : le bouton fait le /roll 1-100 du jeu, l'addon lit
 -- le résultat annoncé par le serveur (message système) et le transmet à la guilde. Les joueurs à côté
 -- le voient aussi passer dans leur discussion. Un seul lancer par membre et par tour.
 -- Avant d'ouvrir, l'organisateur choisit qui participe : la liste des membres connectés qui ont l'addon,
@@ -440,10 +440,15 @@ chrono:SetScript("OnUpdate", function(_, dt)
 end)
 
 --------------------------------------------------------------------------------
--- Fenêtre
+-- Page « Jeux » de la fenêtre GuildUpSMB (ns.AjouterPage("jeux")) : un onglet par jeu, pour l'instant
+-- « Tirage au sort ». À gauche, le tirage en cours (sinon le dernier) : lot, organisateur, état, bouton
+-- Lancer les dés, classement, Clôturer / Annuler pour l'organisateur. À droite, « Nouveau tirage » : le
+-- lot (texte, ou objet glissé dans la case), les participants (membres connectés qui ont l'addon, tous
+-- cochés ; « Mon groupe »), puis « Ouvrir le tirage ».
 --------------------------------------------------------------------------------
 
-local LARGEUR, HAUT_LIGNE, LIGNES = 340, 24, 8
+local HAUT_LIGNE = 24
+local MARGE = 16
 
 local function TirageAMontrer()
 	if vue and tirages[vue.cle] == vue then return vue end
@@ -457,20 +462,6 @@ local function TirageAMontrer()
 	end
 	return vue
 end
-
-local function DemanderLot()
-	ns.UI.DemanderTexte({
-		titre = "Nouveau tirage au sort", bouton = "Ouvrir", maxLettres = 60, vide = true,
-		texte = "Quel est le lot ? (facultatif)\nPour un objet : écris /smb roll puis Maj + clic sur l'objet.",
-		valider = function(texte) if ns.PreparerTirage then ns.PreparerTirage(nil, texte) end end,
-	})
-end
-
---------------------------------------------------------------------------------
--- Choix des participants, avant l'ouverture
---------------------------------------------------------------------------------
-
-local LARGEUR_CHOIX, LIGNES_CHOIX = 300, 10
 
 -- moi d'abord, puis les membres connectés qui ont l'addon, par nom
 local function Presents()
@@ -501,11 +492,33 @@ local function ClesGroupe()
 	return cles
 end
 
+--------------------------------------------------------------------------------
+-- « Nouveau tirage » : lot et participants
+--------------------------------------------------------------------------------
+
+local function MajLot()
+	local f = choix
+	if not f then return end
+	local objet = f.objet
+	if objet then
+		local nom, _, qualite, icone = ns.InfoObjet(objet)
+		if not nom and ns.Precharger then ns.Precharger(objet) end
+		if f.case.Poser then f.case:Poser(icone, qualite) end
+		f.nomObjet:SetText(select(2, ns.InfoObjet(objet)) or nom or ("objet n° " .. objet))
+	else
+		if f.case.Poser then f.case:Poser("Interface\\PaperDoll\\UI-Backpack-EmptySlot", nil, true) end
+		f.nomObjet:SetText("|cff9b9380Glisse un objet ici (facultatif)|r")
+	end
+end
+
 local function MajChoix()
 	local f = choix
-	if not f or not f:IsShown() then return end
+	if not f or not f:IsVisible() then return end
+	-- les membres connectés : ceux qui arrivent sont cochés, ceux qui partent disparaissent
+	f.membres = Presents()
 	local coches = 0
 	for i, m in ipairs(f.membres) do
+		if not f.vus[m.cle] then f.vus[m.cle] = true; f.coches[m.cle] = true end
 		local l = f.lignes[i]
 		if not l then
 			l = ns.UI.Case(f.liste.contenu, "", function(oui)
@@ -514,7 +527,7 @@ local function MajChoix()
 				MajChoix()
 			end)
 			l:SetPoint("TOPLEFT", f.liste.contenu, "TOPLEFT", 2, -(i - 1) * HAUT_LIGNE - 1)
-			l:SetWidth(LARGEUR_CHOIX - 44)
+			l:SetPoint("RIGHT", f.liste.contenu, "RIGHT", 0, 0)
 			f.lignes[i] = l
 		end
 		l.texte:SetText(m.nom)
@@ -529,38 +542,55 @@ local function MajChoix()
 	else
 		f.compte:SetText(("Tirage réservé : |cffffd100%d|r membre%s sur %d"):format(coches, coches > 1 and "s" or "", #f.membres))
 	end
-	f.ouvrir:Activer(coches > 0)
+	local monTirage = MonTirageOuvert()
+	f.ouvrir:Activer(coches > 0 and not monTirage)
+	f.ouvrir:Ecrire(monTirage and "Tirage en cours…" or "Ouvrir le tirage")
 	f.groupe:Activer(ClesGroupe() ~= nil)
 end
 
-local function CreerChoix()
+local function CreerChoix(parent)
 	local UI = ns.UI
 	local C = UI.C
-	local f = CreateFrame("Frame", "GuildUpSMBTirageChoix", UIParent, "BackdropTemplate")
-	UI.Habiller(f, C.fond, C.bordFort)
-	f:SetSize(LARGEUR_CHOIX, 172 + LIGNES_CHOIX * HAUT_LIGNE)
-	f:SetPoint("CENTER", UIParent, "CENTER", 0, 80)
-	f:SetFrameStrata("FULLSCREEN_DIALOG")
-	f:SetToplevel(true)
-	f:SetClampedToScreen(true)
-	f:EnableMouse(true)
-	f:SetMovable(true)
-	f:RegisterForDrag("LeftButton")
-	f:SetScript("OnDragStart", f.StartMoving)
-	f:SetScript("OnDragStop", f.StopMovingOrSizing)
-	tinsert(UISpecialFrames, "GuildUpSMBTirageChoix") -- Échap ferme
-	f:Hide()
-	f.membres, f.coches, f.lignes = {}, {}, {}
+	local f = UI.Carte(parent, "Nouveau tirage")
+	f.membres, f.coches, f.lignes, f.vus = {}, {}, {}, {}
+	f.objet = nil
 
-	f.titre = UI.Texte(f, "GameFontNormal", C.ors)
-	f.titre:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -14)
-	f.titre:SetText("Qui participe au tirage ?")
-	local croix = UI.Fermer(f, function() f:Hide() end, 22)
-	croix:SetPoint("TOPRIGHT", f, "TOPRIGHT", -10, -10)
-	f.lot = UI.Texte(f, "GameFontHighlight", C.texte)
-	f.lot:SetPoint("TOPLEFT", f.titre, "BOTTOMLEFT", 0, -8)
-	f.lot:SetPoint("RIGHT", f, "RIGHT", -16, 0)
+	-- le lot : case où glisser un objet, nom de l'objet, et un texte libre
+	local Icone = ns.IconeObjet or function(p, taille, genre)
+		local b = CreateFrame(genre or "Frame", nil, p)
+		b:SetSize(taille, taille)
+		b.image = b:CreateTexture(nil, "ARTWORK")
+		b.image:SetAllPoints()
+		b.Poser = function(self, icone) self.image:SetTexture(icone) end
+		return b
+	end
+	f.case = Icone(f, 36, "Button")
+	f.case:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -40)
+	f.nomObjet = UI.Texte(f, "GameFontHighlight", C.texte)
+	f.nomObjet:SetPoint("LEFT", f.case, "RIGHT", 10, 0)
+	f.nomObjet:SetPoint("RIGHT", f, "RIGHT", -14, 0)
+	ns.BrancherDepot({ f.case }, function(o) f.objet = o; MajLot() end, function() return f.objet end)
+	f.case:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		if f.objet then
+			pcall(GameTooltip.SetItemByID, GameTooltip, f.objet)
+			GameTooltip:AddLine("Clic droit : retirer l'objet", 0.6, 0.6, 0.6)
+		else
+			GameTooltip:SetText("Objet à gagner")
+			GameTooltip:AddLine("Glisse ici un objet de tes sacs (facultatif). Tu peux aussi écrire le lot en dessous.", 1, 1, 1, true)
+		end
+		GameTooltip:Show()
+	end)
+	f.case:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	f.texte = UI.Champ(f, 200, "Lot ou commentaire (facultatif)", 26)
+	f.texte:SetPoint("TOPLEFT", f.case, "BOTTOMLEFT", 0, -8)
+	f.texte:SetPoint("RIGHT", f, "RIGHT", -14, 0)
+	f.texte.saisie:SetMaxLetters(60)
 
+	-- les participants
+	local titre = UI.Texte(f, "GameFontNormal", C.ors)
+	titre:SetPoint("TOPLEFT", f.texte, "BOTTOMLEFT", 0, -14)
+	titre:SetText("Participants")
 	local function Cocher(cles)
 		f.coches = {}
 		for _, m in ipairs(f.membres) do
@@ -569,7 +599,7 @@ local function CreerChoix()
 		MajChoix()
 	end
 	f.tout = UI.Bouton(f, "Tout cocher", "fantome", 86, 24)
-	f.tout:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -62)
+	f.tout:SetPoint("TOPLEFT", titre, "BOTTOMLEFT", 0, -8)
 	f.tout:SetScript("OnClick", function() Cocher(true) end)
 	f.rien = UI.Bouton(f, "Tout décocher", "fantome", 92, 24)
 	f.rien:SetPoint("LEFT", f.tout, "RIGHT", 4, 0)
@@ -579,75 +609,50 @@ local function CreerChoix()
 	f.groupe:SetScript("OnClick", function() Cocher(ClesGroupe()) end)
 	UI.Infobulle(f.groupe, "Mon groupe", "Ne coche que les membres de ton groupe ou de ton raid (ceux qui ont l'addon).")
 
-	f.liste = UI.Liste(f)
-	f.liste:SetPoint("TOPLEFT", f.tout, "BOTTOMLEFT", 0, -8)
-	f.liste:SetSize(LARGEUR_CHOIX - 32, LIGNES_CHOIX * HAUT_LIGNE)
-
-	f.compte = UI.Texte(f, "GameFontHighlightSmall", C.gris)
-	f.compte:SetPoint("TOPLEFT", f.liste, "BOTTOMLEFT", 0, -8)
 	f.ouvrir = UI.Bouton(f, "Ouvrir le tirage", "or", 140, 28)
-	f.ouvrir:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 14)
+	f.ouvrir:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 12)
 	f.ouvrir:SetScript("OnClick", function()
 		local invites, coches = {}, 0
 		for _, m in ipairs(f.membres) do
 			if f.coches[m.cle] then invites[m.cle] = true; coches = coches + 1 end
 		end
 		if coches == 0 then return end
-		f:Hide()
+		f.texte.saisie:ClearFocus()
 		-- tout coché : tirage ouvert à toute la guilde, y compris à ceux qui se connectent ensuite
-		Ouvrir(f.objet, f.texte, coches < #f.membres and invites or nil)
+		Ouvrir(f.objet, f.texte:Lire() or "", coches < #f.membres and invites or nil)
+		if MonTirageOuvert() then
+			f.objet = nil
+			f.texte:Ecrire("")
+			MajLot()
+		end
+		MajChoix()
 	end)
-	f.annuler = UI.Bouton(f, "Annuler", "fantome", 90, 28)
-	f.annuler:SetPoint("RIGHT", f.ouvrir, "LEFT", -8, 0)
-	f.annuler:SetScript("OnClick", function() f:Hide() end)
+	f.compte = UI.Texte(f, "GameFontHighlightSmall", C.gris)
+	f.compte:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 20)
+	f.compte:SetPoint("RIGHT", f.ouvrir, "LEFT", -8, 0)
+
+	f.liste = UI.Liste(f)
+	f.liste:SetPoint("TOPLEFT", f.tout, "BOTTOMLEFT", 0, -8)
+	f.liste:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 48)
+	MajLot()
 	return f
 end
 
--- Montre la liste des membres connectés (tous cochés) avant d'ouvrir le tirage
-ns.PreparerTirage = function(objet, texte)
-	if not ns.UI or not PeutOuvrir() then return end
-	choix = choix or CreerChoix()
-	local f = choix
-	f.objet, f.texte = objet, texte or ""
-	f.membres, f.coches = Presents(), {}
-	for _, m in ipairs(f.membres) do f.coches[m.cle] = true end
-	local nom = objet and (select(2, ns.InfoObjet(objet)) or ns.InfoObjet(objet) or ("objet n° " .. objet))
-	local mot = strtrim(((texte or ""):gsub("[~|\r\n]", " ")))
-	f.lot:SetText("Lot : " .. (nom and (mot ~= "" and (nom .. " · " .. mot) or nom) or (mot ~= "" and mot or "un lot")))
-	f.liste:Haut()
-	f:Show()
-	f:Raise()
-	MajChoix()
-end
+--------------------------------------------------------------------------------
+-- Le tirage en cours
+--------------------------------------------------------------------------------
 
-local function CreerFenetre()
+local function CreerTirage(parent)
 	local UI = ns.UI
 	local C = UI.C
-	local f = CreateFrame("Frame", "GuildUpSMBTirage", UIParent, "BackdropTemplate")
-	UI.Habiller(f, C.fond, C.bordFort)
-	f:SetSize(LARGEUR, 150 + LIGNES * HAUT_LIGNE + 56)
-	f:SetPoint("CENTER", UIParent, "CENTER", 260, 60)
-	f:SetFrameStrata("DIALOG")
-	f:SetToplevel(true)
-	f:SetClampedToScreen(true)
-	f:EnableMouse(true)
-	f:SetMovable(true)
-	f:RegisterForDrag("LeftButton")
-	f:SetScript("OnDragStart", f.StartMoving)
-	f:SetScript("OnDragStop", f.StopMovingOrSizing)
-	tinsert(UISpecialFrames, "GuildUpSMBTirage") -- Échap ferme
-	f:Hide()
-
-	f.titre = UI.Texte(f, "GameFontNormal", C.ors)
-	f.titre:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -14)
-	f.titre:SetText("Tirage au sort")
-	local croix = UI.Fermer(f, function() f:Hide() end, 22)
-	croix:SetPoint("TOPRIGHT", f, "TOPRIGHT", -10, -10)
+	local f = UI.Carte(parent, "Tirage au sort")
+	f.vide:Hide()
 
 	-- le lot : icône de l'objet (infobulle au survol) et son nom
 	f.lot = CreateFrame("Button", nil, f)
-	f.lot:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -42)
-	f.lot:SetSize(LARGEUR - 32, 30)
+	f.lot:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -40)
+	f.lot:SetPoint("RIGHT", f, "RIGHT", -14, 0)
+	f.lot:SetHeight(30)
 	f.lot.icone = f.lot:CreateTexture(nil, "ARTWORK")
 	f.lot.icone:SetSize(28, 28)
 	f.lot.icone:SetPoint("LEFT", f.lot, "LEFT", 0, 0)
@@ -664,29 +669,26 @@ local function CreerFenetre()
 	f.chef:SetPoint("TOPLEFT", f.lot, "BOTTOMLEFT", 0, -4)
 	f.etat = UI.Texte(f, "GameFontHighlight", C.texte)
 	f.etat:SetPoint("TOPLEFT", f.chef, "BOTTOMLEFT", 0, -8)
-	f.etat:SetWidth(LARGEUR - 32)
+	f.etat:SetPoint("RIGHT", f, "RIGHT", -14, 0)
 	f.etat:SetHeight(28)
 	f.etat:SetJustifyV("TOP")
 	f.etat:SetWordWrap(true)
 
-	f.lancer = UI.Bouton(f, "Lancer les dés", "or", LARGEUR - 32, 30)
-	f.lancer:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -136)
+	f.lancer = UI.Bouton(f, "Lancer les dés", "or", 200, 30)
+	f.lancer:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -134)
+	f.lancer:SetPoint("RIGHT", f, "RIGHT", -14, 0)
 	f.lancer:SetScript("OnClick", function()
 		local t = TirageAMontrer()
-		if t and t.etat == "ouvert" then Lancer(t) else DemanderLot() end
+		if t and t.etat == "ouvert" then Lancer(t) end
 	end)
 
-	f.liste = UI.Liste(f)
-	f.liste:SetPoint("TOPLEFT", f.lancer, "BOTTOMLEFT", 0, -10)
-	f.liste:SetSize(LARGEUR - 32, LIGNES * HAUT_LIGNE)
-	f.lignes = {}
-
 	f.cloturer = UI.Bouton(f, "Clôturer", "fantome", 110, 26)
-	f.cloturer:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 14)
+	f.cloturer:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 12)
 	f.cloturer:SetScript("OnClick", function()
 		local t = TirageAMontrer()
 		if t then Cloturer(t) end
 	end)
+	UI.Infobulle(f.cloturer, "Clôturer", "Arrête le tirage maintenant : le meilleur lancer gagne.")
 	f.annuler = UI.Bouton(f, "Annuler", "fantome", 90, 26)
 	f.annuler:SetPoint("RIGHT", f.cloturer, "LEFT", -8, 0)
 	f.annuler:SetScript("OnClick", function()
@@ -694,7 +696,12 @@ local function CreerFenetre()
 		if t then Annuler(t) end
 	end)
 
-	-- le compte à rebours avance tant que la fenêtre est ouverte
+	f.liste = UI.Liste(f)
+	f.liste:SetPoint("TOPLEFT", f.lancer, "BOTTOMLEFT", 0, -10)
+	f.liste:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 48)
+	f.lignes = {}
+
+	-- le compte à rebours avance tant que la page est affichée
 	local attente = 0
 	f:SetScript("OnUpdate", function(_, dt)
 		attente = attente + dt
@@ -731,7 +738,7 @@ local function Secondes(t) return math.max(0, math.ceil(t.fin - GetTime())) end
 
 MajFenetre = function()
 	local f = fenetre
-	if not f or not f:IsShown() then return end
+	if not f or not f:IsVisible() then return end
 	local C = ns.UI.C
 	local t = TirageAMontrer()
 	local moi = MaCle()
@@ -743,9 +750,9 @@ MajFenetre = function()
 		f.lot.nom:SetPoint("RIGHT", f.lot, "RIGHT", 0, 0)
 		f.lot.nom:SetText("Aucun tirage en cours")
 		f.chef:SetText("")
-		f.etat:SetText("Ouvre un tirage : toute la guilde reçoit une bulle et lance les dés.")
-		f.lancer:Ecrire("Nouveau tirage")
-		f.lancer:Activer(true)
+		f.etat:SetText("Prépare un tirage à droite : la guilde reçoit une bulle et lance les dés (1 à 100). Le meilleur lancer gagne.")
+		f.lancer:Ecrire("Lancer les dés")
+		f.lancer:Activer(false)
 		f.cloturer:Hide(); f.annuler:Hide()
 		for _, l in ipairs(f.lignes) do l:Hide() end
 		f.liste:Hauteur(1)
@@ -804,8 +811,8 @@ MajFenetre = function()
 		else
 			f.etat:SetText("Personne n'a lancé les dés.")
 		end
-		f.lancer:Ecrire("Nouveau tirage")
-		f.lancer:Activer(true)
+		f.lancer:Ecrire("Tirage terminé")
+		f.lancer:Activer(false)
 	end
 	local chef = ouvert and t.chef == moi
 	f.cloturer:SetShown(chef)
@@ -827,17 +834,73 @@ MajFenetre = function()
 	end
 	for i = #classement + 1, #f.lignes do f.lignes[i]:Hide() end
 	f.liste:Hauteur(math.max(1, #classement * HAUT_LIGNE))
+	MajChoix()
 end
 
+--------------------------------------------------------------------------------
+-- La page
+--------------------------------------------------------------------------------
+
+local pageJeux
+local function CreerPageJeux(parent)
+	local UI = ns.UI
+	local p = CreateFrame("Frame", nil, parent)
+	p:SetAllPoints()
+	-- onglets : un par jeu (d'autres pourront s'ajouter)
+	p.onglets = UI.Onglets(p, { "Tirage au sort" }, function(i) p.onglets:Choisir(i) end)
+	p.onglets:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -10)
+	p.onglets:SetPoint("RIGHT", p, "RIGHT", -MARGE, 0)
+	p.onglets:Choisir(1)
+
+	local tirage = CreateFrame("Frame", nil, p)
+	tirage:SetPoint("TOPLEFT", p.onglets, "BOTTOMLEFT", 0, -12)
+	tirage:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE, 12)
+	local largeur = (ns.TAILLE_PAGE and ns.TAILLE_PAGE[1] or 794) - 2 * MARGE
+	fenetre = CreerTirage(tirage)
+	fenetre:SetPoint("TOPLEFT", tirage, "TOPLEFT", 0, 0)
+	fenetre:SetPoint("BOTTOMLEFT", tirage, "BOTTOMLEFT", 0, 0)
+	fenetre:SetWidth(math.floor((largeur - 12) * 0.55))
+	choix = CreerChoix(tirage)
+	choix:SetPoint("TOPLEFT", fenetre, "TOPRIGHT", 12, 0)
+	choix:SetPoint("BOTTOMRIGHT", tirage, "BOTTOMRIGHT", 0, 0)
+
+	p.Maj = MajFenetre
+	-- ns.OuvrirInterface("jeux", onglet, objet, texte) : le lot du prochain tirage déjà rempli
+	p.Ouvrir = function(_, objet, texte)
+		if objet or (texte and texte ~= "") then
+			choix.objet = objet
+			choix.texte:Ecrire(texte or "")
+			MajLot()
+		end
+		MajFenetre()
+	end
+	pageJeux = p
+	return p
+end
+if ns.AjouterPage then ns.AjouterPage("jeux", CreerPageJeux) end
+
+-- Ouvre la page Jeux sur le tirage au sort
 ns.MontrerTirage = function()
-	if not ns.UI then return end
-	fenetre = fenetre or CreerFenetre()
-	fenetre:Show()
-	fenetre:Raise()
-	MajFenetre()
+	if ns.OuvrirInterface then ns.OuvrirInterface("jeux", 1) end
 end
 
--- /smb roll : la fenêtre ; /smb roll <texte ou lien d'objet> : choix des participants, puis ouverture
+-- Lot proposé (/smb roll <texte ou lien d'objet>) : la page, le formulaire rempli ; on choisit les
+-- participants puis « Ouvrir le tirage »
+ns.PreparerTirage = function(objet, texte)
+	if not PeutOuvrir() then return end
+	local mot = strtrim(((texte or ""):gsub("[~|\r\n]", " ")))
+	if ns.OuvrirInterface then ns.OuvrirInterface("jeux", 1, objet, mot) end
+end
+
+-- pastille du menu : un tirage ouvert où je peux encore lancer les dés
+ns.TirageEnAttente = function()
+	local t = TirageAMontrer()
+	local moi = MaCle()
+	if t and t.etat == "ouvert" and moi and PeutLancer(t, moi) and not attenteDe and Secondes(t) > 0 then return 1 end
+	return 0
+end
+
+-- /smb roll : la page ; /smb roll <texte ou lien d'objet> : le lot déjà rempli
 ns.Tirage = function(saisie)
 	saisie = strtrim(saisie or "")
 	if saisie == "" then ns.MontrerTirage(); return end

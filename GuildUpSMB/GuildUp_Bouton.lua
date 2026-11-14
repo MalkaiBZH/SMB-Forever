@@ -4,8 +4,8 @@
 -- GuildUpSMB (GuildUp_Interface.lua) ; le rôle, la position et l'appel à l'aide par le menu rapide ;
 -- le pseudo, les personnages et le choix des notifications par la fenêtre d'options.
 -- Le médaillon : emblème de la guilde dans un anneau à la couleur de mon rôle ; pastille = nouveautés
--- (ns.NouveautesGuilde, GuildUp_Interface.lua) ; halo doré qui pulse = des groupes cherchent du monde ;
--- anneau vert qui tourne = je suis moi-même en attente (annonce, candidature). Aucun message réseau.
+-- (ns.NouveautesGuilde, GuildUp_Interface.lua : appels à l'aide, demandes que je peux honorer, tirage au
+-- sort) ; halo doré qui pulse = un tirage au sort attend mon lancer de dés. Aucun message réseau.
 
 local NOM_ADDON, ns = ...
 local MEDIA = "Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\" -- le dossier de l'addon, quel que soit son nom
@@ -39,11 +39,10 @@ local function ChoisirRole(role)
 	Annoncer(true)
 	ToutRafraichir()
 	if ns.MajOptions then ns.MajOptions() end
-	if ns.SurChangementDeRole then ns.SurChangementDeRole() end
 	if MajBouton then MajBouton() end
 	if ns.MajInterface then ns.MajInterface() end
 end
--- utilisé par la fenêtre GuildUpSMB et celle des groupes
+-- utilisé par la fenêtre GuildUpSMB
 ns.ChoisirRole = function(role) if ns.DB() then ChoisirRole(role) end end
 ns.RoleChoisiALaMain = function() return ns.DB() and RoleManuel() end
 
@@ -92,10 +91,10 @@ local function Infobulle(self)
 	GameTooltip:AddLine("Ton rôle : " .. (role and ROLES[role] and ROLES[role].nom or "inconnu"), 1, 1, 1)
 	local n = ns.NouveautesGuilde and ns.NouveautesGuilde()
 	if n then
-		if n.groupes > 0 then GameTooltip:AddLine(n.groupes .. " groupe" .. (n.groupes > 1 and "s" or "") .. " ouvert" .. (n.groupes > 1 and "s" or ""), 1, 0.82, 0) end
 		if n.aide > 0 then GameTooltip:AddLine(n.aide .. " appel" .. (n.aide > 1 and "s" or "") .. " à l'aide", 1, 0.6, 0.5) end
-		if n.dons > 0 then GameTooltip:AddLine(n.dons .. " demande" .. (n.dons > 1 and "s" or "") .. " de don", 1, 0.82, 0) end
-		if n.groupes + n.aide + n.dons == 0 then GameTooltip:AddLine("Rien de nouveau", 0.7, 0.7, 0.7) end
+		if n.demandes > 0 then GameTooltip:AddLine(n.demandes .. " demande" .. (n.demandes > 1 and "s" or "") .. " que tu peux honorer", 1, 0.82, 0) end
+		if n.jeux > 0 then GameTooltip:AddLine("Un tirage au sort t'attend", 1, 0.82, 0) end
+		if n.aide + n.demandes + n.jeux == 0 then GameTooltip:AddLine("Rien de nouveau", 0.7, 0.7, 0.7) end
 	end
 	GameTooltip:AddLine(" ")
 	GameTooltip:AddLine("Clic : ouvrir · Clic droit : menu rapide", 0.6, 0.6, 0.6)
@@ -103,7 +102,7 @@ local function Infobulle(self)
 	GameTooltip:Show()
 end
 
--- Menu rapide (clic droit) : rôle, position, groupes, sondage, appel à l'aide, options
+-- Menu rapide (clic droit) : rôle, position, demandes, tirage au sort, sondage, appel à l'aide, options
 local menu
 local function MontrerMenu()
 	menu = menu or ns.CadreMenu("GuildUpMenuRapide")
@@ -117,7 +116,8 @@ local function MontrerMenu()
 	end
 	lignes[#lignes + 1] = { (db.partagePosition and "|TInterface\\Buttons\\UI-CheckBox-Check:16:16|t " or "|TInterface\\Buttons\\UI-CheckBox-Up:16:16|t ") .. "Partager ma position",
 		ns.BasculerPartagePosition }
-	lignes[#lignes + 1] = { "Groupes", function() if ns.OuvrirInterface then ns.OuvrirInterface("groupes") elseif ns.BasculerGroupes then ns.BasculerGroupes() end end }
+	lignes[#lignes + 1] = { "Demandes", function() if ns.OuvrirDemandes then ns.OuvrirDemandes() end end }
+	lignes[#lignes + 1] = { "Tirage au sort", function() if ns.MontrerTirage then ns.MontrerTirage() end end }
 	lignes[#lignes + 1] = { "Sondage", function() if ns.Sondage then ns.Sondage() end end }
 	lignes[#lignes + 1] = { "|cffff9f80À l'aide !|r", function() if ns.DemanderAide then ns.DemanderAide() end end }
 	lignes[#lignes + 1] = { "Options", function() if ns.OuvrirInterface then ns.OuvrirInterface("options") elseif ns.BasculerOptions then ns.BasculerOptions() end end }
@@ -173,7 +173,7 @@ local function CreerBouton()
 	survol:SetBlendMode("ADD")
 	survol:SetVertexColor(1, 1, 1, 0.18)
 
-	-- halo qui pulse (doré) : des groupes de la guilde cherchent du monde
+	-- halo qui pulse (doré) : un tirage au sort attend mon lancer de dés
 	b.halo = b:CreateTexture(nil, "OVERLAY", nil, 1)
 	if ns.AtlasExiste("groupfinder-eye-highlight") then
 		b.halo:SetAtlas("groupfinder-eye-highlight")
@@ -199,21 +199,6 @@ local function CreerBouton()
 	descend:SetOrder(2)
 	descend:SetSmoothing("IN_OUT")
 	b.pulse:SetLooping("REPEAT")
-
-	-- anneau qui tourne (vert) : je suis moi-même en attente. Texture faite par Miko :
-	-- media\anneau.tga (blanche, teintée ici)
-	b.anneau = b:CreateTexture(nil, "OVERLAY", nil, 1)
-	b.anneau:SetTexture(MEDIA .. "anneau")
-	b.anneau:SetSize(TAILLE * 1.75, TAILLE * 1.75)
-	b.anneau:SetPoint("CENTER")
-	b.anneau:SetBlendMode("ADD")
-	b.anneau:SetVertexColor(0.25, 1, 0.35, 1)
-	b.anneau:Hide()
-	b.tourne = b.anneau:CreateAnimationGroup()
-	local rot = b.tourne:CreateAnimation("Rotation")
-	rot:SetDegrees(360) -- sens inverse des aiguilles d'une montre (choix de Miko)
-	rot:SetDuration(4)
-	b.tourne:SetLooping("REPEAT")
 
 	-- pastille : nombre de nouveautés
 	b.pastille = b:CreateTexture(nil, "OVERLAY", nil, 2)
@@ -263,23 +248,14 @@ MajBouton = function()
 	local role = MonRole()
 	local c = (role and ROLES[role] and ROLES[role].couleur) or COULEUR_SANS_ROLE
 	bouton.anneauRole:SetVertexColor(c[1], c[2], c[3], 1)
-	-- pastille : groupes ouverts + appels à l'aide + demandes de dons
+	-- pastille : appels à l'aide + demandes que je peux honorer + tirage qui m'attend
 	local nv = ns.NouveautesGuilde and ns.NouveautesGuilde()
-	local n = nv and (nv.groupes + nv.aide + nv.dons) or (ns.NombreGroupes and ns.NombreGroupes() or 0)
+	local n = nv and (nv.aide + nv.demandes + nv.jeux) or 0
 	bouton.compteur:SetText(n > 9 and "9+" or tostring(n))
 	bouton.compteur:SetShown(n > 0)
 	bouton.pastille:SetShown(n > 0)
-	-- vert (anneau qui tourne) si je suis en attente, sinon halo doré qui pulse s'il y a des groupes
-	local moi = db.actif and ns.EnAttente and ns.EnAttente()
-	local groupes = db.actif and ns.NombreGroupes and ns.NombreGroupes() > 0
-	if moi then
-		bouton.anneau:Show()
-		if not bouton.tourne:IsPlaying() then bouton.tourne:Play() end
-	else
-		bouton.tourne:Stop()
-		bouton.anneau:Hide()
-	end
-	if groupes and not moi then
+	-- halo doré qui pulse : un tirage au sort attend mon lancer
+	if nv and nv.jeux > 0 then
 		bouton.halo:Show()
 		if not bouton.pulse:IsPlaying() then bouton.pulse:Play() end
 	else
@@ -288,7 +264,7 @@ MajBouton = function()
 	end
 end
 
--- appelé par les modules quand leur état change (groupes, attente, rôle…)
+-- appelé par les modules quand leur état change (demandes, tirage, rôle…)
 ns.MajBouton = function() if MajBouton then MajBouton() end end
 
 -- affiché / caché (options, /smb bouton)
@@ -306,8 +282,8 @@ ns.BoutonVisible = function() return ns.DB() and ReglagesBouton().visible end
 -- Bulles de notification
 --------------------------------------------------------------------------------
 
--- Bulle à côté du médaillon quand un membre ouvre un groupe, avec un son discret.
--- Clic sur la bulle : ouvre les groupes. Elle disparaît en fondu après DUREE_BULLE secondes.
+-- Bulle à côté du médaillon (nouvelle demande, appel à l'aide, tirage…), avec un son discret.
+-- Clic sur la bulle : son action (sinon la fenêtre SMB Forever). Elle disparaît en fondu après DUREE_BULLE secondes.
 local DUREE_BULLE = 10
 local bulle
 local jetonBulle = 0 -- chaque nouvelle bulle annule la fermeture prévue pour la précédente
@@ -350,8 +326,8 @@ local function CreerBulle()
 		self:Hide()
 		if self.action then
 			pcall(self.action)
-		elseif ns.OuvrirGroupes then
-			ns.OuvrirGroupes()
+		elseif ns.OuvrirInterface then
+			ns.OuvrirInterface()
 		end
 	end)
 	f:SetScript("OnUpdate", function(self)
@@ -367,8 +343,8 @@ local function CreerBulle()
 end
 
 -- Bulle d'alerte à côté du médaillon (remplace les messages dans le chat) :
--- titre, texte, son (nom SOUNDKIT, ou nil pour le son discret) ; un clic ouvre les groupes
--- action (facultative) : fonction appelée au clic sur la bulle (par défaut : fenêtre des groupes)
+-- titre, texte, son (nom SOUNDKIT, ou nil pour le son discret)
+-- action (facultative) : fonction appelée au clic sur la bulle (par défaut : la fenêtre SMB Forever)
 ns.MEDIA = MEDIA
 
 -- Les bulles sont rangées par catégorie (passée par l'appelant), pour pouvoir les couper une par
@@ -429,10 +405,6 @@ ns.Notifier = function(categorie, titre, texte, son, action)
 		if bulle and jeton == jetonBulle then bulle:Hide() end
 	end)
 	return true
-end
-
-ns.AlerteNouveauGroupe = function(chef, contenu)
-	ns.Notifier("groupes", "Nouveau groupe de la guilde", ("%s ouvre un groupe : |cffffd100%s|r"):format(chef or "?", contenu or "?"))
 end
 
 -- Partagé avec GuildUp_Options.lua

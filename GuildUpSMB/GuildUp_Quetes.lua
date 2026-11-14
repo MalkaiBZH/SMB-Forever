@@ -2,10 +2,9 @@
 -- Chaque GuildUpSMB envoie la liste des quêtes en cours du joueur (identifiants), préfixe "GuildUpQst" :
 --   "L~id,id,..."  ma liste (identifiants en base 36), à la connexion et quand elle change
 --   "Q"            « envoyez vos listes » (à la connexion)
--- La page « Quêtes en commun » de la fenêtre GuildUpSMB montre mes quêtes que d'autres membres font
--- aussi, avec un bouton « Créer un groupe » : l'annonce de groupe (GuildUp_Groupes.lua) prévient par
--- une bulle les membres qui ont cette quête. Déjà en groupe : « Inviter » (membres en ligne qui ont la
--- quête et ne sont pas dans mon groupe, ns.Groupes.DansMonGroupe) ou « Déjà groupés » (tous y sont).
+-- La page « Quêtes » de la fenêtre GuildUpSMB montre mes quêtes que d'autres membres font aussi, avec un
+-- bouton « Inviter » (les membres en ligne qui ont la quête et ne sont pas encore dans mon groupe ; seul,
+-- l'invitation crée le groupe), « Déjà groupés » (tous y sont) ou « Hors ligne » (personne de connecté).
 
 local NOM_ADDON, ns = ...
 
@@ -85,7 +84,7 @@ local function QuetesGardees()
 	return db.quetesPerso[cle], db.quetesPerso, cle
 end
 
--- Pour GuildUp_Groupes.lua : ai-je cette quête ? et son titre (mon journal, sinon le jeu)
+-- Pour les autres modules : ai-je cette quête ? et son titre (mon journal, sinon le jeu)
 ns.AQuete = function(id) return mesQuetes[id] ~= nil end
 ns.InfoQuete = function(id)
 	local q = mesQuetes[id]
@@ -181,20 +180,37 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 end
 
 --------------------------------------------------------------------------------
--- Page « Quêtes en commun » de la fenêtre GuildUpSMB (style sombre et doré, kit ns.UI)
+-- Page « Quêtes » de la fenêtre GuildUpSMB (style sombre et doré, kit ns.UI)
 --------------------------------------------------------------------------------
 
+-- membres de mon groupe ou de mon raid (clés), ou nil si je suis seul
+local function MonGroupe()
+	if not (IsInGroup and IsInGroup()) then return nil end
+	local cles = {}
+	for _, genre in ipairs({ "party", "raid" }) do
+		for i = 1, genre == "raid" and 40 or 4 do
+			local unite = genre .. i
+			if UnitExists(unite) then
+				local cle = ns.NomComplet and ns.NomComplet(unite)
+				if cle then cles[cle] = true end
+			end
+		end
+	end
+	return cles
+end
+
 -- Chaque quête : membres qui l'ont (groupe = déjà dans mon groupe), et aInviter = ceux qui sont en ligne
--- mais pas encore dans mon groupe (le bouton de la ligne en dépend : Créer un groupe / Inviter / Déjà groupés)
+-- mais pas encore dans mon groupe (le bouton de la ligne en dépend : Inviter / Déjà groupés / Hors ligne)
 local function Partages()
 	local res = {}
-	local DansMonGroupe = IsInGroup and IsInGroup() and ns.Groupes and ns.Groupes.DansMonGroupe
+	local groupe = MonGroupe()
+	local function DansMonGroupe(cle) return groupe ~= nil and groupe[cle] == true end
 	for id, q in pairs(mesQuetes) do
 		local membres, aInviter, groupes = {}, {}, 0
 		for cle, a in pairs(autres) do
 			if a.quetes[id] then
 				local m = { cle = cle, nom = a.nom, enLigne = EstEnLigne(cle) }
-				m.groupe = DansMonGroupe and DansMonGroupe(a.nom) or false
+				m.groupe = DansMonGroupe(cle)
 				if m.groupe then groupes = groupes + 1
 				elseif m.enLigne then aInviter[#aInviter + 1] = m end
 				membres[#membres + 1] = m
@@ -269,19 +285,17 @@ local function CreerLigne(parent)
 	r.icone:SetPoint("LEFT", r, "LEFT", 12, 0)
 	r.icone:SetTexture("Interface\\Icons\\INV_Misc_Note_06")
 	r.icone:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-	r.groupe = UI.Bouton(r, "Créer un groupe", "or", 130, 28)
+	r.groupe = UI.Bouton(r, "Inviter", "or", 130, 28)
 	r.groupe:SetPoint("RIGHT", r, "RIGHT", -12, 0)
 	r.groupe:SetScript("OnClick", function(self)
 		local q = self:GetParent().q
 		if not q then return end
 		if self.action == "inviter" then
-			-- déjà en groupe : on invite directement ceux qui ont la quête et sont en ligne
+			-- ceux qui ont la quête et sont en ligne (seul : la première invitation crée le groupe)
 			local inviter = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
 			if inviter then
-				for _, m in ipairs(q.aInviter or {}) do pcall(inviter, m.nom) end
+				for _, m in ipairs(q.aInviter or {}) do pcall(inviter, (ns.NomListeGuilde and ns.NomListeGuilde(m.cle)) or m.nom) end
 			end
-		elseif self.action == "creer" and ns.CreerGroupeQuete then
-			ns.CreerGroupeQuete(q.id, q.titre, q.zone)
 		end
 	end)
 	r.groupe:SetScript("OnEnter", function(self)
@@ -296,8 +310,8 @@ local function CreerLigne(parent)
 			for _, m in ipairs(q and q.aInviter or {}) do noms[#noms + 1] = NomJoueur(m.nom) end
 			GameTooltip:AddLine("Invite " .. table.concat(noms, ", ") .. " : ils ont cette quête et sont en ligne.", 1, 1, 1, true)
 		else
-			GameTooltip:SetText("Créer un groupe pour cette quête")
-			GameTooltip:AddLine("Publie une annonce dans les groupes de la guilde. Les membres qui ont cette quête sont prévenus par une bulle.", 1, 1, 1, true)
+			GameTooltip:SetText("Personne en ligne")
+			GameTooltip:AddLine("Les membres qui ont cette quête sont hors ligne pour l'instant.", 1, 1, 1, true)
 		end
 		GameTooltip:Show()
 	end)
@@ -336,7 +350,7 @@ local function CreerPage(parent)
 	titre:SetText("Quêtes en commun")
 	local aide = UI.Texte(p, "GameFontHighlightSmall", C.gris)
 	aide:SetPoint("TOPLEFT", titre, "BOTTOMLEFT", 0, -6)
-	aide:SetText("Tes quêtes que d'autres membres font aussi (|cff6fd08cvert|r = connecté). Crée un groupe : ceux qui ont la quête sont prévenus.")
+	aide:SetText("Tes quêtes que d'autres membres font aussi (|cff6fd08cvert|r = connecté). Invite ceux qui sont en ligne pour la faire ensemble.")
 	p.liste = UI.Liste(p)
 	p.liste:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -70)
 	p.liste:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE + 6, 12)
@@ -365,23 +379,23 @@ local function CreerPage(parent)
 					.. (m.groupe and " |cfff1cf6b(groupe)|r" or "")
 			end
 			r.membres:SetText(table.concat(noms, ", "))
-			-- bouton : déjà groupé avec tous ceux en ligne ; en groupe avec d'autres à inviter (chef ou
-			-- assistant) ; sinon créer une annonce de groupe
+			-- bouton : des membres en ligne à inviter (seul, ou chef / assistant du groupe) ; déjà groupé
+			-- avec tous ceux en ligne ; sinon personne en ligne
 			local enGroupe = IsInGroup and IsInGroup()
 			local peutInviter = not enGroupe or UnitIsGroupLeader("player")
 				or (UnitIsGroupAssistant and UnitIsGroupAssistant("player"))
-			if q.groupes > 0 and #q.aInviter == 0 then
-				r.groupe.action = "groupes"
-				r.groupe:Ecrire("Déjà groupés")
-				r.groupe:Activer(false)
-			elseif enGroupe and #q.aInviter > 0 then
+			if #q.aInviter > 0 then
 				r.groupe.action = "inviter"
 				r.groupe:Ecrire(#q.aInviter > 1 and ("Inviter (" .. #q.aInviter .. ")") or "Inviter")
 				r.groupe:Activer(peutInviter and true or false)
+			elseif q.groupes > 0 then
+				r.groupe.action = "groupes"
+				r.groupe:Ecrire("Déjà groupés")
+				r.groupe:Activer(false)
 			else
-				r.groupe.action = "creer"
-				r.groupe:Ecrire("Créer un groupe")
-				r.groupe:Activer(not enGroupe or UnitIsGroupLeader("player"))
+				r.groupe.action = "hors"
+				r.groupe:Ecrire("Hors ligne")
+				r.groupe:Activer(false)
 			end
 			r:ClearAllPoints()
 			r:SetPoint("TOPLEFT", p.liste.contenu, "TOPLEFT", 0, -y)

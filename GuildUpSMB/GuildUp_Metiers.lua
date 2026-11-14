@@ -3,30 +3,18 @@
 -- (relevées quand le joueur ouvre sa fenêtre de métier : le jeu ne les donne qu'à ce moment-là),
 -- puis les partage avec les autres membres qui ont l'addon. Les fiches reçues sont gardées
 -- (GuildUpMetiersDB) : on voit aussi les membres hors ligne.
--- Interface : onglets « Registre » et « Commandes » de la page Artisanat de la fenêtre GuildUpSMB (kit
--- ns.UI ; la page et ses onglets sont dans GuildUp_Carnet.lua) : filtres par métier, recherche, membres,
--- fiche ; commandes reçues et passées, avec leur état.
+-- Interface : onglet « Registre » de la page Artisanat de la fenêtre GuildUpSMB (kit ns.UI ; la page et
+-- ses onglets sont dans GuildUp_Carnet.lua) : filtres par métier, recherche, membres, fiche. Clic sur une
+-- recette d'un autre membre : la page Demandes, formulaire rempli (demande d'artisanat, GuildUp_Demandes.lua).
 -- Lit aussi la liste de guilde (en ligne, zone, rang, note…) : ns.RosterGuilde() et ns.FicheMetiers(cle)
 -- servent la page Guilde (GuildUp_Membres.lua).
 --
--- Messages d'addon (préfixe "GuildUpMet"), sur le canal de guilde sauf « E » :
+-- Messages d'addon (préfixe "GuildUpMet"), sur le canal de guilde :
 --   "Q"                                        demande : « envoyez vos résumés »
 --   "S~niveau~CLASSE~AL,225,300,40,empreinte;CU,..."  résumé : métier, niveau, max, nb de recettes, empreinte
 --   "D~AL~Nom-Royaume"                         demande les recettes d'un métier d'un membre
 --   "R~AL~empreinte~n~total~i1a2b,s3c4,..."    recettes (par morceaux), diffusées à toute la guilde
---   "C~cible~recette~id~quantité~2"            commande d'artisanat (lue seulement par la cible), en plus du
---                                              message privé du client ; « 2 » : le client suit ses
---                                              commandes (les anciennes versions n'envoient pas ce champ
---                                              et l'ignorent à la lecture)
---   "E~cible~id~état~qui"                      changement d'état d'une commande, par chuchotement d'addon
---                                              (WHISPER) à l'autre (canal de guilde en test seul) ; état :
---                                              A acceptée, R refusée, F faite, X annulée ; qui : a (envoyé
---                                              par l'artisan) ou c (par le client). Envoyé seulement si
---                                              l'autre est en ligne, sinon gardé et envoyé à son retour.
---   "K~cible~id~1|0~recette"                   réponse acceptée / refusée, pour un client d'une ancienne
---                                              version (commande sans le champ « 2 ») ; lue aussi des
---                                              artisans d'avant la 1.5
--- id d'une commande = "Nom-Royaume du client:heure du serveur en base 36".
+-- (Les commandes d'artisanat « C », « E », « K » ont été retirées en 4.0.0 : remplacées par les demandes.)
 -- Une recette = "s<id de sort>" ou "i<id d'objet fabriqué>" ; sur le réseau, l'id est en base 36.
 -- L'empreinte change dès qu'une recette s'ajoute : les autres ne redemandent la liste qu'à ce moment.
 
@@ -177,9 +165,7 @@ end
 -- Données (SavedVariables à part : /smb reset ne les efface pas)
 --   GuildUpMetiersDB.moi[cle]              mes métiers (par personnage)
 --   GuildUpMetiersDB.guildes[guilde][cle]  fiches reçues des autres membres
---   GuildUpMetiersDB.commandes[cle]        mes commandes (par personnage) : { recues = { [id] = c },
---                                          passees = { [id] = c } }, oubliées 30 jours après leur
---                                          dernier changement (c décrit avec le suivi des commandes)
+--   (GuildUpMetiersDB.commandes : anciennes commandes, effacées à la connexion depuis la 4.0.0)
 -- fiche = { nom, classe, niveau, vu, profs = { AL = { n, max, nr, h, r = { "s123", ... } } } }
 --------------------------------------------------------------------------------
 
@@ -245,7 +231,7 @@ local function MesDonnees()
 	return e
 end
 
--- Pour GuildUp_Echanges.lua : mon niveau dans un métier (nil si je ne l'ai pas)
+-- Pour les autres modules : mon niveau dans un métier (nil si je ne l'ai pas)
 ns.MonNiveauMetier = function(code)
 	local p = MesDonnees().profs[code]
 	return p and p.n
@@ -598,24 +584,8 @@ local function Fiche(g, cle, nom)
 	return e
 end
 
---------------------------------------------------------------------------------
--- Commandes d'artisanat (« C », « E », « K ») : suivi plus bas, après la liste de guilde
---------------------------------------------------------------------------------
-
-local function NomRecette(code)
-	local nom, _, lien = InfoRecette(code)
-	return lien or nom or "une recette"
-end
-
--- Nom pour chuchoter sur Forever : « Prénom Famille » (sans le suffixe de test)
-local function PrenomSeul(nom) return ((nom or "?"):gsub(" %(test%)$", ""):gsub("%-", " ")) end
-
-local RecevoirCommande -- (défini avec le suivi des commandes)
-
 local function Recevoir(prefixe, msg, canal, expediteur)
-	if prefixe ~= PREFIXE or not msg or not expediteur then return end
-	-- chuchotement d'addon : seulement les changements d'état des commandes
-	if canal ~= "GUILD" and not (canal == "WHISPER" and msg:sub(1, 2) == "E~") then return end
+	if prefixe ~= PREFIXE or canal ~= "GUILD" or not msg or not expediteur then return end
 	local g = Guilde()
 	if not g then return end
 	local cle = Normaliser(expediteur)
@@ -628,10 +598,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	local genre = msg:sub(1, 1)
 	local reste = msg:sub(3)
 
-	if genre == "C" or genre == "K" or genre == "E" then
-		if RecevoirCommande then RecevoirCommande(genre, reste, cle, nom) end
-
-	elseif genre == "Q" then
+	if genre == "Q" then
 		RepondreQ()
 
 	elseif genre == "S" then
@@ -750,264 +717,18 @@ end
 
 local EnLigne
 
---------------------------------------------------------------------------------
--- Suivi des commandes d'artisanat. Le client envoie « C » (diffusé sur la guilde, lu par l'artisan) et
--- un message privé ; ensuite chaque changement d'état part en « E » par chuchotement d'addon et fait
--- une bulle chez l'autre. Les deux gardent la commande (GuildUpMetiersDB.commandes[ma clé]) :
---   c = { id, code (recette), qte, client, clientNom, artisan, artisanNom, date, maj, etat,
---         suivi (l'autre suit les commandes : « 2 » dans « C », ou un « E » reçu de l'artisan),
---         aEnvoyer (état pas encore transmis : l'autre était hors ligne) }
--- États : attente → acceptee / refusee (l'artisan) ; attente / acceptee → faite (l'artisan, ou le client
--- qui l'a reçue) ou annulee (le client).
---------------------------------------------------------------------------------
-
-local OUBLI_COMMANDE = 30 * 86400
-local ETATS_COMMANDE = {
-	attente  = { lettre = "W", nom = "En attente", couleur = "|cfff1cf6b" },
-	acceptee = { lettre = "A", nom = "Acceptée",   couleur = "|cff7fb4ee" },
-	refusee  = { lettre = "R", nom = "Refusée",    couleur = "|cffff8a7a" },
-	faite    = { lettre = "F", nom = "Faite",      couleur = "|cff6fd08c" },
-	annulee  = { lettre = "X", nom = "Annulée",    couleur = "|cff9c937f" },
-}
-local ETAT_PAR_LETTRE = {}
-for etat, e in pairs(ETATS_COMMANDE) do ETAT_PAR_LETTRE[e.lettre] = etat end
-local COMMANDE_FINIE = { refusee = true, faite = true, annulee = true }
--- changements permis : [qui][nouvel état] = { [état actuel] = true } ; a = l'artisan, c = le client
-local PERMIS_COMMANDE = {
-	a = { acceptee = { attente = true }, refusee = { attente = true, acceptee = true },
-		faite = { attente = true, acceptee = true } },
-	c = { annulee = { attente = true, acceptee = true }, faite = { attente = true, acceptee = true } },
-}
-
-local function MesCommandes()
-	local b = Base()
-	if type(b.commandes) ~= "table" then b.commandes = {} end
-	local cle = MaCle() or "?"
-	local m = b.commandes[cle]
-	if type(m) ~= "table" then m = {}; b.commandes[cle] = m end
-	if type(m.recues) ~= "table" then m.recues = {} end
-	if type(m.passees) ~= "table" then m.passees = {} end
-	return m
-end
-
--- Purge à la connexion : commandes sans changement depuis 30 jours, commandes de test hors test seul
-local function PurgerCommandes()
-	local b = Base()
-	if type(b.commandes) ~= "table" then return end
-	local maintenant, test = time(), TestSolo()
-	for perso, m in pairs(b.commandes) do
-		if type(m) ~= "table" then
-			b.commandes[perso] = nil
-		else
-			for _, sens in ipairs({ "recues", "passees" }) do
-				local t = m[sens]
-				if type(t) == "table" then
-					for id, c in pairs(t) do
-						if type(c) ~= "table" or maintenant - (tonumber(c.maj or c.date) or 0) > OUBLI_COMMANDE
-							or (not test and ((c.client or "") .. (c.artisan or "")):find("#test", 1, true)) then
-							t[id] = nil
-						end
-					end
-				end
-			end
-		end
+-- Clic sur la recette d'un membre : la page Demandes, formulaire rempli (demande d'artisanat). Une
+-- recette qui ne crée pas d'objet (enchantement) ne peut pas être demandée : on propose de chuchoter.
+local function DemanderRecette(code, cle, nom)
+	local objet = tonumber((code or ""):match("^i(%d+)$"))
+	if objet and ns.OuvrirDemandes then
+		ns.OuvrirDemandes(objet, "A", 1)
+	elseif cle then
+		ns.UI.Chuchoter(cle, nom)
 	end
 end
 
--- id unique : ma clé et l'heure du serveur (au moins une seconde d'écart entre deux commandes)
-local dernierIdCommande = 0
-local function NouvelIdCommande()
-	local t = math.floor(GetServerTime and GetServerTime() or time())
-	if t <= dernierIdCommande then t = dernierIdCommande + 1 end
-	dernierIdCommande = t
-	return MaCle() .. ":" .. Base36(t)
-end
-
--- « 3 x [Potion] » (lien de l'objet si le jeu le connaît)
-local function TexteCommande(c)
-	return ((c.qte or 1) > 1 and (c.qte .. " x ") or "") .. NomRecette(c.code or "")
-end
-
--- Onglet Commandes, compteur de l'onglet (GuildUp_Carnet.lua) et médaillon
-local function MajCommandes()
-	if ns.MajCompteCommandes then ns.MajCompteCommandes() end
-	if ns.ArtisanatVisible and ns.ArtisanatVisible(4) and ns.MajInterface then ns.MajInterface() end
-	if ns.MajBouton then ns.MajBouton() end
-end
-
-local function BulleCommande(titre, texte, son)
-	if ns.Notifier then
-		ns.Notifier("commandes", titre, texte, son, function() if ns.OuvrirArtisanat then ns.OuvrirArtisanat(4) end end)
-	end
-end
-
--- Envoie l'état d'une commande à l'autre ; s'il est hors ligne, l'envoi attend son retour (aEnvoyer,
--- revu à chaque mise à jour de la liste de guilde). recue : commande reçue (je suis l'artisan).
-local function EnvoyerEtat(c, recue)
-	local autre = recue and c.client or c.artisan
-	local e = ETATS_COMMANDE[c.etat]
-	if not autre or not e or not c.id then return end
-	local msg = ("E~%s~%s~%s~%s"):format(autre, c.id, e.lettre, recue and "a" or "c")
-	if autre:find("#test", 1, true) then
-		-- test seul : par la guilde, le jeu me renvoie mon message
-		c.aEnvoyer = nil
-		Envoyer(msg)
-		return
-	end
-	if not EnLigne(autre, { vu = 0 }) then
-		c.aEnvoyer = true
-		return
-	end
-	c.aEnvoyer = nil
-	if recue and not c.suivi then
-		-- client d'une ancienne version : il ne lit que « K » (acceptée / refusée), sur la guilde
-		if c.etat == "acceptee" or c.etat == "refusee" then
-			Envoyer(("K~%s~%s~%s~%s"):format(autre, c.id, c.etat == "acceptee" and "1" or "0", c.code or ""))
-		end
-		return
-	end
-	local nom = (roster[autre] and roster[autre].nom) or (recue and c.clientNom or c.artisanNom)
-	if nom then ns.EnvoyerAddon(PREFIXE, msg, "WHISPER", nom) end
-end
-
--- états pas encore transmis (l'autre était hors ligne) : envoyés dès qu'il est en ligne
-local function EnvoyerEtatsEnAttente()
-	if not pret then return end
-	local m = MesCommandes()
-	for _, c in pairs(m.recues) do if c.aEnvoyer then EnvoyerEtat(c, true) end end
-	for _, c in pairs(m.passees) do if c.aEnvoyer then EnvoyerEtat(c, false) end end
-end
-
--- Bouton de l'onglet Commandes : change l'état d'une de mes commandes et prévient l'autre
-local function ChangerCommande(id, recue, etat)
-	local m = MesCommandes()
-	local c = (recue and m.recues or m.passees)[id]
-	local permis = PERMIS_COMMANDE[recue and "a" or "c"][etat]
-	if not c or not (permis and permis[c.etat]) then return end
-	c.etat, c.maj = etat, time()
-	EnvoyerEtat(c, recue)
-	MajCommandes()
-end
-
--- Retire de la liste une commande finie (refusée, faite, annulée)
-local function RetirerCommande(id, recue)
-	local t = recue and MesCommandes().recues or MesCommandes().passees
-	if t[id] and COMMANDE_FINIE[t[id].etat] and not t[id].aEnvoyer then
-		t[id] = nil
-		MajCommandes()
-	end
-end
-
--- Commandes reçues encore en attente de ma réponse (compteur de l'onglet)
-ns.CommandesEnAttente = function()
-	local n = 0
-	for _, c in pairs(MesCommandes().recues) do if c.etat == "attente" then n = n + 1 end end
-	return n
-end
-
-local TITRES_ARTISAN = {
-	acceptee = { "Commande acceptée", "%s s'en occupe : %s", "TELL_MESSAGE" },
-	refusee  = { "Commande refusée", "%s ne peut pas la faire : %s" },
-	faite    = { "Commande prête", "%s a fabriqué : %s", "TELL_MESSAGE" },
-}
-local TITRES_CLIENT = {
-	annulee = { "Commande annulée", "%s annule sa commande : %s" },
-	faite   = { "Commande reçue", "%s a bien reçu : %s" },
-}
-
-RecevoirCommande = function(genre, reste, cle, nom)
-	local moi = MaCle()
-	local function PourMoi(cible) return cible == moi or (TestSolo() and cible == moi .. "#test") end
-	local m = MesCommandes()
-	if genre == "C" then
-		local cible, code, id, qteC, suivi = strsplit("~", reste)
-		if not PourMoi(cible) or not code or not code:match("^[si]%d+$") or not id or id == "" then return end
-		if m.recues[id] then return end -- (déjà reçue)
-		qteC = tonumber(qteC)
-		qteC = (qteC and qteC >= 1) and math.min(math.floor(qteC), 9999) or 1
-		local maintenant = time()
-		m.recues[id] = { id = id, code = code, qte = qteC, client = cle, clientNom = nom, artisan = cible,
-			date = maintenant, maj = maintenant, etat = "attente", suivi = (suivi == "2") or nil }
-		MajCommandes()
-		-- (silencieuse : le message privé du client a déjà sonné)
-		BulleCommande("Nouvelle commande", ("%s te demande : %s"):format(NomJoueur(nom), TexteCommande(m.recues[id])), "aucun")
-
-	elseif genre == "E" then
-		local cible, id, lettre, qui = strsplit("~", reste)
-		local etat = ETAT_PAR_LETTRE[lettre or ""]
-		if not PourMoi(cible) or not id or not etat or not PERMIS_COMMANDE[qui or ""] then return end
-		-- l'artisan écrit au client (mes commandes passées), le client à l'artisan (mes commandes reçues)
-		local c = (qui == "a" and m.passees or m.recues)[id]
-		if not c or (qui == "a" and c.artisan or c.client) ~= cle then return end
-		local permis = PERMIS_COMMANDE[qui][etat]
-		if not (permis and permis[c.etat]) then return end
-		c.etat, c.maj = etat, time()
-		if qui == "a" then c.suivi, c.artisanNom = true, nom else c.clientNom = nom end
-		MajCommandes()
-		local t = (qui == "a" and TITRES_ARTISAN or TITRES_CLIENT)[etat]
-		if t then BulleCommande(t[1], t[2]:format(NomJoueur(nom), TexteCommande(c)), t[3]) end
-
-	elseif genre == "K" then
-		-- réponse d'un artisan d'avant la 1.5 (bouton Accepter / Refuser)
-		local cible, id, ok, code = strsplit("~", reste)
-		if not PourMoi(cible) then return end
-		local c = id and m.passees[id]
-		if c and c.artisan == cle and c.etat == "attente" then
-			c.etat, c.maj = ok == "1" and "acceptee" or "refusee", time()
-			MajCommandes()
-		end
-		local t = TITRES_ARTISAN[ok == "1" and "acceptee" or "refusee"]
-		BulleCommande(t[1], t[2]:format(NomJoueur(nom), c and TexteCommande(c) or NomRecette(code or "")), t[3])
-	end
-end
-
-local dernieresCommandes = {}
-local function Commander(cle, nom, code, qte)
-	qte = tonumber(qte)
-	if qte and qte < 2 then qte = nil end
-	if not EnLigne(cle, { vu = 0 }) then
-		if ns.Erreur then ns.Erreur("Ce joueur est hors ligne : impossible de lui commander") end
-		return
-	end
-	local k = cle .. code
-	if dernieresCommandes[k] and GetTime() - dernieresCommandes[k] < 30 then
-		if ns.Erreur then ns.Erreur("Commande déjà envoyée, attends sa réponse") end
-		return
-	end
-	dernieresCommandes[k] = GetTime()
-	local id = NouvelIdCommande()
-	Envoyer(("C~%s~%s~%s~%d~2"):format(cle, code, id, qte or 1))
-	-- gardée pour le suivi (onglet Commandes)
-	local maintenant = time()
-	MesCommandes().passees[id] = { id = id, code = code, qte = qte or 1, client = MaCle(),
-		clientNom = NomCompletUnite("player"), artisan = cle, artisanNom = nom, date = maintenant,
-		maj = maintenant, etat = "attente" }
-	MajCommandes()
-	-- message privé envoyé par le demandeur : le crafteur en garde la trace dans sa discussion
-	if not cle:find("#test", 1, true) then
-		local nomMP = (roster[cle] and roster[cle].nom) or PrenomSeul(nom)
-		local envoi = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
-		if envoi and nomMP then
-			pcall(envoi, "Commande d'artisanat : " .. (qte and (qte .. " x ") or "") .. NomRecette(code)
-				.. (qte and " — peux-tu me les fabriquer ?" or " — peux-tu me le fabriquer ?"), "WHISPER", nil, nomMP)
-		end
-	end
-end
-
--- Confirmation avant d'envoyer une commande (évite les clics par erreur et les demandes en double) ;
--- quantité modifiable : 1 par défaut, ou celle du carnet de craft (fenêtre de saisie du kit)
-local function DemanderConfirmation(cle, nom, code, qte)
-	ns.UI.DemanderTexte({
-		titre = "Commander",
-		texte = ("À |cffffd100%s|r : %s\nQuantité :"):format(NomJoueur(nom), NomRecette(code)),
-		defaut = tostring(qte or 1), numerique = true, maxLettres = 4, bouton = "Commander",
-		valider = function(t) Commander(cle, nom, code, tonumber(t) or qte) end,
-	})
-end
--- Pour le carnet de craft : commander un objet (avec une quantité) à un membre
-ns.CommanderObjet = function(cle, nom, objet, qte) DemanderConfirmation(cle, nom, "i" .. objet, qte) end
-
--- Pour GuildUp_Besoins.lua et GuildUp_Echanges.lua
+-- Pour les autres modules (demandes, accueil, page Guilde…)
 ns.EnLigneMembre = function(cle) return EnLigne(cle, { vu = 0 }) end
 ns.DemanderRoster = function() DemanderRoster() end
 ns.MembreGuilde = function(cle)
@@ -1037,7 +758,7 @@ end
 -- Onglet « Registre » de la page Artisanat (fenêtre GuildUpSMB, kit ns.UI)
 -- En haut : « Tous » et un bouton par métier (filtre ; re-clic : retiré), recherche « joueur ou
 -- recette », case « recettes spéciales », Actualiser. À gauche les membres, à droite la fiche du
--- membre choisi (métiers repliables, recettes : clic = commander, Maj-clic = lien).
+-- membre choisi (métiers repliables, recettes : clic = demander, Maj-clic = lien).
 --------------------------------------------------------------------------------
 
 local UI = ns.UI
@@ -1382,7 +1103,7 @@ local function Prendre(genre)
 		l.texte:SetPoint("RIGHT", l, "RIGHT", -8, 0)
 		l:EnableMouse(false)
 	else
-		-- recette : icône, nom (couleur de qualité), « clic : commander » au survol
+		-- recette : icône, nom (couleur de qualité), « clic : demander » au survol
 		l:SetHeight(28)
 		l.icone:SetSize(20, 20)
 		l.icone:SetPoint("LEFT", l, "LEFT", 18, 0)
@@ -1395,8 +1116,8 @@ local function Prendre(genre)
 		l.texte:SetPoint("RIGHT", l, "RIGHT", -110, 0)
 		UI.Survol(l, 0.05)
 		l:SetScript("OnEnter", function(self)
-			if self.commande then
-				self.indice:SetText(self.commande.enLigne and "clic : commander" or "hors ligne")
+			if self.membre then
+				self.indice:SetText(self.objetFabrique and "clic : demander" or "clic : chuchoter")
 				self.indice:Show()
 			end
 			if not self.hyper then return end
@@ -1404,9 +1125,9 @@ local function Prendre(genre)
 			if not pcall(GameTooltip.SetHyperlink, GameTooltip, self.hyper) then
 				GameTooltip:SetText(self.texte:GetText() or "?")
 			end
-			if self.commande then
-				GameTooltip:AddLine(self.commande.enLigne and ("Clic : commander à " .. NomJoueur(self.commande.nom))
-					or "Hors ligne : commande impossible", 0.3, 1, 0.3)
+			if self.membre then
+				GameTooltip:AddLine(self.objetFabrique and "Clic : demander cet objet à la guilde (page Demandes)"
+					or ("Clic : chuchoter à " .. NomJoueur(self.membre.nom)), 0.3, 1, 0.3)
 			end
 			GameTooltip:AddLine("Maj-clic : lien dans la discussion", 0.6, 0.6, 0.6)
 			GameTooltip:Show()
@@ -1418,8 +1139,8 @@ local function Prendre(genre)
 		l:SetScript("OnClick", function(self)
 			if self.lien and IsModifiedClick and IsModifiedClick("CHATLINK") and ChatEdit_InsertLink then
 				ChatEdit_InsertLink(self.lien)
-			elseif self.commande and self.code then
-				DemanderConfirmation(self.commande.cle, self.commande.nom, self.code)
+			elseif self.membre and self.code then
+				DemanderRecette(self.code, self.membre.cle, self.membre.nom)
 			end
 		end)
 	end
@@ -1516,7 +1237,8 @@ local function MajDetail(f)
 					local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
 					if qc and nomR then r.texte:SetTextColor(qc.r, qc.g, qc.b) else r.texte:SetTextColor(unpack(C.texte)) end
 					r.lien, r.hyper, r.code = lien, hyper, code
-					r.commande = (not f.moi) and { cle = f.cle, nom = e.nom or f.cle, enLigne = f.enLigne } or nil
+					r.membre = (not f.moi) and { cle = f.cle, nom = e.nom or f.cle } or nil
+					r.objetFabrique = code:match("^i%d+$") ~= nil
 					y = y + 28
 				end
 				if ouvert and #recettes == 0 and not m.recolte then
@@ -1774,258 +1496,6 @@ ns.BasculerMetiers = function()
 end
 
 --------------------------------------------------------------------------------
--- Onglet « Commandes » de la page Artisanat (kit ns.UI) : les commandes reçues (Accepter / Refuser,
--- puis Fait), puis les passées (Reçue / Annuler) ; Retirer quand elle est finie. Une rangée : icône et
--- nom de l'objet (clic : encyclopédie, Maj-clic : lien), quantité, état coloré, qui, quand, Chuchoter.
---------------------------------------------------------------------------------
-
-do
-	local HAUTEUR_COMMANDE, ECART_COMMANDE, HAUTEUR_TITRE = 50, 6, 30
-	local GRIS_TXT = "|cff9c937f"
-	local RANG_ETAT = { attente = 1, acceptee = 2 } -- (puis les commandes finies, la plus récente d'abord)
-	local page
-	local rangees, titres = {}, {}
-
-	local function Triees(t)
-		local l = {}
-		for _, c in pairs(t) do if type(c) == "table" then l[#l + 1] = c end end
-		table.sort(l, function(a, b)
-			local ra, rb = RANG_ETAT[a.etat] or 3, RANG_ETAT[b.etat] or 3
-			if ra ~= rb then return ra < rb end
-			if (a.maj or 0) ~= (b.maj or 0) then return (a.maj or 0) > (b.maj or 0) end
-			return tostring(a.id) < tostring(b.id)
-		end)
-		return l
-	end
-
-	local function BulleBouton(self)
-		if not self.bulle then return end
-		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:SetText(self.bulle, 1, 1, 1, 1, true)
-		GameTooltip:Show()
-	end
-
-	-- bouton d'une rangée : texte, infobulle, action (texte nil : caché)
-	local function PoserBouton(b, texte, bulle, action)
-		if not texte then b:Hide(); return end
-		b:Ecrire(texte)
-		b.bulle = bulle or false
-		b:SetScript("OnClick", action)
-		b:Activer(true)
-		b:Show()
-	end
-
-	local function Rangee(i)
-		local l = rangees[i]
-		if l then return l end
-		l = UI.Rangee(page.liste.contenu, HAUTEUR_COMMANDE)
-		l.icone = l:CreateTexture(nil, "ARTWORK")
-		l.icone:SetSize(32, 32)
-		l.icone:SetPoint("LEFT", l, "LEFT", 10, 0)
-		l.icone:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-		l.chuchoter = UI.Bouton(l, "Chuchoter", "fantome", 90, 26)
-		l.chuchoter:SetPoint("RIGHT", l, "RIGHT", -10, 0)
-		l.action2 = UI.Bouton(l, "", "fantome", 84, 26)
-		l.action2:SetPoint("RIGHT", l.chuchoter, "LEFT", -6, 0)
-		l.action = UI.Bouton(l, "", "or", 84, 26)
-		l.action:SetPoint("RIGHT", l.action2, "LEFT", -6, 0)
-		for _, b in ipairs({ l.action, l.action2, l.chuchoter }) do
-			b:SetMotionScriptsWhileDisabled(true)
-			b:SetScript("OnEnter", BulleBouton)
-			b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-			b.bulle = false
-		end
-		l.chuchoter:SetScript("OnClick", function()
-			if l.autre then UI.Chuchoter(l.autre, l.nomAutre) end
-		end)
-		l.nom = UI.Texte(l, "GameFontHighlight", C.texte)
-		l.nom:SetPoint("TOPLEFT", l.icone, "TOPRIGHT", 10, -1)
-		l.sous = UI.Texte(l, "GameFontHighlightSmall", C.gris)
-		l.sous:SetPoint("TOPLEFT", l.nom, "BOTTOMLEFT", 0, -5)
-		-- clic : fiche de l'objet dans l'encyclopédie ; Maj-clic : lien dans la discussion
-		l:SetScript("OnClick", function(self)
-			if self.lien and IsModifiedClick and IsModifiedClick("CHATLINK") and ChatEdit_InsertLink then
-				ChatEdit_InsertLink(self.lien)
-			elseif self.objet and ns.OuvrirFiche then
-				ns.OuvrirFiche(self.objet, self.qte)
-			end
-		end)
-		l:SetScript("OnEnter", function(self)
-			if not self.hyper then return end
-			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			if not pcall(GameTooltip.SetHyperlink, GameTooltip, self.hyper) then
-				GameTooltip:SetText(self.nom:GetText() or "?")
-			end
-			GameTooltip:AddLine((self.objet and "Clic : fiche dans l'encyclopédie · " or "") .. "Maj-clic : lien", 0.6, 0.6, 0.6)
-			GameTooltip:Show()
-		end)
-		l:SetScript("OnLeave", function() GameTooltip:Hide() end)
-		rangees[i] = l
-		return l
-	end
-
-	local function Remplir(l, c, recue)
-		local nom, icone, lien, hyper, qualite = InfoRecette(c.code or "")
-		l.objet = tonumber((c.code or ""):match("^i(%d+)$"))
-		l.qte, l.lien, l.hyper = c.qte or 1, lien, hyper
-		if l.objet and not nom and ns.Precharger then ns.Precharger(l.objet) end
-		l.icone:SetTexture(icone or ICONE_INCONNUE)
-		l.nom:SetText((nom or "chargement…") .. "  " .. GRIS_TXT .. "x" .. (c.qte or 1) .. "|r")
-		local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
-		if qc and nom then l.nom:SetTextColor(qc.r, qc.g, qc.b) else l.nom:SetTextColor(unpack(C.texte)) end
-		-- l'autre : le client (commande reçue) ou l'artisan (commande passée)
-		local autre = recue and c.client or c.artisan
-		local nomAutre = (recue and c.clientNom or c.artisanNom) or autre or "?"
-		l.autre, l.nomAutre = autre, nomAutre
-		local qui = (ns.NomMembreColore and autre and ns.NomMembreColore(autre, nomAutre)) or NomJoueur(nomAutre)
-		local e = ETATS_COMMANDE[c.etat] or ETATS_COMMANDE.attente
-		l.sous:SetText(e.couleur .. e.nom .. (c.etat ~= "attente" and (" " .. UI.IlYa(c.maj)) or "") .. "|r · "
-			.. (recue and "de " or "pour ") .. qui .. " · commandée " .. UI.IlYa(c.date)
-			.. (c.aEnvoyer and (" · " .. GRIS_TXT .. "il sera prévenu à son retour|r") or ""))
-		-- boutons selon l'état
-		local id = c.id
-		if recue and c.etat == "attente" then
-			PoserBouton(l.action, "Accepter", "Tu t'en occupes : le client est prévenu.",
-				function() ChangerCommande(id, true, "acceptee") end)
-			PoserBouton(l.action2, "Refuser", "Tu ne peux pas la faire : le client est prévenu.",
-				function() ChangerCommande(id, true, "refusee") end)
-		elseif recue and c.etat == "acceptee" then
-			PoserBouton(l.action, "Fait", "Commande fabriquée et remise : le client est prévenu.",
-				function() ChangerCommande(id, true, "faite") end)
-			PoserBouton(l.action2, "Refuser", "Finalement, tu ne peux pas la faire : le client est prévenu.",
-				function() ChangerCommande(id, true, "refusee") end)
-		elseif not recue and not COMMANDE_FINIE[c.etat] then
-			PoserBouton(l.action, "Reçue", "Tu as reçu l'objet : la commande est faite, l'artisan est prévenu.",
-				function() ChangerCommande(id, false, "faite") end)
-			PoserBouton(l.action2, "Annuler", "Tu n'en as plus besoin : l'artisan est prévenu.",
-				function() ChangerCommande(id, false, "annulee") end)
-		else
-			PoserBouton(l.action, nil)
-			PoserBouton(l.action2, "Retirer", "Retire cette commande finie de la liste (sinon, elle part seule après 30 jours).",
-				function() RetirerCommande(id, recue) end)
-			if c.aEnvoyer then
-				-- (gardée tant que l'autre n'est pas prévenu)
-				l.action2:Activer(false)
-				l.action2.bulle = "Pas encore : " .. NomJoueur(nomAutre) .. " sera prévenu à son retour."
-			end
-		end
-		local enLigne = autre ~= nil and EnLigne(autre, { vu = 0 })
-		l.chuchoter:Activer(enLigne)
-		l.chuchoter.bulle = enLigne and "Lui envoyer un message privé." or "Hors ligne : impossible de lui écrire."
-		local gauche = l.action:IsShown() and l.action or l.action2
-		l.nom:SetPoint("RIGHT", gauche, "LEFT", -10, 0)
-		l.sous:SetPoint("RIGHT", gauche, "LEFT", -10, 0)
-		l:Fort(recue and c.etat == "attente")
-		l:SetAlpha(COMMANDE_FINIE[c.etat] and 0.7 or 1)
-	end
-
-	-- titre de section (« Reçues (2) ») avec une aide grise à droite, filet dessous
-	local function Titre(i)
-		local t = titres[i]
-		if t then return t end
-		t = CreateFrame("Frame", nil, page.liste.contenu)
-		t:SetHeight(HAUTEUR_TITRE)
-		t.texte = UI.Texte(t, "GameFontNormal", C.ors)
-		t.texte:SetPoint("BOTTOMLEFT", t, "BOTTOMLEFT", 2, 8)
-		t.aide = UI.Texte(t, "GameFontHighlightSmall", C.gris)
-		t.aide:SetPoint("LEFT", t.texte, "RIGHT", 12, 0)
-		t.aide:SetPoint("RIGHT", t, "RIGHT", -2, 0)
-		t.filet = UI.Filet(t)
-		t.filet:SetPoint("BOTTOMLEFT", t, "BOTTOMLEFT", 0, 0)
-		t.filet:SetPoint("BOTTOMRIGHT", t, "BOTTOMRIGHT", 0, 0)
-		titres[i] = t
-		return t
-	end
-
-	local SECTIONS = {
-		{ recue = true, nom = "Reçues", aide = "ce que la guilde te demande de fabriquer",
-			vide = "Personne ne t'a rien commandé ces 30 derniers jours." },
-		{ recue = false, nom = "Passées", aide = "ce que tu as demandé aux artisans",
-			vide = "Tu n'as rien commandé ces 30 derniers jours." },
-	}
-
-	local function Maj()
-		if not page then return end
-		local m = MesCommandes()
-		local listes = { Triees(m.recues), Triees(m.passees) }
-		local rien = #listes[1] + #listes[2] == 0
-		page.vide:SetShown(rien)
-		page.videItems:SetShown(rien)
-		page.liste:SetShown(not rien)
-		local contenu = page.liste.contenu
-		local y, nr, nt = 0, 0, 0
-		local function Placer(cadre, h)
-			cadre:ClearAllPoints()
-			cadre:SetPoint("TOPLEFT", contenu, "TOPLEFT", 0, -y)
-			cadre:SetPoint("RIGHT", contenu, "RIGHT", 0, 0)
-			cadre:Show()
-			y = y + h
-		end
-		if not rien then
-			for s, sec in ipairs(SECTIONS) do
-				local liste = listes[s]
-				nt = nt + 1
-				local t = Titre(nt)
-				Placer(t, HAUTEUR_TITRE + 6)
-				t.texte:SetText(("%s  %s(%d)|r"):format(sec.nom, GRIS_TXT, #liste))
-				t.aide:SetText(#liste > 0 and sec.aide or sec.vide)
-				for _, c in ipairs(liste) do
-					nr = nr + 1
-					local l = Rangee(nr)
-					Placer(l, HAUTEUR_COMMANDE + ECART_COMMANDE)
-					Remplir(l, c, sec.recue)
-				end
-				y = y + 12
-			end
-		end
-		for i = nr + 1, #rangees do rangees[i]:Hide() end
-		for i = nt + 1, #titres do titres[i]:Hide() end
-		page.liste:Hauteur(y)
-		local n = ns.CommandesEnAttente()
-		page.compte:SetText((n > 0 and ("|cff6fd08c%d en attente de ta réponse|r · "):format(n) or "")
-			.. "gardées 30 jours")
-	end
-
-	-- Onglet « Commandes » : créé par la page Artisanat (GuildUp_Carnet.lua) dans son cadre, sous les onglets
-	ns.CreerPageCommandes = function(parent)
-		local p = CreateFrame("Frame", nil, parent)
-		p:SetAllPoints()
-		page = p
-		-- à droite des onglets : commandes à traiter
-		p.compte = UI.Texte(p, "GameFontHighlightSmall", C.gris)
-		p.compte:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -24)
-		p.compte:SetJustifyH("RIGHT")
-		p.liste = UI.Liste(p)
-		p.liste:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -52)
-		p.liste:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE + 6, MARGE)
-		-- aucune commande : comment en passer une
-		p.vide = UI.Texte(p, "GameFontHighlight", C.gris)
-		p.vide:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE + 4, -64)
-		p.vide:SetPoint("RIGHT", p, "RIGHT", -MARGE, 0)
-		p.vide:SetWordWrap(true)
-		p.vide:SetText("Aucune commande pour l'instant.\n\n"
-			.. "Pour commander un objet à un artisan de la guilde : onglet Items, choisis l'objet puis « Commander » "
-			.. "à côté d'un artisan en ligne (ou, dans le Registre, clic sur une de ses recettes). "
-			.. "Tu suivras ici où elle en est : acceptée, faite… "
-			.. "Les commandes que la guilde te passe arrivent ici aussi.")
-		p.videItems = UI.Bouton(p, "Parcourir les Items", "or", 160, 28)
-		p.videItems:SetPoint("TOPLEFT", p.vide, "BOTTOMLEFT", 0, -16)
-		p.videItems:SetScript("OnClick", function() if ns.OuvrirArtisanat then ns.OuvrirArtisanat(2) end end)
-		-- « il y a … » et qui est en ligne changent : rafraîchie toutes les 30 s tant qu'elle est affichée
-		local attente = 0
-		p:SetScript("OnUpdate", function(_, ecoule)
-			attente = attente + (ecoule or 0)
-			if attente > 30 then
-				attente = 0
-				Maj()
-			end
-		end)
-		p.Maj = Maj
-		return p
-	end
-end
-
---------------------------------------------------------------------------------
 -- /smb diag
 --------------------------------------------------------------------------------
 
@@ -2082,12 +1552,6 @@ ns.DiagMetiers = function(L)
 	end
 	L(("  guilde : %s, %d fiche(s) reçue(s), liste de guilde %d membre(s) listé(s), mon nom dans la liste = %s"):format(
 		tostring(GetGuildInfo("player")), n, rn, tostring(exemple)))
-	local mc = MesCommandes()
-	local nr, np, ne = 0, 0, 0
-	for _, c in pairs(mc.recues) do nr = nr + 1; if c.aEnvoyer then ne = ne + 1 end end
-	for _, c in pairs(mc.passees) do np = np + 1; if c.aEnvoyer then ne = ne + 1 end end
-	L(("  commandes : %d reçue(s) (%d en attente), %d passée(s), %d état(s) à envoyer"):format(
-		nr, ns.CommandesEnAttente(), np, ne))
 	L("  " .. (ns.StatsReseau and ns.StatsReseau() or "?"))
 end
 
@@ -2095,7 +1559,7 @@ end
 -- Évènements
 --------------------------------------------------------------------------------
 
-ns.Ecouter(PREFIXE, Recevoir, { GUILD = true, WHISPER = true })
+ns.Ecouter(PREFIXE, Recevoir)
 
 local ev = CreateFrame("Frame")
 for _, nom in ipairs({
@@ -2130,9 +1594,6 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 	elseif event == "GUILD_ROSTER_UPDATE" or event == "PLAYER_GUILD_UPDATE" then
 		LireRoster()
 		if PlanifierMaj then PlanifierMaj(0.3) end
-		-- (qui est en ligne a pu changer : états de commande en attente d'envoi, onglet Commandes)
-		pcall(EnvoyerEtatsEnAttente)
-		if ns.ArtisanatVisible and ns.ArtisanatVisible(4) and ns.MajInterface then ns.MajInterface() end
 	elseif event == "GET_ITEM_INFO_RECEIVED" then
 		if PlanifierMaj then PlanifierMaj(0.5) end
 	elseif event == "PLAYER_ENTERING_WORLD" and premiereEntree then
@@ -2145,15 +1606,13 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 				end
 			end
 		end
-		pcall(PurgerCommandes)
+		Base().commandes = nil -- (anciennes commandes d'artisanat, retirées en 4.0.0)
 		C_Timer.After(8, function()
 			pret = true
 			pcall(LireNiveaux)
 			DemanderRoster()
 			EnvoyerResume()
 			Envoyer("Q")
-			pcall(EnvoyerEtatsEnAttente)
-			if ns.MajCompteCommandes then ns.MajCompteCommandes() end
 		end)
 		-- la liste de guilde a eu le temps d'arriver : on sait qui est encore membre
 		C_Timer.After(40, function() pcall(PurgerFiches) end)

@@ -160,7 +160,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		if carte then membres[qui] = { carte = tonumber(carte), sig = sig, vu = GetTime() } end
 	elseif canal == "WHISPER" and msg == "D" then
 		if ns.Notifier then
-			ns.Notifier("groupes", "Changer de layer", ("%s voudrait passer sur ton layer. Clic : l'inviter dans ton groupe.")
+			ns.Notifier("aide", "Changer de layer", ("%s voudrait passer sur ton layer. Clic : l'inviter dans ton groupe.")
 				:format(NomJoueur(expediteur)), "READY_CHECK", function() Inviter(expediteur) end)
 		end
 	end

@@ -23,8 +23,8 @@ local db = setmetatable({}, {
 -- (fichiers chargés avant celui-ci)
 local DEFAUT, rolesConnus, LireCVarJeu, Message, Erreur, NomComplet, EstDeMaGuilde, Etat, MonRole, RoleManuel, PoserRoleManuel, Annoncer = ns.Coeur.DEFAUT, ns.Coeur.rolesConnus, ns.Coeur.LireCVarJeu, ns.Coeur.Message, ns.Coeur.Erreur, ns.Coeur.NomComplet, ns.Coeur.EstDeMaGuilde, ns.Coeur.Etat, ns.Coeur.MonRole, ns.Coeur.RoleManuel, ns.Coeur.PoserRoleManuel, ns.Coeur.Annoncer
 local ToutRafraichir, SurActivation, MajBarre, Bordures, DeplacerAuras, PlacerIncantation, fondsPlaques, misesEnPage, modifiees = ns.Plaques.ToutRafraichir, ns.Plaques.SurActivation, ns.Plaques.MajBarre, ns.Plaques.Bordures, ns.Plaques.DeplacerAuras, ns.Plaques.PlacerIncantation, ns.Plaques.fondsPlaques, ns.Plaques.misesEnPage, ns.Plaques.modifiees
--- Réglages hors DEFAUT, remis à zéro avec les autres (les données des modules : carnets, dons,
--- besoins, projets, identité, cvarsAvant… sont gardées)
+-- Réglages hors DEFAUT, remis à zéro avec les autres (les données des modules : demandes, identité,
+-- cvarsAvant… sont gardées)
 local REGLAGES_HORS_DEFAUT = {
 	"notifs", "bouton", "barre", "interface", "annoncesGuilde", "emoteGU", "voletNotifs", "coursesCompact",
 	"afficherDebug", "tousNiveaux", "itemsClasse", "itemsNiveau", "itemsGuilde", "itemsNivMin", "itemsNivMax", "styleJeu", "rappelGroupe", "portee", "rolesPerso",
@@ -52,14 +52,13 @@ local function Aide()
 	Message("/smb tout seul ouvre la fenêtre SMB Forever. Commandes :")
 	print("  /smb options — réglages de l'addon")
 	print("  /smb taille 1.2 — taille de la fenêtre SMB Forever (de 0.7 à 1.6)")
-	print("  /smb groupes — recherche de groupe de la guilde")
+	print("  /smb demandes — demandes de la guilde (ressources, artisanat)")
 	print("  /smb metiers — registre des métiers de la guilde")
+	print("  /smb crafts — tous les objets fabricables")
 	print("  /smb quetes — quêtes en commun avec la guilde")
+	print("  /smb jeux — jeux de la guilde (tirage au sort)")
 	print("  /smb evenements — ouvrir la page Événements (calendrier de la guilde)")
-	print("  /smb echanges — dons et besoins de la guilde")
 	print("  /smb encyclo — encyclopédie (ou Alt + clic sur un objet)")
-	print("  /smb items — tous les objets fabricables")
-	print("  /smb projets — projets de guilde")
 	print("  /smb nouveautes — les nouveautés de cette version")
 	print("  /smb sos — appeler la guilde à l'aide")
 	print("  /smb roll [objet ou mot] — tirage au sort de la guilde")
@@ -345,16 +344,12 @@ local function Diag()
 	local function L(s) lignes[#lignes + 1] = s end
 	DiagCollecte(L)
 	pcall(DiagPosition, L)
-	if ns.DiagGroupes then
-		local ok, err = pcall(ns.DiagGroupes, L)
-		if not ok then L("groupes : ERREUR " .. tostring(err)) end
-	end
 	if ns.DiagCarte then
 		local ok, err = pcall(ns.DiagCarte, L)
 		if not ok then L("carte : ERREUR " .. tostring(err)) end
 	end
 	for _, d in ipairs({ { "métiers", ns.DiagMetiers }, { "version", ns.DiagVersion }, { "quêtes", ns.DiagQuetes }, { "objectifs", ns.DiagObjectifs },
-		{ "événements", ns.DiagEvenements }, { "recherche", ns.DiagRecherche }, { "besoins", ns.DiagBesoins }, { "échanges", ns.DiagEchanges }, { "discord", ns.DiagDiscord }, { "carnet", ns.DiagCarnet }, { "carnet2", ns.DiagCarnet2 }, { "projets", ns.DiagProjets }, { "identité", ns.DiagIdentite }, { "gu", ns.DiagGU }, { "layers", ns.DiagLayers } }) do
+		{ "événements", ns.DiagEvenements }, { "demandes", ns.DiagDemandes }, { "discord", ns.DiagDiscord }, { "carnet", ns.DiagCarnet }, { "carnet2", ns.DiagCarnet2 }, { "identité", ns.DiagIdentite }, { "gu", ns.DiagGU }, { "layers", ns.DiagLayers } }) do
 		if d[2] then
 			local ok, err = pcall(d[2], L)
 			if not ok then L(d[1] .. " : ERREUR " .. tostring(err)) end
@@ -374,10 +369,9 @@ local HAUT_CARTE, HAUT_NOTIFS, HAUT_ECRAN = 186, 126, 86
 
 -- types de bulles du médaillon (db.notifs[cat] == false : coupées), cinq par ligne
 local NOTIFS = {
-	{ "groupes", "Groupes" }, { "candidatures", "Candidatures" }, { "niveaux", "Niveaux" }, { "metiers", "Métiers" },
-	{ "evenements", "Événements" }, { "quetes", "Quêtes" }, { "commandes", "Commandes" }, { "plans", "Échanges" },
-	{ "version", "Version" }, { "aide", "Aide" }, { "tirages", "Tirages" }, { "sondages", "Sondages" },
-	{ "cena", "Surprise" }, -- (explosion des montées de niveau, GuildUp_Cena.lua : surprise)
+	{ "demandes", "Demandes" }, { "aide", "Aide" }, { "niveaux", "Niveaux" }, { "metiers", "Métiers" },
+	{ "evenements", "Événements" }, { "quetes", "Quêtes" }, { "tirages", "Tirages" }, { "sondages", "Sondages" },
+	{ "version", "Version" }, { "cena", "Surprise" }, -- (explosion des montées de niveau, GuildUp_Cena.lua : surprise)
 	{ "gu", (ns.Config and ns.Config.cri) and (tostring(ns.Config.cri):upper() .. "!") or "Cri" },
 }
 local MES_ROLES = { "auto", "tank", "heal", "dps" }                  -- puces « Mon rôle »
@@ -544,7 +538,6 @@ local function CreerPage(parent)
 		function() return db.testSolo end, function(v)
 			db.testSolo = v
 			if v and not db.test then Erreur("Coche aussi « Debug » pour activer le test seul") end
-			if ns.SurChangementTestSolo then ns.SurChangementTestSolo() end
 		end)
 	Case(carteDebug, 34, -92, "Bannières de groupe sur tout le monde",
 		function() return db.testGroupe end, function(v)
@@ -577,7 +570,7 @@ local function CreerPage(parent)
 	local phrase = UI.Texte(p, "GameFontHighlightSmall", C.gris)
 	phrase:SetPoint("RIGHT", reset, "LEFT", -12, 0)
 	phrase:SetJustifyH("RIGHT")
-	phrase:SetText("Tes dons, besoins et projets sont gardés si tu réinitialises.")
+	phrase:SetText("Tes demandes et ton profil sont gardés si tu réinitialises.")
 
 	p.Maj = function()
 		if not ns.DB() then return end
@@ -650,10 +643,7 @@ SlashCmdList.GUILDUP = function(msg)
 		db.emoteGU = nil
 		Message(db.notifs.gu == false and "emote du cri de guilde coupée." or "emote du cri de guilde activée.")
 		return
-	elseif cmd == "projets" or cmd == "projet" then
-		if ns.OuvrirProjet then ns.OuvrirProjet() end
-		return
-	elseif cmd == "items" then
+	elseif cmd == "items" or cmd == "crafts" or cmd == "craft" then
 		if ns.BasculerArtisanat then ns.BasculerArtisanat(2) end
 		return
 	elseif cmd == "sos" then
@@ -684,8 +674,11 @@ SlashCmdList.GUILDUP = function(msg)
 	elseif cmd == "nouveautes" or cmd == "nouveautés" or cmd == "notes" then
 		if ns.MontrerNouveautes then ns.MontrerNouveautes() end
 		return
-	elseif cmd == "echanges" or cmd == "échanges" or cmd == "dons" then
-		if ns.BasculerEchanges then ns.BasculerEchanges() end
+	elseif cmd == "demandes" or cmd == "demande" or cmd == "dons" or cmd == "besoins" then
+		if ns.OuvrirDemandes then ns.OuvrirDemandes() end
+		return
+	elseif cmd == "jeux" or cmd == "jeu" then
+		if ns.OuvrirInterface then ns.OuvrirInterface("jeux") end
 		return
 	elseif cmd == "quetes" or cmd == "quêtes" then
 		if ns.BasculerQuetes then ns.BasculerQuetes() end
@@ -696,9 +689,6 @@ SlashCmdList.GUILDUP = function(msg)
 	elseif cmd == "annonces" then
 		db.annoncesGuilde = (db.annoncesGuilde == false)
 		Message("annonces de la guilde en bulle (niveaux, métiers) : " .. OuiNon(db.annoncesGuilde))
-	elseif cmd == "groupes" or cmd == "groupe" then
-		if ns.BasculerGroupes then ns.BasculerGroupes() end
-		return
 	elseif cmd == "bouton" or cmd == "barre" then
 		local visible = ns.BasculerBouton and ns.BasculerBouton()
 		Message("médaillon SMB Forever : " .. OuiNon(visible))
@@ -708,7 +698,6 @@ SlashCmdList.GUILDUP = function(msg)
 		db.afficherDebug = not db.afficherDebug or nil
 		if not db.afficherDebug then db.test, db.testSolo, db.testGroupe = false, false, false end
 		Message("partie Debug de la page Options : " .. OuiNon(db.afficherDebug))
-		if db.afficherDebug and ns.InstallerEspionRecherche then ns.InstallerEspionRecherche() end
 		ns.MajOptions()
 		return
 	elseif cmd == "entree" or cmd == "entrée" then
@@ -768,7 +757,7 @@ SlashCmdList.GUILDUP = function(msg)
 		db.a = math.max(0, math.min(a, 1)); Message(("opacité : %.2f"):format(db.a))
 	elseif cmd == "reset" then
 		ReinitialiserReglages()
-		Message("réglages par défaut (tes dons, besoins et projets sont gardés)")
+		Message("réglages par défaut (tes demandes et ton profil sont gardés)")
 	else
 		if cmd == "" then
 			if ns.BasculerInterface then ns.BasculerInterface() else ns.BasculerOptions() end

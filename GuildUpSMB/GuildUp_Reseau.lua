@@ -28,7 +28,7 @@ end
 -- Envoi : un message toutes les 0,3 s ; nouvel essai (jusqu'à 6) si le jeu refuse (trop de messages)
 --
 -- Deux voies. À la connexion d'un membre, le relais (ns.EstLeRelais) lui renvoie ce qu'il a manqué :
--- dons, besoins, projets, événements, groupes, quêtes, identités, fil d'activité, souvenirs, relevés
+-- demandes, événements, quêtes, identités, fil d'activité, souvenirs, relevés
 -- de présence. Cela fait des dizaines de messages, et tant qu'ils défilent, un appel à l'aide ou un
 -- vote attend derrière. Ces longs envois passent donc en « fond » : un module qui met plus de
 -- RAFALE_MAX messages du même préfixe dans la file en moins de RAFALE_FENETRE secondes est en train de

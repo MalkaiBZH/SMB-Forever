@@ -4,16 +4,15 @@
 -- session, la fenêtre « Complète ton profil » (ns.OuvrirProfil, GuildUp_Identite.lua) s'ouvre si le
 -- profil est incomplet.
 -- Pages :
---   Accueil : ce qui se passe dans la guilde (membres sur ma carte, groupes ouverts, appels à l'aide,
---             demandes de dons, besoins que je sais fabriquer, avancement d'un projet).
+--   Accueil : ce qui se passe dans la guilde (membres sur ma carte, demandes que je peux honorer, appels
+--             à l'aide, mes demandes, prochains événements).
 --   Les autres sections sont des pages fournies par leur module (ns.AjouterPage), avec le kit
---   d'interface ns.UI (GuildUp_Style.lua) : Guilde (GuildUp_Membres.lua), Groupes
---   (GuildUp_GroupesFenetre.lua), Quêtes en commun (GuildUp_Quetes.lua), Artisanat (GuildUp_Carnet.lua,
---   onglets Registre de GuildUp_Metiers.lua, Items, Projets de GuildUp_Projets.lua), Dons
---   (GuildUp_Echanges.lua + GuildUp_Besoins.lua), Options
---   (GuildUp_Options.lua), Événements (GuildUp_Evenements.lua), Activité (GuildUp_Journal.lua : fil
---   d'activité et podium ; sa pastille compte les nouveautés depuis la dernière visite), Statistiques
---   (GuildUp_Stats.lua : présence de la guilde par jour et par heure).
+--   d'interface ns.UI (GuildUp_Style.lua), dans cet ordre : Demandes (GuildUp_Demandes.lua), Artisanat
+--   (GuildUp_Carnet.lua : onglets Registre de GuildUp_Metiers.lua et Crafts), Quêtes (GuildUp_Quetes.lua),
+--   Guilde (GuildUp_Membres.lua), Jeux (GuildUp_Tirage.lua : onglet Tirage au sort), Événements
+--   (GuildUp_Evenements.lua), Activité (GuildUp_Journal.lua : fil d'activité et podium ; sa pastille
+--   compte les nouveautés depuis la dernière visite), Statistiques (GuildUp_Stats.lua : présence de la
+--   guilde par jour et par heure), et Options (GuildUp_Options.lua) en bas.
 -- Fournit ns.NouveautesGuilde() (pastille du médaillon), ns.BasculerInterface(), ns.OuvrirInterface(page),
 -- ns.MajInterface(), ns.DistanceMembre(cle) (distance d'un membre sur ma carte). Réglages :
 -- db.interface = { x, y } (position). Aucun message réseau.
@@ -46,9 +45,9 @@ ns.TAILLE_PAGE = { LARGEUR - LARGEUR_MENU - 2, HAUTEUR - HAUTEUR_TETE - 2 } -- z
 
 ns.NouveautesGuilde = function()
 	return {
-		groupes = ns.NombreGroupes and ns.NombreGroupes() or 0,
 		aide = ns.AppelsAide and #ns.AppelsAide() or 0,
-		dons = ns.NombreDemandesDons and ns.NombreDemandesDons() or 0,
+		demandes = ns.NombreDemandesAider and ns.NombreDemandesAider() or 0,
+		jeux = ns.TirageEnAttente and ns.TirageEnAttente() or 0,
 	}
 end
 
@@ -61,18 +60,16 @@ local Aller -- (défini plus bas)
 
 local SECTIONS = {
 	{ id = "accueil", nom = "Accueil", icone = "Interface\\Icons\\INV_Misc_Book_09" },
-	{ id = "guilde", nom = "Guilde", icone = "Interface\\Icons\\INV_Shirt_GuildTabard_01" },
-	{ id = "groupes", nom = "Groupes", icone = "Interface\\Icons\\INV_Sword_04",
-		ouvrir = function() if ns.OuvrirGroupes then ns.OuvrirGroupes() end end,
-		badge = function() return ns.NombreGroupes and ns.NombreGroupes() or 0 end },
-	{ id = "quetes", nom = "Quêtes en commun", icone = "Interface\\Icons\\INV_Misc_Note_06", neutre = true,
-		ouvrir = function() if ns.BasculerQuetes then ns.BasculerQuetes(true) end end,
-		badge = function() return ns.QuetesEnCommun and #ns.QuetesEnCommun() or 0 end },
+	{ id = "demandes", nom = "Demandes", icone = "Interface\\Icons\\INV_Misc_Gift_01",
+		badge = function() return ns.NombreDemandesAider and ns.NombreDemandesAider() or 0 end },
 	{ id = "artisanat", nom = "Artisanat", icone = "Interface\\Icons\\Trade_BlackSmithing",
 		ouvrir = function() if ns.OuvrirArtisanat then ns.OuvrirArtisanat(1) end end },
-	{ id = "dons", nom = "Dons", icone = "Interface\\Icons\\INV_Misc_Gift_01",
-		ouvrir = function() if ns.OuvrirEchanges then ns.OuvrirEchanges(nil, 1) end end,
-		badge = function() return ns.NombreDemandesDons and ns.NombreDemandesDons() or 0 end },
+	{ id = "quetes", nom = "Quêtes", icone = "Interface\\Icons\\INV_Misc_Note_06", neutre = true,
+		ouvrir = function() if ns.BasculerQuetes then ns.BasculerQuetes(true) end end,
+		badge = function() return ns.QuetesEnCommun and #ns.QuetesEnCommun() or 0 end },
+	{ id = "guilde", nom = "Guilde", icone = "Interface\\Icons\\INV_Shirt_GuildTabard_01" },
+	{ id = "jeux", nom = "Jeux", icone = "Interface\\Icons\\INV_Misc_Dice_01",
+		badge = function() return ns.TirageEnAttente and ns.TirageEnAttente() or 0 end },
 	{ id = "evenements", nom = "Événements", icone = "Interface\\Icons\\INV_Misc_PocketWatch_01" },
 	{ id = "activite", nom = "Activité", icone = "Interface\\Icons\\INV_Misc_Note_01", neutre = true,
 		badge = function() return ns.NouveautesActivite and ns.NouveautesActivite() or 0 end },
@@ -196,27 +193,12 @@ local function MembresDeMaCarte()
 end
 
 local NOMS_ROLES = { tank = "Tank", heal = "Heal", dps = "DPS" }
-local COULEURS_ROLES = { tank = "|cff6aa7e6", heal = "|cff6fd08c", dps = "|cffee8075" }
 
--- groupes ouverts (hors le mien), les plus récents d'abord
-local function GroupesOuverts()
-	local res = {}
-	local etat = ns.Groupes and ns.Groupes.etat
-	if not etat then return res end
-	for id, a in pairs(etat.annonces or {}) do
-		if not (etat.monAnnonce and id == etat.monAnnonce.id) and (a.membres or 1) < (a.taille or 5) then
-			res[#res + 1] = a
-		end
-	end
-	-- groupes immédiats d'abord (les plus récents), puis les programmés (départ le plus proche)
-	local Programmee = ns.Groupes.Programmee or function() return false end
-	table.sort(res, function(a, b)
-		local pa, pb = Programmee(a), Programmee(b)
-		if pa ~= pb then return not pa end
-		if pa then return (a.depart or 0) < (b.depart or 0) end
-		return (a.premiere or 0) > (b.premiere or 0)
-	end)
-	return res
+-- icône, nom et lien d'un objet ; « ×5 » après le nom si plus d'un
+local function TexteObjet(objet, qte)
+	local nom, lien, _, icone = ns.InfoObjet(objet)
+	if not nom and ns.Precharger then ns.Precharger(objet) end
+	return (lien or nom or "un objet") .. ((qte or 1) > 1 and (" ×" .. qte) or ""), icone
 end
 
 local function CreerAccueil(parent)
@@ -248,18 +230,18 @@ local function CreerAccueil(parent)
 		zone.membres[i] = m
 	end
 
-	-- Groupes ouverts
-	local groupes = CarteAccueil(p, "Groupes ouverts")
-	groupes:SetPoint("TOPLEFT", zone, "BOTTOMLEFT", 0, -ECART)
-	groupes:SetSize(demi, 182)
-	groupes.lignes = { LigneCarte(groupes, 1), LigneCarte(groupes, 2) }
-	groupes.creer = Bouton(groupes, "Voir les groupes", "fantome", 120, 22)
-	groupes.creer:SetPoint("BOTTOMLEFT", groupes, "BOTTOMLEFT", 14, 10)
-	groupes.creer:SetScript("OnClick", function() Aller("groupes") end)
+	-- Demandes de la guilde que je peux honorer (ou que j'ai prises)
+	local demandes = CarteAccueil(p, "Tu peux aider")
+	demandes:SetPoint("TOPLEFT", zone, "BOTTOMLEFT", 0, -ECART)
+	demandes:SetSize(demi, 182)
+	demandes.lignes = { LigneCarte(demandes, 1), LigneCarte(demandes, 2) }
+	demandes.voir = Bouton(demandes, "Voir les demandes", "fantome", 130, 22)
+	demandes.voir:SetPoint("BOTTOMLEFT", demandes, "BOTTOMLEFT", 14, 10)
+	demandes.voir:SetScript("OnClick", function() Aller("demandes") end)
 
 	-- Appels à l'aide
 	local aide = CarteAccueil(p, "Appels à l'aide")
-	aide:SetPoint("TOPLEFT", groupes, "TOPRIGHT", ECART, 0)
+	aide:SetPoint("TOPLEFT", demandes, "TOPRIGHT", ECART, 0)
 	aide:SetSize(demi, 182)
 	aide.titre:SetTextColor(unpack(C.aide))
 	aide:SetBackdropBorderColor(0.43, 0.2, 0.14, 1)
@@ -268,47 +250,23 @@ local function CreerAccueil(parent)
 	aide.note:SetPoint("BOTTOMLEFT", aide, "BOTTOMLEFT", 14, 12)
 	aide.note:SetText("Seuls les membres qui ont le niveau reçoivent l'appel.")
 
-	-- Dons : demandes reçues
-	local dons = CarteAccueil(p, "Dons")
-	dons:SetPoint("TOPLEFT", groupes, "BOTTOMLEFT", 0, -ECART)
-	dons:SetSize(demi, 160)
-	dons.lignes = { LigneCarte(dons, 1), LigneCarte(dons, 2) }
-	dons.parcourir = Bouton(dons, "Parcourir les dons", "fantome", 130, 22)
-	dons.parcourir:SetPoint("BOTTOMLEFT", dons, "BOTTOMLEFT", 14, 10)
-	dons.parcourir:SetScript("OnClick", function() Aller("dons") end)
+	-- Mes demandes en cours
+	local mes = CarteAccueil(p, "Mes demandes")
+	mes:SetPoint("TOPLEFT", demandes, "BOTTOMLEFT", 0, -ECART)
+	mes:SetSize(demi, 160)
+	mes.lignes = { LigneCarte(mes, 1), LigneCarte(mes, 2) }
+	mes.nouvelle = Bouton(mes, "Nouvelle demande", "fantome", 130, 22)
+	mes.nouvelle:SetPoint("BOTTOMLEFT", mes, "BOTTOMLEFT", 14, 10)
+	mes.nouvelle:SetScript("OnClick", function() Aller("demandes") end)
 
-	-- Tu peux aider : besoins que je sais fabriquer, avancement du dernier projet
-	local aider = CarteAccueil(p, "Tu peux aider")
-	aider:SetPoint("TOPLEFT", dons, "TOPRIGHT", ECART, 0)
-	aider:SetSize(demi, 160)
-	aider.lignes = { LigneCarte(aider, 1), LigneCarte(aider, 2) }
-	aider.projet = Texte(aider, "GameFontHighlightSmall", C.texte)
-	aider.projet:SetPoint("BOTTOMLEFT", aider, "BOTTOMLEFT", 14, 24)
-	aider.projet:SetPoint("RIGHT", aider, "RIGHT", -70, 0)
-	aider.avance = Texte(aider, "GameFontHighlightSmall", C.gris)
-	aider.avance:SetPoint("BOTTOMRIGHT", aider, "BOTTOMRIGHT", -14, 24)
-	aider.avance:SetJustifyH("RIGHT")
-	aider.barre = aider:CreateTexture(nil, "ARTWORK")
-	aider.barre:SetColorTexture(0.165, 0.137, 0.094, 1)
-	aider.barre:SetHeight(6)
-	aider.barre:SetPoint("BOTTOMLEFT", aider, "BOTTOMLEFT", 14, 12)
-	aider.barre:SetPoint("BOTTOMRIGHT", aider, "BOTTOMRIGHT", -14, 12)
-	aider.plein = aider:CreateTexture(nil, "OVERLAY")
-	aider.plein:SetColorTexture(C.orFonce[1], C.orFonce[2], C.orFonce[3], 1)
-	aider.plein:SetHeight(6)
-	aider.plein:SetPoint("LEFT", aider.barre, "LEFT", 0, 0)
-	aider.projetBouton = CreateFrame("Button", nil, aider)
-	aider.projetBouton:SetPoint("TOPLEFT", aider.projet, "TOPLEFT", 0, 4)
-	aider.projetBouton:SetPoint("BOTTOMRIGHT", aider.barre, "BOTTOMRIGHT", 0, -4)
-
-	-- Prochain événement de la guilde (calendrier du jeu, GuildUp_Evenements.lua)
-	local evts = CarteAccueil(p, "Prochain événement")
-	evts:SetPoint("TOPLEFT", dons, "BOTTOMLEFT", 0, -ECART)
-	evts:SetSize(largeur, 80)
-	evts.ligne = LigneCarte(evts, 1)
+	-- Prochains événements de la guilde (calendrier du jeu, GuildUp_Evenements.lua)
+	local evts = CarteAccueil(p, "Prochains événements")
+	evts:SetPoint("TOPLEFT", mes, "TOPRIGHT", ECART, 0)
+	evts:SetSize(demi, 160)
+	evts.lignes = { LigneCarte(evts, 1), LigneCarte(evts, 2) }
 	evts.vide:SetText("Aucun événement prévu dans les 30 prochains jours.")
 	evts.tous = Bouton(evts, "Tous les événements", "fantome", 150, 22)
-	evts.tous:SetPoint("TOPRIGHT", evts, "TOPRIGHT", -12, -8)
+	evts.tous:SetPoint("BOTTOMLEFT", evts, "BOTTOMLEFT", 14, 10)
 	evts.tous:SetScript("OnClick", function() Aller("evenements") end)
 	evts.compte:Hide()
 
@@ -341,67 +299,35 @@ local function CreerAccueil(parent)
 			or "Position inconnue (instance) : les membres de ta zone s'afficheront dehors.")
 		zone.compte:SetShown(#membres > 0)
 
-		-- groupes ouverts
-		local liste = GroupesOuverts()
-		local etat = ns.Groupes and ns.Groupes.etat
-		local monRole = ns.MonRole and ns.MonRole()
-		groupes.compte:SetText(#liste > 0 and tostring(#liste) or "")
-		for i, l in ipairs(groupes.lignes) do
-			local a = liste[i]
-			if a then
-				local info = ns.Groupes.InfoContenu and ns.Groupes.InfoContenu(a.code) or {}
-				l:Joueur(ns.Normaliser and ns.Normaliser(a.chef or ""), a.classe)
-				l.titre:SetText(info.nom or "?")
-				local places = {}
-				for _, r in ipairs({ "tank", "heal", "dps" }) do
-					for n = 1, (a.besoin and a.besoin[r] or 0) do
-						places[#places + 1] = { role = r, pris = n <= (a.pris and a.pris[r] or 0) }
-					end
-				end
-				l:Places(places)
-				local cherche = {}
-				for _, r in ipairs({ "tank", "heal", "dps" }) do
-					if ns.Groupes.PlacesLibres and (ns.Groupes.PlacesLibres(a, r) or 0) > 0 then
-						cherche[#cherche + 1] = COULEURS_ROLES[r] .. NOMS_ROLES[r] .. "|r"
-					end
-				end
-				-- groupe programmé : l'heure de départ avant le reste
-				local programme = ns.Groupes.Programmee and ns.Groupes.Programmee(a)
-				local depart = (programme and ns.Groupes.TexteDepart) and ("|cfff1cf6bdépart " .. ns.Groupes.TexteDepart(a.depart) .. "|r · ") or ""
-				l.sous:SetText(depart .. ("%s%s|r · %d/%d%s"):format(CouleurClasseTexte(a.classe), NomJoueur(a.chef or "?"),
-					a.membres or 1, a.taille or 5, #cherche > 0 and (" · cherche " .. table.concat(cherche, " ")) or ""))
-				local cand = etat and etat.candidatures and etat.candidatures[a.id]
-				local libres = ns.Groupes.PlacesLibres and ns.Groupes.PlacesLibres(a, monRole)
+		-- demandes que je peux honorer : celles que j'ai prises d'abord
+		local aider = ns.DemandesAccueil and ns.DemandesAccueil() or {}
+		demandes.compte:SetText(#aider > 0 and tostring(#aider) or "")
+		for i, l in ipairs(demandes.lignes) do
+			local x = aider[i]
+			if x then
+				local d = x.d
+				local texte, icone = TexteObjet(d.objet, d.qte)
+				l:Icone(icone)
+				l:Places(nil)
+				l.titre:SetText(NomColore(d.auteur) .. " demande " .. texte)
+				l.sous:SetText(x.prise and "|cff6fd08ctu t'en occupes|r"
+					or (x.jai and ("tu en as " .. x.jai) or "tu sais le fabriquer"))
 				l.bouton:SetScript("OnClick", nil)
-				if cand == "envoyee" then
-					l.bouton:Ecrire(programme and "Se désinscrire" or "Annuler")
-					l.bouton:Activer(true)
-					l.bouton:SetScript("OnClick", function()
-						if ns.Groupes.AnnulerCandidature then ns.Groupes.AnnulerCandidature(a.id) end
-						ns.MajInterface()
-					end)
-				elseif cand == "refusee" then
-					l.bouton:Ecrire("Refusé")
-					l.bouton:Activer(false)
-				elseif libres and libres <= 0 then
-					l.bouton:Ecrire("Rôle complet")
-					l.bouton:Activer(false)
+				if x.prise then
+					l.bouton:Ecrire("C'est fait !")
+					l.bouton:SetScript("OnClick", function() if ns.HonorerDemande then ns.HonorerDemande(d) end end)
 				else
-					l.bouton:Ecrire(programme and "S'inscrire" or "Postuler")
-					l.bouton:Activer(true)
-					l.bouton:SetScript("OnClick", function()
-						if ns.Groupes.Postuler then ns.Groupes.Postuler(a.id) end
-						ns.MajInterface()
-					end)
+					l.bouton:Ecrire("Je m'en occupe")
+					l.bouton:SetScript("OnClick", function() if ns.PrendreDemande then ns.PrendreDemande(d) end end)
 				end
+				l.bouton:Activer(true)
 				l:Show()
 			else
 				l:Hide()
 			end
 		end
-		groupes.vide:SetShown(#liste == 0)
-		groupes.vide:SetText("Aucun groupe ouvert pour l'instant.")
-		groupes.creer:Ecrire(#liste == 0 and "Créer un groupe" or "Voir les groupes")
+		demandes.vide:SetShown(#aider == 0)
+		demandes.vide:SetText("Rien que tu puisses honorer pour l'instant : ni dans tes sacs ou ta banque, ni dans tes recettes.")
 
 		-- appels à l'aide
 		local appels = ns.AppelsAide and ns.AppelsAide() or {}
@@ -425,95 +351,56 @@ local function CreerAccueil(parent)
 		aide.vide:SetShown(#appels == 0)
 		aide.vide:SetText("Aucun appel en cours.")
 
-		-- dons : demandes reçues pas encore vues, sinon les dernières
-		local demandes = ns.DemandesDons and ns.DemandesDons() or {}
-		local nonVues = ns.NombreDemandesDons and ns.NombreDemandesDons() or 0
-		dons.compte:SetText(nonVues > 0 and (nonVues .. " nouvelle" .. (nonVues > 1 and "s" or "")) or "")
-		for i, l in ipairs(dons.lignes) do
-			local d = demandes[i]
-			if d then
-				local nom, lien, _, icone = ns.InfoObjet(d.objet)
-				if not nom and ns.Precharger then ns.Precharger(d.objet) end
+		-- mes demandes en cours : celles qu'un membre a prises d'abord
+		local miennes = ns.MesDemandesAccueil and ns.MesDemandesAccueil() or {}
+		mes.compte:SetText(#miennes > 0 and tostring(#miennes) or "")
+		for i, l in ipairs(mes.lignes) do
+			local x = miennes[i]
+			if x then
+				local d = x.d
+				local texte, icone = TexteObjet(d.objet, d.qte)
 				l:Icone(icone)
 				l:Places(nil)
-				l.titre:SetText(NomColore(d.nom) .. " te demande " .. (lien or nom or "un objet"))
-				l.sous:SetText((d.vu and "" or "|cff6fd08cnouvelle|r · ") .. IlYa(d.quand))
+				l.titre:SetText(texte)
+				l.bouton:SetScript("OnClick", nil)
+				if d.etat == "P" and d.preneur then
+					l.sous:SetText("|cfff1cf6b" .. NomJoueur(d.preneur) .. " s'en occupe|r")
+					l.bouton:Ecrire("Reçu !")
+					l.bouton:SetScript("OnClick", function() if ns.HonorerDemande then ns.HonorerDemande(d) end end)
+				else
+					l.sous:SetText("en attente · " .. IlYa(d.maj))
+					l.bouton:Ecrire("Voir")
+					l.bouton:SetScript("OnClick", function() Aller("demandes") end)
+				end
+				l.bouton:Activer(true)
+				l:Show()
+			else
+				l:Hide()
+			end
+		end
+		mes.vide:SetShown(#miennes == 0)
+		mes.vide:SetText("Aucune demande en cours. Une ressource, un objet à fabriquer ? Demande-le à la guilde.")
+
+		-- prochains événements
+		local prochains = ns.ProchainsEvenements and ns.ProchainsEvenements(3) or {}
+		for i, l in ipairs(evts.lignes) do
+			local ev = prochains[i]
+			if ev then
+				l:Icone(ev.icone)
+				l:Places(nil)
+				l.titre:SetText(ev.titre or "?")
+				l.sous:SetText((ev.date or "") .. ((ev.type and ev.type ~= "") and (" · " .. ev.type) or "")
+					.. ((ev.etatTexte and ev.etatTexte ~= "") and (" · " .. ev.etatTexte) or ""))
 				l.bouton:Ecrire("Voir")
 				l.bouton:Activer(true)
-				l.bouton:SetScript("OnClick", function() if ns.OuvrirEchanges then ns.OuvrirEchanges(nil, 3) end end)
+				l.bouton:SetScript("OnClick", function() if ns.OuvrirEvenements then ns.OuvrirEvenements(ev.cle) end end)
 				l:Show()
 			else
 				l:Hide()
 			end
 		end
-		dons.vide:SetShown(#demandes == 0)
-		dons.vide:SetText("Aucune demande de don pour toi.")
-
-		-- tu peux aider : besoins que je sais fabriquer
-		local besoins = ns.BesoinsQueJeSaisFabriquer and ns.BesoinsQueJeSaisFabriquer() or {}
-		aider.compte:SetText(#besoins > 0 and tostring(#besoins) or "")
-		for i, l in ipairs(aider.lignes) do
-			local b = besoins[i]
-			if b then
-				local nom, lien, _, icone = ns.InfoObjet(b.objet)
-				if not nom and ns.Precharger then ns.Precharger(b.objet) end
-				l:Icone(icone)
-				l:Places(nil)
-				l.titre:SetText(NomColore(b.nom) .. " cherche " .. ((b.qte or 0) > 0 and (b.qte .. " ") or "") .. (lien or nom or "un objet"))
-				l.sous:SetText("tu sais le fabriquer" .. (b.enLigne and " · |cff6fd08cen ligne|r" or " · hors ligne"))
-				l.bouton:Ecrire("Chuchoter")
-				l.bouton:Activer(b.enLigne)
-				l.bouton:SetScript("OnClick", function() Chuchoter(b.cle, b.nom) end)
-				l:Show()
-			else
-				l:Hide()
-			end
-		end
-		aider.vide:SetShown(#besoins == 0)
-		aider.vide:SetText("Personne ne cherche ce que tu sais fabriquer.")
-		-- dernier projet de guilde
-		local projets = ns.ListeProjets and ns.ListeProjets() or {}
-		local pr = projets[1]
-		local faites, total = 0, 0
-		if pr and ns.AvancementProjet then
-			local ok, f, t = pcall(ns.AvancementProjet, pr)
-			if ok then faites, total = f or 0, t or 0 end
-		end
-		aider.projet:SetShown(pr ~= nil)
-		aider.avance:SetShown(pr ~= nil)
-		aider.barre:SetShown(pr ~= nil)
-		aider.projetBouton:SetShown(pr ~= nil)
-		if pr then
-			aider.projet:SetText("Projet : " .. (pr.nom or "?"))
-			aider.avance:SetText(faites .. " / " .. total .. " tâches")
-			local l = aider.barre:GetWidth()
-			aider.plein:SetWidth(math.max(1, (l > 0 and l or (demi - 28)) * (total > 0 and faites / total or 0)))
-			aider.plein:SetShown(faites > 0)
-			aider.projetBouton:SetScript("OnClick", function() if ns.OuvrirProjet then ns.OuvrirProjet(pr.id) end end)
-		else
-			aider.plein:Hide()
-		end
-
-		-- prochain événement
-		local prochains = ns.ProchainsEvenements and ns.ProchainsEvenements(3) or {}
-		local ev = prochains[1]
-		local l = evts.ligne
-		if ev then
-			l:Icone(ev.icone)
-			l:Places(nil)
-			l.titre:SetText(ev.titre or "?")
-			l.sous:SetText((ev.date or "") .. ((ev.type and ev.type ~= "") and (" · " .. ev.type) or "")
-				.. ((ev.etatTexte and ev.etatTexte ~= "") and (" · " .. ev.etatTexte) or "")
-				.. (#prochains > 1 and ("  |cff999999(+" .. (#prochains - 1) .. " à venir)|r") or ""))
-			l.bouton:Ecrire("Voir")
-			l.bouton:Activer(true)
-			l.bouton:SetScript("OnClick", function() if ns.OuvrirEvenements then ns.OuvrirEvenements(ev.cle) end end)
-			l:Show()
-		else
-			l:Hide()
-		end
-		evts.vide:SetShown(ev == nil)
-		evts.tous:SetShown(ev ~= nil)
+		evts.vide:SetShown(#prochains == 0)
+		evts.tous:SetShown(#prochains > 0)
 	end
 	return p
 end
@@ -524,7 +411,7 @@ end
 
 local pages = {}     -- [id] = cadre de page (seulement les pages intégrées)
 local CREER_PAGE = { accueil = CreerAccueil }
--- Une page fournie par un module (ex. GuildUp_GroupesPage.lua) : creer(parent) renvoie un cadre qui
+-- Une page fournie par un module (ex. GuildUp_Demandes.lua) : creer(parent) renvoie un cadre qui
 -- remplit parent, avec p.Maj() (rafraîchir) et, si besoin, p.Ouvrir(...) (arguments de OuvrirInterface)
 ns.AjouterPage = function(id, creer) CREER_PAGE[id] = creer end
 local pageActive = "accueil"

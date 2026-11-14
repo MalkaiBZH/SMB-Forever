@@ -3,58 +3,6 @@
 
 local NOM_ADDON, ns = ...
 
--- Espion (mode Debug seulement) : relève les appels de la fenêtre « Annonce » du jeu (forme exacte attendue par Forever)
-local function Decrire(...)
-	local t = {}
-	for i = 1, select("#", ...) do
-		local v = select(i, ...)
-		if type(v) == "table" then
-			local champs = {}
-			for k, x in pairs(v) do
-				local s
-				if type(x) == "table" then
-					local l = {}
-					for kk, xx in pairs(x) do l[#l + 1] = tostring(kk) .. ":" .. tostring(xx) end
-					s = "{" .. table.concat(l, ",") .. "}"
-				else
-					s = tostring(x)
-				end
-				champs[#champs + 1] = tostring(k) .. "=" .. s
-			end
-			table.sort(champs)
-			t[#t + 1] = "{" .. table.concat(champs, ", ") .. "}"
-		else
-			t[#t + 1] = type(v) == "string" and ("\"" .. v .. "\"") or tostring(v)
-		end
-	end
-	return table.concat(t, ", ")
-end
-ns.DecrireAppel = Decrire -- (pour /smb diag, GuildUp_Recherche.lua)
-local espionInstalle = false
-local function InstallerEspion()
-	if espionInstalle then return end
-	espionInstalle = true
-	if type(C_LFGList) == "table" and hooksecurefunc then
-		for _, nom in ipairs({ "CreateListing", "UpdateListing", "RemoveListing", "SetEntryTitle",
-			"CopyActiveEntryInfoToCreationFields", "ClearCreationTextFields" }) do
-			if C_LFGList[nom] then
-				pcall(hooksecurefunc, C_LFGList, nom, function(...)
-					if ns.NoterAppelRecherche then ns.NoterAppelRecherche(("%s(%s)"):format(nom, Decrire(...))) end
-				end)
-			end
-		end
-	end
-end
-
--- installé à la connexion si le mode Debug est actif, ou dès qu'on l'active (/smb debug)
-ns.InstallerEspionRecherche = InstallerEspion
-local ev = CreateFrame("Frame")
-ev:RegisterEvent("PLAYER_LOGIN")
-ev:SetScript("OnEvent", function()
-	local db = ns.DB and ns.DB()
-	if db and db.afficherDebug then InstallerEspion() end
-end)
-
 -- Discord : le client Forever expose-t-il quelque chose aux addons ? (fonctions, tables, réglages)
 ns.DiagDiscord = function(L)
 	local trouves, tables = {}, {}

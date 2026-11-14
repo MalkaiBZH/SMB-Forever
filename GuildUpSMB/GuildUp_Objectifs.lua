@@ -199,9 +199,21 @@ local signatureEnvoyee = nil
 local envoiPrevu = false
 local reassembleur = ns.Reassembleur and ns.Reassembleur(8)
 
+-- (noms comparés par ns.Normaliser : sur Forever, le nom de famille tient la place du royaume)
 local function DansMonGroupe(nom)
 	if not (IsInGroup and IsInGroup()) then return false end
-	if ns.Groupes and ns.Groupes.DansMonGroupe then return ns.Groupes.DansMonGroupe(nom) end
+	local cible = nom and ns.Normaliser and ns.Normaliser(nom)
+	if cible and ns.NomComplet then
+		for _, genre in ipairs({ "party", "raid" }) do
+			for i = 1, genre == "raid" and 40 or 4 do
+				local unite = genre .. i
+				if UnitExists(unite) then
+					local n = ns.NomComplet(unite)
+					if n and ns.Normaliser(n) == cible then return true end
+				end
+			end
+		end
+	end
 	return ((UnitInParty and UnitInParty(nom)) or (UnitInRaid and UnitInRaid(nom))) and true or false
 end
 
