@@ -460,8 +460,8 @@ local function Animer(f)
 	end
 end
 
--- portrait d'un membre : le mien (race, classe, sexe), sinon celui de la carte de la guilde, sinon
--- l'icône de sa classe
+-- portrait d'un membre : le mien (race, classe, sexe), sinon le dernier reçu par la carte de la guilde
+-- (gardé même en instance) ou lu dans mon groupe (ns.PortraitMembre), sinon l'icône de sa classe
 local function PoserPortrait(f, nom)
 	local cle = nom and Normaliser and Normaliser(nom)
 	local moi = cle and ns.MaCle and cle == ns.MaCle()
@@ -469,9 +469,7 @@ local function PoserPortrait(f, nom)
 	if moi then
 		chemin = ns.CheminPortrait and ns.PortraitUnite and ns.CheminPortrait(ns.PortraitUnite("player"))
 	else
-		local positions = ns.PositionsMembres and ns.PositionsMembres()
-		local p = positions and cle and positions[cle]
-		chemin = p and p.portrait
+		chemin = ns.PortraitMembre and ns.PortraitMembre(cle)
 	end
 	local img = f.imagePortrait
 	img:ClearAllPoints()

@@ -5,7 +5,8 @@
 --                          et 1 ; PORTRAIT = « nain-chaman-femme », vide sans portrait ; les anciennes
 --                          versions ignorent ce dernier champ). Sert aussi aux repères du HUD
 --                          (GuildUp_Reperes.lua).
---   "I"                    en instance (pas de position utilisable)
+--   "I~PORTRAIT"           en instance (pas de position utilisable) ; PORTRAIT comme dans « P » (les
+--                          anciennes versions envoient « I » seul et ignorent ce champ)
 --   "O"                    partage coupé
 -- Envoi toutes les INTERVALLE secondes si le joueur a bougé, sinon un signal toutes les BATTEMENT s
 -- (message « jetable » : un seul en attente dans la file d'envoi).
@@ -22,6 +23,9 @@
 -- suivie (ns.TraceSuivie) est dessinée en points dorés, plus pâles pour les étapes déjà passées.
 -- Souvenirs de la guilde (GuildUp_Souvenirs.lua, ns.SouvenirsCarte) : un symbole de raid par souvenir de
 -- la zone affichée (étoile : niveau ; rond : métier ; losange : tirage), sous les membres.
+-- Portraits : le dernier reçu de chaque membre est gardé pour la session, même quand il entre en instance
+-- ou se tait (ns.PortraitMembre, pour les portraits ronds de l'interface et la fête de montée de niveau) ;
+-- à défaut, lu sur son personnage s'il est dans mon groupe.
 
 local NOM_ADDON, ns = ...
 
@@ -47,6 +51,7 @@ local function NiveauCarte(canevas, rang) return math.min(9000, canevas:GetFrame
 local ROND = (ns.MEDIA or ("Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\")) .. "point"
 
 local positions = {}     -- [nom normalisé] = { nom, carte, x, y, classe, portrait, vu, instance } (+ cle au dessin)
+local portraitsConnus = {} -- [nom normalisé] = chemin du portrait (pas effacé avec la position)
 local dernier = { carte = nil, x = -1, y = -1, t = 0, etat = nil }
 local epingles = {}      -- repères des membres affichés sur la carte (réutilisés)
 local visibles = {}      -- positions dessinées au dernier passage (table réutilisée)
@@ -107,7 +112,7 @@ local function Emettre(force)
 	local carte, x, y = MaPosition()
 	if not carte then
 		if force or dernier.etat ~= "I" or maintenant - dernier.t > BATTEMENT then
-			Envoyer("I")
+			Envoyer("I~" .. ((ns.PortraitUnite and ns.PortraitUnite("player")) or ""))
 			dernier.etat, dernier.t = "I", maintenant
 		end
 		return
@@ -145,9 +150,12 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			classe = (d and d ~= "") and d or nil, vu = GetTime(),
 			portrait = ns.CheminPortrait and ns.CheminPortrait(e) or nil, -- chemin de l'image, ou nil
 		}
+		if positions[cle].portrait then portraitsConnus[cle] = positions[cle].portrait end
 		if ns.NoterTrace then ns.NoterTrace(cle, positions[cle]) end
 	elseif type_ == "I" then
 		positions[cle] = { nom = expediteur, instance = true, vu = GetTime() }
+		local portrait = ns.CheminPortrait and ns.CheminPortrait(a)
+		if portrait then portraitsConnus[cle] = portrait end
 	elseif type_ == "O" then
 		positions[cle] = nil
 	end
@@ -902,6 +910,32 @@ ns.Ecouter(PREFIXE, Recevoir)
 -- positions reçues : [nom normalisé] = { nom, carte, x, y, classe, portrait, vu, instance } (lecture seule,
 -- pour GuildUp_Reperes.lua ; les trop vieilles sont effacées au dessin de la carte)
 ns.PositionsMembres = function() return positions end
+
+-- unité d'un membre de mon groupe (ou moi), nil s'il n'y est pas
+local function UniteDe(cle)
+	if ns.MaCle and cle == ns.MaCle() then return "player" end
+	local raid = IsInRaid and IsInRaid()
+	local n = (GetNumGroupMembers and GetNumGroupMembers()) or 0
+	for i = 1, n do
+		local u = (raid and "raid" or "party") .. i
+		if UnitExists(u) then
+			local ok, nom = pcall(ns.NomComplet, u)
+			if ok and nom and not (ns.Secrete and ns.Secrete(nom)) and nom == cle then return u end
+		end
+	end
+end
+
+-- Portrait d'un membre (chemin de l'image) ou nil : le dernier reçu (même s'il est depuis entré en
+-- instance), sinon lu sur son personnage s'il est dans mon groupe (ou si c'est moi)
+ns.PortraitMembre = function(cle)
+	if not cle then return nil end
+	if portraitsConnus[cle] then return portraitsConnus[cle] end
+	if not (ns.NomComplet and ns.PortraitUnite and ns.CheminPortrait) then return nil end
+	local u = UniteDe(cle)
+	local chemin = u and ns.CheminPortrait(ns.PortraitUnite(u))
+	if chemin and u ~= "player" then portraitsConnus[cle] = chemin end
+	return chemin
+end
 
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("PLAYER_ENTERING_WORLD")

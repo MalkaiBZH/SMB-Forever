@@ -254,8 +254,8 @@ end
 -- Portraits et rôles
 --------------------------------------------------------------------------------
 
--- Portrait rond d'un joueur : son médaillon s'il est connu (positions de la carte), sinon l'icône de
--- sa classe dans un disque sombre
+-- Portrait rond d'un joueur : son médaillon s'il est connu (ns.PortraitMembre de la carte : dernier reçu,
+-- même en instance, ou lu dans mon groupe), sinon l'icône de sa classe dans un disque sombre
 function UI.Portrait(parent, taille)
 	local f = CreateFrame("Frame", nil, parent)
 	f:SetSize(taille, taille)
@@ -266,9 +266,9 @@ function UI.Portrait(parent, taille)
 	f.image = f:CreateTexture(nil, "ARTWORK")
 	f.image:SetAllPoints()
 	f.Poser = function(self, cle, classe)
-		local p = cle and ns.PositionsMembres and ns.PositionsMembres()[cle]
-		if p and p.portrait then
-			self.image:SetTexture(p.portrait)
+		local portrait = cle and ns.PortraitMembre and ns.PortraitMembre(cle)
+		if portrait then
+			self.image:SetTexture(portrait)
 			self.image:SetTexCoord(0, 1, 0, 1)
 			self.image:ClearAllPoints()
 			self.image:SetAllPoints()
