@@ -287,15 +287,24 @@ local function EstMoi(qui)
 	return qui:sub(1, #prenom + 1) == prenom .. " " or qui:sub(1, #prenom + 1) == prenom .. "-"
 end
 
-local function LireLancer(texte)
-	if not attenteDe or type(texte) ~= "string" or (ns.Secrete and ns.Secrete(texte)) then return end
+-- Un /roll annoncé par le serveur (message système) : valeur, minimum, maximum si c'est le mien, rien
+-- sinon. Sert aussi aux autres jeux (ns.LireMonJet, GuildUp_Bizkit.lua).
+local function LireMonJet(texte)
+	if type(texte) ~= "string" or (ns.Secrete and ns.Secrete(texte)) then return end
 	local m, o = Motif()
 	local c = { texte:match(m) }
 	if #c < 4 then return end
 	local v = {}
 	for i = 1, 4 do v[o[i] or i] = c[i] end
-	local valeur, mini, maxi = tonumber(v[2]), tonumber(v[3]), tonumber(v[4])
-	if not valeur or mini ~= 1 or maxi ~= 100 or not EstMoi(v[1]) then return end
+	if not EstMoi(v[1]) then return end
+	return tonumber(v[2]), tonumber(v[3]), tonumber(v[4])
+end
+ns.LireMonJet = LireMonJet
+
+local function LireLancer(texte)
+	if not attenteDe then return end
+	local valeur, mini, maxi = LireMonJet(texte)
+	if not valeur or mini ~= 1 or maxi ~= 100 then return end
 	local a = attenteDe
 	attenteDe = nil
 	local t, moi = a.tirage, MaCle()
@@ -440,8 +449,8 @@ chrono:SetScript("OnUpdate", function(_, dt)
 end)
 
 --------------------------------------------------------------------------------
--- Page « Jeux » de la fenêtre GuildUpSMB (ns.AjouterPage("jeux")) : un onglet par jeu, pour l'instant
--- « Tirage au sort ». À gauche, le tirage en cours (sinon le dernier) : lot, organisateur, état, bouton
+-- Page « Jeux » de la fenêtre GuildUpSMB (ns.AjouterPage("jeux")) : un onglet par jeu, « Tirage au sort »
+-- d'abord, puis ceux déclarés par ns.AjouterJeu (Bizkit, GuildUp_Bizkit.lua). Tirage au sort : à gauche, le tirage en cours (sinon le dernier) : lot, organisateur, état, bouton
 -- Lancer les dés, classement, Clôturer / Annuler pour l'organisateur. À droite, « Nouveau tirage » : le
 -- lot (texte, ou objet glissé dans la case), les participants (membres connectés qui ont l'addon, tous
 -- cochés ; « Mon groupe »), puis « Ouvrir le tirage ».
@@ -841,20 +850,34 @@ end
 -- La page
 --------------------------------------------------------------------------------
 
+-- Les autres jeux de la page, un onglet chacun après « Tirage au sort » : ns.AjouterJeu(nom, creer, id),
+-- appelé au chargement par les fichiers qui suivent celui-ci dans le .toc. creer(zone) remplit la zone
+-- de l'onglet et renvoie un cadre avec Maj() (et Ouvrir(...) si besoin) ; id ouvre l'onglet par son nom
+-- (ns.OuvrirInterface("jeux", id, ...)).
+local autresJeux = {}
+ns.AjouterJeu = function(nom, creer, id)
+	autresJeux[#autresJeux + 1] = { nom = nom, creer = creer, id = id }
+end
+
 local pageJeux
 local function CreerPageJeux(parent)
 	local UI = ns.UI
 	local p = CreateFrame("Frame", nil, parent)
 	p:SetAllPoints()
-	-- onglets : un par jeu (d'autres pourront s'ajouter)
-	p.onglets = UI.Onglets(p, { "Tirage au sort" }, function(i) p.onglets:Choisir(i) end)
+	-- onglets : un par jeu
+	local noms = { "Tirage au sort" }
+	for _, j in ipairs(autresJeux) do noms[#noms + 1] = j.nom end
+	p.onglets = UI.Onglets(p, noms, function(i) p.Choisir(i) end)
 	p.onglets:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -10)
 	p.onglets:SetPoint("RIGHT", p, "RIGHT", -MARGE, 0)
-	p.onglets:Choisir(1)
 
-	local tirage = CreateFrame("Frame", nil, p)
-	tirage:SetPoint("TOPLEFT", p.onglets, "BOTTOMLEFT", 0, -12)
-	tirage:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE, 12)
+	local function Zone()
+		local z = CreateFrame("Frame", nil, p)
+		z:SetPoint("TOPLEFT", p.onglets, "BOTTOMLEFT", 0, -12)
+		z:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE, 12)
+		return z
+	end
+	local tirage = Zone()
 	local largeur = (ns.TAILLE_PAGE and ns.TAILLE_PAGE[1] or 794) - 2 * MARGE
 	fenetre = CreerTirage(tirage)
 	fenetre:SetPoint("TOPLEFT", tirage, "TOPLEFT", 0, 0)
@@ -864,9 +887,42 @@ local function CreerPageJeux(parent)
 	choix:SetPoint("TOPLEFT", fenetre, "TOPRIGHT", 12, 0)
 	choix:SetPoint("BOTTOMRIGHT", tirage, "BOTTOMRIGHT", 0, 0)
 
-	p.Maj = MajFenetre
-	-- ns.OuvrirInterface("jeux", onglet, objet, texte) : le lot du prochain tirage déjà rempli
-	p.Ouvrir = function(_, objet, texte)
+	-- zones[i] = contenu de l'onglet i ; zones[i].jeu = le cadre rendu par le jeu (autres que le tirage)
+	local zones = { tirage }
+	for i, j in ipairs(autresJeux) do
+		local z = Zone()
+		local ok, jeu = pcall(j.creer, z)
+		if ok then z.jeu = jeu elseif Erreur then Erreur("Jeu « " .. j.nom .. " » : " .. tostring(jeu)) end
+		z:Hide()
+		zones[i + 1] = z
+	end
+	p.Choisir = function(i)
+		if not zones[i] then i = 1 end
+		p.onglet = i
+		p.onglets:Choisir(i)
+		for k, z in ipairs(zones) do z:SetShown(k == i) end
+		p.Maj()
+	end
+	p.Maj = function()
+		local z = zones[p.onglet or 1]
+		if z == tirage then MajFenetre()
+		elseif z and z.jeu and z.jeu.Maj then z.jeu.Maj() end
+	end
+
+	-- ns.OuvrirInterface("jeux", onglet, ...) : onglet = numéro ou id du jeu ; pour le tirage (1), le
+	-- lot du prochain tirage déjà rempli (objet, texte)
+	p.Ouvrir = function(onglet, ...)
+		local i = tonumber(onglet)
+		for k, j in ipairs(autresJeux) do
+			if onglet ~= nil and j.id == onglet then i = k + 1 end
+		end
+		p.Choisir(i or p.onglet or 1)
+		local z = zones[p.onglet]
+		if z ~= tirage then
+			if z and z.jeu and z.jeu.Ouvrir then z.jeu.Ouvrir(...) end
+			return
+		end
+		local objet, texte = ...
 		if objet or (texte and texte ~= "") then
 			choix.objet = objet
 			choix.texte:Ecrire(texte or "")
@@ -874,6 +930,7 @@ local function CreerPageJeux(parent)
 		end
 		MajFenetre()
 	end
+	p.Choisir(1)
 	pageJeux = p
 	return p
 end

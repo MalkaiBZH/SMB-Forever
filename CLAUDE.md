@@ -56,7 +56,8 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   dans cet ordre (4.0.0) : Accueil (`GuildUp_Interface.lua`), Demandes (`GuildUp_Demandes.lua`), Artisanat
   (`GuildUp_Carnet.lua` : onglets Registre dans `GuildUp_Metiers.lua` et Crafts dans `GuildUp_Carnet.lua`), Quêtes
   (`GuildUp_Quetes.lua`), Guilde (`GuildUp_Membres.lua`), Jeux (`GuildUp_Tirage.lua` : onglet Tirage au sort ; un jeu de
-  plus = un onglet de plus), Événements (`GuildUp_Evenements.lua`), Activité (`GuildUp_Journal.lua`), Statistiques
+  plus = un onglet de plus, déclaré avec `ns.AjouterJeu(nom, creer, id)` par un fichier chargé après `GuildUp_Tirage.lua` :
+  Bizkit dans `GuildUp_Bizkit.lua`), Événements (`GuildUp_Evenements.lua`), Activité (`GuildUp_Journal.lua`), Statistiques
   (`GuildUp_Stats.lua`) ; Options (`GuildUp_Options.lua`) en bas du menu. Les anciennes fonctions `ns.Ouvrir*` /
   `ns.Basculer*` ouvrent ces pages (`ns.OuvrirInterface(page, ...)`). L'encyclopédie et l'aperçu 3D restent des
   fenêtres à part. Ne pas éparpiller : une nouvelle fonction trouve sa place dans une section existante (onglet) avant
@@ -98,6 +99,12 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   `GuildUp_Demandes.lua` : une demande entière par message, la date la plus récente gagne), `GuildUpId` (identité),
   `GuildUpAnn` (annonces), `GuildUpAid` (aide), `GuildUpVer` (version), `GuildUpGU` (emote du cri de guilde),
   `GuildUpTir` (tirage au sort, `/smb roll`), `GuildUpSdg` (sondage, `/smb sondage`, `GuildUp_Sondage.lua`),
+  `GuildUpBzk` (Bizkit, jeu de dés, `/smb bizkit`, `GuildUp_Bizkit.lua` : places autour d'une table, deux `/roll` 1-6 lus par
+  `ns.LireMonJet` de `GuildUp_Tirage.lua`, chacun son tour ; sur un 7, cris « Bizkit ! » (message `B` et discussion de
+  guilde), le dernier perd un point ; sur un 3, prison de 3 (chaque 3 sorti
+  coûte au prisonnier le numéro de son cran, de 1 à 5, table `PRISONS`), sur un 5, prison de 5 ; sur un double, attaques à
+  distribuer (`R` relance du double 6, `T` attaques) ; 9, 10, 11 : un point pour le joueur d'avant, le lanceur, celui d'après ;
+  sinon (4, 6, 8 sans double), le vecteur : `Vecteur(l)`, calculé par chacun sur les positions des dés reçues ; tout est appliqué à la réception, mes messages compris),
   `GuildUpJrn` (fil d'activité et podium, `GuildUp_Journal.lua` : les autres modules y notent leurs nouvelles avec
   `ns.NoterActivite(genre, clé, valeur)`), `GuildUpNpd` (mode calme « ne pas déranger », `GuildUp_Calme.lua` : `ns.NePasDeranger()` coupe les bulles dans
   `ns.Notifier`, `ns.CalmeDe` / `ns.IconeCalme` pour l'afficher sur les autres membres),

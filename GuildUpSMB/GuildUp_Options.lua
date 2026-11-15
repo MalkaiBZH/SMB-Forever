@@ -57,7 +57,8 @@ local function Aide()
 	print("  /smb metiers — registre des métiers de la guilde")
 	print("  /smb crafts — tous les objets fabricables")
 	print("  /smb quetes — quêtes en commun avec la guilde")
-	print("  /smb jeux — jeux de la guilde (tirage au sort)")
+	print("  /smb jeux — jeux de la guilde (tirage au sort, Bizkit)")
+	print("  /smb bizkit — le Bizkit, jeu de dés de la guilde")
 	print("  /smb evenements — ouvrir la page Événements (calendrier de la guilde)")
 	print("  /smb encyclo — encyclopédie (ou Alt + clic sur un objet)")
 	print("  /smb nouveautes — les nouveautés de cette version")
@@ -694,6 +695,9 @@ SlashCmdList.GUILDUP = function(msg)
 		return
 	elseif cmd == "demandes" or cmd == "demande" or cmd == "dons" or cmd == "besoins" then
 		if ns.OuvrirDemandes then ns.OuvrirDemandes() end
+		return
+	elseif cmd == "bizkit" or cmd == "des" or cmd == "dés" then
+		if ns.MontrerBizkit then ns.MontrerBizkit() end
 		return
 	elseif cmd == "jeux" or cmd == "jeu" then
 		if ns.OuvrirInterface then ns.OuvrirInterface("jeux") end

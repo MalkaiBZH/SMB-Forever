@@ -135,8 +135,18 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "4.3.2", "4.3.1", "4.3.0", "4.2.0", "4.1.0", "4.0.6", "4.0.5", "4.0.4", "4.0.3", "4.0.2", "4.0.1", "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "5.0.0", "4.3.2", "4.3.1", "4.3.0", "4.2.0", "4.1.0", "4.0.6", "4.0.5", "4.0.4", "4.0.3", "4.0.2", "4.0.1", "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["5.0.0"] = {
+		"|cffffd100Bizkit|r : un nouveau jeu de dés dans la page Jeux (ou |cffffd100/smb bizkit|r). Une table pour toute la guilde, huit places autour : clique sur une place libre pour t'asseoir. Chacun commence avec 30 points et lance deux dés à son tour : toute la table les voit partir de ta place, rouler et se poser sur le tapis.",
+		"Un 7 ? Le lanceur crie |cffffd100Bizkit !|r d'un clic, dans la discussion de guilde, et le bouton apparaît chez tous les joueurs de la table : crie à ton tour, le plus vite possible. Le dernier perd un point !",
+		"Un 3 ? Direction la |cffffd100prison de 3|r, jusqu'à ce qu'un autre joueur y entre. Tant que tu y es, chaque dé qui montre un 3, chez n'importe quel joueur, te coûte un point. Un double 3 ? Deux points !",
+		"Et si tu refais 3 en prison, c'est pire : La Prison (chaque 3 te coûte 2 points), la Prison du cuirassé (3 points), le Donjon de Fort-de-Durn (4 points), puis la Prison d'Alcaz (5 points). Seul un autre joueur qui fait 3 t'en sort.",
+		"Un 5 ? |cffffd100Prison de 5|r, si personne n'y est déjà. Là, chaque 5 des autres joueurs te coûte un point, et la seule façon d'en sortir, c'est de refaire 5 toi-même.",
+		"Un double ? Tu |cffffd100attaques|r : autant d'attaques que la valeur du dé (7 pour un double 1), à répartir d'un clic sur les joueurs de ton choix, et chacune leur coûte un point. Double 6 : 6 attaques, ou tu tentes ta chance en relançant, et la somme des dés donne tes attaques.",
+		"Et gare au |cffffd1009|r (le joueur d'avant perd un point), au |cffffd10010|r (c'est toi qui le perds) et au |cffffd10011|r (le joueur d'après perd un point).",
+		"Et quand les dés ne font rien de tout ça, le |cffffd100vecteur|r : une ligne part du plus petit dé vers le plus grand, et le joueur qu'elle vise perd un point. Si elle tombe entre deux joueurs : dégâts de zone, les deux trinquent !",
+	},
 	["4.3.2"] = {
 		"Addon plus léger : 8 Mo d'anciennes copies d'images inutiles en moins. Le programme de mise à jour les retire tout seul de ton dossier.",
 	},
