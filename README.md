@@ -153,8 +153,8 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   direct, changement d'avis possible jusqu'à la fin, votes publics (le survol d'un choix montre qui l'a choisi),
   résultat en bulle. Un membre qui se connecte pendant le vote ne le voit pas.
 - **Carte des souvenirs** : les grands moments de chaque membre (niveau 10, 20… et niveau maximum, nouveau métier,
-  palier de métier, tirage gagné) sont épinglés sur la carte du monde, à l'endroit où ils sont arrivés : étoile,
-  rond ou losange, avec qui, quoi et quand au survol. Gardés sans limite de durée (400 au plus) et échangés à la
+  palier de métier, tirage gagné) sont épinglés sur la carte du monde, à l'endroit où ils sont arrivés : un anneau
+  jaune (niveau), orange (métier) ou violet (tirage), avec qui, quoi et quand au survol. Gardés sans limite de durée (400 au plus) et échangés à la
   connexion. Seulement pour les membres qui partagent leur position, hors instance. `/smb souvenirs` pour les cacher.
 - **Activité** (`/smb activite`) : le fil d'activité de la guilde sur 30 jours (montées de niveau, métiers, demandes
   honorées, tirages gagnés). À la connexion, une bulle « Pendant ton absence » résume ce qui a été manqué : un membre

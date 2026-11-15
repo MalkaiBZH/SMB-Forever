@@ -11,8 +11,8 @@
 --   "Q~depuis"                      je me connecte : envoyez-moi les souvenirs plus récents (base 36)
 --   "E~t,g,membre,carte,x,y,valeur;…"  souvenirs (240 octets au plus par message), envoyés par le seul
 --                                   relais (ns.EstLeRelais), 40 au plus ; tout le monde les lit
--- Sur la carte du monde (dessin dans GuildUp_Carte.lua, ns.SouvenirsCarte) : un symbole de raid par
--- souvenir sur la carte de la zone où il est arrivé (étoile : niveau ; rond : métier ; losange : tirage),
+-- Sur la carte du monde (dessin dans GuildUp_Carte.lua, ns.SouvenirsCarte) : un anneau coloré par
+-- souvenir sur la carte de la zone où il est arrivé (jaune : niveau ; orange : métier ; violet : tirage),
 -- date et phrase du fil d'activité au survol. /smb souvenirs les cache ou les montre (db.souvenirsCarte).
 
 local NOM_ADDON, ns = ...
