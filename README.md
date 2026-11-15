@@ -151,24 +151,26 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   - *Bizkit* (`/smb bizkit`) : jeu de dés, une table pour toute la guilde, huit places autour. On clique sur une place libre
     pour s'asseoir, puis chacun son tour (dans le sens des aiguilles d'une montre) lance deux dés : deux `/roll` 1-6
     du jeu, lus par l'addon. Tout le monde voit les dés partir de la place du lanceur et se poser au hasard sur le
-    tapis, entre les joueurs ; les derniers lancers sont listés à droite. Chacun commence avec 30 points. Un 7 :
-    le lanceur a un bouton « Bizkit ! » qui le crie dans la discussion de guilde ; le bouton apparaît alors chez les
-    autres joueurs (la page s'ouvre si elle est fermée), qui crient à leur tour, et le dernier perd un point. Le
-    lanceur qui ne crie pas dans les 10 s perd ; ceux qui n'ont pas crié 10 s après le cri perdent aussi.
-    Un 3 (1 + 2) envoie le lanceur en *prison de 3* (barreaux sur son portrait) et en fait sortir celui qui y était :
+    tapis, entre les joueurs ; les derniers lancers sont listés à droite. Chacun commence avec 30 points ; un
+    point perdu fait monter « -1 » au-dessus du joueur et rougir son portrait. Le bouton « Bizkit ! », à côté de
+    « Lancer les dés », est toujours là (un clic le crie dans la discussion de guilde) : sur un 7, tous les joueurs
+    doivent cliquer, le lanceur aussi, dans n'importe quel ordre, et le dernier perd un point ; ceux qui n'ont pas
+    cliqué 10 s après perdent aussi. Cliquer quand les dés ne font pas 7 coûte un point.
+    Un 3 (1 + 2) envoie le lanceur en *prison de 3* (barreaux orange et pastille « 3 » sur son portrait) et en fait sortir celui qui y était :
     un seul prisonnier à la fois. À chaque lancer, chaque dé qui montre un 3 lui coûte un point (deux sur un
     double 3). Le prisonnier qui refait 3 monte d'un cran : La Prison, Prison du cuirassé, Donjon de Fort-de-Durn puis
     Prison d'Alcaz, où
     chaque 3 lui coûte 2, 3, 4 puis 5 points (au dernier cran, il y reste). Dès qu'un autre joueur fait 3, il sort,
     quel que soit le cran, et le nouveau entre en prison de 3. Le prisonnier qui quitte la table reste en prison
-    jusqu'au prochain 3. Un 5 envoie en *prison de 5* si elle est vide (un seul prisonnier) : tant qu'il y est,
+    jusqu'au prochain 3. Un 5 envoie en *prison de 5* (barreaux bleus et pastille « 5 ») si elle est vide (un seul prisonnier) : tant qu'il y est,
     chaque 5 d'un autre joueur lui coûte un point, et il n'en sort qu'en refaisant 5. On peut être dans les deux
     prisons à la fois. Un double donne autant d'*attaques* que la valeur du dé (double 1 : 7) : le lanceur clique sur
-    les places des joueurs à attaquer (clic droit pour en retirer), chaque attaque coûte un point ; au double 6, il
+    les places des joueurs à attaquer (clic droit pour en retirer), chaque attaque coûte un point, 7 au plus par joueur
+    (celles que personne d'autre ne peut plus recevoir, le lanceur se les met lui-même) ; au double 6, il
     choisit entre 6 attaques et une relance dont la somme des dés donne les attaques. Un 9 coûte un point au
     joueur d'avant, un 10 au lanceur, un 11 au joueur d'après. Sur un 4, un 6 ou un 8 (pas un double), le
-    *vecteur* : une ligne part du plus petit dé vers le plus grand (pointillés rouges sur la table), et le joueur
-    le plus proche de son arrivée perd un point ; entre deux joueurs, dégâts de zone : les deux. Les règles complètes sont
+    *vecteur* : une ligne part du plus petit dé vers le plus grand (pointillés rouges sur la table) ; si elle
+    arrive près d'un joueur, il perd un point, sinon dégâts de zone : les deux joueurs les plus proches. Les règles complètes sont
     dans l'infobulle « Les règles du Bizkit », à droite de la table.
     « Nouvelle partie » remet tout le monde à 30 points. Un joueur qui tarde (40 s) peut être sauté par le suivant ;
     les membres déconnectés libèrent leur place, et on reprend sa place et ses points après un `/reload`.

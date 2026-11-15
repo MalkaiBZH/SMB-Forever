@@ -6,13 +6,14 @@
 -- leur discussion), lit les deux résultats (ns.LireMonJet de GuildUp_Tirage.lua) et les envoie à la guilde avec
 -- l'endroit où les dés se posent, tiré au hasard sur le tapis, entre les joueurs. Tout le monde voit les dés
 -- partir de la place du lanceur, rouler et se poser au même endroit.
--- Le Bizkit : un lancer qui fait 7 donne au lanceur un bouton « Bizkit ! », qui crie « Bizkit ! » dans la
--- discussion de guilde. À ce cri, le bouton apparaît chez les autres joueurs assis (la page s'ouvre si elle
--- est fermée) : chacun crie à son tour, et le dernier à appuyer perd un point. Dès qu'il ne reste qu'un
--- joueur qui n'a pas crié, c'est lui le dernier : il perd sans attendre. Seul à la table, le lanceur est le
--- dernier. Le lanceur qui ne crie pas dans les DELAI_CRI secondes perd ; après le cri, ceux qui n'ont pas
--- appuyé au bout de DELAI_COURSE secondes perdent tous (c'est le lanceur qui l'annonce, « P »). Pendant un
--- Bizkit, personne ne lance ; ensuite le tour passe au joueur suivant.
+-- Le Bizkit : le bouton « Bizkit ! » est toujours là, à côté de « Lancer les dés », et ne change pas
+-- d'aspect (rien ne trahit un 7). Un clic crie « Bizkit ! » dans la discussion de guilde. Quand les dés font
+-- 7, tous les joueurs assis doivent cliquer, le lanceur comme les autres, dans n'importe quel ordre : le
+-- dernier perd un point. Dès qu'il ne reste qu'un joueur qui n'a pas cliqué, c'est lui le dernier : il perd
+-- sans attendre (seul à la table, il est le dernier). Ceux qui n'ont pas cliqué au bout de DELAI_COURSE
+-- secondes perdent tous (c'est le lanceur qui l'annonce, « P »). Un clic alors que les dés posés ne font pas
+-- 7 coûte un point (une fois par lancer). Le bouton attend que les dés soient posés. Pendant un Bizkit,
+-- personne ne lance ; ensuite le tour passe au joueur suivant.
 -- La prison de 3 : un lancer qui fait 3 (1 + 2) envoie le lanceur en prison de 3, et en fait sortir celui qui
 -- y était (un seul prisonnier à la fois). À chaque lancer, de n'importe quel joueur (le prisonnier compris),
 -- chaque dé qui montre un 3 enlève un point au prisonnier : deux points sur un double 3. Le prisonnier qui
@@ -28,17 +29,18 @@
 -- Les doubles : le lanceur distribue autant d'attaques que la valeur du dé (double 1 : 7 attaques) aux autres
 -- joueurs assis, comme il veut (clic sur une place : une attaque, clic droit : en retirer une) ; chaque
 -- attaque coûte un point. Double 6 : au choix, 6 attaques, ou une relance dont la somme des dés donne le
--- nombre d'attaques (la relance ne déclenche aucune autre règle). Il a DELAI_ATTAQUE secondes : ensuite,
--- les attaques déjà placées partent et les autres sont perdues. Seul à la table, personne à attaquer.
--- Pendant les attaques, personne ne lance.
+-- nombre d'attaques (la relance ne déclenche aucune autre règle). Au plus MAX_PAR_JOUEUR attaques sur un
+-- même joueur : celles que personne d'autre ne peut plus recevoir, le lanceur se les met à lui-même (seul à
+-- la table : toutes). Il a DELAI_ATTAQUE secondes : ensuite, les attaques déjà placées partent (et celles
+-- pour lui), les autres sont perdues. Pendant les attaques, personne ne lance.
 -- Le 9, le 10 et le 11 (somme des dés) : 9, le joueur assis avant le lanceur (celui qui a joué avant lui)
 -- perd un point ; 10, le lanceur perd un point ; 11, le joueur assis après lui perd un point. Seul à la
 -- table, le 9 et le 11 ne coûtent rien.
 -- Le vecteur : un lancer qui n'est pas un double et dont la somme ne déclenche rien (4, 6 ou 8 ; un dé qui
 -- montre un 3 et coûte au prisonnier de 3 ne compte pas comme un effet) trace une ligne du plus petit dé vers
--- le plus grand : le joueur assis le plus proche de son point d'arrivée perd un point (le lanceur compris).
--- Si la ligne tombe presque entre deux joueurs (moins de ZONE pixels d'écart), dégâts de zone : les deux
--- perdent un point. Chacun fait le calcul avec les positions des dés reçues : tous trouvent les mêmes.
+-- le plus grand : si son point d'arrivée tombe près d'un joueur assis (moins de TOUCHE pixels, le lanceur
+-- compris), ce joueur perd un point ; sinon, dégâts de zone : les deux joueurs les plus proches perdent un
+-- point. Chacun fait le calcul avec les positions des dés reçues : tous trouvent les mêmes.
 -- Un lancer en rappel (« ~1 ») ne change ni les prisons ni les points.
 -- Tout changement est appliqué à la réception, mes messages compris (le serveur les renvoie à tous dans le
 -- même ordre) : si deux membres prennent la même place en même temps, le premier arrivé l'a, et l'ordre
@@ -73,7 +75,6 @@ local POINTS_DEPART = 30
 -- (les prisons du jeu, d'après la table des lieux du client : AreaTable 717, 515, 275, 16620)
 local PRISONS = { "Prison de 3", "La Prison", "Prison du cuirassé", "Donjon de Fort-de-Durn", "Prison d'Alcaz" }
 local CRI = "Bizkit !"
-local DELAI_CRI = 10         -- secondes pour que le lanceur crie après son 7
 local DELAI_COURSE = 10      -- secondes, après le cri, pour que tous les joueurs crient
 local SANS_NOUVELLES = 10    -- secondes de plus sans nouvelles du lanceur : le Bizkit est abandonné
 local DELAI_ATTAQUE = 60     -- secondes pour distribuer les attaques d'un double
@@ -92,7 +93,9 @@ local RX, RY = LARGEUR_TABLE / 2 * 0.88, HAUTEUR_TABLE / 2 * 0.78
 local TAILLE_DE = 26
 local TAILLE_PLACE = 44
 local ECART_PLACE = 36       -- distance entre le bord de la table et le centre d'une place
-local ZONE = 24              -- vecteur : en dessous de cet écart (pixels) entre les deux joueurs visés, dégâts de zone
+local TOUCHE = 40            -- vecteur : un joueur est touché seul si la ligne arrive à moins de ça (pixels) de lui ;
+                             -- plus loin de tout le monde, dégâts de zone sur les deux plus proches
+local MAX_PAR_JOUEUR = 7     -- doubles : au plus 7 attaques sur un même joueur
 
 local Normaliser = ns.Normaliser
 local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
@@ -118,6 +121,7 @@ local demande = false        -- « Q » déjà envoyé cette session
 local vue                    -- l'onglet (créé à la première ouverture)
 local Maj = function() end
 local Animer = function() end
+local Toucher = function() end -- (animation des points perdus sur la place du joueur)
 
 local function DB() return (ns.DB and ns.DB()) or {} end
 -- (jamais en fond : la voie lente du réseau ne renvoie pas un message identique, or « A~3 » peut revenir)
@@ -166,8 +170,8 @@ local function PositionDe(l, k)
 end
 
 -- Le vecteur : une ligne part du plus petit dé, passe par le plus grand et continue jusqu'au cercle des
--- places ; le joueur assis le plus près du point d'arrivée est visé. Si le deuxième plus près l'est presque
--- autant (moins de ZONE pixels d'écart), dégâts de zone : les deux sont visés. Renvoie les clés visées et
+-- places ; le joueur assis le plus près du point d'arrivée est visé s'il en est à moins de TOUCHE pixels,
+-- sinon dégâts de zone : les deux plus près sont visés (seul à la table : lui). Renvoie les clés visées et
 -- le tracé { ox, oy, px, py } (du centre du petit dé au point d'arrivée), ou rien.
 local function Vecteur(l)
 	local petit, grand = 1, 2
@@ -196,7 +200,7 @@ local function Vecteur(l)
 	if #proches == 0 then return nil end
 	table.sort(proches, function(x, y) return x.d < y.d end)
 	local vises = { proches[1].cle }
-	if proches[2] and proches[2].d - proches[1].d < ZONE then vises[2] = proches[2].cle end
+	if proches[2] and proches[1].d >= TOUCHE then vises[2] = proches[2].cle end
 	return vises, { ox = ox, oy = oy, px = px, py = py }
 end
 
@@ -241,6 +245,7 @@ end
 -- n points en moins pour ce joueur (jamais sous zéro)
 local function Retirer(cle, n)
 	points[cle] = math.max(0, Points(cle) - n)
+	Toucher(cle, n)
 	if cle == MaCle() then
 		local mienne = PlaceDe(cle)
 		if mienne then NoterMaPlace(mienne) end
@@ -259,7 +264,8 @@ end
 
 -- un 7 : tous les joueurs assis à cet instant devront crier
 local function NouveauBizkit(l)
-	local b = { id = l.id, lanceur = l.qui, requis = {}, nRequis = 0, appuis = {}, rang = {}, debut = GetTime() }
+	-- (la course commence quand les dés sont posés, à la fin de leur animation)
+	local b = { id = l.id, lanceur = l.qui, requis = {}, nRequis = 0, appuis = {}, rang = {}, debut = GetTime() + DUREE_ROULE }
 	for i = 1, PLACES do
 		if places[i] then
 			b.requis[places[i]] = true
@@ -287,7 +293,7 @@ end
 -- après chaque cri, ou un joueur parti : reste-t-il un seul joueur à crier ?
 local function VerifierBizkit()
 	local b = bizkit
-	if not b or not b.cri then return end
+	if not b then return end
 	local restants = {}
 	for cle in pairs(b.requis) do
 		if not b.rang[cle] then restants[#restants + 1] = cle end
@@ -304,11 +310,6 @@ end
 local function RetirerDuBizkit(cle)
 	local b = bizkit
 	if not b then return end
-	if cle == b.lanceur and not b.cri then
-		bizkit = nil
-		annonce = "Bizkit annulé : le lanceur a quitté la table"
-		return
-	end
 	if b.requis[cle] and not b.rang[cle] then
 		b.requis[cle] = nil
 		b.nRequis = b.nRequis - 1
@@ -316,18 +317,17 @@ local function RetirerDuBizkit(cle)
 	end
 end
 
--- puis-je crier maintenant ?
+-- le bouton « Bizkit ! » : actif pour un joueur assis, quand des dés sont sur la table, s'il n'a pas déjà
+-- cliqué pour ce lancer (qu'il fasse 7 ou non : le bouton ne doit rien trahir)
+local monCri -- id du dernier lancer pour lequel j'ai cliqué
 local function PeutCrier()
-	local b, moi = bizkit, MaCle()
-	if not b or not moi or b.jai then return false end
-	if not b.cri then return b.lanceur == moi end
-	return b.requis[moi] and not b.rang[moi] or false
+	return PlaceDe(MaCle()) ~= nil and dernierLancer ~= nil and monCri ~= dernierLancer.id
 end
 
 local function Crier()
 	if not PeutCrier() then return end
-	bizkit.jai = true -- (un seul envoi, même si le message met un instant à revenir)
-	Envoyer("B~" .. bizkit.id)
+	monCri = dernierLancer.id -- (un seul envoi par lancer, même si le message met un instant à revenir)
+	Envoyer("B~" .. dernierLancer.id)
 	local envoi = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
 	if envoi and IsInGuild and IsInGuild() then pcall(envoi, CRI, "GUILD") end
 	Maj()
@@ -337,11 +337,15 @@ end
 -- Les doubles : des attaques à distribuer
 --------------------------------------------------------------------------------
 
--- un double : le lanceur distribue ses attaques aux autres joueurs assis (seul à la table : personne)
+-- un double : le lanceur distribue ses attaques aux autres joueurs assis (MAX_PAR_JOUEUR au plus chacun)
 local function NouvelleAttaque(l)
-	if Assis() < 2 then return false end
 	attaque = { id = l.id, qui = l.qui, n = l.d1 == 1 and 7 or l.d1, choix6 = l.d1 == 6, repartition = {}, debut = GetTime() }
-	return true
+end
+
+-- les attaques que personne d'autre ne peut recevoir (MAX_PAR_JOUEUR chacun) : le lanceur se les met à lui-même
+local function SurplusPour(n, lanceur)
+	local autres = Assis() - (PlaceDe(lanceur) and 1 or 0)
+	return math.max(0, n - MAX_PAR_JOUEUR * autres)
 end
 
 -- double 6 : le lanceur n'a pas encore choisi entre 6 attaques et la relance
@@ -370,13 +374,17 @@ local function JeDistribue()
 	return a ~= nil and a.qui == MaCle() and not a.envoye and AttaquesConnues() ~= nil
 end
 
+-- pendant ma distribution : les attaques pour moi (surplus), et celles que je place sur les autres
+local function Surplus() return SurplusPour(AttaquesConnues() or 0, attaque and attaque.qui) end
+local function APlacer() return (AttaquesConnues() or 0) - Surplus() end
+
 -- clic sur une place pendant ma distribution : une attaque de plus (sens = -1 : une de moins)
 local function Viser(place, sens)
 	if not JeDistribue() then return end
 	local cle = places[place]
 	if not cle or cle == MaCle() then return end
 	local r = attaque.repartition
-	if sens > 0 and Distribuees() < AttaquesConnues() then
+	if sens > 0 and Distribuees() < APlacer() and (r[cle] or 0) < MAX_PAR_JOUEUR then
 		r[cle] = (r[cle] or 0) + 1
 	elseif sens < 0 and r[cle] then
 		r[cle] = r[cle] > 1 and r[cle] - 1 or nil
@@ -387,15 +395,17 @@ end
 local function EnvoyerAttaques()
 	local a = attaque
 	if not a or a.envoye or a.qui ~= MaCle() then return end
+	local surplus = Surplus()
 	a.envoye = true
 	local liste = {}
 	for cle, k in pairs(a.repartition) do liste[#liste + 1] = cle .. ":" .. k end
+	if surplus > 0 then liste[#liste + 1] = a.qui .. ":" .. surplus end
 	Envoyer("T~" .. a.id .. "~" .. table.concat(liste, ","))
 	Maj()
 end
 
 local function Attaquer()
-	if JeDistribue() and Distribuees() == AttaquesConnues() then EnvoyerAttaques() end
+	if JeDistribue() and Distribuees() == APlacer() then EnvoyerAttaques() end
 end
 
 local function EffacerAttaques()
@@ -524,8 +534,8 @@ local function LireJet(texte)
 end
 
 -- le Bizkit commence chez moi : la page s'ouvre si elle est fermée, pour que je puisse crier
+-- (sans son : rien ne doit trahir le 7 à ceux qui regardent la table)
 local function Alerter()
-	Son("RAID_WARNING")
 	if not (vue and vue:IsVisible()) and ns.OuvrirInterface then ns.OuvrirInterface("jeux", "bizkit") end
 end
 
@@ -677,12 +687,14 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 					end
 				end
 			end
-			if d1 + d2 == 7 then NouveauBizkit(l) end
+			if d1 + d2 == 7 then
+				NouveauBizkit(l)
+				if bizkit.requis[moi] then Alerter() end
+			end
 			-- un double : des attaques à distribuer
 			if d1 == d2 then
-				if not NouvelleAttaque(l) then
-					annonce = annonce .. " · personne à attaquer"
-				elseif d1 == 6 then
+				NouvelleAttaque(l)
+				if d1 == 6 then
 					annonce = annonce .. " · 6 attaques, ou relance !"
 				else
 					annonce = annonce .. (" · %d attaques à distribuer"):format(attaque.n)
@@ -717,33 +729,50 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		end
 		Maj()
 	elseif genre == "T" then
-		-- les attaques du lanceur : seulement sur des joueurs assis, autres que lui, sans dépasser son nombre
+		-- les attaques du lanceur : sur des joueurs assis, MAX_PAR_JOUEUR au plus chacun, sans dépasser son
+		-- nombre ; sur lui-même, seulement celles que personne d'autre ne pouvait recevoir (le surplus)
 		local a = attaque
 		local id, liste = suite:match("^([^~]+)~?(.*)$")
 		if not a or id ~= a.id or qui ~= a.qui then return end
-		local cibles, total = {}, 0
+		local surplus = SurplusPour(a.n, a.qui)
+		local cibles, total, soi = {}, 0, 0
 		for cle, k in (liste or ""):gmatch("([^,:]+):(%d+)") do
 			k = tonumber(k)
-			if PlaceDe(cle) and cle ~= a.qui and k > 0 and total + k <= a.n then
-				cibles[#cibles + 1] = { cle = cle, n = k }
-				total = total + k
+			if cle == a.qui then
+				soi = math.min(k, surplus)
+			elseif PlaceDe(cle) and k > 0 then
+				k = math.min(k, MAX_PAR_JOUEUR)
+				if total + k <= a.n then
+					cibles[#cibles + 1] = { cle = cle, n = k }
+					total = total + k
+				end
 			end
 		end
+		if soi > 0 and total + soi <= a.n then cibles[#cibles + 1] = { cle = a.qui, n = soi } end
 		FinAttaque(cibles)
 	elseif genre == "B" then
+		-- un cri « Bizkit ! » sur le lancer posé sur la table (un autre id : il s'est croisé avec un nouveau
+		-- lancer, on l'oublie)
+		local l = dernierLancer
+		if not l or suite ~= l.id or not PlaceDe(qui) then return end
 		local b = bizkit
-		if not b or suite ~= b.id or b.rang[qui] then return end
-		if not b.cri then
-			if qui ~= b.lanceur then return end -- (le lanceur crie le premier)
-			b.cri = GetTime()
-			if b.requis[moi] and moi ~= qui then Alerter() end
-		elseif not b.requis[qui] then
-			return
+		if b and b.id == l.id then
+			if not b.requis[qui] or b.rang[qui] then return end
+			b.appuis[#b.appuis + 1] = qui
+			b.rang[qui] = #b.appuis
+			VerifierBizkit()
+			Maj()
+		elseif l.d1 + l.d2 ~= 7 then
+			-- faux Bizkit : les dés ne font pas 7, un point (une fois par lancer)
+			l.faux = l.faux or {}
+			if l.faux[qui] then return end
+			l.faux[qui] = true
+			Retirer(qui, 1)
+			Noter({ genre = "peine", qui = qui, n = 1, lieu = "Faux Bizkit" })
+			annonce = annonce .. (" · %s crie Bizkit pour rien : -1"):format(NomJoueur(qui))
+			Maj()
 		end
-		b.appuis[#b.appuis + 1] = qui
-		b.rang[qui] = #b.appuis
-		VerifierBizkit()
-		Maj()
+		-- (un 7 dont le Bizkit est déjà fini : rien)
 	elseif genre == "P" then
 		local b = bizkit
 		local id, liste = suite:match("^([^~]+)~?(.*)$")
@@ -825,12 +854,13 @@ local function CreerPlace(parent, i)
 	local b = CreateFrame("Button", nil, parent)
 	b:SetSize(TAILLE_PLACE, TAILLE_PLACE)
 	b.place = i
-	-- halo doré qui pulse autour du joueur dont c'est le tour
+	-- halo doré, fixe, autour du joueur dont c'est le tour (rouge : un joueur que je peux attaquer)
 	b.halo = b:CreateTexture(nil, "BACKGROUND")
 	b.halo:SetTexture(UI.ROND)
 	b.halo:SetPoint("CENTER")
 	b.halo:SetSize(TAILLE_PLACE + 14, TAILLE_PLACE + 14)
 	b.halo:SetVertexColor(C.ors[1], C.ors[2], C.ors[3], 1)
+	b.halo:SetAlpha(0.6)
 	b.halo:Hide()
 	b.bord = b:CreateTexture(nil, "BORDER")
 	b.bord:SetTexture(UI.ROND)
@@ -852,45 +882,70 @@ local function CreerPlace(parent, i)
 	b.jeton:SetSize(26, 15)
 	b.jeton:SetPoint("CENTER", b, "BOTTOM", 0, 1)
 	b.jeton:SetFrameLevel(b:GetFrameLevel() + 4)
-	-- barreaux de la prison de 3, par-dessus le portrait
-	b.prison = CreateFrame("Frame", nil, b)
-	b.prison:SetAllPoints()
-	b.prison:SetFrameLevel(b:GetFrameLevel() + 3)
-	for k = -1.5, 1.5 do
-		local barre = b.prison:CreateTexture(nil, "OVERLAY")
-		barre:SetColorTexture(0.13, 0.12, 0.11, 0.9)
-		barre:SetSize(3, TAILLE_PLACE - 8)
-		barre:SetPoint("CENTER", b.prison, "CENTER", k * 9, 0)
+	-- Les prisons, par-dessus le portrait : barreaux de couleur (orange, verticaux : prison de 3 ; bleus,
+	-- horizontaux : prison de 5 ; les deux font une grille) et une pastille dans un coin (« 3 » ou « ×2 »… en
+	-- haut à gauche, « 5 » en haut à droite)
+	local function Prison(couleur, verticaux, coin)
+		local p = CreateFrame("Frame", nil, b)
+		p:SetAllPoints()
+		p:SetFrameLevel(b:GetFrameLevel() + 3)
+		for k = -1.5, 1.5 do
+			local barre = p:CreateTexture(nil, "OVERLAY")
+			barre:SetColorTexture(couleur[1], couleur[2], couleur[3], 0.85)
+			if verticaux then
+				barre:SetSize(3, TAILLE_PLACE - 8)
+				barre:SetPoint("CENTER", p, "CENTER", k * 9, 0)
+			else
+				barre:SetSize(TAILLE_PLACE - 8, 3)
+				barre:SetPoint("CENTER", p, "CENTER", 0, k * 9)
+			end
+		end
+		p.pastille = CreateFrame("Frame", nil, p, "BackdropTemplate")
+		UI.Habiller(p.pastille, { couleur[1] * 0.55, couleur[2] * 0.55, couleur[3] * 0.55, 1 }, { couleur[1], couleur[2], couleur[3], 1 })
+		p.pastille:SetSize(22, 15)
+		p.pastille:SetPoint("CENTER", b, coin, coin == "TOPLEFT" and 2 or -2, -2)
+		p.pastille:SetFrameLevel(b:GetFrameLevel() + 6)
+		p.texte = p.pastille:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		p.texte:SetPoint("CENTER", 0, 0)
+		p:Hide()
+		return p
 	end
-	b.prison.trois = b.prison:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	b.prison.trois:SetPoint("CENTER", b.prison, "TOPLEFT", 3, -3)
-	b.prison.trois:SetText("3")
-	b.prison.trois:SetTextColor(unpack(C.aide))
-	b.prison:Hide()
-	-- barreaux en travers de la prison de 5 (avec ceux de la prison de 3, ça fait une grille)
-	b.prison5 = CreateFrame("Frame", nil, b)
-	b.prison5:SetAllPoints()
-	b.prison5:SetFrameLevel(b:GetFrameLevel() + 3)
-	for k = -1, 1 do
-		local barre = b.prison5:CreateTexture(nil, "OVERLAY")
-		barre:SetColorTexture(0.13, 0.12, 0.11, 0.9)
-		barre:SetSize(TAILLE_PLACE - 8, 3)
-		barre:SetPoint("CENTER", b.prison5, "CENTER", 0, k * 11)
-	end
-	b.prison5.cinq = b.prison5:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	b.prison5.cinq:SetPoint("CENTER", b.prison5, "LEFT", 0, 0)
-	b.prison5.cinq:SetText("5")
-	b.prison5.cinq:SetTextColor(0.55, 0.75, 1)
-	b.prison5:Hide()
+	b.prison = Prison({ 1, 0.5, 0.2 }, true, "TOPLEFT")
+	b.prison5 = Prison({ 0.35, 0.6, 1 }, false, "TOPRIGHT")
+	b.prison5.texte:SetText("5")
 	b.dessus = CreateFrame("Frame", nil, b)
 	b.dessus:SetAllPoints()
 	b.dessus:SetFrameLevel(b:GetFrameLevel() + 5)
 	b.points = b.jeton:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	b.points:SetPoint("CENTER", 0, 0)
-	-- rang du cri pendant un Bizkit (1, 2, 3…), en haut à droite
+	-- rang du cri pendant un Bizkit (1, 2, 3…), à droite de la place
 	b.rang = b.dessus:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	b.rang:SetPoint("CENTER", b, "TOPRIGHT", -2, -2)
+	b.rang:SetPoint("LEFT", b, "RIGHT", 3, 0)
 	b.rang:SetTextColor(unpack(C.ors))
+	-- points perdus : un éclair rouge sur le portrait, et « -2 » qui monte et s'efface (voir Toucher)
+	b.eclair = b.dessus:CreateTexture(nil, "ARTWORK")
+	b.eclair:SetTexture(UI.ROND)
+	b.eclair:SetAllPoints()
+	b.eclair:SetVertexColor(1, 0.1, 0.05, 1)
+	b.eclair:SetAlpha(0)
+	b.perte = b.dessus:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+	b.perte:SetTextColor(1, 0.3, 0.25)
+	b.perte:Hide()
+	b.AnimerPerte = function(self)
+		local t = (GetTime() - self.perteDebut) / 1.5
+		if t < 0 then return end -- (les dés roulent encore)
+		if t >= 1 then
+			self.perteDebut = nil
+			self.perte:Hide()
+			self.eclair:SetAlpha(0)
+			return
+		end
+		self.perte:ClearAllPoints()
+		self.perte:SetPoint("BOTTOM", self, "TOP", 0, 2 + 26 * t)
+		self.perte:SetAlpha(t < 0.6 and 1 or (1 - t) / 0.4)
+		self.perte:Show()
+		self.eclair:SetAlpha(math.max(0, 0.7 * (1 - t * 3)))
+	end
 	-- attaques que je lui donne pendant ma distribution (« -2 »), au milieu du portrait
 	b.attaque = b.dessus:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
 	b.attaque:SetPoint("CENTER", b, "CENTER", 0, 0)
@@ -934,7 +989,7 @@ local function CreerPlace(parent, i)
 				GameTooltip:AddLine("Prison de 5 : chaque 5 d'un autre joueur lui coûte un point ; refaire 5 l'en sort", 0.55, 0.75, 1, true)
 			end
 			if JeDistribue() and cle ~= MaCle() then
-				GameTooltip:AddLine("Clic : une attaque · clic droit : en retirer une", 1, 0.45, 0.4)
+				GameTooltip:AddLine(("Clic : une attaque (%d au plus) · clic droit : en retirer une"):format(MAX_PAR_JOUEUR), 1, 0.45, 0.4)
 			elseif self.place == PlaceDuTour() and not bizkit and not attaque then
 				GameTooltip:AddLine("C'est son tour", 1, 0.82, 0)
 			end
@@ -987,15 +1042,6 @@ local function CreerTable(parent)
 	f.impact:SetVertexColor(1, 0.25, 0.2, 0.55)
 	f.trace:Hide()
 
-	-- le bouton « Bizkit ! », au milieu du tapis, au-dessus des dés
-	f.bizkit = UI.Bouton(f.zone, CRI, "or", 150, 42)
-	f.bizkit.texte:SetFontObject("GameFontNormalLarge")
-	f.bizkit.texte:SetTextColor(0.07, 0.05, 0.02)
-	f.bizkit:SetPoint("CENTER", f.zone, "CENTER", 0, 0)
-	f.bizkit:SetFrameLevel(f:GetFrameLevel() + 30)
-	f.bizkit:SetScript("OnClick", Crier)
-	f.bizkit:Hide()
-
 	-- sous la table : la dernière nouvelle, à qui le tour, le bouton
 	f.resultat = UI.Texte(f, "GameFontNormalLarge", C.ors)
 	f.resultat:SetPoint("TOP", f.zone, "BOTTOM", 0, -ECART_PLACE - TAILLE_PLACE / 2 - 30)
@@ -1026,15 +1072,19 @@ local function CreerTable(parent)
 		if ChoixEnAttente() then ChoisirSix() else EffacerAttaques() end
 	end)
 	f.secondaire:Hide()
+	-- à sa droite, toujours là et toujours pareil (rien ne doit trahir un 7) : « Bizkit ! »
+	f.crier = UI.Bouton(f, CRI, "aide", 110, 32)
+	f.crier:SetPoint("LEFT", f.lancer, "RIGHT", 8, 0)
+	f.crier:SetScript("OnClick", Crier)
+	UI.Infobulle(f.crier, CRI, "Sur un 7, tout le monde clique : le dernier perd un point. Un clic quand les dés ne font pas 7 coûte un point.")
 
-	-- animation des dés, halo du joueur dont c'est le tour, bouton « Bizkit ! » qui bat
-	local horloge, attenteMaj = 0, 0
+	-- animation des dés et des points perdus (le halo des places reste fixe : voir CreerPlace)
+	local attenteMaj = 0
 	f:SetScript("OnUpdate", function(self, dt)
-		horloge = horloge + dt
-		local a = 0.25 + 0.2 * math.sin(horloge * 4)
-		for _, b in ipairs(self.places) do b.halo:SetAlpha(a) end
-		if self.bizkit:IsShown() then self.bizkit:SetScale(1 + 0.06 * math.sin(horloge * 12)) end
 		if self.roule then self:Rouler() end
+		for _, b in ipairs(self.places) do
+			if b.perteDebut then b:AnimerPerte() end
+		end
 		attenteMaj = attenteMaj + dt
 		if attenteMaj >= 0.25 then
 			attenteMaj = 0
@@ -1087,6 +1137,26 @@ Animer = function(l)
 	AnimerDes(vue.table, l, not vue:IsVisible())
 end
 
+-- un joueur perd n points : « -n » monte au-dessus de sa place, son portrait rougit. Si les dés roulent
+-- encore, l'animation attend qu'ils soient posés (rien n'est dévoilé avant) ; plusieurs pertes rapprochées
+-- s'additionnent.
+Toucher = function(cle, n)
+	if not vue or not vue.table or not vue:IsVisible() then return end
+	local t = vue.table
+	local p = PlaceDe(cle)
+	local b = p and t.places[p]
+	if not b then return end
+	local debut = GetTime()
+	if t.roule and not t.roule.instantane then debut = math.max(debut, t.roule.debut + DUREE_ROULE) end
+	if b.perteDebut and debut - b.perteDebut < 0.5 then
+		b.perteN = b.perteN + n
+	else
+		b.perteN = n
+	end
+	b.perteDebut = debut
+	b.perte:SetText("-" .. b.perteN)
+end
+
 --------------------------------------------------------------------------------
 -- À droite : les derniers lancers et Bizkit, se lever, nouvelle partie
 --------------------------------------------------------------------------------
@@ -1119,17 +1189,17 @@ local function CreerCote(parent)
 	UI.Infobulle(f.regles, "Les règles du Bizkit", table.concat({
 		("Chacun son tour lance deux dés. Départ : %d points."):format(POINTS_DEPART),
 		"",
-		"|cffffd1007|r : le lanceur crie « Bizkit ! », puis tout le monde crie à son tour. Le dernier perd un point.",
+		"|cffffd1007|r : tout le monde clique sur « Bizkit ! », le lanceur aussi, dans n'importe quel ordre. Le dernier perd un point. Cliquer quand les dés ne font pas 7 coûte un point.",
 		"",
 		"|cffffd1003|r (1 + 2) : prison de 3, un seul prisonnier à la fois. Chaque dé qui montre un 3, chez n'importe qui, lui coûte un point. S'il refait 3, il monte d'un cran : chaque 3 coûte alors 2, 3, 4 puis 5 points. Un autre joueur qui fait 3 prend sa place, au premier cran.",
 		"",
 		"|cffffd1005|r : prison de 5 si elle est vide. Chaque 5 d'un autre joueur coûte un point au prisonnier, qui sort en refaisant 5.",
 		"",
-		"|cffffd100Doubles|r : autant d'attaques que la valeur du dé (double 1 : 7), à distribuer aux autres joueurs ; chaque attaque coûte un point. Double 6 : 6 attaques, ou une relance dont la somme donne les attaques.",
+		"|cffffd100Doubles|r : autant d'attaques que la valeur du dé (double 1 : 7), à distribuer aux autres joueurs ; chaque attaque coûte un point, 7 au plus par joueur (le reste, pour soi). Double 6 : 6 attaques, ou une relance dont la somme donne les attaques.",
 		"",
 		"|cffffd1009|r : le joueur d'avant perd un point. |cffffd10010|r : le lanceur perd un point. |cffffd10011|r : le joueur d'après perd un point.",
 		"",
-		"|cffffd100Le vecteur|r : sur un 4, un 6 ou un 8 (pas un double), une ligne part du plus petit dé vers le plus grand. Le joueur le plus proche de son arrivée perd un point ; si elle tombe entre deux joueurs, dégâts de zone : les deux perdent un point.",
+		"|cffffd100Le vecteur|r : sur un 4, un 6 ou un 8 (pas un double), une ligne part du plus petit dé vers le plus grand. Si elle arrive près d'un joueur, il perd un point ; sinon, dégâts de zone : les deux joueurs les plus proches perdent un point.",
 	}, "\n"))
 	f.lever = UI.Bouton(f, "Quitter la table", "fantome", 100, 26)
 	f.lever:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 14)
@@ -1176,17 +1246,10 @@ end
 local function TexteEtat(mienne, tour)
 	local moi = MaCle()
 	local b = bizkit
-	if b then
-		local lanceur = NomJoueur(b.lanceur)
-		if not b.cri then
-			local reste = math.max(0, math.ceil(DELAI_CRI - (GetTime() - b.debut)))
-			if b.lanceur == moi then return ("|cffffd1007 !|r Crie « Bizkit ! » · %d s"):format(reste) end
-			return ("|cffffd1007 !|r %s doit crier « Bizkit ! »…"):format(lanceur)
-		end
-		local reste = math.max(0, math.ceil(DELAI_COURSE - (GetTime() - b.cri)))
-		if b.rang[moi] then return ("Tu as crié en position %d. On attend les autres… %d s"):format(b.rang[moi], reste) end
-		if b.requis[moi] then return ("|cffffd100Bizkit ! Crie vite !|r %d s"):format(reste) end
-		return "Bizkit en cours…"
+	-- (pendant un Bizkit, rien tant que je n'ai pas crié : c'est à moi de voir le 7)
+	if b and b.rang[moi] then
+		local reste = math.max(0, math.ceil(DELAI_COURSE - (GetTime() - b.debut)))
+		return ("Tu as crié en position %d. On attend les autres… %d s"):format(b.rang[moi], reste)
 	end
 	local a = attaque
 	if a then
@@ -1197,7 +1260,11 @@ local function TexteEtat(mienne, tour)
 				return ("|cffffd100Double 6 !|r 6 attaques, ou relance : la somme des dés · %d s"):format(reste)
 			end
 			if not AttaquesConnues() then return "Les dés roulent…" end
-			return ("|cffffd100%d attaques|r : clique sur les joueurs (clic droit : en retirer) · %d s"):format(AttaquesConnues(), reste)
+			if APlacer() == 0 then
+				return ("Personne d'autre pour les recevoir : tes |cffffd100%d attaques|r sont pour toi · %d s"):format(AttaquesConnues(), reste)
+			end
+			local pourMoi = Surplus() > 0 and (" (dont %d pour toi)"):format(Surplus()) or ""
+			return ("|cffffd100%d attaques|r%s : clique sur les joueurs (clic droit : en retirer) · %d s"):format(AttaquesConnues(), pourMoi, reste)
 		end
 		if a.choix6 and not a.relance then return ("%s choisit : 6 attaques ou relance…"):format(NomJoueur(a.qui)) end
 		return ("%s distribue %d attaques…"):format(NomJoueur(a.qui), a.n)
@@ -1239,6 +1306,7 @@ Maj = function()
 			b.halo:SetVertexColor(C.ors[1], C.ors[2], C.ors[3], 1)
 		end
 		local k = cle and attaque and attaque.qui == moi and attaque.repartition[cle]
+		if cle == moi and distribue and Surplus() > 0 then k = Surplus() end -- (celles que je me mets)
 		b.attaque:SetText(k and ("-" .. k) or "")
 		if cle then
 			local r, g, bl = ns.CouleurClasse(ns.ClasseMembre and ns.ClasseMembre(cle))
@@ -1255,7 +1323,7 @@ Maj = function()
 			b.jeton:Show()
 			b.prison:SetShown(cle == prison)
 			b.prison5:SetShown(cle == prison5)
-			b.prison.trois:SetText(cran > 1 and ("×" .. cran) or "3")
+			b.prison.texte:SetText(cran > 1 and ("×" .. cran) or "3")
 			local rang = bizkit and bizkit.rang[cle]
 			b.rang:SetText(rang and tostring(rang) or "")
 		else
@@ -1295,9 +1363,8 @@ Maj = function()
 		t.trace:Hide()
 	end
 
-	-- le bouton « Bizkit ! » (après l'arrivée des dés, pour le lanceur)
-	t.bizkit:SetShown(PeutCrier() and not t.roule)
-	if not t.bizkit:IsShown() then t.bizkit:SetScale(1) end
+	-- le bouton « Bizkit ! » : une fois les dés posés, un clic par lancer
+	t.crier:Activer(PeutCrier() and not t.roule)
 
 	-- dernière nouvelle, état, bouton
 	t.resultat:SetText(t.roule and "" or annonce)
@@ -1312,8 +1379,9 @@ Maj = function()
 			t.secondaire:Activer(true)
 			t.secondaire:Show()
 		elseif AttaquesConnues() then
-			local reste = AttaquesConnues() - Distribuees()
-			t.lancer:Ecrire(reste > 0 and ("Encore %d attaque%s"):format(reste, reste > 1 and "s" or "") or "Attaquer !")
+			local reste = APlacer() - Distribuees()
+			t.lancer:Ecrire(reste > 0 and ("Encore %d attaque%s"):format(reste, reste > 1 and "s" or "")
+				or (APlacer() == 0 and "Prendre mes attaques" or "Attaquer !"))
 			t.lancer:Activer(reste == 0)
 			t.secondaire:Ecrire("Effacer")
 			t.secondaire:Activer(Distribuees() > 0)
@@ -1472,21 +1540,16 @@ ev:SetScript("OnUpdate", function(_, dt)
 	if b then
 		local maintenant = GetTime()
 		if b.lanceur == moi and not b.annonce then
-			-- c'est moi qui tranche : je n'ai pas crié à temps, ou d'autres n'ont pas crié à temps
-			local perdants
-			if not b.cri and maintenant - b.debut > DELAI_CRI then
-				perdants = { moi }
-			elseif b.cri and maintenant - b.cri > DELAI_COURSE then
-				perdants = {}
+			-- c'est moi, le lanceur, qui tranche : ceux qui n'ont pas crié à temps perdent
+			if maintenant - b.debut > DELAI_COURSE then
+				local perdants = {}
 				for cle in pairs(b.requis) do
 					if not b.rang[cle] then perdants[#perdants + 1] = cle end
 				end
-			end
-			if perdants then
 				b.annonce = true
 				Envoyer("P~" .. b.id .. "~" .. table.concat(perdants, ","))
 			end
-		elseif b.lanceur ~= moi and maintenant - b.debut > DELAI_CRI + DELAI_COURSE + SANS_NOUVELLES then
+		elseif b.lanceur ~= moi and maintenant - b.debut > DELAI_COURSE + SANS_NOUVELLES then
 			bizkit = nil
 			annonce = "Bizkit abandonné : le lanceur ne répond plus"
 			Maj()
