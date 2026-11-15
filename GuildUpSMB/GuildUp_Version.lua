@@ -135,8 +135,12 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "4.2.0", "4.1.0", "4.0.6", "4.0.5", "4.0.4", "4.0.3", "4.0.2", "4.0.1", "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "4.3.0", "4.2.0", "4.1.0", "4.0.6", "4.0.5", "4.0.4", "4.0.3", "4.0.2", "4.0.1", "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["4.3.0"] = {
+		"|cffffd100Page Aide|r : une nouvelle entrée dans le menu (ou |cffffd100/smb aide|r) qui liste les 44 commandes de l'addon, rangées par chapitre, avec une phrase expliquant ce que fait chacune, ses autres écritures, et son état quand c'est un interrupteur (activé ou désactivé). Une case de recherche filtre la liste, et un clic sur une ligne lance la commande.",
+		"|cffffd100/smb gu|r s'appelle maintenant |cffffd100/smb biere|r (l'ancienne écriture marche toujours) : elle affiche ou non la chope qui descend de l'écran quand un membre crie, et ne lance pas le cri. Douze commandes qui n'étaient écrites nulle part sont enfin documentées.",
+	},
 	["4.2.0"] = {
 		"|cffffd100Ne pas déranger|r : |cffffd100/smb calme|r (ou la case dans Options > Notifications) coupe toutes les bulles de l'addon quand tu veux être tranquille. |cffffd100/smb calme 30|r le fait pour 30 minutes. En sortant, l'addon te dit en une ligne ce qui est passé pendant ce temps.",
 		"La guilde le voit : une lune apparaît devant ton nom dans la page Guilde, avec une ligne dans ton infobulle, pour que personne ne te chuchote pour rien. Le mode suit aussi le |cffffd100/dnd|r du jeu, ce qui se coupe dans les options.",

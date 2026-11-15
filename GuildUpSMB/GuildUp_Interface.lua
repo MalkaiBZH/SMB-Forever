@@ -74,6 +74,7 @@ local SECTIONS = {
 	{ id = "activite", nom = "Activité", icone = "Interface\\Icons\\INV_Misc_Note_01", neutre = true,
 		badge = function() return ns.NouveautesActivite and ns.NouveautesActivite() or 0 end },
 	{ id = "stats", nom = "Statistiques", icone = "Interface\\Icons\\INV_Misc_PocketWatch_02" },
+	{ id = "aide", nom = "Aide", icone = "Interface\\Icons\\INV_Misc_QuestionMark", neutre = true },
 }
 local OPTIONS = { id = "options", nom = "Options", icone = "Interface\\Icons\\Trade_Engineering",
 	ouvrir = function() if ns.BasculerOptions then ns.BasculerOptions() end end }

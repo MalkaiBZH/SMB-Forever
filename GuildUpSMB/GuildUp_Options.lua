@@ -50,6 +50,7 @@ local function OuiNon(v) return v and "|cff00ff00oui|r" or "|cffff4444non|r" end
 
 local function Aide()
 	Message("/smb tout seul ouvre la fenêtre SMB Forever. Commandes :")
+	print("  /smb aide — la page Aide : toutes les commandes, ce qu'elles font et leur état")
 	print("  /smb options — réglages de l'addon")
 	print("  /smb taille 1.2 — taille de la fenêtre SMB Forever (de 0.7 à 1.6)")
 	print("  /smb demandes — demandes de la guilde (ressources, artisanat)")
@@ -63,6 +64,7 @@ local function Aide()
 	print("  /smb sos — appeler la guilde à l'aide")
 	print("  /smb roll [objet ou mot] — tirage au sort de la guilde")
 	print("  /smb sondage — sondage de la guilde (en cours, ou en poser un)")
+	print("  /smb biere — chope à l'écran quand un membre crie (" .. OuiNon(not (type(db.notifs) == "table" and db.notifs.gu == false)) .. ")")
 	print("  /smb layer — ton layer et les membres sur le même layer ou un autre")
 	print("  /smb activite — fil d'activité de la guilde et podium de la semaine")
 	print("  /smb souvenirs — souvenirs de la guilde sur la carte du monde (" .. OuiNon(db.souvenirsCarte ~= false) .. ")")
@@ -646,12 +648,12 @@ SlashCmdList.GUILDUP = function(msg)
 		local fi = ns.FicheCadre and ns.FicheCadre()
 		if fi and fi:IsShown() then fi:Hide() elseif ns.OuvrirFiche then ns.OuvrirFiche(nil) end
 		return
-	elseif cmd == "gu" then
+	elseif cmd == "biere" or cmd == "bière" or cmd == "gu" then
 		-- même réglage que la case du cri de guilde dans les notifications du volet
 		if type(db.notifs) ~= "table" then db.notifs = {} end
 		db.notifs.gu = (db.notifs.gu == false) and nil or false
 		db.emoteGU = nil
-		Message(db.notifs.gu == false and "emote du cri de guilde coupée." or "emote du cri de guilde activée.")
+		Message(db.notifs.gu == false and "chope du cri de guilde coupée." or "chope du cri de guilde activée.")
 		return
 	elseif cmd == "items" or cmd == "crafts" or cmd == "craft" then
 		if ns.BasculerArtisanat then ns.BasculerArtisanat(2) end
@@ -671,6 +673,9 @@ SlashCmdList.GUILDUP = function(msg)
 		return
 	elseif cmd == "cena" or cmd == "explosion" then
 		if ns.EssaiExplosion then ns.EssaiExplosion(((msg or ""):match("^%s*%S+%s*(.-)%s*$"))) end
+		return
+	elseif cmd == "aide" or cmd == "commandes" or cmd == "help" then
+		if ns.OuvrirInterface then ns.OuvrirInterface("aide") end
 		return
 	elseif cmd == "calme" or cmd == "dnd" or cmd == "npd" then
 		if ns.BasculerCalme then ns.BasculerCalme(nil, tonumber(reste)) end

@@ -164,6 +164,9 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   chaque addon connecté relève le nombre de membres en ligne (liste de guilde du jeu, addon ou pas) ; les relevés sont
   gardés 8 semaines et partagés entre membres à la connexion. Semaine type (grille jours × heures), cinq meilleurs
   créneaux, membres en ligne par jour sur 28 jours, courbe d'aujourd'hui.
+- **Aide** (`/smb aide`) : toutes les commandes de l'addon rangées par chapitre, avec ce que fait chacune, ses autres
+  écritures et son état (activé ou désactivé) pour les interrupteurs. Case de recherche, et clic sur une ligne pour
+  lancer la commande (sauf celles qui attendent une valeur et `/smb reset`, à taper à la main).
 - **Ne pas déranger** (`/smb calme`, ou la case dans Options > Notifications) : coupe toutes les bulles de l'addon
   quand on veut être tranquille ; `/smb calme 30` pour trente minutes seulement. À la sortie, un message dit ce qui a
   été coupé (« 5 bulles : 2 demandes, 1 quête… ») ; rien n'est rejoué. Les autres membres voient une lune devant le
@@ -207,6 +210,8 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 | `/smb sondage` | Sondage de la guilde : celui en cours ou le dernier, sinon en poser un |
 | `/smb nouveautes` | Nouveautés de la version |
 | `/smb on` / `off` | Activer / couper les bannières |
+| `/smb aide` | La page Aide : toutes les commandes, ce qu'elles font et leur état |
+| `/smb biere` | Chope à l'écran quand un membre crie (`/smb gu` marche toujours) |
 | `/smb bouton` | Afficher / cacher le médaillon GuildUpSMB |
 | `/smb calme [minutes]` | Ne pas déranger : couper les bulles, la guilde le voit |
 | `/smb noms` | Nom et guilde des autres joueurs |

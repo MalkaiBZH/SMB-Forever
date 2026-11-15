@@ -84,6 +84,8 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   l'infobulle du jeu (`C_TooltipInfo.GetUnit`) ; listes des coéquipiers reçues sur `PARTY` / `RAID` (`GuildUpObj`).
 - `GuildUp_Config.lua` : **réglages propres à la guilde** (`ns.Config` : nom public, cri de guilde, emote animée,
   membre vedette). Chargé en premier, sans dépendance ; les autres modules le lisent via `ns.Config`.
+- `GuildUp_Commandes.lua` : page « Aide », la liste de toutes les commandes de `/smb`. Elles y sont déclarées à la
+  main (table `CHAPITRES`) : **toute nouvelle commande ajoutée à `GuildUp_Options.lua` doit y être ajoutée aussi**.
 - `GuildUp_Reseau.lua` : **tout le réseau passe par lui**.
   - `ns.EnvoyerAddon(préfixe, msg, canal, cible, { jetable = true })` : file unique, un message toutes les 0,3 s, nouvel essai si le jeu refuse, refus au-delà de 255 octets.
   - Deux voies d'envoi : les messages courants d'abord, les longs envois de rattrapage (relais à la connexion d'un membre) derrière, un toutes les 1,2 s. Un module qui met plus de trois messages du même préfixe dans la file en dix secondes est reconnu comme relais : **rien à déclarer**. `{ fond = true }` ou `{ fond = false }` force le choix ; un chuchotement d'addon n'est jamais mis en fond. Un message de fond identique envoyé il y a moins de 90 s n'est pas renvoyé (tout part sur la guilde : les autres l'ont déjà reçu).
