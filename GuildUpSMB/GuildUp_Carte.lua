@@ -21,8 +21,9 @@
 -- pour s'afficher aussi sur la carte du continent.
 -- Fil d'Ariane : chaque position reçue est aussi passée à ns.NoterTrace (GuildUp_Reperes.lua) ; la trace
 -- suivie (ns.TraceSuivie) est dessinée en points dorés, plus pâles pour les étapes déjà passées.
--- Souvenirs de la guilde (GuildUp_Souvenirs.lua, ns.SouvenirsCarte) : un symbole de raid par souvenir de
--- la zone affichée (étoile : niveau ; rond : métier ; losange : tirage), sous les membres.
+-- Souvenirs de la guilde (GuildUp_Souvenirs.lua, ns.SouvenirsCarte) : un anneau évidé au centre
+-- (media\souvenir.tga) par souvenir de la zone affichée, teinté selon le genre (jaune : niveau ; orange :
+-- métier ; violet : tirage), sous les membres.
 -- Portraits : le dernier reçu de chaque membre est gardé pour la session, même quand il entre en instance
 -- ou se tait (ns.PortraitMembre, pour les portraits ronds de l'interface et la fête de montée de niveau) ;
 -- à défaut, lu sur son personnage s'il est dans mon groupe.
@@ -766,7 +767,15 @@ end
 -- Souvenirs de la guilde : un symbole par souvenir de la zone affichée, sur un calque du canevas
 local calqueSouvenirs
 local epinglesSouvenirs = {}
-local SYMBOLES = { N = 1, M = 2, P = 2, T = 3 } -- étoile, rond, losange (symboles de raid du jeu)
+-- anneau évidé au centre (media\souvenir.tga, blanc cerclé de noir), teinté selon le genre de souvenir :
+-- les couleurs des anciens symboles de raid (étoile jaune, rond orange, losange violet)
+local ANNEAU_SOUVENIR = (ns.MEDIA or ("Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\")) .. "souvenir"
+local COULEURS_SOUVENIRS = {
+	N = { 1, 0.85, 0.2 },     -- niveau
+	M = { 1, 0.55, 0.15 },    -- métier
+	P = { 1, 0.55, 0.15 },    -- palier de métier
+	T = { 0.8, 0.45, 1 },     -- tirage
+}
 local function MajSouvenirs(canevas, carte, largeur, hauteur, echelle)
 	local liste = ns.SouvenirsCarte and ns.SouvenirsCarte(carte)
 	if not liste or #liste == 0 then
@@ -785,6 +794,7 @@ local function MajSouvenirs(canevas, carte, largeur, hauteur, echelle)
 			e = CreateFrame("Button", nil, calqueSouvenirs)
 			e.icone = e:CreateTexture(nil, "ARTWORK")
 			e.icone:SetAllPoints(e)
+			e.icone:SetTexture(ANNEAU_SOUVENIR)
 			e:SetScript("OnEnter", function(self)
 				if not self.s then return end
 				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -796,7 +806,8 @@ local function MajSouvenirs(canevas, carte, largeur, hauteur, echelle)
 		end
 		e.s = s
 		e:SetSize(taille, taille)
-		e.icone:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_" .. (SYMBOLES[s.g] or 1))
+		local c = COULEURS_SOUVENIRS[s.g] or COULEURS_SOUVENIRS.N
+		e.icone:SetVertexColor(c[1], c[2], c[3], 1)
 		e:ClearAllPoints()
 		e:SetPoint("CENTER", calqueSouvenirs, "TOPLEFT", s.x * largeur, -s.y * hauteur)
 		e:SetFrameLevel(NiveauCarte(canevas, 0))
