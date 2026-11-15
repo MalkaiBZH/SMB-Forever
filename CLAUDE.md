@@ -75,9 +75,9 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
 - `GuildUp_Cena.lua` : « Et son nom est… », musique et fête à l'écran (portrait, nom arc-en-ciel, compteur de niveau,
   confettis, feux d'artifice, bords dorés ; 4 s après le boum) à chaque montée de niveau d'un membre ; version calme
   chez le joueur en combat (musique, portrait, nom et niveau en petit en haut, sans effets plein écran)
-  (`ns.ExplosionNiveau`, appelé par `GuildUp_Annonces.lua` ; pas de préfixe propre). **Surprise pour la guilde** : la case
-  des notifications s'appelle « Surprise », `/smb cena` n'est pas dans l'aide, rien dans le `README.md`, et les notes de
-  version n'en disent rien (pas même « secrète »). Musique : `media/levelup.mp3` (sample de 5 s) ; un joueur peut la
+  (`ns.ExplosionNiveau`, appelé par `GuildUp_Annonces.lua` ; pas de préfixe propre). Ce fut une surprise pour la guilde
+  (case des notifications « Surprise ») ; elle ne l'est plus : `/smb cena` figure dans la page Aide (4.3.0) et peut
+  être cité dans le `README.md` et les notes de version. Musique : `media/levelup.mp3` (sample de 5 s) ; un joueur peut la
   remplacer par `Interface\AddOns\GuildUpSMB_Sons\levelup.mp3`, hors du dossier de l'addon.
 - `GuildUp_Objectifs.lua` : « ! » sur les barres de nom des ennemis de quête (jaune moi, bleu groupe, vert les deux).
   Croise `ns.OBJECTIFS_QUETES` (données générées) avec le journal de quêtes, par numéro de PNJ (GUID) ; complété par
