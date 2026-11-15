@@ -5,11 +5,23 @@
 -- La page « Quêtes » de la fenêtre GuildUpSMB montre mes quêtes que d'autres membres font aussi, avec un
 -- bouton « Inviter » (les membres en ligne qui ont la quête et ne sont pas encore dans mon groupe ; seul,
 -- l'invitation crée le groupe), « Déjà groupés » (tous y sont) ou « Hors ligne » (personne de connecté).
+-- Les membres les plus proches viennent en premier, avec leur distance : elle est calculée sur les
+-- positions que GuildUp_Carte.lua partage déjà (ns.PositionsMembres, ns.MaPosition, ns.PositionMonde),
+-- sans message de plus. Quand un membre qui a une de mes quêtes arrive à moins de PROCHE mètres sans
+-- être dans mon groupe, une bulle (catégorie « quetes ») le signale et propose de l'inviter : c'est le
+-- cas qu'on rate tout le temps, deux membres sur le même camp sans le savoir. Une seule bulle par
+-- membre toutes les RAPPEL secondes, une toutes les ENTRE_BULLES au plus, et aucune en instance ou
+-- pendant un vol.
 
 local NOM_ADDON, ns = ...
 
 local PREFIXE = "GuildUpQst"
+local UNITE = (GetLocale() == "enUS" or GetLocale() == "enGB") and "yd" or "m"
 local MAX_QUETES = 35         -- tient dans un message (255 caractères)
+local PROCHE = 300            -- mètres : au-delà, un membre n'est pas « tout près »
+local RAPPEL = 1800           -- secondes avant de re-signaler le même membre
+local ENTRE_BULLES = 180      -- secondes entre deux bulles de proximité, quel que soit le membre
+local VERIF = 8               -- secondes entre deux recherches de membre tout près
 
 local mesQuetes = {}          -- [id] = { titre, zone }
 local autres = {}             -- [nom normalisé] = { nom, quetes = { [id] = true }, vu }
@@ -17,6 +29,9 @@ local signature = nil
 local pret = false
 local dernierEnvoi = 0
 local MajFenetre
+
+local derniereBulle = {}      -- [clé] = heure de la dernière bulle de proximité pour ce membre
+local bulleRecente = -math.huge
 
 local Normaliser = ns.Normaliser
 local MaCle = ns.MaCle
@@ -199,6 +214,23 @@ local function MonGroupe()
 	return cles
 end
 
+-- Distance en mètres entre moi et ce membre, à partir des positions déjà partagées (nil si je ne sais
+-- pas où il est, s'il est en instance, ou s'il est sur un autre continent)
+local function DistanceDe(cle)
+	if not (ns.PositionsMembres and ns.MaPosition and ns.PositionMonde) then return nil end
+	local p = ns.PositionsMembres()[cle]
+	if not p or p.instance or not p.carte then return nil end
+	local carte, x, y = ns.MaPosition()
+	if not carte then return nil end
+	local monNord, monOuest, monContinent = ns.PositionMonde(carte, x, y)
+	local nord, ouest, continent = ns.PositionMonde(p.carte, p.x, p.y)
+	if not monNord or not nord or monContinent ~= continent then return nil end
+	local dn, dO = nord - monNord, ouest - monOuest
+	return math.sqrt(dn * dn + dO * dO)
+end
+
+local function Metres(d) return ("%d %s"):format(math.floor(d + 0.5), UNITE) end
+
 -- Chaque quête : membres qui l'ont (groupe = déjà dans mon groupe), et aInviter = ceux qui sont en ligne
 -- mais pas encore dans mon groupe (le bouton de la ligne en dépend : Inviter / Déjà groupés / Hors ligne)
 local function Partages()
@@ -211,22 +243,31 @@ local function Partages()
 			if a.quetes[id] then
 				local m = { cle = cle, nom = a.nom, enLigne = EstEnLigne(cle) }
 				m.groupe = DansMonGroupe(cle)
+				m.distance = DistanceDe(cle)
 				if m.groupe then groupes = groupes + 1
 				elseif m.enLigne then aInviter[#aInviter + 1] = m end
 				membres[#membres + 1] = m
 			end
 		end
 		if #membres > 0 then
+			-- les plus proches d'abord : c'est avec eux qu'on peut faire la quête tout de suite
 			table.sort(membres, function(x, y)
 				if x.groupe ~= y.groupe then return x.groupe end
+				if (x.distance ~= nil) ~= (y.distance ~= nil) then return x.distance ~= nil end
+				if x.distance and y.distance and x.distance ~= y.distance then return x.distance < y.distance end
 				if x.enLigne ~= y.enLigne then return x.enLigne end
 				return x.nom < y.nom
 			end)
+			local plusProche = membres[1] and not membres[1].groupe and membres[1].distance or nil
 			res[#res + 1] = { id = id, titre = q.titre, zone = q.zone, niveau = q.niveau, membres = membres,
-				aInviter = aInviter, groupes = groupes }
+				aInviter = aInviter, groupes = groupes, plusProche = plusProche }
 		end
 	end
+	-- une quête dont un membre est tout près passe devant, sinon par zone
 	table.sort(res, function(a, b)
+		local pa, pb = (a.plusProche and a.plusProche <= PROCHE), (b.plusProche and b.plusProche <= PROCHE)
+		if pa ~= pb then return pa end
+		if pa and pb and a.plusProche ~= b.plusProche then return a.plusProche < b.plusProche end
 		if (a.zone or "") ~= (b.zone or "") then return (a.zone or "") < (b.zone or "") end
 		return a.titre < b.titre
 	end)
@@ -267,7 +308,8 @@ local function InfobulleQuete(self)
 	for _, m in ipairs(q.membres) do
 		if m.enLigne then
 			local zone = enLigne[m.cle] and enLigne[m.cle].zone
-			GameTooltip:AddLine("|cff33dd55●|r " .. NomJoueur(m.nom) .. (zone and ("  |cff999999" .. zone .. "|r") or ""), 1, 1, 1)
+			local ou = m.distance and ("  |cfff1cf6b" .. Metres(m.distance) .. "|r") or (zone and ("  |cff999999" .. zone .. "|r")) or ""
+			GameTooltip:AddLine("|cff33dd55●|r " .. NomJoueur(m.nom) .. ou, 1, 1, 1)
 		else
 			GameTooltip:AddLine("|cff888888○ " .. NomJoueur(m.nom) .. " (hors ligne)|r", 1, 1, 1)
 		end
@@ -350,7 +392,7 @@ local function CreerPage(parent)
 	titre:SetText("Quêtes en commun")
 	local aide = UI.Texte(p, "GameFontHighlightSmall", C.gris)
 	aide:SetPoint("TOPLEFT", titre, "BOTTOMLEFT", 0, -6)
-	aide:SetText("Tes quêtes que d'autres membres font aussi (|cff6fd08cvert|r = connecté). Invite ceux qui sont en ligne pour la faire ensemble.")
+	aide:SetText("Tes quêtes que d'autres membres font aussi (|cff6fd08cvert|r = connecté, distance pour ceux qui sont tout près). Invite ceux qui sont en ligne pour la faire ensemble.")
 	p.liste = UI.Liste(p)
 	p.liste:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -70)
 	p.liste:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE + 6, 12)
@@ -376,7 +418,8 @@ local function CreerPage(parent)
 			local noms = {}
 			for _, m in ipairs(q.membres) do
 				noms[#noms + 1] = (m.enLigne and "|cff6fd08c" or "|cff8a826f") .. NomJoueur(m.nom) .. "|r"
-					.. (m.groupe and " |cfff1cf6b(groupe)|r" or "")
+					.. (m.groupe and " |cfff1cf6b(groupe)|r"
+						or (m.distance and m.distance <= PROCHE and (" |cfff1cf6b(" .. Metres(m.distance) .. ")|r") or ""))
 			end
 			r.membres:SetText(table.concat(noms, ", "))
 			-- bouton : des membres en ligne à inviter (seul, ou chef / assistant du groupe) ; déjà groupé
@@ -474,3 +517,64 @@ ev:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
 		end)
 	end
 end)
+
+--------------------------------------------------------------------------------
+-- Un membre qui a une de mes quêtes arrive tout près : une bulle le signale
+--------------------------------------------------------------------------------
+
+-- Rien en instance ni pendant un vol : on ne peut pas se rejoindre, et la bulle serait inutile
+local function PeutSignaler()
+	local ok, dedans = pcall(IsInInstance)
+	if ok and dedans then return false end
+	local ok2, vol = pcall(UnitOnTaxi, "player")
+	if ok2 and vol then return false end
+	return true
+end
+
+-- Le membre tout près avec qui j'ai le plus de quêtes en commun, s'il y en a un à signaler
+local function AProximite()
+	local groupe = MonGroupe()
+	local maintenant = GetTime()
+	local candidats = {}
+	for _, q in ipairs(Partages()) do
+		for _, m in ipairs(q.membres) do
+			if m.enLigne and not m.groupe and m.distance and m.distance <= PROCHE
+				and not (groupe and groupe[m.cle])
+				and maintenant - (derniereBulle[m.cle] or -math.huge) > RAPPEL then
+				local t = candidats[m.cle]
+				if not t then
+					t = { cle = m.cle, nom = m.nom, distance = m.distance, quetes = {} }
+					candidats[m.cle] = t
+				end
+				t.quetes[#t.quetes + 1] = q.titre
+			end
+		end
+	end
+	-- le plus de quêtes en commun, puis le plus proche
+	local meilleur
+	for _, t in pairs(candidats) do
+		if not meilleur or #t.quetes > #meilleur.quetes
+			or (#t.quetes == #meilleur.quetes and t.distance < meilleur.distance) then
+			meilleur = t
+		end
+	end
+	return meilleur
+end
+
+local function Guetter()
+	if not pret or not ns.Notifier or not PeutSignaler() then return end
+	if GetTime() - bulleRecente < ENTRE_BULLES then return end
+	if ns.PageInterface and ns.PageInterface() == "quetes" then return end -- (il la voit déjà)
+	local m = AProximite()
+	if not m then return end
+	derniereBulle[m.cle] = GetTime()
+	bulleRecente = GetTime()
+	local n = #m.quetes
+	ns.Notifier("quetes", NomJoueur(m.nom) .. " est tout près",
+		("%s %s · %s. Clic : la page Quêtes."):format(
+			n > 1 and ("%d quêtes en commun, dont"):format(n) or "Même quête :",
+			m.quetes[1], Metres(m.distance)),
+		nil, function() if ns.BasculerQuetes then ns.BasculerQuetes(true) end end)
+end
+
+if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(VERIF, Guetter) end

@@ -131,6 +131,10 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 - **Quêtes** : les quêtes que d'autres membres font aussi, avec « Inviter » (les membres en ligne qui ont la
   quête et ne sont pas encore avec toi ; seul, l'invitation crée le groupe), « Déjà groupés » quand ils sont tous
   dans ton groupe, « Hors ligne » quand personne n'est connecté ; « (groupe) » marque ceux qui y sont.
+  Les membres les plus proches viennent en premier, avec leur distance, et les quêtes dont un membre est tout près
+  remontent dans la liste. Quand un membre qui a une de tes quêtes arrive à moins de 300 m sans être dans ton groupe,
+  une bulle le signale (au plus une toutes les trois minutes, jamais en instance ni en vol). Les distances viennent
+  des positions déjà partagées entre membres : aucun message de plus.
 - **Artisanat** :
   - *Registre* des métiers et recettes de chaque membre ; clic sur une recette d'un membre : demande d'artisanat ;
   - *Crafts* : tous les objets fabricables, par catégorie, avec des filtres (ma classe, mon niveau, niveau requis, fabricable par la guilde) ; un clic sur un objet montre à droite qui, dans la guilde, sait le fabriquer (chuchoter), et « Demander » prépare une demande d'artisanat ;

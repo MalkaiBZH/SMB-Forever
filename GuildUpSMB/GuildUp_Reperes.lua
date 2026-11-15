@@ -68,6 +68,8 @@ local function Monde(carte, x, y)
 	return nord, ouest, continent
 end
 
+ns.PositionMonde = Monde -- carte, x, y -> nord, ouest, continent (distances de GuildUp_Quetes.lua)
+
 -- position sur le monde des membres, recalculée seulement quand leur position change
 local mondes = {} -- [nom normalisé] = { carte, x, y, nord, ouest, continent }
 local function MondeMembre(cle, p)
