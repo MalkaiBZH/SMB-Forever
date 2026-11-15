@@ -373,6 +373,11 @@ end
 -- Renvoie true si la bulle est affichée (false : GuildUpSMB pas prêt ou catégorie coupée)
 ns.Notifier = function(categorie, titre, texte, son, action)
 	if not db then return false end
+	-- mode calme (GuildUp_Calme.lua) : rien ne s'affiche, mais on compte pour le dire à la sortie
+	if ns.NePasDeranger and ns.NePasDeranger() then
+		if ns.CompterBulleCoupee then ns.CompterBulleCoupee(categorie) end
+		return false
+	end
 	if not NotifActive(categorie) then return false end
 	bulle = bulle or CreerBulle()
 	if bulle.Reinit then bulle.Reinit(bulle) end -- une bulle spéciale (GuildUp_GU) l'avait décorée

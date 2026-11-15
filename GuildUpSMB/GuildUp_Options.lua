@@ -69,6 +69,7 @@ local function Aide()
 	print("  /smb stats — statistiques de présence : quand la guilde est en ligne")
 	print("  /smb on | off — bannières de la guilde (" .. OuiNon(db.actif) .. ")")
 	print("  /smb bouton — afficher / cacher le médaillon SMB Forever")
+	print("  /smb calme [minutes] — ne pas déranger : couper les bulles (" .. OuiNon(ns.NePasDeranger and ns.NePasDeranger()) .. ")")
 	print("  /smb noms — nom et guilde des autres joueurs (" .. OuiNon(db.nomsAllies) .. ")")
 	print("  /smb lueur — lueur derrière la bannière de ta cible (" .. OuiNon(db.lueur) .. ")")
 	print("  /smb medaillons — portraits des joueurs sur les bannières (" .. OuiNon(db.medaillons ~= false) .. ")")
@@ -490,6 +491,15 @@ local function CreerPage(parent)
 			end)
 	end
 
+	-- mode calme : coupe toutes les bulles d'un coup, et la guilde le voit (GuildUp_Calme.lua)
+	local n = #NOTIFS
+	Case(notifs, 14 + (n % 5) * colonne, -40 - math.floor(n / 5) * 26, "Ne pas déranger",
+		function() return ns.NePasDeranger and ns.NePasDeranger() end,
+		function(v) if ns.BasculerCalme then ns.BasculerCalme(v and true or false) end end)
+	Case(notifs, 14 + ((n + 1) % 5) * colonne, -40 - math.floor((n + 1) / 5) * 26, "Suivre /dnd",
+		function() return db.calmeSuitDnd ~= false end,
+		function(v) db.calmeSuitDnd = (not v) and false or nil end)
+
 	-- Carte et repères : réglages personnels (GuildUpDB), à défaut ceux de GuildUp_Config.lua. Une
 	-- colonne par réglage, le libellé au-dessus de son curseur : { réglage, libellé, min, max, pas, valeur
 	-- de la guilde, unité, infobulle }
@@ -661,6 +671,9 @@ SlashCmdList.GUILDUP = function(msg)
 		return
 	elseif cmd == "cena" or cmd == "explosion" then
 		if ns.EssaiExplosion then ns.EssaiExplosion(((msg or ""):match("^%s*%S+%s*(.-)%s*$"))) end
+		return
+	elseif cmd == "calme" or cmd == "dnd" or cmd == "npd" then
+		if ns.BasculerCalme then ns.BasculerCalme(nil, tonumber(reste)) end
 		return
 	elseif cmd == "layer" or cmd == "layers" then
 		if ns.MontrerLayer then ns.MontrerLayer() end

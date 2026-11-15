@@ -97,7 +97,9 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   `GuildUpAnn` (annonces), `GuildUpAid` (aide), `GuildUpVer` (version), `GuildUpGU` (emote du cri de guilde),
   `GuildUpTir` (tirage au sort, `/smb roll`), `GuildUpSdg` (sondage, `/smb sondage`, `GuildUp_Sondage.lua`),
   `GuildUpJrn` (fil d'activité et podium, `GuildUp_Journal.lua` : les autres modules y notent leurs nouvelles avec
-  `ns.NoterActivite(genre, clé, valeur)`), `GuildUpSta` (statistiques de présence, `GuildUp_Stats.lua` : un relevé
+  `ns.NoterActivite(genre, clé, valeur)`), `GuildUpNpd` (mode calme « ne pas déranger », `GuildUp_Calme.lua` : `ns.NePasDeranger()` coupe les bulles dans
+  `ns.Notifier`, `ns.CalmeDe` / `ns.IconeCalme` pour l'afficher sur les autres membres),
+  `GuildUpSta` (statistiques de présence, `GuildUp_Stats.lua` : un relevé
   toutes les 10 min, partagé par le relais à la connexion), `GuildUpSvn` (carte des souvenirs, `GuildUp_Souvenirs.lua` :
   les grands moments de chacun, à sa position, gardés sans limite de durée, dessinés par `GuildUp_Carte.lua`),
   `GuildUpLay` (layers, `GuildUp_Layers.lua` : signature des GUID des PNJ observés, comparée entre membres de la

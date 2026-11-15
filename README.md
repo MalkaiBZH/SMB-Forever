@@ -164,6 +164,10 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   chaque addon connecté relève le nombre de membres en ligne (liste de guilde du jeu, addon ou pas) ; les relevés sont
   gardés 8 semaines et partagés entre membres à la connexion. Semaine type (grille jours × heures), cinq meilleurs
   créneaux, membres en ligne par jour sur 28 jours, courbe d'aujourd'hui.
+- **Ne pas déranger** (`/smb calme`, ou la case dans Options > Notifications) : coupe toutes les bulles de l'addon
+  quand on veut être tranquille ; `/smb calme 30` pour trente minutes seulement. À la sortie, un message dit ce qui a
+  été coupé (« 5 bulles : 2 demandes, 1 quête… ») ; rien n'est rejoué. Les autres membres voient une lune devant le
+  nom dans la page Guilde et une ligne dans l'infobulle. Le mode suit aussi le `/dnd` du jeu (désactivable).
 - **Événements** : les événements de la guilde et tes invitations des 30 prochains jours, groupés par jour
   (Aujourd'hui, Demain…), avec l'heure, le type (donjon ou raid), l'organisateur, le nombre d'inscrits et ton
   état en couleur. À droite, le détail (description, inscrits avec leur classe et leur état) et les réponses :
@@ -204,6 +208,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 | `/smb nouveautes` | Nouveautés de la version |
 | `/smb on` / `off` | Activer / couper les bannières |
 | `/smb bouton` | Afficher / cacher le médaillon GuildUpSMB |
+| `/smb calme [minutes]` | Ne pas déranger : couper les bulles, la guilde le voit |
 | `/smb noms` | Nom et guilde des autres joueurs |
 | `/smb objectifs` | « ! » sur les ennemis de quête |
 | `/smb lueur` | Lueur derrière la bannière de la cible |

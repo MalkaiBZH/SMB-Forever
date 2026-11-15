@@ -18,6 +18,8 @@
 -- sans l'addon ou en retard : un message privé court et poli (SendChatMessage, WHISPER), une fois
 -- toutes les 10 min au plus par joueur (heure du dernier rappel gardée dans GuildUpDB.rappels).
 -- Données lues ailleurs : ns.RosterGuilde() et ns.FicheMetiers() (GuildUp_Metiers.lua), ns.Identite()
+-- Une lune devant le nom (et une ligne dans l'infobulle) : membre en mode calme (ns.CalmeDe,
+-- ns.IconeCalme, GuildUp_Calme.lua) — inutile de le déranger, ses bulles sont coupées.
 -- et ns.LignesIdentite() (GuildUp_Identite.lua), ns.RoleDeNom() (GuildUp.lua), ns.PositionsMembres()
 -- (GuildUp_Carte.lua), ns.DistanceMembre() (GuildUp_Interface.lua), ns.VersionMembre() si
 -- GuildUp_Version.lua la fournit. « Avec l'addon » = un signe de SMB Forever reçu de ce joueur (version,
@@ -432,6 +434,9 @@ local function Infobulle(self)
 		tt:AddLine("|cffffd100Principal :|r " .. NomCourt(m.principal), 1, 1, 1)
 	end
 	if m.role then tt:AddLine("|cffffd100Rôle :|r " .. UI.TexteRole(m.role), 1, 1, 1) end
+	if ns.CalmeDe and ns.CalmeDe(m.cle) then
+		tt:AddLine((ns.IconeCalme(m.cle) or "") .. " Ne pas déranger : les bulles de l'addon sont coupées", 0.75, 0.72, 0.62)
+	end
 	-- SMB Forever (version : à jour, plus ancienne ou plus récente que la mienne ; date si pas vue cette session)
 	if m.version then
 		local quand = (not m.versionSession and m.versionVue) and (" |cff9c9380(vue " .. UI.IlYa(m.versionVue) .. ")|r") or ""
@@ -583,7 +588,8 @@ local function Remplir(r, m)
 	r.portrait:SetAlpha(m.enLigne and 1 or 0.45)
 	r.point:SetShown(m.enLigne)
 	-- ligne 1 : nom, niveau, pseudo, rôle, statut
-	local l1 = CouleurClasseTexte(e.classe) .. NomJoueur(m.nom) .. "|r"
+	local calme = ns.IconeCalme and ns.IconeCalme(m.cle) or ""
+	local l1 = (calme ~= "" and (calme .. " ") or "") .. CouleurClasseTexte(e.classe) .. NomJoueur(m.nom) .. "|r"
 		.. "  " .. GRIS .. "niv. " .. tostring(e.niveau or "?") .. "|r"
 	if m.role then l1 = l1 .. "  " .. UI.TexteRole(m.role) end
 	if m.moi then l1 = l1 .. "  " .. GRIS .. "(toi)|r" end
