@@ -1,3 +1,6 @@
 outils/cache/
 __pycache__/
 outils/MiseAJour/*.exe
+# anciennes copies des images, laissées par un éditeur : inutiles dans le dépôt
+*.bak
+*.previous
