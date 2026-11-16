@@ -135,8 +135,11 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "5.1.0", "5.0.0", "4.3.2", "4.3.1", "4.3.0", "4.2.0", "4.1.0", "4.0.6", "4.0.5", "4.0.4", "4.0.3", "4.0.2", "4.0.1", "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "5.1.1", "5.1.0", "5.0.0", "4.3.2", "4.3.1", "4.3.0", "4.2.0", "4.1.0", "4.0.6", "4.0.5", "4.0.4", "4.0.3", "4.0.2", "4.0.1", "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["5.1.1"] = {
+		"|cffffd100Montée de niveau|r : l'anneau doré autour du portrait est plus grand, il entoure maintenant tout le dessin au lieu de passer dessus.",
+	},
 	["5.1.0"] = {
 		"|cffffd100Bizkit|r : le bouton |cffffd100Bizkit !|r est maintenant toujours là, à côté de « Lancer les dés ». Sur un 7, tout le monde clique, le lanceur aussi, dans n'importe quel ordre : le dernier perd un point. Mais attention, cliquer quand les dés ne font pas 7 coûte un point !",
 		"Plus de 7 attaques sur un même joueur : celles que personne d'autre ne peut plus recevoir, c'est pour toi. Et le vecteur ne touche un joueur seul que s'il arrive vraiment près de lui ; sinon, dégâts de zone.",

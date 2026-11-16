@@ -227,13 +227,15 @@ local function Creer()
 	f.cadrePortrait:SetSize(PORTRAIT, PORTRAIT)
 	f.fondPortrait = f.cadrePortrait:CreateTexture(nil, "BORDER")
 	f.fondPortrait:SetTexture(ROND)
-	f.fondPortrait:SetSize(PORTRAIT * 0.9, PORTRAIT * 0.9)
+	f.fondPortrait:SetSize(PORTRAIT * 1.06, PORTRAIT * 1.06) -- (remplit l'intérieur de l'anneau)
 	f.fondPortrait:SetPoint("CENTER")
 	f.fondPortrait:SetVertexColor(0.12, 0.09, 0.06, 1)
 	f.imagePortrait = f.cadrePortrait:CreateTexture(nil, "ARTWORK")
 	f.anneauPortrait = f.cadrePortrait:CreateTexture(nil, "OVERLAY")
 	f.anneauPortrait:SetTexture(ANNEAU)
-	f.anneauPortrait:SetSize(PORTRAIT * 1.02, PORTRAIT * 1.02)
+	-- (le trait de media\anneau.tga va de 88 % à 98 % de l'image ; le dessin des portraits déborde du disque
+	-- jusqu'à environ 76 px du centre, sur les côtés et en bas : l'intérieur de l'anneau passe à 78 px)
+	f.anneauPortrait:SetSize(PORTRAIT * 1.18, PORTRAIT * 1.18)
 	f.anneauPortrait:SetPoint("CENTER")
 	f.anneauPortrait:SetVertexColor(1, 0.8, 0.25, 1)
 	f.cadrePortrait:Hide()
@@ -373,7 +375,8 @@ local function Animer(f)
 	c:ClearAllPoints()
 	c:SetPoint("CENTER", f.centre, "CENTER", 0, 30 / s)
 	c:Show()
-	local yNom, yNiveau = 30 - PORTRAIT / 2 - 42, 30 - PORTRAIT / 2 - 100
+	-- (sous l'anneau doré, qui dépasse le portrait de 13 px)
+	local yNom, yNiveau = 30 - PORTRAIT / 2 - 54, 30 - PORTRAIT / 2 - 112
 
 	-- le nom s'écrase, en arc-en-ciel
 	Placer(f.cadreNom, f, Ecrase(b), yNom)
