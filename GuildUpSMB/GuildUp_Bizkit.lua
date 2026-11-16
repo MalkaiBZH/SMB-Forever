@@ -43,7 +43,9 @@
 -- point. Chacun fait le calcul avec les positions des dés reçues : tous trouvent les mêmes.
 -- Un lancer en rappel (« ~1 ») ne change ni les prisons ni les points.
 -- Affichage : tant que les dés roulent, la page montre l'état d'avant le lancer (points, prisons, derniers
--- lancers, effets) ; le résultat n'apparaît qu'une fois les dés posés. Les points perdus depuis le dernier
+-- lancers, effets) ; les dés se montrent une fois posés, et les effets du lancer (points, prisons, lignes
+-- d'effets, vecteur) DELAI_EFFETS secondes plus tard, pour tous les lancers : le 7 est le seul lancer sans
+-- effet, son absence d'effet ne doit pas le trahir avant que chacun ait pu lire les dés. Les points perdus depuis le dernier
 -- lancer restent affichés sur la place de chacun (« -2 ») jusqu'au lancer suivant. Chaque cri « Bizkit ! »
 -- fait apparaître une bulle au-dessus de la place du joueur qui a cliqué.
 -- La page : l'état (à qui le tour, mes attaques, mon cri, avec le temps qui reste) dans l'en-tête ; les deux
@@ -95,6 +97,8 @@ local HISTORIQUE = 14        -- lancers et Bizkit gardés dans la liste
 local REPRISE = 10 * 60      -- après un /reload ou une reconnexion, je reprends ma place si je l'ai quittée depuis moins que ça
 local DUREE_ROULE = 0.9      -- secondes de l'animation des dés
 local DUREE_BULLE = 4        -- secondes de la bulle « Bizkit ! » au-dessus du joueur qui crie
+local DELAI_EFFETS = 1.5     -- secondes, après que les dés se posent, avant de montrer les effets du lancer
+                             -- (pour tous les lancers : un 7, seul lancer sans effet, ne doit pas se voir à ça)
 local MEDIA = "Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\"
 local TABLE = MEDIA .. "table_des"
 local FACE = MEDIA .. "de"   -- de1 à de6
@@ -146,9 +150,12 @@ local function Son(nom) if ns.Son then ns.Son(nom) end end
 -- les dés roulent encore à l'écran : rien du résultat ne doit se voir
 local function DesEnRoute() return GetTime() < finRoule end
 
--- fn tout de suite, ou quand les dés sont posés
-local function ApresRoule(fn)
-	local reste = finRoule - GetTime()
+-- les effets du lancer ne se montrent pas encore (dés qui roulent, puis DELAI_EFFETS)
+local function EffetsCaches() return GetTime() < finRoule + DELAI_EFFETS end
+
+-- fn tout de suite, ou quand les effets du lancer se montrent
+local function ApresEffets(fn)
+	local reste = finRoule + DELAI_EFFETS - GetTime()
 	if reste > 0 and C_Timer then C_Timer.After(reste, fn) else fn() end
 end
 
@@ -276,7 +283,7 @@ local function Retirer(cle, n)
 	if cle == MaCle() then
 		local mienne = PlaceDe(cle)
 		if mienne then NoterMaPlace(mienne) end
-		ApresRoule(function() Son("IG_QUEST_FAILED") end)
+		ApresEffets(function() Son("IG_QUEST_FAILED") end)
 	end
 end
 
@@ -1032,7 +1039,7 @@ local function CreerPlace(parent, i)
 		else
 			GameTooltip:SetText(NomJoueur(cle))
 			-- (les dés roulent : rien du résultat, comme sur la table)
-			local masque = DesEnRoute() and avant
+			local masque = EffetsCaches() and avant
 			local pts = masque and (masque.points[cle] or POINTS_DEPART) or Points(cle)
 			GameTooltip:AddLine(("%d point%s"):format(pts, pts > 1 and "s" or ""), 1, 1, 1)
 			if not masque and pertes[cle] then
@@ -1365,7 +1372,9 @@ local function AnimerDes(f, l, instantane)
 			self.roule = nil
 			if not r.instantane then
 				Son("U_CHAT_SCROLL_BUTTON")
-				Maj() -- (le résultat se montre dès que les dés sont posés)
+				-- (les dés se montrent dès qu'ils sont posés, leurs effets DELAI_EFFETS plus tard)
+				Maj()
+				if C_Timer then C_Timer.After(DELAI_EFFETS + 0.05, function() Maj() end) end
 			end
 		end
 	end
@@ -1398,7 +1407,7 @@ Toucher = function(cle, n)
 	local p = PlaceDe(cle)
 	local b = p and t.places[p]
 	if not b then return end
-	local debut = math.max(GetTime(), finRoule)
+	local debut = math.max(GetTime(), finRoule + DELAI_EFFETS)
 	if b.perteDebut and debut - b.perteDebut < 0.5 then
 		b.perteN = b.perteN + n
 	else
@@ -1502,9 +1511,15 @@ local function SousLigne(f, i)
 end
 
 -- Effets à montrer pour un lancer : tant que les dés roulent, seulement ceux d'avant (voir Animer)
-local function EffetsVus(l, masque)
+local function EffetsVus(l, cache)
 	local n = #l.effets
-	if masque and l == masque.lancer then n = math.min(n, masque.nEffets or 0) end
+	if cache then
+		if l == cache.lancer then
+			n = math.min(n, cache.nEffets or 0)
+		elseif l == dernierLancer then
+			n = 0
+		end
+	end
 	return n
 end
 
@@ -1560,10 +1575,12 @@ Maj = function()
 	local tour = PlaceDuTour()
 	-- les dés roulent : l'état d'avant le lancer (voir Animer), rien de son résultat
 	local masque = DesEnRoute() and avant
-	local PointsVus = masque and function(cle) return masque.points[cle] or POINTS_DEPART end or Points
-	local pertesVues = masque and masque.pertes or pertes
+	-- puis, dés posés, ses effets attendent encore DELAI_EFFETS (points, prisons, lignes d'effets, vecteur)
+	local cache = EffetsCaches() and avant
+	local PointsVus = cache and function(cle) return cache.points[cle] or POINTS_DEPART end or Points
+	local pertesVues = cache and cache.pertes or pertes
 	local prisonVue, cranVu, prison5Vue = prison, cran, prison5
-	if masque then prisonVue, cranVu, prison5Vue = masque.prison, masque.cran, masque.prison5 end
+	if cache then prisonVue, cranVu, prison5Vue = cache.prison, cache.cran, cache.prison5 end
 
 	-- les places
 	local distribue = JeDistribue() and not masque
@@ -1621,9 +1638,9 @@ Maj = function()
 	-- les dés du dernier lancer (sans animation en cours)
 	if dernierLancer and not t.roule and not t.des[1]:IsShown() then AnimerDes(t, dernierLancer, true) end
 
-	-- le vecteur du dernier lancer, une fois les dés posés : un point tous les 9 pixels
+	-- le vecteur du dernier lancer, une fois ses effets montrés : un point tous les 9 pixels
 	local tr = dernierLancer and dernierLancer.trace
-	if tr and not t.roule then
+	if tr and not t.roule and not cache then
 		local dx, dy = tr.px - tr.ox, tr.py - tr.oy
 		local n = math.min(#t.points, math.floor(math.sqrt(dx * dx + dy * dy) / 9))
 		for k, pt in ipairs(t.points) do
@@ -1736,8 +1753,8 @@ Maj = function()
 		bo.de2:Show()
 		bo.par:SetText("par |cffe8e2d4" .. NomJoueur(l.qui) .. "|r")
 		local liste = {}
-		for k = 1, EffetsVus(l, masque) do liste[#liste + 1] = l.effets[k] end
-		if a and not masque and a.id == l.id and not a.envoye then
+		for k = 1, EffetsVus(l, cache) do liste[#liste + 1] = l.effets[k] end
+		if a and not cache and a.id == l.id and not a.envoye then
 			local txt = ChoixEnAttente() and "double 6 : 6 attaques ou relance"
 				or (AttaquesConnues() and ("%d attaques à distribuer"):format(a.n)) or "relance…"
 			liste[#liste + 1] = { k = "att", cle = a.qui, texte = txt, enCours = true }
@@ -1786,7 +1803,7 @@ Maj = function()
 		ligne:Show()
 		local haut = y
 		y = y + HAUT_LIGNE
-		for k = 1, EffetsVus(h, masque) do
+		for k = 1, EffetsVus(h, cache) do
 			nS = nS + 1
 			local sous = SousLigne(cote, nS)
 			sous:ClearAllPoints()

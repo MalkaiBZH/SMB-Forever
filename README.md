@@ -153,7 +153,8 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
     du jeu, lus par l'addon. Tout le monde voit les dés partir de la place du lanceur et se poser au hasard sur le
     tapis, entre les joueurs. Sous la table, la case « Ce lancer » montre les dés, le lanceur et une ligne par effet
     (qui perd combien, et pourquoi) ; à droite, les derniers lancers, chacun avec ses effets ; en haut, à qui le
-    tour, avec le temps qui reste. Rien ne trahit un 7 : la somme du lancer en cours n'est pas affichée, et la page
+    tour, avec le temps qui reste. Rien ne trahit un 7 : la somme du lancer en cours n'est pas affichée, les effets
+    de chaque lancer n'apparaissent que 1,5 s après que les dés se sont posés, et la page
     s'ouvre (hors combat) à chaque lancer chez les joueurs assis. Chacun commence avec 30 points ; un
     point perdu fait monter « -1 » au-dessus du joueur et rougir son portrait, puis reste affiché à côté de lui
     jusqu'au lancer suivant ; le résultat d'un lancer ne s'affiche qu'une fois les dés posés. Le bouton « Bizkit ! », à côté de
