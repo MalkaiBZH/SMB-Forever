@@ -1,6 +1,7 @@
 -- GuildUpSMB : le Bizkit, jeu de dés de la guilde (onglet « Bizkit » de la page Jeux, /smb bizkit, préfixe "GuildUpBzk").
 -- Une table ovale pour toute la guilde, huit places autour. Un membre clique sur une place libre pour
--- s'asseoir (ou changer de place), « Quitter la table » pour se lever. Chacun commence avec POINTS_DEPART points.
+-- s'asseoir (ou changer de place), « Quitter la table » pour se lever. Chacun a son compteur de coups : 0 au départ,
+-- il ne fait que monter (seule une nouvelle partie le remet à 0).
 -- Chacun son tour, dans l'ordre des places (sens des aiguilles d'une montre), le joueur lance deux dés :
 -- l'addon fait deux /roll 1-6 du jeu (le hasard vient du serveur, les joueurs à côté le voient passer dans
 -- leur discussion), lit les deux résultats (ns.LireMonJet de GuildUp_Tirage.lua) et les envoie à la guilde avec
@@ -9,44 +10,44 @@
 -- Le Bizkit : le bouton « Bizkit ! » est toujours là, à côté de « Lancer les dés », et ne change pas
 -- d'aspect (rien ne trahit un 7). Un clic crie « Bizkit ! » dans la discussion de guilde. Quand les dés font
 -- 7, tous les joueurs assis doivent cliquer, le lanceur comme les autres, dans n'importe quel ordre : le
--- dernier perd un point. Dès qu'il ne reste qu'un joueur qui n'a pas cliqué, c'est lui le dernier : il perd
--- sans attendre (seul à la table, il est le dernier). Ceux qui n'ont pas cliqué au bout de DELAI_COURSE
--- secondes perdent tous (c'est le lanceur qui l'annonce, « P »). Un clic alors que les dés posés ne font pas
--- 7 coûte un point (une fois par lancer). Le bouton attend que les dés soient posés. Pendant un Bizkit,
+-- dernier prend un coup. Dès qu'il ne reste qu'un joueur qui n'a pas cliqué, c'est lui le dernier : il prend
+-- son coup sans attendre (seul à la table, il est le dernier). Ceux qui n'ont pas cliqué au bout de DELAI_COURSE
+-- secondes prennent tous un coup (c'est le lanceur qui l'annonce, « P »). Un clic alors que les dés posés ne font pas
+-- 7 coûte un coup (une fois par lancer). Le bouton attend que les dés soient posés. Pendant un Bizkit,
 -- personne ne lance ; ensuite le tour passe au joueur suivant.
 -- La prison de 3 : un lancer qui fait 3 (1 + 2) envoie le lanceur en prison de 3, et en fait sortir celui qui
 -- y était (un seul prisonnier à la fois). À chaque lancer, de n'importe quel joueur (le prisonnier compris),
--- chaque dé qui montre un 3 enlève un point au prisonnier : deux points sur un double 3. Le prisonnier qui
+-- chaque dé qui montre un 3 donne un coup au prisonnier : deux coups sur un double 3. Le prisonnier qui
 -- refait 3 monte d'un cran (PRISONS : La Prison, Prison du cuirassé,
 -- Donjon de Fort-de-Durn, Prison d'Alcaz) et chaque 3 lui coûte alors
--- autant de points que le numéro du cran (2, 3, 4, 5) ; au dernier cran, il y reste. Quand un autre joueur
+-- autant de coups que le numéro du cran (2, 3, 4, 5) ; au dernier cran, il y reste. Quand un autre joueur
 -- fait 3, le prisonnier sort, quel que soit le cran, et le nouveau entre au premier (prison de 3). Le
 -- prisonnier qui se lève reste en prison : seul un autre 3 l'en fait sortir.
 -- La prison de 5 : un lancer qui fait 5 envoie le lanceur en prison de 5 si elle est vide (un seul
--- prisonnier de 5 à la fois). Tant qu'il y est, chaque 5 d'un autre joueur lui coûte un point, et ce joueur
+-- prisonnier de 5 à la fois). Tant qu'il y est, chaque 5 d'un autre joueur lui coûte un coup, et ce joueur
 -- reste libre. Le prisonnier de 5 en sort en refaisant 5 à son tour. Elle est indépendante de la prison de 3
 -- (on peut être dans les deux), et le prisonnier de 5 qui se lève y reste aussi.
 -- Les doubles : le lanceur distribue autant d'attaques que la valeur du dé (double 1 : 7 attaques) aux autres
 -- joueurs assis, comme il veut (clic sur une place : une attaque, clic droit : en retirer une) ; chaque
--- attaque coûte un point. Double 6 : au choix, 6 attaques, ou une relance dont la somme des dés donne le
+-- attaque coûte un coup. Double 6 : au choix, 6 attaques, ou une relance dont la somme des dés donne le
 -- nombre d'attaques (la relance ne déclenche aucune autre règle). Au plus MAX_PAR_JOUEUR attaques sur un
 -- même joueur : celles que personne d'autre ne peut plus recevoir, le lanceur se les met à lui-même (seul à
 -- la table : toutes). Il a DELAI_ATTAQUE secondes : ensuite, les attaques déjà placées partent (et celles
 -- pour lui), les autres sont perdues. Pendant les attaques, personne ne lance.
 -- Le 9, le 10 et le 11 (somme des dés) : 9, le joueur assis avant le lanceur (celui qui a joué avant lui)
--- perd un point ; 10, le lanceur perd un point ; 11, le joueur assis après lui perd un point. Seul à la
+-- prend un coup ; 10, le lanceur prend un coup ; 11, le joueur assis après lui prend un coup. Seul à la
 -- table, le 9 et le 11 ne coûtent rien.
 -- Le vecteur : un lancer qui n'est pas un double et dont la somme ne déclenche rien (4, 6 ou 8 ; un dé qui
 -- montre un 3 et coûte au prisonnier de 3 ne compte pas comme un effet) trace une ligne du plus petit dé vers
 -- le plus grand : si son point d'arrivée tombe près d'un joueur assis (moins de TOUCHE pixels, le lanceur
--- compris), ce joueur perd un point ; sinon, dégâts de zone : les deux joueurs les plus proches perdent un
--- point. Chacun fait le calcul avec les positions des dés reçues : tous trouvent les mêmes.
--- Un lancer en rappel (« ~1 ») ne change ni les prisons ni les points.
--- Affichage : tant que les dés roulent, la page montre l'état d'avant le lancer (points, prisons, derniers
--- lancers, effets) ; les dés se montrent une fois posés, et les effets du lancer (points, prisons, lignes
+-- compris), ce joueur prend un coup ; sinon, dégâts de zone : les deux joueurs les plus proches prennent un
+-- coup. Chacun fait le calcul avec les positions des dés reçues : tous trouvent les mêmes.
+-- Un lancer en rappel (« ~1 ») ne change ni les prisons ni les coups.
+-- Affichage : tant que les dés roulent, la page montre l'état d'avant le lancer (coups, prisons, derniers
+-- lancers, effets) ; les dés se montrent une fois posés, et les effets du lancer (coups, prisons, lignes
 -- d'effets, vecteur) DELAI_EFFETS secondes plus tard, pour tous les lancers : le 7 est le seul lancer sans
--- effet, son absence d'effet ne doit pas le trahir avant que chacun ait pu lire les dés. Les points perdus depuis le dernier
--- lancer restent affichés sur la place de chacun (« -2 ») jusqu'au lancer suivant. Chaque cri « Bizkit ! »
+-- effet, son absence d'effet ne doit pas le trahir avant que chacun ait pu lire les dés. Les coups pris depuis le dernier
+-- lancer restent affichés sur la place de chacun (« +2 ») jusqu'au lancer suivant. Chaque cri « Bizkit ! »
 -- fait apparaître une bulle au-dessus de la place du joueur qui a cliqué.
 -- La page : l'état (à qui le tour, mes attaques, mon cri, avec le temps qui reste) dans l'en-tête ; les deux
 -- prisons en cachots dans les coins du haut (prisonnier, crans) ; sous la table, la case « Ce lancer » (dés,
@@ -60,30 +61,35 @@
 -- des cris est celui de leur arrivée.
 --   "A~place"                   je m'assois à cette place (1 à 8) ; déjà assis ailleurs : je change de place
 --   "A~place~derniere~points~prisonnier~cran~prisonnier5"  réponse à « Q » ou retour après un /reload : ma
---                               place, la place du dernier lanceur que je connais (ou vide), mes points, la clé
+--                               place, la place du dernier lanceur que je connais (ou vide), mes points à
+--                               l'ancienne (ANCIEN_DEPART moins mes coups, pas sous 0 : pour les versions d'avant
+--                               les coups, qui partaient de ANCIEN_DEPART points ; suivi de « C »), la clé
 --                               du prisonnier de 3 et son cran (1 à 5), la clé du prisonnier de 5 (vides s'il n'y
 --                               en a pas) ; adoptés par qui ne les connaît pas
 --   "D"                         je me lève
 --   "L~id~d1~d2~x1~y1~a1~x2~y2~a2[~1]"  mon lancer : id = heure du serveur en base 36 ; d1, d2 de 1 à 6 ;
 --                               x, y de 0 à 200 (100 = centre du tapis) ; a = angle du dé en degrés ;
---                               « ~1 » = rappel pour qui vient d'ouvrir la table (ni Bizkit, ni prison, ni points)
+--                               « ~1 » = rappel pour qui vient d'ouvrir la table (ni Bizkit, ni prison, ni coups)
 --   "B~id"                      je crie « Bizkit ! » (id = celui du lancer qui a fait 7)
---   "P~id~clé,clé…"             le lanceur annonce ceux qui n'ont pas crié à temps : ils perdent un point
+--   "P~id~clé,clé…"             le lanceur annonce ceux qui n'ont pas crié à temps : ils prennent un coup
 --   "R~id~d1~d2~x1~y1~a1~x2~y2~a2"  relance d'un double 6 (id = celui du double) : la somme = les attaques
---   "T~id~clé:n,clé:n…"         mes attaques (id = celui du double) : chaque joueur cité perd n points
---   "N"                         nouvelle partie : tous les joueurs repartent à POINTS_DEPART points, prison vide
---   "Q"                         j'ouvre la table : les membres assis renvoient « A~place~derniere~points », et
+--   "T~id~clé:n,clé:n…"         mes attaques (id = celui du double) : chaque joueur cité prend n coups
+--   "C~n"                       mes coups, juste après « A » (adoptés par qui ne les connaît pas, ou ne les
+--                               connaît que par le champ « points » de « A » ; les versions d'avant l'ignorent)
+--   "N"                         nouvelle partie : tous les joueurs repartent à 0 coup, prisons vides
+--   "Q"                         j'ouvre la table : les membres assis renvoient « A~place~derniere~points » et
+--                               « C~coups », et
 --                               l'auteur du dernier lancer le renvoie en rappel (même id : déjà vu, ignoré)
 -- C'est au tour du joueur assis après le dernier lanceur ; sans lancer connu, de la première place occupée.
 -- Un joueur qui tarde (TARDE secondes) peut être sauté : le suivant peut lancer à sa place. Les places des
--- membres déconnectés sont libérées. Ma place et mes points sont notés dans GuildUpDB (db.bizkit) pour les
+-- membres déconnectés sont libérées. Ma place et mes coups sont notés dans GuildUpDB (db.bizkit) pour les
 -- reprendre après un /reload ; le reste n'est pas gardé d'une session à l'autre.
 
 local NOM_ADDON, ns = ...
 
 local PREFIXE = "GuildUpBzk"
 local PLACES = 8
-local POINTS_DEPART = 30
+local ANCIEN_DEPART = 30     -- avant les coups, chacun partait de 30 points (champ « points » de « A »)
 -- les crans de la prison : un prisonnier qui refait 3 monte d'un cran ; chaque 3 coûte le numéro du cran
 -- (les prisons du jeu, d'après la table des lieux du client : AreaTable 717, 515, 275, 16620)
 local PRISONS = { "Prison de 3", "La Prison", "Prison du cuirassé", "Donjon de Fort-de-Durn", "Prison d'Alcaz" }
@@ -120,7 +126,8 @@ local Base36 = ns.Base36
 local Erreur = ns.Erreur
 
 local places = {}            -- [place] = clé du membre assis
-local points = {}            -- [clé] = points du joueur (gardés s'il se lève, pour la session)
+local coups = {}             -- [clé] = coups pris par le joueur (gardés s'il se lève, pour la session)
+local devines = {}           -- [clé] = vrai : ses coups ne viennent que du champ « points » de « A » (en attente de « C »)
 local derniere               -- place du dernier lanceur (le tour passe au suivant)
 local dernierLancer          -- le dernier lancer reçu (voir Recevoir, genre « L »)
 local historique = {}        -- lancers et Bizkit, le plus récent en premier
@@ -134,13 +141,13 @@ local debutTour = 0
 local attente                -- { limite, valeurs } : j'ai lancé, j'attends mes deux /roll
 local demande = false        -- « Q » déjà envoyé cette session
 local vue                    -- l'onglet (créé à la première ouverture)
-local pertes = {}            -- [clé] = points perdus depuis le dernier lancer (affichés sur sa place jusqu'au suivant)
+local pertes = {}            -- [clé] = coups pris depuis le dernier lancer (affichés sur sa place jusqu'au suivant)
 local cris = {}              -- [clé] = GetTime() de son dernier cri « Bizkit ! » (bulle au-dessus de sa place)
 local finRoule = 0           -- GetTime() où les dés qui roulent à l'écran se posent
 local avant                  -- l'état d'avant ce lancer, affiché tant que les dés roulent (voir Animer)
 local Maj = function() end
 local Animer = function() end
-local Toucher = function() end -- (animation des points perdus sur la place du joueur)
+local Toucher = function() end -- (animation des coups pris sur la place du joueur)
 
 local function DB() return (ns.DB and ns.DB()) or {} end
 -- (jamais en fond : la voie lente du réseau ne renvoie pas un message identique, or « A~3 » peut revenir)
@@ -160,7 +167,7 @@ local function ApresEffets(fn)
 end
 
 --------------------------------------------------------------------------------
--- Places, points et tour de jeu
+-- Places, coups et tour de jeu
 --------------------------------------------------------------------------------
 
 local function PlaceDe(cle)
@@ -178,7 +185,7 @@ local function Assis()
 	return n
 end
 
-local function Points(cle) return points[cle] or POINTS_DEPART end
+local function Coups(cle) return coups[cle] or 0 end
 
 -- la première place occupée après la place p, dans l'ordre des places (p elle-même en dernier)
 local function Suivante(p)
@@ -270,14 +277,17 @@ local function PeutLancer(malgreBizkit)
 	return tour == mienne or (tarde and Suivante(tour) == mienne)
 end
 
--- ma place et mes points, pour les reprendre après un /reload
+-- ma place et mes coups, pour les reprendre après un /reload
 local function NoterMaPlace(place)
-	DB().bizkit = place and { place = place, quand = ns.Maintenant(), points = Points(MaCle()) } or nil
+	DB().bizkit = place and { place = place, quand = ns.Maintenant(), coups = Coups(MaCle()) } or nil
 end
 
--- n points en moins pour ce joueur (jamais sous zéro)
-local function Retirer(cle, n)
-	points[cle] = math.max(0, Points(cle) - n)
+-- « A » : mes points à l'ancienne, pour les versions d'avant les coups
+local function AnciensPoints(cle) return math.max(0, ANCIEN_DEPART - Coups(cle)) end
+
+-- n coups de plus pour ce joueur
+local function Encaisser(cle, n)
+	coups[cle] = Coups(cle) + n
 	pertes[cle] = (pertes[cle] or 0) + n
 	Toucher(cle, n)
 	if cle == MaCle() then
@@ -293,7 +303,7 @@ local function Noter(entree)
 end
 
 -- Un effet du dernier lancer, pour la case « Ce lancer » et le journal de droite : k = genre (couleur de
--- la ligne : p3, p5, sortie, somme, vec, att, bz, info), cle = joueur concerné (ou rien), n = points perdus
+-- la ligne : p3, p5, sortie, somme, vec, att, bz, info), cle = joueur concerné (ou rien), n = coups pris
 -- (ou rien), texte = la raison. Sans lancer connu, la ligne attend le prochain (infoSeule).
 local infoSeule
 local function Effet(k, cle, n, texte)
@@ -319,10 +329,10 @@ local function NouveauBizkit(l)
 	bizkit = b
 end
 
--- fin du Bizkit : chaque perdant perd un point (raison : « dernier au Bizkit », « pas crié à temps »)
+-- fin du Bizkit : chaque perdant prend un coup (raison : « dernier au Bizkit », « pas crié à temps »)
 local function FinBizkit(perdants, raison)
 	for _, cle in ipairs(perdants) do
-		Retirer(cle, 1)
+		Encaisser(cle, 1)
 		Effet("bz", cle, 1, raison)
 	end
 	if #perdants == 0 then Effet("info", nil, nil, "Bizkit annulé") end
@@ -478,11 +488,11 @@ local function Relancer()
 	Maj()
 end
 
--- fin des attaques : chaque cible perd ses points
+-- fin des attaques : chaque cible prend ses coups
 local function FinAttaque(cibles)
 	local a = attaque
 	for _, c in ipairs(cibles) do
-		Retirer(c.cle, c.n)
+		Encaisser(c.cle, c.n)
 		Effet("att", c.cle, c.n, c.cle == a.qui and "ses propres attaques" or ("attaque de " .. NomJoueur(a.qui)))
 	end
 	if #cibles == 0 then Effet("info", a.qui, nil, "n'attaque personne") end
@@ -508,7 +518,7 @@ end
 local confirmeNouvelle = 0
 local function NouvellePartie()
 	if not PlaceDe(MaCle()) then return end
-	-- deux clics à moins de 3 s : on ne remet pas les points de tout le monde à zéro par erreur
+	-- deux clics à moins de 3 s : on ne remet pas les coups de tout le monde à zéro par erreur
 	if GetTime() - confirmeNouvelle > 3 then
 		confirmeNouvelle = GetTime()
 		Maj()
@@ -599,7 +609,11 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		if avant and avant ~= place then places[avant] = nil end
 		places[place] = qui
 		pts = tonumber(pts)
-		if not points[qui] then points[qui] = pts and math.max(0, math.min(pts, 999)) or POINTS_DEPART end
+		if not coups[qui] then
+			-- (une version d'avant les coups n'envoie que ses points ; une récente envoie aussi « C »)
+			coups[qui] = pts and math.max(0, ANCIEN_DEPART - math.min(pts, ANCIEN_DEPART)) or 0
+			devines[qui] = pts and true or nil
+		end
 		if qui == moi then NoterMaPlace(place) end
 		dern = tonumber(dern)
 		if dern and not derniere and dern >= 1 and dern <= PLACES then derniere = dern end
@@ -655,11 +669,11 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		if not rappel then pertes = {} end -- (les pertes affichées sont celles de ce lancer)
 		Noter(l)
 		if not rappel then
-			-- chaque 3 sorti coûte au prisonnier autant de points que son cran
+			-- chaque 3 sorti coûte au prisonnier autant de coups que son cran
 			local trois = (d1 == 3 and 1 or 0) + (d2 == 3 and 1 or 0)
 			if trois > 0 and prison then
 				local perte = trois * cran
-				Retirer(prison, perte)
+				Encaisser(prison, perte)
 				Effet("p3", prison, perte, ("%s · %s"):format(trois > 1 and "deux 3 sortis" or "un 3 sorti",
 					cran > 1 and (PRISONS[cran] .. " ×" .. cran) or "prison de 3"))
 			end
@@ -675,7 +689,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 					Effet("p3", qui, nil, "entre en prison de 3")
 				end
 			end
-			-- prison de 5 : on y entre si elle est vide ; un 5 d'un autre coûte un point au prisonnier ; le
+			-- prison de 5 : on y entre si elle est vide ; un 5 d'un autre coûte un coup au prisonnier ; le
 			-- prisonnier en sort en refaisant 5
 			if d1 + d2 == 5 then
 				if not prison5 then
@@ -685,11 +699,11 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 					prison5 = nil
 					Effet("sortie", qui, nil, "sort de la prison de 5")
 				else
-					Retirer(prison5, 1)
+					Encaisser(prison5, 1)
 					Effet("p5", prison5, 1, "un 5 sorti · prison de 5")
 				end
 			end
-			-- le 9 : le joueur d'avant perd un point ; le 10 : le lanceur ; le 11 : le joueur d'après
+			-- le 9 : le joueur d'avant prend un coup ; le 10 : le lanceur ; le 11 : le joueur d'après
 			local somme = d1 + d2
 			if somme >= 9 and somme <= 11 then
 				local cible = qui
@@ -698,7 +712,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 					cible = voisin and voisin ~= p and places[voisin] or nil
 				end
 				if cible then
-					Retirer(cible, 1)
+					Encaisser(cible, 1)
 					Effet("somme", cible, 1, ({ [9] = "le 9 : joueur d'avant", [10] = "le 10 : le lanceur", [11] = "le 11 : joueur d'après" })[somme])
 				end
 			end
@@ -709,7 +723,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 				if vises then
 					l.trace = trace
 					for _, cle in ipairs(vises) do
-						Retirer(cle, 1)
+						Encaisser(cle, 1)
 						Effet("vec", cle, 1, #vises > 1 and "dégâts de zone du vecteur" or "touché par le vecteur")
 					end
 				end
@@ -780,11 +794,11 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			VerifierBizkit()
 			Maj()
 		elseif l.d1 + l.d2 ~= 7 then
-			-- faux Bizkit : les dés ne font pas 7, un point (une fois par lancer)
+			-- faux Bizkit : les dés ne font pas 7, un coup (une fois par lancer)
 			l.faux = l.faux or {}
 			if l.faux[qui] then return end
 			l.faux[qui] = true
-			Retirer(qui, 1)
+			Encaisser(qui, 1)
 			Effet("bz", qui, 1, "Bizkit pour rien")
 			Maj()
 		end
@@ -798,15 +812,23 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			if b.requis[cle] and not b.rang[cle] then perdants[#perdants + 1] = cle end
 		end
 		FinBizkit(perdants, "pas crié à temps")
+	elseif genre == "C" then
+		local n = tonumber(suite)
+		if not n or not PlaceDe(qui) then return end
+		if not coups[qui] or devines[qui] then
+			coups[qui] = math.max(0, math.min(math.floor(n), 99999))
+			devines[qui] = nil
+			Maj()
+		end
 	elseif genre == "N" then
 		if not PlaceDe(qui) then return end
-		for cle in pairs(points) do points[cle] = POINTS_DEPART end
+		coups, devines = {}, {}
 		historique = {}
 		pertes = {}
 		bizkit, attaque = nil, nil
 		prison, cran, prison5 = nil, 1, nil
 		if dernierLancer then dernierLancer.effets = {} end
-		Effet("info", qui, nil, ("nouvelle partie : tout le monde repart à %d points"):format(POINTS_DEPART))
+		Effet("info", qui, nil, "nouvelle partie : tout le monde repart à 0 coup")
 		if PlaceDe(moi) then NoterMaPlace(PlaceDe(moi)) end
 		Maj()
 	elseif genre == "Q" then
@@ -816,8 +838,9 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		-- après un délai au hasard, pour ne pas répondre tous en même temps
 		C_Timer.After(0.5 + math.random() * 2.5, function()
 			if PlaceDe(moi) ~= mienne then return end
-			Envoyer(("A~%d~%s~%d~%s~%s~%s"):format(mienne, derniere and tostring(derniere) or "", Points(moi), prison or "",
+			Envoyer(("A~%d~%s~%d~%s~%s~%s"):format(mienne, derniere and tostring(derniere) or "", AnciensPoints(moi), prison or "",
 				prison and tostring(cran) or "", prison5 or ""))
+			Envoyer("C~" .. Coups(moi))
 			if dernierLancer and dernierLancer.qui == moi then Envoyer(dernierLancer.brut) end
 		end)
 	end
@@ -894,7 +917,7 @@ local function CreerPlace(parent, i)
 	b.plus:SetPoint("CENTER", 0, 1)
 	b.plus:SetText("+")
 	b.plus:SetTextColor(unpack(C.orFonce))
-	-- jeton des points, à cheval sur le bas du portrait
+	-- jeton des coups, à cheval sur le bas du portrait
 	b.jeton = CreateFrame("Frame", nil, b, "BackdropTemplate")
 	UI.Habiller(b.jeton, C.bandeau, C.bordFort)
 	b.jeton:SetSize(26, 15)
@@ -940,7 +963,7 @@ local function CreerPlace(parent, i)
 	b.rang = b.dessus:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 	b.rang:SetPoint("LEFT", b, "RIGHT", 3, 0)
 	b.rang:SetTextColor(unpack(C.ors))
-	-- points perdus : un éclair rouge sur le portrait, et « -2 » qui monte et s'efface (voir Toucher)
+	-- coups pris : un éclair rouge sur le portrait, et « +2 » qui monte et s'efface (voir Toucher)
 	b.eclair = b.dessus:CreateTexture(nil, "ARTWORK")
 	b.eclair:SetTexture(UI.ROND)
 	b.eclair:SetAllPoints()
@@ -964,11 +987,11 @@ local function CreerPlace(parent, i)
 		self.perte:Show()
 		self.eclair:SetAlpha(math.max(0, 0.7 * (1 - t * 3)))
 	end
-	-- attaques que je lui donne pendant ma distribution (« -2 »), au milieu du portrait
+	-- attaques que je lui donne pendant ma distribution (« +2 »), au milieu du portrait
 	b.attaque = b.dessus:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
 	b.attaque:SetPoint("CENTER", b, "CENTER", 0, 0)
 	b.attaque:SetTextColor(1, 0.35, 0.3)
-	-- points perdus depuis le dernier lancer (« -2 »), à gauche du portrait, jusqu'au lancer suivant
+	-- coups pris depuis le dernier lancer (« +2 »), à gauche du portrait, jusqu'au lancer suivant
 	b.marque = CreateFrame("Frame", nil, b, "BackdropTemplate")
 	UI.Habiller(b.marque, { 0.33, 0.06, 0.04, 0.95 }, { 1, 0.3, 0.25, 1 })
 	b.marque:SetSize(30, 17)
@@ -1040,19 +1063,19 @@ local function CreerPlace(parent, i)
 			GameTooltip:SetText(NomJoueur(cle))
 			-- (les dés roulent : rien du résultat, comme sur la table)
 			local masque = EffetsCaches() and avant
-			local pts = masque and (masque.points[cle] or POINTS_DEPART) or Points(cle)
-			GameTooltip:AddLine(("%d point%s"):format(pts, pts > 1 and "s" or ""), 1, 1, 1)
+			local n = masque and (masque.coups[cle] or 0) or Coups(cle)
+			GameTooltip:AddLine(("%d coup%s"):format(n, n > 1 and "s" or ""), 1, 1, 1)
 			if not masque and pertes[cle] then
-				GameTooltip:AddLine(("-%d depuis le dernier lancer"):format(pertes[cle]), 1, 0.45, 0.4)
+				GameTooltip:AddLine(("+%d depuis le dernier lancer"):format(pertes[cle]), 1, 0.45, 0.4)
 			end
 			local pr, cr, pr5 = prison, cran, prison5
 			if masque then pr, cr, pr5 = masque.prison, masque.cran, masque.prison5 end
 			if cle == pr then
 				GameTooltip:AddLine(("%s : chaque 3 sorti lui coûte %s"):format(PRISONS[cr],
-					cr > 1 and (cr .. " points") or "un point"), 1, 0.45, 0.4, true)
+					cr > 1 and (cr .. " coups") or "un coup"), 1, 0.45, 0.4, true)
 			end
 			if cle == pr5 then
-				GameTooltip:AddLine("Prison de 5 : chaque 5 d'un autre joueur lui coûte un point ; refaire 5 l'en sort", 0.55, 0.75, 1, true)
+				GameTooltip:AddLine("Prison de 5 : chaque 5 d'un autre joueur lui coûte un coup ; refaire 5 l'en sort", 0.55, 0.75, 1, true)
 			end
 			if masque then
 				-- (ni attaques ni tour tant que les dés roulent)
@@ -1076,7 +1099,7 @@ local COULEURS_EFFETS = {
 local LARGEUR_GAUCHE = 124   -- case « Ce lancer » : largeur de la partie des dés
 local LIGNES_BOITE = 4       -- lignes d'effets dans la case (au-delà : voir le journal)
 
--- Une ligne d'effet : barre de couleur, (portrait,) « Nom · raison », points perdus à droite.
+-- Une ligne d'effet : barre de couleur, (portrait,) « Nom · raison », coups pris à droite.
 -- grande : la case « Ce lancer » (portrait, police normale) ; sinon le journal de droite.
 local function CreerLigneEffet(parent, grande)
 	local UI = ns.UI
@@ -1116,7 +1139,7 @@ local function CreerLigneEffet(parent, grande)
 			self.n:SetText("en cours")
 			self.n:SetTextColor(C.ors[1], C.ors[2], C.ors[3])
 		else
-			self.n:SetText(e.n and ("-" .. e.n) or "")
+			self.n:SetText(e.n and ("+" .. e.n) or "")
 			self.n:SetTextColor(1, 0.4, 0.33)
 		end
 		self:Show()
@@ -1196,12 +1219,12 @@ local function CreerCachot(f, titre, couleur, coin)
 		if coin == "TOPLEFT" then
 			if self.cle and self.nCran then
 				GameTooltip:AddLine(("%s : %s. Chaque 3 sorti lui coûte %s."):format(NomJoueur(self.cle), PRISONS[self.nCran],
-					self.nCran > 1 and (self.nCran .. " points") or "un point"), 1, 1, 1, true)
+					self.nCran > 1 and (self.nCran .. " coups") or "un coup"), 1, 1, 1, true)
 			end
 			GameTooltip:AddLine("Un 3 (1 + 2) y envoie le lanceur et en fait sortir le prisonnier. Le prisonnier qui refait 3 monte d'un cran (5 au plus).", 0.8, 0.8, 0.8, true)
 		else
 			if self.cle then GameTooltip:AddLine(NomJoueur(self.cle), 1, 1, 1) end
-			GameTooltip:AddLine("Un 5 y envoie le lanceur si elle est vide. Chaque 5 d'un autre joueur coûte un point au prisonnier, qui sort en refaisant 5.", 0.8, 0.8, 0.8, true)
+			GameTooltip:AddLine("Un 5 y envoie le lanceur si elle est vide. Chaque 5 d'un autre joueur coûte un coup au prisonnier, qui sort en refaisant 5.", 0.8, 0.8, 0.8, true)
 		end
 		GameTooltip:Show()
 	end)
@@ -1287,7 +1310,7 @@ local function CreerTable(parent)
 	f.crier = UI.Bouton(f, CRI, "aide", 110, 32)
 	f.crier:SetPoint("LEFT", f.lancer, "RIGHT", 8, 0)
 	f.crier:SetScript("OnClick", Crier)
-	UI.Infobulle(f.crier, CRI, "Sur un 7, tout le monde clique : le dernier perd un point. Un clic quand les dés ne font pas 7 coûte un point.")
+	UI.Infobulle(f.crier, CRI, "Sur un 7, tout le monde clique : le dernier prend un coup. Un clic quand les dés ne font pas 7 coûte un coup.")
 
 	-- sous la table, au-dessus des boutons : « Ce lancer », les dés et le lanceur à gauche, les effets à droite
 	f.boite = UI.Cadre(f, { 0.086, 0.071, 0.055, 1 }, C.bord)
@@ -1322,7 +1345,7 @@ local function CreerTable(parent)
 		bo.lignes[k] = ligne
 	end
 
-	-- animation des dés et des points perdus (le halo des places reste fixe : voir CreerPlace)
+	-- animation des dés et des coups pris (le halo des places reste fixe : voir CreerPlace)
 	local attenteMaj = 0
 	f:SetScript("OnUpdate", function(self, dt)
 		if self.roule then self:Rouler() end
@@ -1381,7 +1404,7 @@ local function AnimerDes(f, l, instantane)
 	f:Rouler()
 end
 
--- Appelé à la réception d'un lancer, avant ses effets : la page garde l'état d'avant (points, pertes,
+-- Appelé à la réception d'un lancer, avant ses effets : la page garde l'état d'avant (coups, pertes,
 -- prisons, derniers lancers) jusqu'à ce que les dés soient posés.
 Animer = function(l)
 	if not vue or not vue.table then return end
@@ -1389,16 +1412,16 @@ Animer = function(l)
 	local instantane = not vue:IsVisible()
 	if not instantane then
 		local p, perdu = {}, {}
-		for cle, n in pairs(points) do p[cle] = n end
+		for cle, n in pairs(coups) do p[cle] = n end
 		for cle, n in pairs(pertes) do perdu[cle] = n end
-		avant = { points = p, pertes = perdu, prison = prison, cran = cran, prison5 = prison5, entree = historique[1],
+		avant = { coups = p, pertes = perdu, prison = prison, cran = cran, prison5 = prison5, entree = historique[1],
 			lancer = dernierLancer, nEffets = dernierLancer and #dernierLancer.effets or 0 }
 		finRoule = GetTime() + DUREE_ROULE
 	end
 	AnimerDes(vue.table, l, instantane)
 end
 
--- un joueur perd n points : « -n » monte au-dessus de sa place, son portrait rougit. Si les dés roulent
+-- un joueur prend n coups : « +n » monte au-dessus de sa place, son portrait rougit. Si les dés roulent
 -- encore, l'animation attend qu'ils soient posés (rien n'est dévoilé avant) ; plusieurs pertes rapprochées
 -- s'additionnent.
 Toucher = function(cle, n)
@@ -1414,7 +1437,7 @@ Toucher = function(cle, n)
 		b.perteN = n
 	end
 	b.perteDebut = debut
-	b.perte:SetText("-" .. b.perteN)
+	b.perte:SetText("+" .. b.perteN)
 end
 
 --------------------------------------------------------------------------------
@@ -1446,19 +1469,19 @@ local function CreerCote(parent)
 	f.regles.texte:SetPoint("LEFT", 0, 0)
 	f.regles.texte:SetText("|cfff1cf6b?|r  Les règles du Bizkit (survol)")
 	UI.Infobulle(f.regles, "Les règles du Bizkit", table.concat({
-		("Chacun son tour lance deux dés. Départ : %d points."):format(POINTS_DEPART),
+		"Chacun son tour lance deux dés. Chaque joueur compte ses coups : 0 au départ, et ça ne fait que monter.",
 		"",
-		"|cffffd1007|r : tout le monde clique sur « Bizkit ! », le lanceur aussi, dans n'importe quel ordre. Le dernier perd un point. Cliquer quand les dés ne font pas 7 coûte un point.",
+		"|cffffd1007|r : tout le monde clique sur « Bizkit ! », le lanceur aussi, dans n'importe quel ordre. Le dernier prend un coup. Cliquer quand les dés ne font pas 7 coûte un coup.",
 		"",
-		"|cffffd1003|r (1 + 2) : prison de 3, un seul prisonnier à la fois. Chaque dé qui montre un 3, chez n'importe qui, lui coûte un point. S'il refait 3, il monte d'un cran : chaque 3 coûte alors 2, 3, 4 puis 5 points. Un autre joueur qui fait 3 prend sa place, au premier cran.",
+		"|cffffd1003|r (1 + 2) : prison de 3, un seul prisonnier à la fois. Chaque dé qui montre un 3, chez n'importe qui, lui coûte un coup. S'il refait 3, il monte d'un cran : chaque 3 coûte alors 2, 3, 4 puis 5 coups. Un autre joueur qui fait 3 prend sa place, au premier cran.",
 		"",
-		"|cffffd1005|r : prison de 5 si elle est vide. Chaque 5 d'un autre joueur coûte un point au prisonnier, qui sort en refaisant 5.",
+		"|cffffd1005|r : prison de 5 si elle est vide. Chaque 5 d'un autre joueur coûte un coup au prisonnier, qui sort en refaisant 5.",
 		"",
-		"|cffffd100Doubles|r : autant d'attaques que la valeur du dé (double 1 : 7), à distribuer aux autres joueurs ; chaque attaque coûte un point, 7 au plus par joueur (le reste, pour soi). Double 6 : 6 attaques, ou une relance dont la somme donne les attaques.",
+		"|cffffd100Doubles|r : autant d'attaques que la valeur du dé (double 1 : 7), à distribuer aux autres joueurs ; chaque attaque coûte un coup, 7 au plus par joueur (le reste, pour soi). Double 6 : 6 attaques, ou une relance dont la somme donne les attaques.",
 		"",
-		"|cffffd1009|r : le joueur d'avant perd un point. |cffffd10010|r : le lanceur perd un point. |cffffd10011|r : le joueur d'après perd un point.",
+		"|cffffd1009|r : le joueur d'avant prend un coup. |cffffd10010|r : le lanceur prend un coup. |cffffd10011|r : le joueur d'après prend un coup.",
 		"",
-		"|cffffd100Le vecteur|r : sur un 4, un 6 ou un 8 (pas un double), une ligne part du plus petit dé vers le plus grand. Si elle arrive près d'un joueur, il perd un point ; sinon, dégâts de zone : les deux joueurs les plus proches perdent un point.",
+		"|cffffd100Le vecteur|r : sur un 4, un 6 ou un 8 (pas un double), une ligne part du plus petit dé vers le plus grand. Si elle arrive près d'un joueur, il prend un coup ; sinon, dégâts de zone : les deux joueurs les plus proches prennent un coup.",
 	}, "\n"))
 	f.lever = UI.Bouton(f, "Quitter la table", "fantome", 100, 26)
 	f.lever:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 14)
@@ -1468,7 +1491,7 @@ local function CreerCote(parent)
 	f.nouvelle:SetPoint("BOTTOMLEFT", f.lever, "TOPLEFT", 0, 6)
 	f.nouvelle:SetPoint("RIGHT", f, "RIGHT", -14, 0)
 	f.nouvelle:SetScript("OnClick", NouvellePartie)
-	UI.Infobulle(f.nouvelle, "Nouvelle partie", ("Tous les joueurs repartent à %d points. Deux clics pour confirmer."):format(POINTS_DEPART))
+	UI.Infobulle(f.nouvelle, "Nouvelle partie", "Tous les joueurs repartent à 0 coup. Deux clics pour confirmer.")
 	return f
 end
 
@@ -1575,9 +1598,9 @@ Maj = function()
 	local tour = PlaceDuTour()
 	-- les dés roulent : l'état d'avant le lancer (voir Animer), rien de son résultat
 	local masque = DesEnRoute() and avant
-	-- puis, dés posés, ses effets attendent encore DELAI_EFFETS (points, prisons, lignes d'effets, vecteur)
+	-- puis, dés posés, ses effets attendent encore DELAI_EFFETS (coups, prisons, lignes d'effets, vecteur)
 	local cache = EffetsCaches() and avant
-	local PointsVus = cache and function(cle) return cache.points[cle] or POINTS_DEPART end or Points
+	local CoupsVus = cache and function(cle) return cache.coups[cle] or 0 end or Coups
 	local pertesVues = cache and cache.pertes or pertes
 	local prisonVue, cranVu, prison5Vue = prison, cran, prison5
 	if cache then prisonVue, cranVu, prison5Vue = cache.prison, cache.cran, cache.prison5 end
@@ -1597,7 +1620,7 @@ Maj = function()
 		end
 		local k = distribue and cle and attaque.repartition[cle]
 		if cle == moi and distribue and Surplus() > 0 then k = Surplus() end -- (celles que je me mets)
-		b.attaque:SetText(k and ("-" .. k) or "")
+		b.attaque:SetText(k and ("+" .. k) or "")
 		if cle then
 			local r, g, bl = ns.CouleurClasse(ns.ClasseMembre and ns.ClasseMembre(cle))
 			b.bord:SetVertexColor(r, g, bl, 1)
@@ -1607,18 +1630,16 @@ Maj = function()
 			b.portrait:Show()
 			b.nom:SetText(NomJoueur(cle))
 			b.nom:SetTextColor(unpack(cle == moi and C.ors or C.texte))
-			local p = PointsVus(cle)
-			b.points:SetText(p)
-			b.points:SetTextColor(unpack(p <= 5 and C.aide or C.ors))
+			b.points:SetText(CoupsVus(cle))
 			b.jeton:Show()
 			b.prison:SetShown(cle == prisonVue)
 			b.prison5:SetShown(cle == prison5Vue)
 			b.prison.texte:SetText(cranVu > 1 and ("×" .. cranVu) or "3")
 			local rang = bizkit and bizkit.rang[cle]
 			b.rang:SetText(rang and tostring(rang) or "")
-			-- (cachée pendant que « -n » monte au-dessus de lui ; pas avant que les dés soient posés)
+			-- (cachée pendant que « +n » monte au-dessus de lui ; pas avant que les dés soient posés)
 			local perdu = pertesVues[cle]
-			b.marque.texte:SetText(perdu and ("-" .. perdu) or "")
+			b.marque.texte:SetText(perdu and ("+" .. perdu) or "")
 			b.marque:SetShown(perdu ~= nil and not (b.perteDebut and GetTime() >= b.perteDebut))
 		else
 			b.bord:SetVertexColor(C.bordMoyen[1], C.bordMoyen[2], C.bordMoyen[3], 1)
@@ -1736,7 +1757,7 @@ Maj = function()
 
 	-- les cachots
 	t.cachot3:Poser(prisonVue, prisonVue and cranVu, nil)
-	t.cachot5:Poser(prison5Vue, nil, "-1 par 5")
+	t.cachot5:Poser(prison5Vue, nil, "+1 par 5")
 
 	-- « Ce lancer » : ses dés, son lanceur, ses effets (et les attaques d'un double qui attendent)
 	local bo = t.boite
@@ -1871,13 +1892,16 @@ ev:SetScript("OnEvent", function(_, event, texte)
 		LireJet(texte)
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		ev:UnregisterEvent("PLAYER_ENTERING_WORLD")
-		-- après un /reload ou une courte déconnexion, je reprends ma place et mes points
+		-- après un /reload ou une courte déconnexion, je reprends ma place et mes coups
 		C_Timer.After(8, function()
 			local p = DB().bizkit
 			if type(p) == "table" and tonumber(p.place) and ns.Maintenant() - (tonumber(p.quand) or 0) < REPRISE then
 				local moi = MaCle()
-				if moi and tonumber(p.points) then points[moi] = tonumber(p.points) end
-				Envoyer(("A~%d~~%d"):format(p.place, Points(moi)))
+				-- (noté avant les coups : des points restants)
+				local n = tonumber(p.coups) or (tonumber(p.points) and math.max(0, ANCIEN_DEPART - tonumber(p.points)))
+				if moi and n then coups[moi] = n end
+				Envoyer(("A~%d~~%d"):format(p.place, AnciensPoints(moi)))
+				Envoyer("C~" .. Coups(moi))
 				Demander()
 			else
 				NoterMaPlace(nil)

@@ -152,34 +152,34 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
     pour s'asseoir, puis chacun son tour (dans le sens des aiguilles d'une montre) lance deux dés : deux `/roll` 1-6
     du jeu, lus par l'addon. Tout le monde voit les dés partir de la place du lanceur et se poser au hasard sur le
     tapis, entre les joueurs. Sous la table, la case « Ce lancer » montre les dés, le lanceur et une ligne par effet
-    (qui perd combien, et pourquoi) ; à droite, les derniers lancers, chacun avec ses effets ; en haut, à qui le
+    (qui prend combien de coups, et pourquoi) ; à droite, les derniers lancers, chacun avec ses effets ; en haut, à qui le
     tour, avec le temps qui reste. Rien ne trahit un 7 : la somme du lancer en cours n'est pas affichée, les effets
     de chaque lancer n'apparaissent que 1,5 s après que les dés se sont posés, et la page
-    s'ouvre (hors combat) à chaque lancer chez les joueurs assis. Chacun commence avec 30 points ; un
-    point perdu fait monter « -1 » au-dessus du joueur et rougir son portrait, puis reste affiché à côté de lui
+    s'ouvre (hors combat) à chaque lancer chez les joueurs assis. Chacun compte ses *coups* : 0 au départ, et le
+    compteur ne fait que monter ; un coup pris fait monter « +1 » au-dessus du joueur et rougir son portrait, puis reste affiché à côté de lui
     jusqu'au lancer suivant ; le résultat d'un lancer ne s'affiche qu'une fois les dés posés. Le bouton « Bizkit ! », à côté de
     « Lancer les dés », est toujours là (un clic le crie dans la discussion de guilde) : sur un 7, tous les joueurs
-    doivent cliquer, le lanceur aussi, dans n'importe quel ordre, et le dernier perd un point ; ceux qui n'ont pas
-    cliqué 10 s après perdent aussi. Cliquer quand les dés ne font pas 7 coûte un point. Chaque clic fait
+    doivent cliquer, le lanceur aussi, dans n'importe quel ordre, et le dernier prend un coup ; ceux qui n'ont pas
+    cliqué 10 s après en prennent un aussi. Cliquer quand les dés ne font pas 7 coûte un coup. Chaque clic fait
     apparaître une bulle « Bizkit ! » au-dessus du joueur.
     Les deux prisons sont des cachots dans les coins de la table. Un 3 (1 + 2) envoie le lanceur en *prison de 3* (barreaux orange et pastille « 3 » sur son portrait) et en fait sortir celui qui y était :
-    un seul prisonnier à la fois. À chaque lancer, chaque dé qui montre un 3 lui coûte un point (deux sur un
+    un seul prisonnier à la fois. À chaque lancer, chaque dé qui montre un 3 lui coûte un coup (deux sur un
     double 3). Le prisonnier qui refait 3 monte d'un cran : La Prison, Prison du cuirassé, Donjon de Fort-de-Durn puis
     Prison d'Alcaz, où
-    chaque 3 lui coûte 2, 3, 4 puis 5 points (au dernier cran, il y reste). Dès qu'un autre joueur fait 3, il sort,
+    chaque 3 lui coûte 2, 3, 4 puis 5 coups (au dernier cran, il y reste). Dès qu'un autre joueur fait 3, il sort,
     quel que soit le cran, et le nouveau entre en prison de 3. Le prisonnier qui quitte la table reste en prison
     jusqu'au prochain 3. Un 5 envoie en *prison de 5* (barreaux bleus et pastille « 5 ») si elle est vide (un seul prisonnier) : tant qu'il y est,
-    chaque 5 d'un autre joueur lui coûte un point, et il n'en sort qu'en refaisant 5. On peut être dans les deux
+    chaque 5 d'un autre joueur lui coûte un coup, et il n'en sort qu'en refaisant 5. On peut être dans les deux
     prisons à la fois. Un double donne autant d'*attaques* que la valeur du dé (double 1 : 7) : le lanceur clique sur
-    les places des joueurs à attaquer (clic droit pour en retirer), chaque attaque coûte un point, 7 au plus par joueur
+    les places des joueurs à attaquer (clic droit pour en retirer), chaque attaque coûte un coup, 7 au plus par joueur
     (celles que personne d'autre ne peut plus recevoir, le lanceur se les met lui-même) ; au double 6, il
-    choisit entre 6 attaques et une relance dont la somme des dés donne les attaques. Un 9 coûte un point au
+    choisit entre 6 attaques et une relance dont la somme des dés donne les attaques. Un 9 coûte un coup au
     joueur d'avant, un 10 au lanceur, un 11 au joueur d'après. Sur un 4, un 6 ou un 8 (pas un double), le
     *vecteur* : une ligne part du plus petit dé vers le plus grand (pointillés rouges sur la table) ; si elle
-    arrive près d'un joueur, il perd un point, sinon dégâts de zone : les deux joueurs les plus proches. Les règles complètes sont
+    arrive près d'un joueur, il prend un coup, sinon dégâts de zone : les deux joueurs les plus proches. Les règles complètes sont
     dans l'infobulle « Les règles du Bizkit », à droite de la table.
-    « Nouvelle partie » remet tout le monde à 30 points. Un joueur qui tarde (40 s) peut être sauté par le suivant ;
-    les membres déconnectés libèrent leur place, et on reprend sa place et ses points après un `/reload`.
+    « Nouvelle partie » remet tout le monde à 0 coup. Un joueur qui tarde (40 s) peut être sauté par le suivant ;
+    les membres déconnectés libèrent leur place, et on reprend sa place et ses coups après un `/reload`.
 - **Sondage** (`/smb sondage`, ou « Sondage » dans le menu rapide du médaillon) : une question, 2 à 5 choix, 1 à
   10 minutes pour voter. Les membres connectés qui ont l'addon reçoivent une bulle et votent d'un clic ; résultats en
   direct, changement d'avis possible jusqu'à la fin, votes publics (le survol d'un choix montre qui l'a choisi),
