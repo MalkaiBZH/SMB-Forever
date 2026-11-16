@@ -33,7 +33,8 @@
 -- nombre d'attaques (la relance ne déclenche aucune autre règle). Au plus MAX_PAR_JOUEUR attaques sur un
 -- même joueur : celles que personne d'autre ne peut plus recevoir, le lanceur se les met à lui-même (seul à
 -- la table : toutes). Il a DELAI_ATTAQUE secondes : ensuite, les attaques déjà placées partent (et celles
--- pour lui), les autres sont perdues. Pendant les attaques, personne ne lance.
+-- pour lui), les autres sont perdues. Pendant les attaques, personne ne lance. Tout le monde voit en direct
+-- où elles vont (« +2 » sur les portraits visés, « V »).
 -- Le 9, le 10 et le 11 (somme des dés) : 9, le joueur assis avant le lanceur (celui qui a joué avant lui)
 -- prend un coup ; 10, le lanceur prend un coup ; 11, le joueur assis après lui prend un coup. Seul à la
 -- table, le 9 et le 11 ne coûtent rien.
@@ -73,6 +74,9 @@
 --   "B~id"                      je crie « Bizkit ! » (id = celui du lancer qui a fait 7)
 --   "P~id~clé,clé…"             le lanceur annonce ceux qui n'ont pas crié à temps : ils prennent un coup
 --   "R~id~d1~d2~x1~y1~a1~x2~y2~a2"  relance d'un double 6 (id = celui du double) : la somme = les attaques
+--   "V~id~clé:n,clé:n…"         pendant ma distribution, où vont mes attaques pour l'instant (sans celles
+--                               pour moi) : affiché chez les autres, ne compte pas ; un message au plus toutes
+--                               les VISEE secondes (les versions d'avant l'ignorent)
 --   "T~id~clé:n,clé:n…"         mes attaques (id = celui du double) : chaque joueur cité prend n coups
 --   "C~n"                       mes coups, juste après « A » (adoptés par qui ne les connaît pas, ou ne les
 --                               connaît que par le champ « points » de « A » ; les versions d'avant l'ignorent)
@@ -118,6 +122,7 @@ local ECART_PLACE = 36       -- distance entre le bord de la table et le centre 
 local TOUCHE = 40            -- vecteur : un joueur est touché seul si la ligne arrive à moins de ça (pixels) de lui ;
                              -- plus loin de tout le monde, dégâts de zone sur les deux plus proches
 local MAX_PAR_JOUEUR = 7     -- doubles : au plus 7 attaques sur un même joueur
+local VISEE = 0.4            -- doubles : au plus un « V » (où vont mes attaques) toutes les VISEE secondes
 
 local Normaliser = ns.Normaliser
 local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
@@ -430,6 +435,27 @@ end
 local function Surplus() return SurplusPour(AttaquesConnues() or 0, attaque and attaque.qui) end
 local function APlacer() return (AttaquesConnues() or 0) - Surplus() end
 
+-- pendant ma distribution, les autres voient où vont mes attaques (« V ») : la répartition du moment, au
+-- plus un message toutes les VISEE secondes (des clics rapprochés partent ensemble), seulement si elle a changé
+local viseePrevue, viseeEnvoyee
+local function AnnoncerVisee()
+	if viseePrevue or not C_Timer then return end
+	viseePrevue = true
+	C_Timer.After(VISEE, function()
+		viseePrevue = nil
+		local a = attaque
+		if not a or a.envoye or a.qui ~= MaCle() then return end
+		local liste = {}
+		for cle, k in pairs(a.repartition) do liste[#liste + 1] = cle .. ":" .. k end
+		table.sort(liste)
+		local msg = "V~" .. a.id .. "~" .. table.concat(liste, ",")
+		if msg ~= viseeEnvoyee then
+			viseeEnvoyee = msg
+			Envoyer(msg)
+		end
+	end)
+end
+
 -- clic sur une place pendant ma distribution : une attaque de plus (sens = -1 : une de moins)
 local function Viser(place, sens)
 	if not JeDistribue() or DesEnRoute() then return end
@@ -441,6 +467,7 @@ local function Viser(place, sens)
 	elseif sens < 0 and r[cle] then
 		r[cle] = r[cle] > 1 and r[cle] - 1 or nil
 	end
+	AnnoncerVisee()
 	Maj()
 end
 
@@ -463,6 +490,7 @@ end
 local function EffacerAttaques()
 	if JeDistribue() then
 		attaque.repartition = {}
+		AnnoncerVisee()
 		Maj()
 	end
 end
@@ -471,6 +499,7 @@ end
 local function ChoisirSix()
 	if not ChoixEnAttente() or attaque.qui ~= MaCle() then return end
 	attaque.choisi = "six"
+	AnnoncerVisee() -- (les autres voient que j'ai pris les 6 attaques)
 	Maj()
 end
 
@@ -757,6 +786,22 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		a.choisi = "relance"
 		a.n = d1 + d2
 		Effet("att", qui, nil, ("relance : %d + %d = %d attaques"):format(d1, d2, a.n))
+		Maj()
+	elseif genre == "V" then
+		-- où vont les attaques du lanceur pendant sa distribution : seulement affiché (« T » seul compte)
+		local a = attaque
+		local id, liste = suite:match("^([^~]+)~?(.*)$")
+		if not a or id ~= a.id or qui ~= a.qui or qui == moi then return end
+		if a.choix6 and not a.relance then a.choisi = "six" end -- (il distribue : il a pris les 6 attaques)
+		local vise, total = {}, 0
+		for cle, k in (liste or ""):gmatch("([^,:]+):(%d+)") do
+			k = math.min(tonumber(k), MAX_PAR_JOUEUR)
+			if cle ~= a.qui and PlaceDe(cle) and k > 0 and total + k <= a.n then
+				vise[cle] = k
+				total = total + k
+			end
+		end
+		a.vise = vise
 		Maj()
 	elseif genre == "T" then
 		-- les attaques du lanceur : sur des joueurs assis, MAX_PAR_JOUEUR au plus chacun, sans dépasser son
@@ -1570,7 +1615,7 @@ local function TexteEtat(mienne, tour)
 			local pourMoi = Surplus() > 0 and (", %d pour toi"):format(Surplus()) or ""
 			return ("%d attaques : clique sur les joueurs%s · %d s"):format(AttaquesConnues(), pourMoi, s), "att", part
 		end
-		if a.choix6 and not a.relance then return ("%s choisit : 6 attaques ou relance"):format(NomJoueur(a.qui)), "att", part end
+		if a.choix6 and not a.relance and a.choisi ~= "six" then return ("%s choisit : 6 attaques ou relance"):format(NomJoueur(a.qui)), "att", part end
 		return ("%s distribue %d attaques · %d s"):format(NomJoueur(a.qui), a.n, s), "att", part
 	end
 	if attente then return "Les dés roulent…" end
@@ -1607,10 +1652,12 @@ Maj = function()
 
 	-- les places
 	local distribue = JeDistribue() and not masque
+	-- la distribution d'un autre, en direct (« V »)
+	local regarde = not masque and attaque and attaque.qui ~= moi and attaque.vise
 	for i, b in ipairs(t.places) do
 		local cle = places[i]
-		-- halo doré : son tour ; rouge : un joueur que je peux attaquer
-		local cible = distribue and cle ~= nil and cle ~= moi
+		-- halo doré : son tour ; rouge : un joueur que je peux attaquer, ou que le lanceur vise
+		local cible = (distribue and cle ~= nil and cle ~= moi) or (regarde and cle ~= nil and regarde[cle] ~= nil)
 		-- (allumé aussi pendant un Bizkit : il ne doit pas s'éteindre sur un 7)
 		b.halo:SetShown(not masque and (cible or (cle ~= nil and i == tour and not attaque)))
 		if cible then
@@ -1620,6 +1667,11 @@ Maj = function()
 		end
 		local k = distribue and cle and attaque.repartition[cle]
 		if cle == moi and distribue and Surplus() > 0 then k = Surplus() end -- (celles que je me mets)
+		if regarde and cle then
+			k = regarde[cle]
+			local soi = cle == attaque.qui and SurplusPour(attaque.n, attaque.qui) or 0
+			if soi > 0 then k = soi end -- (celles qu'il se met)
+		end
 		b.attaque:SetText(k and ("+" .. k) or "")
 		if cle then
 			local r, g, bl = ns.CouleurClasse(ns.ClasseMembre and ns.ClasseMembre(cle))
@@ -1778,6 +1830,9 @@ Maj = function()
 		if a and not cache and a.id == l.id and not a.envoye then
 			local txt = ChoixEnAttente() and "double 6 : 6 attaques ou relance"
 				or (AttaquesConnues() and ("%d attaques à distribuer"):format(a.n)) or "relance…"
+			local placees, vise = 0, a.qui == moi and a.repartition or a.vise
+			for _, k in pairs(vise or {}) do placees = placees + k end
+			if AttaquesConnues() and placees > 0 then txt = txt .. (" · %d placée%s"):format(placees, placees > 1 and "s" or "") end
 			liste[#liste + 1] = { k = "att", cle = a.qui, texte = txt, enCours = true }
 		end
 		for k = 1, math.min(#liste, LIGNES_BOITE) do

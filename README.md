@@ -172,7 +172,8 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
     chaque 5 d'un autre joueur lui coûte un coup, et il n'en sort qu'en refaisant 5. On peut être dans les deux
     prisons à la fois. Un double donne autant d'*attaques* que la valeur du dé (double 1 : 7) : le lanceur clique sur
     les places des joueurs à attaquer (clic droit pour en retirer), chaque attaque coûte un coup, 7 au plus par joueur
-    (celles que personne d'autre ne peut plus recevoir, le lanceur se les met lui-même) ; au double 6, il
+    (celles que personne d'autre ne peut plus recevoir, le lanceur se les met lui-même) ; pendant qu'il distribue, tout
+    le monde voit en direct qui va les recevoir (« +2 » sur les portraits visés) ; au double 6, il
     choisit entre 6 attaques et une relance dont la somme des dés donne les attaques. Un 9 coûte un coup au
     joueur d'avant, un 10 au lanceur, un 11 au joueur d'après. Sur un 4, un 6 ou un 8 (pas un double), le
     *vecteur* : une ligne part du plus petit dé vers le plus grand (pointillés rouges sur la table) ; si elle
