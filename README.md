@@ -179,7 +179,10 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
     *vecteur* : une ligne part du plus petit dé vers le plus grand (pointillés rouges sur la table) ; si elle
     arrive près d'un joueur, il prend un coup, sinon dégâts de zone : les deux joueurs les plus proches. Les règles complètes sont
     dans l'infobulle « Les règles du Bizkit », à droite de la table.
-    « Nouvelle partie » remet tout le monde à 0 coup. Un joueur qui tarde (40 s) peut être sauté par le suivant ;
+    Le premier assis à la table vide crée la partie. Dès le premier lancer, chacun garde sa place, et qui quitte
+    la table ne peut plus la rejoindre avant la partie suivante ; un prisonnier ne peut pas la quitter ; un nouveau
+    joueur s'assoit quand il veut. « Nouvelle partie » remet tout le monde à 0 coup : seul le créateur de la partie
+    peut la lancer (s'il a quitté la table, tous les joueurs assis le peuvent), et il devient le créateur. Un joueur qui tarde (40 s) peut être sauté par le suivant ;
     les membres déconnectés libèrent leur place, et on reprend sa place et ses coups après un `/reload`.
 - **Sondage** (`/smb sondage`, ou « Sondage » dans le menu rapide du médaillon) : une question, 2 à 5 choix, 1 à
   10 minutes pour voter. Les membres connectés qui ont l'addon reçoivent une bulle et votent d'un clic ; résultats en

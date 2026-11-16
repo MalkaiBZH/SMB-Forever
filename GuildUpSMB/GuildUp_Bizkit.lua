@@ -1,6 +1,11 @@
 -- GuildUpSMB : le Bizkit, jeu de dés de la guilde (onglet « Bizkit » de la page Jeux, /smb bizkit, préfixe "GuildUpBzk").
 -- Une table ovale pour toute la guilde, huit places autour. Un membre clique sur une place libre pour
--- s'asseoir (ou changer de place), « Quitter la table » pour se lever. Chacun a son compteur de coups : 0 au départ,
+-- s'asseoir (ou changer de place), « Quitter la table » pour se lever.
+-- La partie : le premier qui s'assoit à la table vide la crée (ou celui qui lance « Nouvelle partie »). Elle
+-- est en cours dès son premier lancer : les joueurs assis ne changent plus de place, et qui quitte la table
+-- (« D ») ne peut plus la rejoindre avant la partie suivante ; un nouveau joueur s'assoit quand il veut. Un
+-- prisonnier (prison de 3 ou de 5) ne peut pas quitter la table. Seul le créateur lance une nouvelle partie,
+-- sauf s'il n'est plus assis : alors tous les joueurs assis le peuvent. La table vide, la partie est finie. Chacun a son compteur de coups : 0 au départ,
 -- il ne fait que monter (seule une nouvelle partie le remet à 0).
 -- Chacun son tour, dans l'ordre des places (sens des aiguilles d'une montre), le joueur lance deux dés :
 -- l'addon fait deux /roll 1-6 du jeu (le hasard vient du serveur, les joueurs à côté le voient passer dans
@@ -67,7 +72,10 @@
 --                               les coups, qui partaient de ANCIEN_DEPART points ; suivi de « C »), la clé
 --                               du prisonnier de 3 et son cran (1 à 5), la clé du prisonnier de 5 (vides s'il n'y
 --                               en a pas) ; adoptés par qui ne les connaît pas
---   "D"                         je me lève
+--   "D"                         je me lève (refusé pour un prisonnier)
+--   "G~créateur~en cours~clé,clé…"  l'état de la partie (créateur, 1 si en cours, ceux qui l'ont quittée),
+--                               envoyé avec la réponse à « Q » par le joueur de la première place occupée ;
+--                               adopté par qui ne connaît pas la partie depuis sa création
 --   "L~id~d1~d2~x1~y1~a1~x2~y2~a2[~1]"  mon lancer : id = heure du serveur en base 36 ; d1, d2 de 1 à 6 ;
 --                               x, y de 0 à 200 (100 = centre du tapis) ; a = angle du dé en degrés ;
 --                               « ~1 » = rappel pour qui vient d'ouvrir la table (ni Bizkit, ni prison, ni coups)
@@ -80,7 +88,8 @@
 --   "T~id~clé:n,clé:n…"         mes attaques (id = celui du double) : chaque joueur cité prend n coups
 --   "C~n"                       mes coups, juste après « A » (adoptés par qui ne les connaît pas, ou ne les
 --                               connaît que par le champ « points » de « A » ; les versions d'avant l'ignorent)
---   "N"                         nouvelle partie : tous les joueurs repartent à 0 coup, prisons vides
+--   "N"                         nouvelle partie : tous les joueurs repartent à 0 coup, prisons vides ; seul le
+--                               créateur de la partie l'envoie, sauf s'il n'est plus assis ; je deviens le créateur
 --   "Q"                         j'ouvre la table : les membres assis renvoient « A~place~derniere~points » et
 --                               « C~coups », et
 --                               l'auteur du dernier lancer le renvoie en rappel (même id : déjà vu, ignoré)
@@ -126,6 +135,7 @@ local VISEE = 0.4            -- doubles : au plus un « V » (où vont mes attaq
 
 local Normaliser = ns.Normaliser
 local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
+local NomCourt = ns.NomCourt
 local MaCle = ns.MaCle
 local Base36 = ns.Base36
 local Erreur = ns.Erreur
@@ -141,6 +151,10 @@ local prison                 -- clé du joueur en prison de 3
 local cran = 1               -- son cran dans PRISONS (1 = prison de 3)
 local prison5                -- clé du joueur en prison de 5
 local attaque                -- les attaques d'un double en cours (voir NouvelleAttaque)
+local createur               -- qui a créé la partie (premier assis à la table vide, ou « N »)
+local enCours = false        -- un lancer depuis sa création : places bloquées, qui part ne revient pas
+local partis = {}            -- [clé] = vrai : a quitté la table pendant la partie, n'y revient pas avant la suivante
+local partieSure = false     -- je connais la partie depuis sa création (sinon, « G » me l'apprend)
 local tourCle                -- membre dont c'est le tour, et depuis quand
 local debutTour = 0
 local attente                -- { limite, valeurs } : j'ai lancé, j'attends mes deux /roll
@@ -285,6 +299,28 @@ end
 -- ma place et mes coups, pour les reprendre après un /reload
 local function NoterMaPlace(place)
 	DB().bizkit = place and { place = place, quand = ns.Maintenant(), coups = Coups(MaCle()) } or nil
+end
+
+-- pourquoi ce joueur ne peut pas s'asseoir à une place libre (rien : il peut)
+local function RefusPlace(cle)
+	if not enCours then return nil end
+	if partis[cle] then return "Tu as quitté cette partie : tu pourras revenir à la prochaine" end
+	if PlaceDe(cle) then return "Pendant la partie, chacun garde sa place" end
+end
+
+-- pourquoi ce joueur ne peut pas quitter la table (rien : il peut)
+local function RefusDepart(cle)
+	if cle == prison or cle == prison5 then return "En prison : tu restes à table" end
+end
+
+-- ce joueur peut-il lancer une nouvelle partie ? Assis, et créateur (ou le créateur n'est plus assis)
+local function PeutRelancerPartie(cle)
+	return PlaceDe(cle) ~= nil and (not createur or createur == cle or not PlaceDe(createur))
+end
+
+-- la table s'est vidée : la partie est finie (le prochain assis en crée une)
+local function VerifierTableVide()
+	if Assis() == 0 then createur, enCours, partis, partieSure = nil, false, {}, true end
 end
 
 -- « A » : mes points à l'ancienne, pour les versions d'avant les coups
@@ -536,17 +572,31 @@ end
 
 local function Asseoir(place)
 	if places[place] then return end
+	local refus = RefusPlace(MaCle())
+	if refus then Erreur(refus) return end
 	Envoyer("A~" .. place)
 end
 
+local confirmeDepart = 0
 local function Lever()
-	if PlaceDe(MaCle()) then Envoyer("D") end
+	local moi = MaCle()
+	if not PlaceDe(moi) then NoterMaPlace(nil) return end
+	local refus = RefusDepart(moi)
+	if refus then Erreur(refus) return end
+	-- pendant une partie, pas de retour : deux clics à moins de 3 s
+	if enCours and GetTime() - confirmeDepart > 3 then
+		confirmeDepart = GetTime()
+		Maj()
+		return
+	end
+	confirmeDepart = 0
+	Envoyer("D")
 	NoterMaPlace(nil)
 end
 
 local confirmeNouvelle = 0
 local function NouvellePartie()
-	if not PlaceDe(MaCle()) then return end
+	if not PeutRelancerPartie(MaCle()) then return end
 	-- deux clics à moins de 3 s : on ne remet pas les coups de tout le monde à zéro par erreur
 	if GetTime() - confirmeNouvelle > 3 then
 		confirmeNouvelle = GetTime()
@@ -635,6 +685,15 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			return
 		end
 		local avant = PlaceDe(qui)
+		-- pendant la partie : chacun garde sa place, et qui l'a quittée n'y revient pas
+		if enCours and ((avant and avant ~= place) or (not avant and partis[qui])) then
+			if qui == moi then Erreur(RefusPlace(qui) or "Place refusée") end
+			return
+		end
+		-- le premier assis à la table vide crée la partie
+		if not avant and Assis() == 0 and suite == tostring(place) then
+			createur, enCours, partis = qui, false, {}
+		end
 		if avant and avant ~= place then places[avant] = nil end
 		places[place] = qui
 		pts = tonumber(pts)
@@ -655,9 +714,12 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		Maj()
 	elseif genre == "D" then
 		local p = PlaceDe(qui)
+		if p and RefusDepart(qui) then return end -- (un prisonnier reste à table)
 		if qui == moi then NoterMaPlace(nil) end
 		if p then
 			places[p] = nil
+			if enCours then partis[qui] = true end
+			VerifierTableVide()
 			RetirerDuBizkit(qui)
 			if attaque and attaque.qui == qui then
 				attaque = nil
@@ -682,6 +744,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		if dernierLancer and dernierLancer.qui == qui and dernierLancer.id == champs[1] then return end -- (déjà vu)
 		local rappel = champs[10] == "1"
 		if (bizkit or attaque) and not rappel then return end -- (personne ne lance pendant un Bizkit ou des attaques)
+		if not rappel then enCours = true end -- (le premier lancer : la partie est en cours)
 		local l = {
 			genre = "lancer", qui = qui, id = champs[1], place = p, d1 = d1, d2 = d2, effets = {},
 			x1 = (n[3] - 100) / 100, y1 = (n[4] - 100) / 100, a1 = n[5],
@@ -865,8 +928,20 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			devines[qui] = nil
 			Maj()
 		end
+	elseif genre == "G" then
+		-- l'état de la partie, pour qui ne la connaît pas depuis sa création
+		if partieSure or qui == moi or not PlaceDe(qui) then return end
+		local cr, ec, liste = suite:match("^([^~]*)~(%d)~?(.*)$")
+		if not cr then return end
+		createur = cr ~= "" and cr or nil
+		enCours = ec == "1"
+		partis = {}
+		for cle in (liste or ""):gmatch("[^,]+") do partis[cle] = true end
+		partieSure = true
+		Maj()
 	elseif genre == "N" then
-		if not PlaceDe(qui) then return end
+		if not PeutRelancerPartie(qui) then return end
+		createur, enCours, partis, partieSure = qui, false, {}, true
 		coups, devines = {}, {}
 		historique = {}
 		pertes = {}
@@ -886,6 +961,16 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			Envoyer(("A~%d~%s~%d~%s~%s~%s"):format(mienne, derniere and tostring(derniere) or "", AnciensPoints(moi), prison or "",
 				prison and tostring(cran) or "", prison5 or ""))
 			Envoyer("C~" .. Coups(moi))
+			-- l'état de la partie : un seul l'envoie, le joueur de la première place occupée
+			if Suivante(PLACES) == mienne then
+				local liste, long = {}, 0
+				for cle in pairs(partis) do
+					long = long + #cle + 1
+					if long > 180 then break end
+					liste[#liste + 1] = cle
+				end
+				Envoyer(("G~%s~%d~%s"):format(createur or "", enCours and 1 or 0, table.concat(liste, ",")))
+			end
 			if dernierLancer and dernierLancer.qui == moi then Envoyer(dernierLancer.brut) end
 		end)
 	end
@@ -1103,9 +1188,15 @@ local function CreerPlace(parent, i)
 		local cle = places[self.place]
 		if not cle then
 			GameTooltip:SetText("Place libre")
-			GameTooltip:AddLine(PlaceDe(MaCle()) and "Clic : changer de place" or "Clic : t'asseoir ici", 1, 1, 1)
+			local refus = RefusPlace(MaCle())
+			if refus then
+				GameTooltip:AddLine(refus, 1, 0.45, 0.4, true)
+			else
+				GameTooltip:AddLine(PlaceDe(MaCle()) and "Clic : changer de place" or "Clic : t'asseoir ici", 1, 1, 1)
+			end
 		else
 			GameTooltip:SetText(NomJoueur(cle))
+			if cle == createur then GameTooltip:AddLine("A créé la partie", C.ors[1], C.ors[2], C.ors[3]) end
 			-- (les dés roulent : rien du résultat, comme sur la table)
 			local masque = EffetsCaches() and avant
 			local n = masque and (masque.coups[cle] or 0) or Coups(cle)
@@ -1516,6 +1607,8 @@ local function CreerCote(parent)
 	UI.Infobulle(f.regles, "Les règles du Bizkit", table.concat({
 		"Chacun son tour lance deux dés. Chaque joueur compte ses coups : 0 au départ, et ça ne fait que monter.",
 		"",
+		"|cffffd100La partie|r : dès le premier lancer, chacun garde sa place ; qui quitte la table ne revient qu'à la partie suivante, et un prisonnier ne peut pas partir. Un nouveau joueur s'assoit quand il veut. Seul le créateur de la partie en lance une nouvelle (s'il a quitté la table : tous les joueurs assis).",
+		"",
 		"|cffffd1007|r : tout le monde clique sur « Bizkit ! », le lanceur aussi, dans n'importe quel ordre. Le dernier prend un coup. Cliquer quand les dés ne font pas 7 coûte un coup.",
 		"",
 		"|cffffd1003|r (1 + 2) : prison de 3, un seul prisonnier à la fois. Chaque dé qui montre un 3, chez n'importe qui, lui coûte un coup. S'il refait 3, il monte d'un cran : chaque 3 coûte alors 2, 3, 4 puis 5 coups. Un autre joueur qui fait 3 prend sa place, au premier cran.",
@@ -1536,7 +1629,12 @@ local function CreerCote(parent)
 	f.nouvelle:SetPoint("BOTTOMLEFT", f.lever, "TOPLEFT", 0, 6)
 	f.nouvelle:SetPoint("RIGHT", f, "RIGHT", -14, 0)
 	f.nouvelle:SetScript("OnClick", NouvellePartie)
-	UI.Infobulle(f.nouvelle, "Nouvelle partie", "Tous les joueurs repartent à 0 coup. Deux clics pour confirmer.")
+	UI.Infobulle(f.nouvelle, "Nouvelle partie", "Tous les joueurs repartent à 0 coup. Seul le joueur qui a créé la partie peut en lancer une nouvelle ; s'il a quitté la table, tous les joueurs assis le peuvent. Deux clics pour confirmer.")
+	UI.Infobulle(f.lever, "Quitter la table", "Pendant une partie, qui quitte la table ne peut plus la rejoindre avant la partie suivante (deux clics pour confirmer). Un prisonnier ne peut pas quitter la table.")
+	-- (infobulles aussi sur les boutons grisés)
+	for _, b in ipairs({ f.nouvelle, f.lever }) do
+		if b.SetMotionScriptsWhileDisabled then b:SetMotionScriptsWhileDisabled(true) end
+	end
 	return f
 end
 
@@ -1901,9 +1999,14 @@ Maj = function()
 	for i = nL + 1, #cote.lignes do cote.lignes[i]:Hide() end
 	for i = nS + 1, #cote.sous do cote.sous[i]:Hide() end
 	cote.liste:Hauteur(math.max(1, y))
-	cote.lever:Activer(mienne ~= nil)
-	cote.nouvelle:Activer(mienne ~= nil)
-	cote.nouvelle:Ecrire(GetTime() - confirmeNouvelle <= 3 and "Confirmer ?" or "Nouvelle partie")
+	local refusDepart = mienne and RefusDepart(moi)
+	cote.lever:Activer(mienne ~= nil and not refusDepart)
+	cote.lever:Ecrire(refusDepart or (GetTime() - confirmeDepart <= 3 and "Confirmer ? (sans retour)") or "Quitter la table")
+	local relance = PeutRelancerPartie(moi)
+	cote.nouvelle:Activer(relance)
+	cote.nouvelle:Ecrire(GetTime() - confirmeNouvelle <= 3 and "Confirmer ?"
+		or (mienne and not relance and createur and ("Nouvelle partie : %s seul"):format(NomCourt and NomCourt(createur) or createur))
+		or "Nouvelle partie")
 end
 
 --------------------------------------------------------------------------------
@@ -2026,7 +2129,11 @@ ev:SetScript("OnUpdate", function(_, dt)
 			change = true
 		end
 	end
-	if change then NoterTour(); Maj() end
+	if change then
+		VerifierTableVide()
+		NoterTour()
+		Maj()
+	end
 	local mienne = PlaceDe(moi)
 	if mienne then NoterMaPlace(mienne) end
 end)
