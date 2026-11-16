@@ -46,6 +46,13 @@
 -- lancers, effets) ; le résultat n'apparaît qu'une fois les dés posés. Les points perdus depuis le dernier
 -- lancer restent affichés sur la place de chacun (« -2 ») jusqu'au lancer suivant. Chaque cri « Bizkit ! »
 -- fait apparaître une bulle au-dessus de la place du joueur qui a cliqué.
+-- La page : l'état (à qui le tour, mes attaques, mon cri, avec le temps qui reste) dans l'en-tête ; les deux
+-- prisons en cachots dans les coins du haut (prisonnier, crans) ; sous la table, la case « Ce lancer » (dés,
+-- lanceur, et une ligne par effet : chaque lancer garde ses effets, voir Effet) ; à droite, les derniers
+-- lancers, chacun avec ses effets en dessous. Rien ne trahit un 7 : pas de somme pour le lancer en cours,
+-- pas de ligne « Bizkit » avant la fin de la course, l'état ne change qu'après mon cri, le cadre doré du
+-- joueur suivant reste allumé et son bouton « Lancer les dés » aussi (un clic est alors sans effet). La page
+-- s'ouvre (hors combat) à chaque lancer chez les joueurs assis.
 -- Tout changement est appliqué à la réception, mes messages compris (le serveur les renvoie à tous dans le
 -- même ordre) : si deux membres prennent la même place en même temps, le premier arrivé l'a, et l'ordre
 -- des cris est celui de leur arrivée.
@@ -113,7 +120,6 @@ local points = {}            -- [clé] = points du joueur (gardés s'il se lève
 local derniere               -- place du dernier lanceur (le tour passe au suivant)
 local dernierLancer          -- le dernier lancer reçu (voir Recevoir, genre « L »)
 local historique = {}        -- lancers et Bizkit, le plus récent en premier
-local annonce = ""           -- la dernière nouvelle de la table, sous les places
 local bizkit                 -- le Bizkit en cours (voir NouveauBizkit)
 local prison                 -- clé du joueur en prison de 3
 local cran = 1               -- son cran dans PRISONS (1 = prison de 3)
@@ -248,9 +254,11 @@ local function Tarde()
 	return tour ~= nil and Assis() > 1 and GetTime() - debutTour > TARDE, tour
 end
 
-local function PeutLancer()
+-- malgreBizkit : comme s'il n'y avait pas de Bizkit en cours (le bouton « Lancer les dés » ne doit pas
+-- s'éteindre sur un 7 avant que j'aie crié : un clic est alors sans effet)
+local function PeutLancer(malgreBizkit)
 	local mienne = PlaceDe(MaCle())
-	if not mienne or attente or bizkit or attaque then return false end
+	if not mienne or attente or (bizkit and not malgreBizkit) or attaque then return false end
 	local tarde, tour = Tarde()
 	return tour == mienne or (tarde and Suivante(tour) == mienne)
 end
@@ -277,6 +285,16 @@ local function Noter(entree)
 	if #historique > HISTORIQUE then historique[#historique] = nil end
 end
 
+-- Un effet du dernier lancer, pour la case « Ce lancer » et le journal de droite : k = genre (couleur de
+-- la ligne : p3, p5, sortie, somme, vec, att, bz, info), cle = joueur concerné (ou rien), n = points perdus
+-- (ou rien), texte = la raison. Sans lancer connu, la ligne attend le prochain (infoSeule).
+local infoSeule
+local function Effet(k, cle, n, texte)
+	local l = dernierLancer
+	if not l then infoSeule = texte; return end
+	l.effets[#l.effets + 1] = { k = k, cle = cle, n = n, texte = texte }
+end
+
 --------------------------------------------------------------------------------
 -- Le Bizkit
 --------------------------------------------------------------------------------
@@ -294,16 +312,13 @@ local function NouveauBizkit(l)
 	bizkit = b
 end
 
--- fin du Bizkit : chaque perdant perd un point
-local function FinBizkit(perdants)
-	local noms = {}
+-- fin du Bizkit : chaque perdant perd un point (raison : « dernier au Bizkit », « pas crié à temps »)
+local function FinBizkit(perdants, raison)
 	for _, cle in ipairs(perdants) do
 		Retirer(cle, 1)
-		noms[#noms + 1] = NomJoueur(cle) .. (" (%d)"):format(Points(cle))
+		Effet("bz", cle, 1, raison)
 	end
-	Noter({ genre = "bizkit", perdants = perdants })
-	annonce = #perdants > 0 and ("Bizkit ! %s perd un point"):format(table.concat(noms, ", ")) or "Bizkit annulé"
-	if #perdants > 1 then annonce = ("Bizkit ! %s perdent un point"):format(table.concat(noms, ", ")) end
+	if #perdants == 0 then Effet("info", nil, nil, "Bizkit annulé") end
 	bizkit = nil
 	debutTour = GetTime() -- (le joueur suivant ne « tarde » pas pendant le Bizkit)
 	Maj()
@@ -318,10 +333,10 @@ local function VerifierBizkit()
 		if not b.rang[cle] then restants[#restants + 1] = cle end
 	end
 	if #restants == 1 and b.nRequis > 1 then
-		FinBizkit(restants)
+		FinBizkit(restants, "dernier au Bizkit")
 	elseif #restants == 0 then
 		-- (seul à la table, ou les autres partis : le dernier à avoir crié)
-		FinBizkit(#b.appuis > 0 and { b.appuis[#b.appuis] } or {})
+		FinBizkit(#b.appuis > 0 and { b.appuis[#b.appuis] } or {}, "dernier au Bizkit")
 	end
 end
 
@@ -459,17 +474,11 @@ end
 -- fin des attaques : chaque cible perd ses points
 local function FinAttaque(cibles)
 	local a = attaque
-	local textes = {}
 	for _, c in ipairs(cibles) do
 		Retirer(c.cle, c.n)
-		textes[#textes + 1] = ("%s -%d"):format(NomJoueur(c.cle), c.n)
+		Effet("att", c.cle, c.n, c.cle == a.qui and "ses propres attaques" or ("attaque de " .. NomJoueur(a.qui)))
 	end
-	Noter({ genre = "attaque", qui = a.qui, cibles = cibles })
-	if #cibles > 0 then
-		annonce = ("%s attaque : %s"):format(NomJoueur(a.qui), table.concat(textes, ", "))
-	else
-		annonce = ("%s n'attaque personne"):format(NomJoueur(a.qui))
-	end
+	if #cibles == 0 then Effet("info", a.qui, nil, "n'attaque personne") end
 	attaque = nil
 	debutTour = GetTime() -- (le joueur suivant ne « tarde » pas pendant les attaques)
 	Maj()
@@ -553,10 +562,12 @@ local function LireJet(texte)
 	Maj()
 end
 
--- le Bizkit commence chez moi : la page s'ouvre si elle est fermée, pour que je puisse crier
--- (sans son : rien ne doit trahir le 7 à ceux qui regardent la table)
+-- un lancer à la table où je suis assis : la page s'ouvre si elle est fermée (hors combat), à chaque lancer,
+-- pour que je voie les dés (sans son ; jamais seulement sur un 7 : rien ne doit le trahir)
 local function Alerter()
-	if not (vue and vue:IsVisible()) and ns.OuvrirInterface then ns.OuvrirInterface("jeux", "bizkit") end
+	if not PlaceDe(MaCle()) or (vue and vue:IsVisible()) or not ns.OuvrirInterface then return end
+	if (InCombatLockdown and InCombatLockdown()) or (UnitAffectingCombat and UnitAffectingCombat("player")) then return end
+	ns.OuvrirInterface("jeux", "bizkit")
 end
 
 --------------------------------------------------------------------------------
@@ -600,7 +611,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			RetirerDuBizkit(qui)
 			if attaque and attaque.qui == qui then
 				attaque = nil
-				annonce = ("Attaques annulées : %s a quitté la table"):format(NomJoueur(qui))
+				Effet("info", qui, nil, "a quitté la table : attaques annulées")
 			end
 			NoterTour()
 			Maj()
@@ -622,44 +633,39 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		local rappel = champs[10] == "1"
 		if (bizkit or attaque) and not rappel then return end -- (personne ne lance pendant un Bizkit ou des attaques)
 		local l = {
-			genre = "lancer", qui = qui, id = champs[1], place = p, d1 = d1, d2 = d2,
+			genre = "lancer", qui = qui, id = champs[1], place = p, d1 = d1, d2 = d2, effets = {},
 			x1 = (n[3] - 100) / 100, y1 = (n[4] - 100) / 100, a1 = n[5],
 			x2 = (n[6] - 100) / 100, y2 = (n[7] - 100) / 100, a2 = n[8],
 		}
 		l.brut = ("L~%s~%d~%d~%d~%d~%d~%d~%d~%d~1"):format(l.id, d1, d2, n[3], n[4], n[5], n[6], n[7], n[8])
-		dernierLancer = l
-		derniere = p
-		-- sur un 7, ma page s'ouvre avant l'animation, pour que je voie les dés rouler
-		if not rappel and d1 + d2 == 7 and PlaceDe(moi) then Alerter() end
+		-- ma page s'ouvre à chaque lancer, pour que je voie les dés rouler (jamais seulement sur un 7)
+		if not rappel then Alerter() end
 		-- les dés partent avant les effets : la page garde l'état d'avant jusqu'à ce qu'ils se posent
 		Animer(l)
+		dernierLancer = l
+		derniere = p
+		infoSeule = nil
 		if not rappel then pertes = {} end -- (les pertes affichées sont celles de ce lancer)
 		Noter(l)
-		if d1 == d2 then
-			annonce = ("%s : double %d"):format(NomJoueur(qui), d1)
-		else
-			annonce = ("%s : %d + %d = %d"):format(NomJoueur(qui), d1, d2, d1 + d2)
-		end
 		if not rappel then
 			-- chaque 3 sorti coûte au prisonnier autant de points que son cran
 			local trois = (d1 == 3 and 1 or 0) + (d2 == 3 and 1 or 0)
 			if trois > 0 and prison then
 				local perte = trois * cran
 				Retirer(prison, perte)
-				Noter({ genre = "peine", qui = prison, n = perte, cran = cran })
-				annonce = annonce .. (" · %s perd %d point%s (%s)"):format(NomJoueur(prison), perte, perte > 1 and "s" or "", PRISONS[cran])
+				Effet("p3", prison, perte, ("%s · %s"):format(trois > 1 and "deux 3 sortis" or "un 3 sorti",
+					cran > 1 and (PRISONS[cran] .. " ×" .. cran) or "prison de 3"))
 			end
 			if d1 + d2 == 3 then
 				if prison == qui then
 					-- le prisonnier refait 3 : un cran de plus (au dernier, il y reste)
 					cran = math.min(cran + 1, #PRISONS)
-					Noter({ genre = "prison", qui = qui, cran = cran })
-					annonce = annonce .. (" · direction : %s !"):format(PRISONS[cran])
+					Effet("p3", qui, nil, "direction : " .. PRISONS[cran])
 				else
 					-- un autre joueur : le prisonnier sort, quel que soit le cran, et le nouveau entre au premier
-					Noter({ genre = "prison", qui = qui, avant = prison, cran = 1 })
+					if prison then Effet("sortie", prison, nil, "sort de " .. (cran > 1 and PRISONS[cran] or "la prison de 3")) end
 					prison, cran = qui, 1
-					annonce = annonce .. " · en prison de 3 !"
+					Effet("p3", qui, nil, "entre en prison de 3")
 				end
 			end
 			-- prison de 5 : on y entre si elle est vide ; un 5 d'un autre coûte un point au prisonnier ; le
@@ -667,16 +673,13 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			if d1 + d2 == 5 then
 				if not prison5 then
 					prison5 = qui
-					Noter({ genre = "prison5", qui = qui })
-					annonce = annonce .. " · en prison de 5 !"
+					Effet("p5", qui, nil, "entre en prison de 5")
 				elseif prison5 == qui then
 					prison5 = nil
-					Noter({ genre = "prison5", qui = qui, sort = true })
-					annonce = annonce .. " · sort de la prison de 5 !"
+					Effet("sortie", qui, nil, "sort de la prison de 5")
 				else
 					Retirer(prison5, 1)
-					Noter({ genre = "peine", qui = prison5, n = 1, lieu = "Prison de 5" })
-					annonce = annonce .. (" · %s perd 1 point (prison de 5)"):format(NomJoueur(prison5))
+					Effet("p5", prison5, 1, "un 5 sorti · prison de 5")
 				end
 			end
 			-- le 9 : le joueur d'avant perd un point ; le 10 : le lanceur ; le 11 : le joueur d'après
@@ -689,8 +692,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 				end
 				if cible then
 					Retirer(cible, 1)
-					Noter({ genre = "peine", qui = cible, n = 1, lieu = ({ [9] = "Le 9", [10] = "Le 10", [11] = "Le 11" })[somme] })
-					annonce = annonce .. (" · %s perd 1 point"):format(NomJoueur(cible))
+					Effet("somme", cible, 1, ({ [9] = "le 9 : joueur d'avant", [10] = "le 10 : le lanceur", [11] = "le 11 : joueur d'après" })[somme])
 				end
 			end
 			-- le vecteur : pas de double, et une somme sans effet (le 3 de la prison de 3 ne compte pas)
@@ -699,29 +701,15 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 				local vises, trace = Vecteur(l)
 				if vises then
 					l.trace = trace
-					local noms = {}
 					for _, cle in ipairs(vises) do
 						Retirer(cle, 1)
-						Noter({ genre = "peine", qui = cle, n = 1, lieu = #vises > 1 and "Zone" or "Vecteur" })
-						noms[#noms + 1] = NomJoueur(cle)
-					end
-					if #vises > 1 then
-						annonce = annonce .. (" · dégâts de zone : %s perdent 1 point"):format(table.concat(noms, " et "))
-					else
-						annonce = annonce .. (" · vecteur : %s perd 1 point"):format(noms[1])
+						Effet("vec", cle, 1, #vises > 1 and "dégâts de zone du vecteur" or "touché par le vecteur")
 					end
 				end
 			end
 			if d1 + d2 == 7 then NouveauBizkit(l) end
-			-- un double : des attaques à distribuer
-			if d1 == d2 then
-				NouvelleAttaque(l)
-				if d1 == 6 then
-					annonce = annonce .. " · 6 attaques, ou relance !"
-				else
-					annonce = annonce .. (" · %d attaques à distribuer"):format(attaque.n)
-				end
-			end
+			-- un double : des attaques à distribuer (affichées en cours tant qu'elles ne sont pas parties)
+			if d1 == d2 then NouvelleAttaque(l) end
 		end
 		NoterTour()
 		Maj()
@@ -747,8 +735,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		a.relance = { d1, d2 }
 		a.choisi = "relance"
 		a.n = d1 + d2
-		Noter({ genre = "relance", qui = qui, d1 = d1, d2 = d2 })
-		annonce = ("%s relance : %d + %d = %d attaques à distribuer"):format(NomJoueur(qui), d1, d2, a.n)
+		Effet("att", qui, nil, ("relance : %d + %d = %d attaques"):format(d1, d2, a.n))
 		Maj()
 	elseif genre == "T" then
 		-- les attaques du lanceur : sur des joueurs assis, MAX_PAR_JOUEUR au plus chacun, sans dépasser son
@@ -791,8 +778,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			if l.faux[qui] then return end
 			l.faux[qui] = true
 			Retirer(qui, 1)
-			Noter({ genre = "peine", qui = qui, n = 1, lieu = "Faux Bizkit" })
-			annonce = annonce .. (" · %s crie Bizkit pour rien : -1"):format(NomJoueur(qui))
+			Effet("bz", qui, 1, "Bizkit pour rien")
 			Maj()
 		end
 		-- (un 7 dont le Bizkit est déjà fini : rien)
@@ -804,7 +790,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		for cle in (liste or ""):gmatch("[^,]+") do
 			if b.requis[cle] and not b.rang[cle] then perdants[#perdants + 1] = cle end
 		end
-		FinBizkit(perdants)
+		FinBizkit(perdants, "pas crié à temps")
 	elseif genre == "N" then
 		if not PlaceDe(qui) then return end
 		for cle in pairs(points) do points[cle] = POINTS_DEPART end
@@ -812,7 +798,8 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		pertes = {}
 		bizkit, attaque = nil, nil
 		prison, cran, prison5 = nil, 1, nil
-		annonce = ("Nouvelle partie lancée par %s : tout le monde repart à %d points"):format(NomJoueur(qui), POINTS_DEPART)
+		if dernierLancer then dernierLancer.effets = {} end
+		Effet("info", qui, nil, ("nouvelle partie : tout le monde repart à %d points"):format(POINTS_DEPART))
 		if PlaceDe(moi) then NoterMaPlace(PlaceDe(moi)) end
 		Maj()
 	elseif genre == "Q" then
@@ -1064,7 +1051,7 @@ local function CreerPlace(parent, i)
 				-- (ni attaques ni tour tant que les dés roulent)
 			elseif JeDistribue() and cle ~= MaCle() then
 				GameTooltip:AddLine(("Clic : une attaque (%d au plus) · clic droit : en retirer une"):format(MAX_PAR_JOUEUR), 1, 0.45, 0.4)
-			elseif self.place == PlaceDuTour() and not bizkit and not attaque then
+			elseif self.place == PlaceDuTour() and not attaque then
 				GameTooltip:AddLine("C'est son tour", 1, 0.82, 0)
 			end
 		end
@@ -1072,6 +1059,148 @@ local function CreerPlace(parent, i)
 	end)
 	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	return b
+end
+
+-- couleur de la petite barre de chaque ligne d'effet (voir Effet)
+local COULEURS_EFFETS = {
+	p3 = { 1, 0.5, 0.2 }, p5 = { 0.35, 0.6, 1 }, sortie = { 0.44, 0.82, 0.55 }, somme = { 0.95, 0.81, 0.42 },
+	vec = { 1, 0.3, 0.25 }, att = { 1, 0.45, 0.3 }, bz = { 1, 0.82, 0 }, info = { 0.61, 0.576, 0.5 },
+}
+local LARGEUR_GAUCHE = 124   -- case « Ce lancer » : largeur de la partie des dés
+local LIGNES_BOITE = 4       -- lignes d'effets dans la case (au-delà : voir le journal)
+
+-- Une ligne d'effet : barre de couleur, (portrait,) « Nom · raison », points perdus à droite.
+-- grande : la case « Ce lancer » (portrait, police normale) ; sinon le journal de droite.
+local function CreerLigneEffet(parent, grande)
+	local UI = ns.UI
+	local C = UI.C
+	local l = CreateFrame("Frame", nil, parent)
+	l:SetHeight(grande and 19 or 16)
+	l.barre = l:CreateTexture(nil, "ARTWORK")
+	l.barre:SetSize(grande and 4 or 3, grande and 14 or 11)
+	l.barre:SetPoint("LEFT", l, "LEFT", grande and 0 or 12, 0)
+	if grande then
+		l.portrait = UI.Portrait(l, 16)
+		l.portrait:SetPoint("LEFT", l.barre, "RIGHT", 5, 0)
+	end
+	l.n = UI.Texte(l, grande and "GameFontNormal" or "GameFontHighlightSmall", { 1, 0.4, 0.33 })
+	l.n:SetPoint("RIGHT", l, "RIGHT", -2, 0)
+	l.n:SetJustifyH("RIGHT")
+	l.texte = UI.Texte(l, grande and "GameFontHighlight" or "GameFontHighlightSmall", C.gris)
+	-- e = { k, cle, n, texte, enCours } ; sans genre (k) : une ligne grise sans barre (« + 2 autres effets »)
+	l.Poser = function(self, e)
+		local c = COULEURS_EFFETS[e.k] or COULEURS_EFFETS.info
+		self.barre:SetColorTexture(c[1], c[2], c[3], 1)
+		self.barre:SetShown(e.k ~= nil)
+		if self.portrait then
+			self.portrait:SetShown(e.cle ~= nil)
+			if e.cle then self.portrait:Poser(e.cle) end
+		end
+		self.texte:ClearAllPoints()
+		self.texte:SetPoint("LEFT", (self.portrait and e.cle and self.portrait) or self.barre, "RIGHT", 5, 0)
+		self.texte:SetPoint("RIGHT", self.n, "LEFT", -6, 0)
+		if e.cle then
+			local couleur = e.cle == MaCle() and "f1cf6b" or "e8e2d4"
+			self.texte:SetText(("|cff%s%s|r · %s"):format(couleur, NomJoueur(e.cle), e.texte or ""))
+		else
+			self.texte:SetText(e.texte or "")
+		end
+		if e.enCours then
+			self.n:SetText("en cours")
+			self.n:SetTextColor(C.ors[1], C.ors[2], C.ors[3])
+		else
+			self.n:SetText(e.n and ("-" .. e.n) or "")
+			self.n:SetTextColor(1, 0.4, 0.33)
+		end
+		self:Show()
+	end
+	return l
+end
+
+-- Un cachot dans un coin de la table (prison de 3 ou de 5) : barreaux en fond, portrait du prisonnier
+-- derrière des barreaux, son nom, et en dessous ses crans (prison de 3) ou la règle (prison de 5)
+local function CreerCachot(f, titre, couleur, coin)
+	local UI = ns.UI
+	local C = UI.C
+	local c = UI.Cadre(f, { couleur[1] * 0.1, couleur[2] * 0.1, couleur[3] * 0.1, 0.95 }, { couleur[1], couleur[2], couleur[3], 0.9 })
+	c:SetSize(60, 88)
+	c:SetPoint(coin, f, coin, coin == "TOPLEFT" and 10 or -10, -38)
+	for k = 1, 5 do
+		local b = c:CreateTexture(nil, "BACKGROUND", nil, 2)
+		b:SetColorTexture(couleur[1], couleur[2], couleur[3], 0.09)
+		b:SetSize(2, 86)
+		b:SetPoint("TOPLEFT", c, "TOPLEFT", k * 10 - 1, -1)
+	end
+	c.titre = UI.Texte(c, "GameFontHighlightSmall", couleur)
+	c.titre:SetPoint("TOP", c, "TOP", 0, -5)
+	c.titre:SetText(titre)
+	c.portrait = UI.Portrait(c, 30)
+	c.portrait:SetPoint("TOP", c, "TOP", 0, -19)
+	c.grille = CreateFrame("Frame", nil, c)
+	c.grille:SetAllPoints(c.portrait)
+	c.grille:SetFrameLevel(c.portrait:GetFrameLevel() + 2)
+	for k = -1.5, 1.5 do
+		local b = c.grille:CreateTexture(nil, "OVERLAY")
+		b:SetColorTexture(couleur[1], couleur[2], couleur[3], 0.85)
+		b:SetSize(2, 30)
+		b:SetPoint("CENTER", c.grille, "CENTER", k * 7, 0)
+	end
+	c.nom = UI.Texte(c, "GameFontHighlightSmall", C.texte)
+	c.nom:SetPoint("TOP", c, "TOP", 0, -53)
+	c.nom:SetWidth(56)
+	c.nom:SetJustifyH("CENTER")
+	c.detail = UI.Texte(c, "GameFontHighlightSmall", C.gris)
+	c.detail:SetPoint("TOP", c, "TOP", 0, -68)
+	c.detail:SetJustifyH("CENTER")
+	c.crans = {}
+	for k = 1, #PRISONS do
+		local q = CreateFrame("Frame", nil, c, "BackdropTemplate")
+		q:SetSize(7, 7)
+		q:SetPoint("TOP", c, "TOP", (k - 3) * 10, -71)
+		c.crans[k] = q
+	end
+	c.vide = UI.Texte(c, "GameFontHighlightSmall", C.gris)
+	c.vide:SetPoint("CENTER", c, "CENTER", 0, -8)
+	c.vide:SetText("vide")
+	-- cle : le prisonnier (ou rien) ; nCran : son cran (prison de 3 seulement) ; detail : la ligne du bas
+	c.Poser = function(self, cle, nCran, detail)
+		self.cle, self.nCran = cle, nCran
+		self.portrait:SetShown(cle ~= nil)
+		self.grille:SetShown(cle ~= nil)
+		self.vide:SetShown(cle == nil)
+		if cle then
+			self.portrait:Poser(cle)
+			self.nom:SetText(NomJoueur(cle))
+			self.nom:SetTextColor(unpack(PlaceDe(cle) and C.texte or C.gris)) -- (gris : absent de la table)
+		else
+			self.nom:SetText("")
+		end
+		self.detail:SetText(cle and detail or "")
+		for k, q in ipairs(self.crans) do
+			q:SetShown(cle ~= nil and nCran ~= nil)
+			UI.Habiller(q, (nCran and k <= nCran) and { couleur[1], couleur[2], couleur[3], 1 } or { 0, 0, 0, 0 },
+				{ couleur[1], couleur[2], couleur[3], 1 })
+		end
+	end
+	c:EnableMouse(true)
+	c:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(titre)
+		if coin == "TOPLEFT" then
+			if self.cle and self.nCran then
+				GameTooltip:AddLine(("%s : %s. Chaque 3 sorti lui coûte %s."):format(NomJoueur(self.cle), PRISONS[self.nCran],
+					self.nCran > 1 and (self.nCran .. " points") or "un point"), 1, 1, 1, true)
+			end
+			GameTooltip:AddLine("Un 3 (1 + 2) y envoie le lanceur et en fait sortir le prisonnier. Le prisonnier qui refait 3 monte d'un cran (5 au plus).", 0.8, 0.8, 0.8, true)
+		else
+			if self.cle then GameTooltip:AddLine(NomJoueur(self.cle), 1, 1, 1) end
+			GameTooltip:AddLine("Un 5 y envoie le lanceur si elle est vide. Chaque 5 d'un autre joueur coûte un point au prisonnier, qui sort en refaisant 5.", 0.8, 0.8, 0.8, true)
+		end
+		GameTooltip:Show()
+	end)
+	c:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	c:Poser(nil)
+	return c
 end
 
 local function CreerTable(parent)
@@ -1083,7 +1212,7 @@ local function CreerTable(parent)
 	-- la table au centre de la zone de jeu, les places autour
 	f.zone = CreateFrame("Frame", nil, f)
 	f.zone:SetSize(LARGEUR_TABLE, HAUTEUR_TABLE)
-	f.zone:SetPoint("TOP", f, "TOP", 0, -40 - ECART_PLACE - TAILLE_PLACE / 2 - 18)
+	f.zone:SetPoint("TOP", f, "TOP", 0, -34 - ECART_PLACE - TAILLE_PLACE / 2 - 18)
 	f.plateau = f.zone:CreateTexture(nil, "BACKGROUND")
 	f.plateau:SetTexture(TABLE)
 	f.plateau:SetAllPoints()
@@ -1116,18 +1245,19 @@ local function CreerTable(parent)
 	f.impact:SetVertexColor(1, 0.25, 0.2, 0.55)
 	f.trace:Hide()
 
-	-- sous la table : la dernière nouvelle, à qui le tour, le bouton
-	f.resultat = UI.Texte(f, "GameFontNormalLarge", C.ors)
-	f.resultat:SetPoint("TOP", f.zone, "BOTTOM", 0, -ECART_PLACE - TAILLE_PLACE / 2 - 30)
-	f.resultat:SetPoint("LEFT", f, "LEFT", 14, 0)
-	f.resultat:SetPoint("RIGHT", f, "RIGHT", -14, 0)
-	f.resultat:SetJustifyH("CENTER")
-	f.etat = UI.Texte(f, "GameFontHighlight", C.texte)
-	f.etat:SetPoint("TOP", f.resultat, "BOTTOM", 0, -6)
-	f.etat:SetPoint("LEFT", f, "LEFT", 14, 0)
-	f.etat:SetPoint("RIGHT", f, "RIGHT", -14, 0)
-	f.etat:SetJustifyH("CENTER")
-	f.etat:SetWordWrap(true)
+	-- dans l'en-tête, au milieu : l'état (à qui le tour, mes attaques, mon cri), avec le temps qui reste
+	f.etat = CreateFrame("Frame", nil, f, "BackdropTemplate")
+	f.etat:SetHeight(24)
+	f.etat:SetPoint("TOP", f, "TOP", 0, -8)
+	f.etat:SetFrameLevel(f:GetFrameLevel() + 2)
+	f.etat.texte = f.etat:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	f.etat.texte:SetPoint("CENTER", 0, 0)
+	f.etat.barre = f.etat:CreateTexture(nil, "OVERLAY")
+	f.etat.barre:SetHeight(2)
+	f.etat.barre:SetPoint("BOTTOMLEFT", f.etat, "BOTTOMLEFT", 1, 1)
+	-- les deux prisons, en cachots dans les coins du haut
+	f.cachot3 = CreerCachot(f, "Prison de 3", { 1, 0.5, 0.2 }, "TOPLEFT")
+	f.cachot5 = CreerCachot(f, "Prison de 5", { 0.35, 0.6, 1 }, "TOPRIGHT")
 	-- le bouton principal : lancer ; pendant mes attaques, relancer (double 6) ou attaquer
 	f.lancer = UI.Bouton(f, "Lancer les dés", "or", 200, 32)
 	f.lancer:SetPoint("BOTTOM", f, "BOTTOM", 0, 14)
@@ -1151,6 +1281,39 @@ local function CreerTable(parent)
 	f.crier:SetPoint("LEFT", f.lancer, "RIGHT", 8, 0)
 	f.crier:SetScript("OnClick", Crier)
 	UI.Infobulle(f.crier, CRI, "Sur un 7, tout le monde clique : le dernier perd un point. Un clic quand les dés ne font pas 7 coûte un point.")
+
+	-- sous la table, au-dessus des boutons : « Ce lancer », les dés et le lanceur à gauche, les effets à droite
+	f.boite = UI.Cadre(f, { 0.086, 0.071, 0.055, 1 }, C.bord)
+	f.boite:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 54)
+	f.boite:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 54)
+	f.boite:SetHeight(98)
+	local bo = f.boite
+	bo.titre = UI.Texte(bo, "GameFontHighlightSmall", C.gris)
+	bo.titre:SetPoint("TOPLEFT", bo, "TOPLEFT", 10, -7)
+	bo.titre:SetText("CE LANCER")
+	bo.de1 = bo:CreateTexture(nil, "ARTWORK")
+	bo.de1:SetSize(30, 30)
+	bo.de1:SetPoint("TOPLEFT", bo, "TOPLEFT", 6, -24)
+	bo.de2 = bo:CreateTexture(nil, "ARTWORK")
+	bo.de2:SetSize(30, 30)
+	bo.de2:SetPoint("LEFT", bo.de1, "RIGHT", 0, 0)
+	bo.par = UI.Texte(bo, "GameFontHighlightSmall", C.gris)
+	bo.par:SetPoint("TOPLEFT", bo, "TOPLEFT", 10, -62)
+	bo.par:SetWidth(LARGEUR_GAUCHE - 14)
+	bo.vide = UI.Texte(bo, "GameFontHighlight", C.gris)
+	bo.vide:SetPoint("CENTER", bo, "CENTER", 0, 0)
+	bo.filet = bo:CreateTexture(nil, "ARTWORK")
+	bo.filet:SetColorTexture(C.bord[1], C.bord[2], C.bord[3], 1)
+	bo.filet:SetWidth(1)
+	bo.filet:SetPoint("TOPLEFT", bo, "TOPLEFT", LARGEUR_GAUCHE, -8)
+	bo.filet:SetPoint("BOTTOMLEFT", bo, "BOTTOMLEFT", LARGEUR_GAUCHE, 8)
+	bo.lignes = {}
+	for k = 1, LIGNES_BOITE do
+		local ligne = CreerLigneEffet(bo, true)
+		ligne:SetPoint("TOPLEFT", bo, "TOPLEFT", LARGEUR_GAUCHE + 10, -8 - (k - 1) * 21)
+		ligne:SetPoint("RIGHT", bo, "RIGHT", -10, 0)
+		bo.lignes[k] = ligne
+	end
 
 	-- animation des dés et des points perdus (le halo des places reste fixe : voir CreerPlace)
 	local attenteMaj = 0
@@ -1219,7 +1382,8 @@ Animer = function(l)
 		local p, perdu = {}, {}
 		for cle, n in pairs(points) do p[cle] = n end
 		for cle, n in pairs(pertes) do perdu[cle] = n end
-		avant = { points = p, pertes = perdu, prison = prison, cran = cran, prison5 = prison5, entree = historique[1] }
+		avant = { points = p, pertes = perdu, prison = prison, cran = cran, prison5 = prison5, entree = historique[1],
+			lancer = dernierLancer, nEffets = dernierLancer and #dernierLancer.effets or 0 }
 		finRoule = GetTime() + DUREE_ROULE
 	end
 	AnimerDes(vue.table, l, instantane)
@@ -1257,15 +1421,14 @@ local function CreerCote(parent)
 	f.vide:SetText("Aucun lancer pour l'instant.")
 	f.liste = UI.Liste(f)
 	f.liste:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -40)
-	f.liste:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 146)
-	f.lignes = {}
-	-- en bas, de haut en bas : les deux prisons, les règles (au survol), nouvelle partie, quitter la table
-	f.prison = UI.Texte(f, "GameFontHighlight", C.texte)
-	f.prison:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 124)
-	f.prison:SetPoint("RIGHT", f, "RIGHT", -14, 0)
-	f.prison5 = UI.Texte(f, "GameFontHighlight", C.texte)
-	f.prison5:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 106)
-	f.prison5:SetPoint("RIGHT", f, "RIGHT", -14, 0)
+	f.liste:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 104)
+	f.lignes = {}             -- un lancer : son lanceur, ses dés, leur somme
+	f.sous = {}               -- sous chaque lancer : ses effets
+	-- le lancer en cours, encadré (voir Maj)
+	f.actuel = CreateFrame("Frame", nil, f.liste.contenu, "BackdropTemplate")
+	UI.Habiller(f.actuel, { 0.133, 0.11, 0.078, 1 }, { 0.29, 0.235, 0.145, 1 })
+	f.actuel:SetFrameLevel(f.liste.contenu:GetFrameLevel())
+	-- en bas, de haut en bas : les règles (au survol), nouvelle partie, quitter la table
 	f.regles = CreateFrame("Button", nil, f)
 	f.regles:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 78)
 	f.regles:SetPoint("RIGHT", f, "RIGHT", -14, 0)
@@ -1300,6 +1463,9 @@ local function CreerCote(parent)
 	return f
 end
 
+local HAUT_SOUS = 16
+
+-- ligne d'un lancer dans le journal (placée par Maj)
 local function LigneHistorique(f, i)
 	local l = f.lignes[i]
 	if l then return l end
@@ -1307,8 +1473,7 @@ local function LigneHistorique(f, i)
 	local C = UI.C
 	l = CreateFrame("Frame", nil, f.liste.contenu)
 	l:SetHeight(HAUT_LIGNE)
-	l:SetPoint("TOPLEFT", f.liste.contenu, "TOPLEFT", 0, -(i - 1) * HAUT_LIGNE)
-	l:SetPoint("RIGHT", f.liste.contenu, "RIGHT", 0, 0)
+	l:SetFrameLevel(f.liste.contenu:GetFrameLevel() + 2)
 	l.total = UI.Texte(l, "GameFontHighlight", C.ors)
 	l.total:SetPoint("RIGHT", l, "RIGHT", -2, 0)
 	l.total:SetWidth(24)
@@ -1326,48 +1491,61 @@ local function LigneHistorique(f, i)
 	return l
 end
 
---------------------------------------------------------------------------------
--- Mise à jour de l'onglet
---------------------------------------------------------------------------------
+-- ligne d'un effet sous son lancer, dans le journal (placée par Maj)
+local function SousLigne(f, i)
+	local l = f.sous[i]
+	if l then return l end
+	l = CreerLigneEffet(f.liste.contenu, false)
+	l:SetFrameLevel(f.liste.contenu:GetFrameLevel() + 2)
+	f.sous[i] = l
+	return l
+end
 
+-- Effets à montrer pour un lancer : tant que les dés roulent, seulement ceux d'avant (voir Animer)
+local function EffetsVus(l, masque)
+	local n = #l.effets
+	if masque and l == masque.lancer then n = math.min(n, masque.nEffets or 0) end
+	return n
+end
+
+-- L'état, dans l'en-tête de la table : texte, genre (couleur : « moi », « bz », « att », ou rien) et part
+-- du temps qui reste (barre). Pendant un Bizkit, rien tant que je n'ai pas crié : c'est à moi de voir le 7.
 local function TexteEtat(mienne, tour)
 	if DesEnRoute() then return "Les dés roulent…" end
 	local moi = MaCle()
 	local b = bizkit
-	-- (pendant un Bizkit, rien tant que je n'ai pas crié : c'est à moi de voir le 7)
 	if b and b.rang[moi] then
-		local reste = math.max(0, math.ceil(DELAI_COURSE - (GetTime() - b.debut)))
-		return ("Tu as crié en position %d. On attend les autres… %d s"):format(b.rang[moi], reste)
+		local reste = math.max(0, DELAI_COURSE - (GetTime() - b.debut))
+		local r = b.rang[moi]
+		return ("Bizkit ! Tu as crié %d%s · %d s"):format(r, r == 1 and "er" or "e", math.ceil(reste)), "bz", reste / DELAI_COURSE
 	end
 	local a = attaque
 	if a then
-		local reste = math.max(0, math.ceil(DELAI_ATTAQUE - (GetTime() - a.debut)))
+		local reste = math.max(0, DELAI_ATTAQUE - (GetTime() - a.debut))
+		local part = reste / DELAI_ATTAQUE
+		local s = math.ceil(reste)
 		if a.qui == moi then
-			if a.envoye then return "Tes attaques partent…" end
-			if ChoixEnAttente() then
-				return ("|cffffd100Double 6 !|r 6 attaques, ou relance : la somme des dés · %d s"):format(reste)
-			end
-			if not AttaquesConnues() then return "Les dés roulent…" end
-			if APlacer() == 0 then
-				return ("Personne d'autre pour les recevoir : tes |cffffd100%d attaques|r sont pour toi · %d s"):format(AttaquesConnues(), reste)
-			end
-			local pourMoi = Surplus() > 0 and (" (dont %d pour toi)"):format(Surplus()) or ""
-			return ("|cffffd100%d attaques|r%s : clique sur les joueurs (clic droit : en retirer) · %d s"):format(AttaquesConnues(), pourMoi, reste)
+			if a.envoye then return "Tes attaques partent…", "att" end
+			if ChoixEnAttente() then return ("Double 6 : 6 attaques ou relance · %d s"):format(s), "att", part end
+			if not AttaquesConnues() then return "Les dés roulent…", "att" end
+			if APlacer() == 0 then return ("Tes %d attaques sont pour toi · %d s"):format(AttaquesConnues(), s), "att", part end
+			local pourMoi = Surplus() > 0 and (", %d pour toi"):format(Surplus()) or ""
+			return ("%d attaques : clique sur les joueurs%s · %d s"):format(AttaquesConnues(), pourMoi, s), "att", part
 		end
-		if a.choix6 and not a.relance then return ("%s choisit : 6 attaques ou relance…"):format(NomJoueur(a.qui)) end
-		return ("%s distribue %d attaques…"):format(NomJoueur(a.qui), a.n)
+		if a.choix6 and not a.relance then return ("%s choisit : 6 attaques ou relance"):format(NomJoueur(a.qui)), "att", part end
+		return ("%s distribue %d attaques · %d s"):format(NomJoueur(a.qui), a.n, s), "att", part
 	end
 	if attente then return "Les dés roulent…" end
 	if not mienne then
-		return Assis() >= PLACES and "La table est pleine." or "Clique sur une place libre pour t'asseoir."
+		return Assis() >= PLACES and "La table est pleine" or "Clique sur une place libre pour t'asseoir"
 	end
-	if tour == mienne then return "|cffffd100À toi de lancer !|r" end
+	if tour == mienne then return "À toi de lancer !", "moi" end
 	if tour and places[tour] then
 		local tarde = Tarde()
 		if tarde and Suivante(tour) == mienne then
-			return ("%s tarde : tu peux lancer à sa place."):format(NomJoueur(places[tour]))
+			return ("%s tarde : tu peux lancer à sa place"):format(NomJoueur(places[tour])), "moi"
 		end
-		return ("Au tour de %s."):format(NomJoueur(places[tour]))
+		return ("Au tour de %s"):format(NomJoueur(places[tour]))
 	end
 	return ""
 end
@@ -1393,7 +1571,8 @@ Maj = function()
 		local cle = places[i]
 		-- halo doré : son tour ; rouge : un joueur que je peux attaquer
 		local cible = distribue and cle ~= nil and cle ~= moi
-		b.halo:SetShown(not masque and (cible or (cle ~= nil and i == tour and not bizkit and not attaque)))
+		-- (allumé aussi pendant un Bizkit : il ne doit pas s'éteindre sur un 7)
+		b.halo:SetShown(not masque and (cible or (cle ~= nil and i == tour and not attaque)))
 		if cible then
 			b.halo:SetVertexColor(1, 0.3, 0.25, 1)
 		else
@@ -1466,9 +1645,43 @@ Maj = function()
 	-- le bouton « Bizkit ! » : une fois les dés posés, un clic par lancer
 	t.crier:Activer(PeutCrier() and not t.roule)
 
-	-- dernière nouvelle, état, bouton
-	t.resultat:SetText((t.roule or masque) and "" or annonce)
-	t.etat:SetText(TexteEtat(mienne, tour))
+	-- l'état, dans l'en-tête (couleur selon le genre, barre du temps qui reste)
+	local texte, genre, part = TexteEtat(mienne, tour)
+	local e = t.etat
+	e.texte:SetWidth(0)
+	e.texte:SetText(texte)
+	if e.genre ~= (genre or "") then
+		e.genre = genre or ""
+		local couleurTexte = C.texte
+		if genre == "moi" then
+			UI.Habiller(e, { C.orFonce[1], C.orFonce[2], C.orFonce[3], 1 }, { C.ors[1], C.ors[2], C.ors[3], 1 })
+			couleurTexte = { 0.07, 0.05, 0.02 }
+		elseif genre == "bz" then
+			UI.Habiller(e, C.fondAide, C.bordAide)
+			couleurTexte = { 1, 0.83, 0.54 }
+		elseif genre == "att" then
+			UI.Habiller(e, { 0.165, 0.078, 0.06, 1 }, C.bordAide)
+			couleurTexte = C.aide
+		else
+			UI.Habiller(e, C.bandeau, C.bordFort)
+		end
+		e.texte:SetTextColor(unpack(couleurTexte))
+		-- (texte sombre sur l'or : sans l'ombre noire de la police)
+		e.texte:SetShadowOffset(genre == "moi" and 0 or 1, genre == "moi" and 0 or -1)
+		e.barre:SetColorTexture(couleurTexte[1], couleurTexte[2], couleurTexte[3], 0.9)
+	end
+	local largeur = math.min(340, math.max(120, (e.texte:GetStringWidth() or 0) + 28))
+	if largeur >= 340 then e.texte:SetWidth(largeur - 16) end
+	e:SetWidth(largeur)
+	e:SetShown(texte ~= "")
+	if part then
+		e.barre:SetWidth(math.max(1, (largeur - 2) * part))
+		e.barre:Show()
+	else
+		e.barre:Hide()
+	end
+
+	-- les boutons
 	local a = attaque
 	if masque then
 		t.secondaire:Hide()
@@ -1497,24 +1710,57 @@ Maj = function()
 		end
 	else
 		t.secondaire:Hide()
-		t.lancer:Activer(PeutLancer())
+		-- (pendant un Bizkit où je n'ai pas crié, le bouton reste comme avant le 7 ; un clic est sans effet)
+		local b = bizkit
+		t.lancer:Activer(PeutLancer() or (b ~= nil and not b.rang[moi] and PeutLancer(true)))
 		t.lancer:Ecrire(attente and "Les dés roulent…" or "Lancer les dés")
 	end
 	t.compte:SetText(("%d / %d"):format(Assis(), PLACES))
 
-	-- à droite : la prison de 3, les derniers lancers et Bizkit
-	if prisonVue then
-		cote.prison:SetText(("%s%s : |cffffd100%s|r%s"):format(PRISONS[cranVu], cranVu > 1 and (" (×" .. cranVu .. ")") or "",
-			NomJoueur(prisonVue), PlaceDe(prisonVue) and "" or " (absent)"))
+	-- les cachots
+	t.cachot3:Poser(prisonVue, prisonVue and cranVu, nil)
+	t.cachot5:Poser(prison5Vue, nil, "-1 par 5")
+
+	-- « Ce lancer » : ses dés, son lanceur, ses effets (et les attaques d'un double qui attendent)
+	local bo = t.boite
+	local l = dernierLancer
+	if masque then l = masque.lancer end
+	for _, ligne in ipairs(bo.lignes) do ligne:Hide() end
+	if l then
+		bo.vide:Hide()
+		bo.titre:Show()
+		bo.filet:Show()
+		bo.de1:SetTexture(FACE .. l.d1)
+		bo.de2:SetTexture(FACE .. l.d2)
+		bo.de1:Show()
+		bo.de2:Show()
+		bo.par:SetText("par |cffe8e2d4" .. NomJoueur(l.qui) .. "|r")
+		local liste = {}
+		for k = 1, EffetsVus(l, masque) do liste[#liste + 1] = l.effets[k] end
+		if a and not masque and a.id == l.id and not a.envoye then
+			local txt = ChoixEnAttente() and "double 6 : 6 attaques ou relance"
+				or (AttaquesConnues() and ("%d attaques à distribuer"):format(a.n)) or "relance…"
+			liste[#liste + 1] = { k = "att", cle = a.qui, texte = txt, enCours = true }
+		end
+		for k = 1, math.min(#liste, LIGNES_BOITE) do
+			local ef = liste[k]
+			if k == LIGNES_BOITE and #liste > LIGNES_BOITE then
+				ef = { texte = ("+ %d autres effets : voir les derniers lancers"):format(#liste - LIGNES_BOITE + 1) }
+			end
+			bo.lignes[k]:Poser(ef)
+		end
 	else
-		cote.prison:SetText("Prison de 3 : |cff9b9380personne|r")
+		bo.titre:Hide()
+		bo.filet:Hide()
+		bo.de1:Hide()
+		bo.de2:Hide()
+		bo.par:SetText("")
+		bo.vide:SetText(infoSeule or "Aucun lancer pour l'instant")
+		bo.vide:Show()
 	end
-	if prison5Vue then
-		cote.prison5:SetText(("Prison de 5 : |cffffd100%s|r%s"):format(NomJoueur(prison5Vue), PlaceDe(prison5Vue) and "" or " (absent)"))
-	else
-		cote.prison5:SetText("Prison de 5 : |cff9b9380personne|r")
-	end
-	-- pendant que les dés roulent, la liste commence à la dernière entrée d'avant le lancer
+
+	-- à droite : les derniers lancers, chacun avec ses effets en dessous ; le premier (le lancer en cours)
+	-- est encadré, sans sa somme (c'est à chacun de voir le 7)
 	local premier = 1
 	if masque then
 		premier = #historique + 1
@@ -1522,65 +1768,46 @@ Maj = function()
 			if h == masque.entree then premier = j; break end
 		end
 	end
-	local nLignes = 0
+	local y, nL, nS = 0, 0, 0
 	for j = premier, #historique do
 		local h = historique[j]
-		nLignes = nLignes + 1
-		local ligne = LigneHistorique(cote, nLignes)
-		if h.genre == "bizkit" then
-			local noms = {}
-			for _, cle in ipairs(h.perdants) do noms[#noms + 1] = NomJoueur(cle) end
-			ligne.nom:SetText("|cffffd100Bizkit !|r " .. (#noms > 0 and table.concat(noms, ", ") or "annulé"))
-			ligne.nom:SetTextColor(unpack(C.texte))
-			ligne.de1:Hide()
-			ligne.de2:Hide()
-			ligne.total:SetText(#noms > 0 and "-1" or "")
-			ligne.total:SetTextColor(unpack(C.aide))
-		elseif h.genre == "peine" or h.genre == "prison" or h.genre == "prison5" then
-			if h.genre == "peine" then
-				ligne.nom:SetText("|cffff7766" .. (h.lieu or PRISONS[h.cran or 1]) .. "|r " .. NomJoueur(h.qui))
-				ligne.total:SetText("-" .. h.n)
-			elseif h.genre == "prison5" then
-				ligne.nom:SetText("|cff8cbfff" .. (h.sort and "Sort de la prison de 5" or "Prison de 5") .. "|r " .. NomJoueur(h.qui))
-				ligne.total:SetText("")
-			else
-				local lieu = (h.cran or 1) > 1 and PRISONS[h.cran] or "En prison"
-				ligne.nom:SetText("|cffff7766" .. lieu .. "|r " .. NomJoueur(h.qui) .. (h.avant and (" · " .. NomJoueur(h.avant) .. " sort") or ""))
-				ligne.total:SetText("")
-			end
-			ligne.nom:SetTextColor(unpack(C.texte))
-			ligne.total:SetTextColor(unpack(C.aide))
-			ligne.de1:Hide()
-			ligne.de2:Hide()
-		elseif h.genre == "attaque" then
-			local noms, total = {}, 0
-			for _, c in ipairs(h.cibles) do
-				noms[#noms + 1] = ("%s -%d"):format(NomJoueur(c.cle), c.n)
-				total = total + c.n
-			end
-			ligne.nom:SetText("|cffff9966Attaque|r " .. (#noms > 0 and table.concat(noms, ", ") or "personne"))
-			ligne.nom:SetTextColor(unpack(C.texte))
-			ligne.total:SetText(total > 0 and ("-" .. total) or "")
-			ligne.total:SetTextColor(unpack(C.aide))
-			ligne.de1:Hide()
-			ligne.de2:Hide()
-		else
-			-- un lancer, ou la relance d'un double 6
-			ligne.nom:SetText((h.genre == "relance" and "|cffff9966Relance|r " or "") .. NomJoueur(h.qui))
-			ligne.nom:SetTextColor(unpack(h.qui == moi and C.ors or C.texte))
-			ligne.de1:SetTexture(FACE .. h.d1)
-			ligne.de2:SetTexture(FACE .. h.d2)
-			ligne.de1:Show()
-			ligne.de2:Show()
-			ligne.total:SetText(tostring(h.d1 + h.d2))
-			local somme = h.d1 + h.d2
-			ligne.total:SetTextColor(unpack(somme == 7 and C.ors or somme == 3 and C.aide or C.texte))
-		end
+		nL = nL + 1
+		local ligne = LigneHistorique(cote, nL)
+		ligne:ClearAllPoints()
+		ligne:SetPoint("TOPLEFT", cote.liste.contenu, "TOPLEFT", 0, -y)
+		ligne:SetPoint("RIGHT", cote.liste.contenu, "RIGHT", 0, 0)
+		ligne.nom:SetText(NomJoueur(h.qui))
+		ligne.nom:SetTextColor(unpack(h.qui == moi and C.ors or C.texte))
+		ligne.de1:SetTexture(FACE .. h.d1)
+		ligne.de2:SetTexture(FACE .. h.d2)
+		local somme = h.d1 + h.d2
+		ligne.total:SetText(nL > 1 and tostring(somme) or "")
+		ligne.total:SetTextColor(unpack(somme == 7 and C.ors or C.texte))
 		ligne:Show()
+		local haut = y
+		y = y + HAUT_LIGNE
+		for k = 1, EffetsVus(h, masque) do
+			nS = nS + 1
+			local sous = SousLigne(cote, nS)
+			sous:ClearAllPoints()
+			sous:SetPoint("TOPLEFT", cote.liste.contenu, "TOPLEFT", 0, -y)
+			sous:SetPoint("RIGHT", cote.liste.contenu, "RIGHT", 0, 0)
+			sous:Poser(h.effets[k])
+			y = y + HAUT_SOUS
+		end
+		if nL == 1 then
+			cote.actuel:ClearAllPoints()
+			cote.actuel:SetPoint("TOPLEFT", cote.liste.contenu, "TOPLEFT", -2, -haut)
+			cote.actuel:SetPoint("RIGHT", cote.liste.contenu, "RIGHT", 0, 0)
+			cote.actuel:SetHeight(y - haut + 3)
+		end
+		y = y + 5
 	end
-	cote.vide:SetShown(nLignes == 0)
-	for i = nLignes + 1, #cote.lignes do cote.lignes[i]:Hide() end
-	cote.liste:Hauteur(math.max(1, nLignes * HAUT_LIGNE))
+	cote.actuel:SetShown(nL > 0)
+	cote.vide:SetShown(nL == 0)
+	for i = nL + 1, #cote.lignes do cote.lignes[i]:Hide() end
+	for i = nS + 1, #cote.sous do cote.sous[i]:Hide() end
+	cote.liste:Hauteur(math.max(1, y))
 	cote.lever:Activer(mienne ~= nil)
 	cote.nouvelle:Activer(mienne ~= nil)
 	cote.nouvelle:Ecrire(GetTime() - confirmeNouvelle <= 3 and "Confirmer ?" or "Nouvelle partie")
@@ -1666,7 +1893,7 @@ ev:SetScript("OnUpdate", function(_, dt)
 			end
 		elseif b.lanceur ~= moi and maintenant - b.debut > DELAI_COURSE + SANS_NOUVELLES then
 			bizkit = nil
-			annonce = "Bizkit abandonné : le lanceur ne répond plus"
+			Effet("info", nil, nil, "Bizkit abandonné : le lanceur ne répond plus")
 			Maj()
 		end
 	end
@@ -1678,7 +1905,7 @@ ev:SetScript("OnUpdate", function(_, dt)
 			EnvoyerAttaques()
 		elseif a.qui ~= moi and maintenant - a.debut > DELAI_ATTAQUE + SANS_NOUVELLES then
 			attaque = nil
-			annonce = "Attaques abandonnées : le lanceur ne répond plus"
+			Effet("info", nil, nil, "Attaques abandonnées : le lanceur ne répond plus")
 			Maj()
 		end
 	end

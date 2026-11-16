@@ -151,14 +151,17 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   - *Bizkit* (`/smb bizkit`) : jeu de dés, une table pour toute la guilde, huit places autour. On clique sur une place libre
     pour s'asseoir, puis chacun son tour (dans le sens des aiguilles d'une montre) lance deux dés : deux `/roll` 1-6
     du jeu, lus par l'addon. Tout le monde voit les dés partir de la place du lanceur et se poser au hasard sur le
-    tapis, entre les joueurs ; les derniers lancers sont listés à droite. Chacun commence avec 30 points ; un
+    tapis, entre les joueurs. Sous la table, la case « Ce lancer » montre les dés, le lanceur et une ligne par effet
+    (qui perd combien, et pourquoi) ; à droite, les derniers lancers, chacun avec ses effets ; en haut, à qui le
+    tour, avec le temps qui reste. Rien ne trahit un 7 : la somme du lancer en cours n'est pas affichée, et la page
+    s'ouvre (hors combat) à chaque lancer chez les joueurs assis. Chacun commence avec 30 points ; un
     point perdu fait monter « -1 » au-dessus du joueur et rougir son portrait, puis reste affiché à côté de lui
     jusqu'au lancer suivant ; le résultat d'un lancer ne s'affiche qu'une fois les dés posés. Le bouton « Bizkit ! », à côté de
     « Lancer les dés », est toujours là (un clic le crie dans la discussion de guilde) : sur un 7, tous les joueurs
     doivent cliquer, le lanceur aussi, dans n'importe quel ordre, et le dernier perd un point ; ceux qui n'ont pas
     cliqué 10 s après perdent aussi. Cliquer quand les dés ne font pas 7 coûte un point. Chaque clic fait
     apparaître une bulle « Bizkit ! » au-dessus du joueur.
-    Un 3 (1 + 2) envoie le lanceur en *prison de 3* (barreaux orange et pastille « 3 » sur son portrait) et en fait sortir celui qui y était :
+    Les deux prisons sont des cachots dans les coins de la table. Un 3 (1 + 2) envoie le lanceur en *prison de 3* (barreaux orange et pastille « 3 » sur son portrait) et en fait sortir celui qui y était :
     un seul prisonnier à la fois. À chaque lancer, chaque dé qui montre un 3 lui coûte un point (deux sur un
     double 3). Le prisonnier qui refait 3 monte d'un cran : La Prison, Prison du cuirassé, Donjon de Fort-de-Durn puis
     Prison d'Alcaz, où
