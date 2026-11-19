@@ -38,7 +38,9 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   doré des maquettes) : pas de modèle du jeu (`UIPanelButtonTemplate`, parchemins…) dans les pages. Depuis la 7.2.0, des
   surfaces plutôt que des cadres : `C.bord` est à peine visible, un élément choisi a le fond `C.actif` et le trait doré
   `UI.Accent` à gauche (menu, `Rangee:Fort`), un élément cliquable au repos le fond `C.voile` ; l'or reste aux accents.
-- `GuildUp_Interface.lua` : fenêtre principale (style sombre et doré : `Habiller`, `Bouton`, `CarteAccueil`…),
+- `GuildUp_Interface.lua` : fenêtre principale (style sombre et doré : `Habiller`, `Bouton`, `CarteAccueil`… ; 1120 × 700
+  depuis la 7.4.0, échelle 1,1 par défaut, réduite toute seule si la fenêtre ne tient pas dans l'écran ; une page se
+  dimensionne par ancrages ou avec `ns.TAILLE_PAGE`, jamais avec une largeur ou une hauteur de page écrite en dur),
   menu des sections et page Accueil ; `ns.OuvrirInterface(page)`, `ns.MajInterface()`, `ns.NouveautesGuilde()`.
   Un module fournit sa page avec `ns.AjouterPage(id, creer)` (`creer(parent)` renvoie un cadre avec `Maj()` et
   `Ouvrir(...)`). Les sections pas encore refaites ouvrent leur ancienne fenêtre (`ouvrir` dans `SECTIONS`).

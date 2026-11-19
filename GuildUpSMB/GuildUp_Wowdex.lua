@@ -976,7 +976,6 @@ local C = UI and UI.C
 local MARGE = 16
 local LARGEUR_FICHE = 300
 local HAUT_VUES = -92            -- sous l'entête et les onglets
-local HAUT_GRILLE = 434
 local ONGLETS = { "Avis de recherche", "Bestiaire", "Zones", "Carnet de chasse", "Guilde" }
 local FILTRES = { { "Tous", "À capturer", "Capturés" }, { "Tous", "Vus", "Capturés", "À capturer" } }
 local GRIS, VERT, OR, BLEU = "|cff9c9380", "|cff6fd08c", "|cfff1cf6b", "|cffbfbfff"
@@ -985,9 +984,11 @@ local COULEURS_PALIERS = { [0] = { 0.3, 0.27, 0.22 }, { 0.75, 0.72, 0.65 }, { 0.
 local NOMS_PALIERS = { [0] = "Jamais rencontré", "Vu", "Capturé", "Capturé et dépouillé" }
 -- La grille : « cases » (bestiaire, 6 par ligne) ou « cartes » (avis de recherche et recherche d'un objet, 3 par
 -- ligne, avec le nom). Toujours des lignes entières : un modèle 3D ne se découpe pas au bord d'une zone qui défile.
+-- Colonnes, lignes et taille des cases sont calculées à la création de la grille, d'après la place de la page
+-- (taille minimale d'une case : largeurMin × hauteurMin).
 local MODES = {
-	cases = { col = 6, lignes = 5, hauteur = 82, ecart = 6 },
-	cartes = { col = 3, lignes = 3, hauteur = 140, ecart = 6 },
+	cases = { largeurMin = 70, hauteurMin = 82, ecart = 6, col = 6, lignes = 5, largeur = 68, hauteur = 82 },
+	cartes = { largeurMin = 136, hauteurMin = 138, ecart = 6, col = 3, lignes = 3, largeur = 142, hauteur = 140 },
 }
 local TRANCHES = { { 1, 9 }, { 10, 19 }, { 20, 29 }, { 30, 39 }, { 40, 49 }, { 50, 59 }, { 60, 999 } }
 local ORDRE_RANGS = { 4, 2, 3, 1, 0 } -- rare, rare élite, boss, élite, normal
@@ -1002,6 +1003,7 @@ local DessinerGrille, MajFiche -- (définis plus bas)
 local function Couleur(c) return ("|cff%02x%02x%02x"):format(math.floor(c[1] * 255), math.floor(c[2] * 255), math.floor(c[3] * 255)) end
 
 local function LargeurPage() return (ns.TAILLE_PAGE and ns.TAILLE_PAGE[1] or 794) end
+local function HauteurPage() return (ns.TAILLE_PAGE and ns.TAILLE_PAGE[2] or 586) end
 
 local function NiveauTexte(mi, ma)
 	if not mi or mi <= 0 then return nil end
@@ -1430,7 +1432,7 @@ DessinerGrille = function()
 	local mode = ModeGrille()
 	local m = MODES[mode]
 	local grand = (mode == "cartes")
-	local largeur = math.floor((gr.largeur - (m.col - 1) * m.ecart) / m.col)
+	local largeur = m.largeur
 	local total = math.ceil(#affiches / m.col)
 	local dernier = math.max(0, total - m.lignes)
 	etat.ligne = math.max(0, math.min(dernier, etat.ligne))
@@ -1470,9 +1472,9 @@ DessinerGrille = function()
 	-- repère de défilement
 	local piste = gr.piste
 	if total > m.lignes then
-		local hp = math.max(24, HAUT_GRILLE * m.lignes / total)
+		local hp = math.max(24, gr.hauteur * m.lignes / total)
 		piste.poignee:ClearAllPoints()
-		piste.poignee:SetPoint("TOP", piste, "TOP", 0, -(dernier > 0 and (etat.ligne / dernier) * (HAUT_GRILLE - hp) or 0))
+		piste.poignee:SetPoint("TOP", piste, "TOP", 0, -(dernier > 0 and (etat.ligne / dernier) * (gr.hauteur - hp) or 0))
 		piste.poignee:SetHeight(hp)
 		piste:Show()
 	else
@@ -1483,7 +1485,14 @@ end
 local function CreerGrille(parent)
 	local gr = CreateFrame("Frame", nil, parent)
 	gr.largeur = LargeurPage() - 2 * MARGE - LARGEUR_FICHE - 10 - 12
-	gr:SetSize(gr.largeur, HAUT_GRILLE)
+	gr.hauteur = HauteurPage() + HAUT_VUES - 40 - 20
+	for _, m in pairs(MODES) do
+		m.col = math.max(1, math.floor((gr.largeur + m.ecart) / (m.largeurMin + m.ecart)))
+		m.lignes = math.max(1, math.floor((gr.hauteur + m.ecart) / (m.hauteurMin + m.ecart)))
+		m.largeur = math.floor((gr.largeur - (m.col - 1) * m.ecart) / m.col)
+		m.hauteur = math.floor((gr.hauteur - (m.lignes - 1) * m.ecart) / m.lignes)
+	end
+	gr:SetSize(gr.largeur, gr.hauteur)
 	gr:EnableMouseWheel(true)
 	gr:SetScript("OnMouseWheel", function(_, sens)
 		local pas = (IsShiftKeyDown and IsShiftKeyDown()) and MODES[ModeGrille()].lignes or 1
@@ -1492,7 +1501,7 @@ local function CreerGrille(parent)
 	end)
 	-- piste à droite : cliquer ou glisser pour aller loin (plus de 500 lignes dans le bestiaire)
 	local piste = CreateFrame("Button", nil, gr)
-	piste:SetSize(8, HAUT_GRILLE)
+	piste:SetSize(8, gr.hauteur)
 	piste:SetPoint("TOPLEFT", gr, "TOPRIGHT", 4, 0)
 	local fond = piste:CreateTexture(nil, "BACKGROUND")
 	fond:SetAllPoints()
@@ -1529,8 +1538,8 @@ end
 -- Fiche d'un monstre
 --------------------------------------------------------------------------------
 
-local LIGNES_BUTIN = 7
-local HAUT_SCENE = 104
+local LIGNES_BUTIN = 9
+local HAUT_SCENE = 128
 
 local function Voisin(sens)
 	local n = #affiches
@@ -1850,7 +1859,7 @@ MajFiche = function()
 	-- butin : autant de lignes que la place le permet
 	local liste, corps, membres = ButinAffiche(id)
 	local haut = tonumber(fiche:GetHeight()) or 0
-	if haut < 200 then haut = 478 end
+	if haut < 200 then haut = HauteurPage() + HAUT_VUES - 16 end
 	local places = math.floor((haut - 76 - HAUT_SCENE - 10 - y - 10 - 20 - 20 - 44) / 21)
 	places = math.max(1, math.min(LIGNES_BUTIN, places))
 	fiche.titreButin:ClearAllPoints()
@@ -2006,7 +2015,7 @@ local function CreerRangeeZone(parent, largeur)
 	r.rares = UI.Texte(r, "GameFontHighlightSmall", COULEUR_RARE)
 	r.rares:SetPoint("LEFT", r, "LEFT", 232, 0)
 	r.rares:SetWidth(150)
-	r.barre = Barre(r, 250, 8)
+	r.barre = Barre(r, math.max(160, largeur - 392 - 96), 8)
 	r.barre:SetPoint("LEFT", r, "LEFT", 392, 0)
 	r.compte = UI.Texte(r, "GameFontHighlightSmall", C.gris)
 	r.compte:SetPoint("RIGHT", r, "RIGHT", -12, 0)
@@ -2183,10 +2192,18 @@ local function CreerVueCarnet(p)
 	local largeur = LargeurPage() - 2 * MARGE
 	local lg = math.floor((largeur - 10) / 2)
 	local ld = largeur - 10 - lg
+	-- hauteurs : celles d'une page de 586 de haut, plus la place en plus répartie entre les cartes
+	local haut = HauteurPage() + HAUT_VUES - 4 - 12
+	local sup = math.max(0, haut - 452)
+	local hTitre, pasTitre = 196 + math.floor(sup * 0.4), 14 + math.floor(sup * 0.4 / #TITRES)
+	local hNiveaux, pasNiveaux = 152 + math.floor(sup * 0.35), 16 + math.floor(sup * 0.35 / #TRANCHES)
+	local hRangs, pasRangs = 130 + math.floor(sup * 0.2), 18 + math.floor(sup * 0.2 / #ORDRE_RANGS)
+	local hListe = math.floor((haut - hRangs - 20) / 2)
+	local nListe = math.max(3, math.floor((hListe - 34) / 19))
 	-- colonne de gauche : titre, progression par niveau, réglages
 	v.titre = UI.Carte(v, "Titre de chasseur")
 	v.titre:SetPoint("TOPLEFT", v, "TOPLEFT", MARGE, -4)
-	v.titre:SetSize(lg, 196)
+	v.titre:SetSize(lg, hTitre)
 	v.titre.nom = UI.Texte(v.titre, "GameFontNormalLarge", C.ors)
 	v.titre.nom:SetPoint("TOPLEFT", v.titre, "TOPLEFT", 14, -34)
 	v.titre.detail = UI.Texte(v.titre, "GameFontHighlightSmall", C.gris)
@@ -2194,20 +2211,20 @@ local function CreerVueCarnet(p)
 	v.titre.echelle = {}
 	for i = 1, #TITRES do
 		local nom = UI.Texte(v.titre, "GameFontHighlightSmall", C.gris)
-		nom:SetPoint("TOPLEFT", v.titre, "TOPLEFT", 14, -76 - (i - 1) * 14)
+		nom:SetPoint("TOPLEFT", v.titre, "TOPLEFT", 14, -76 - (i - 1) * pasTitre)
 		local seuil = UI.Texte(v.titre, "GameFontHighlightSmall", C.gris)
-		seuil:SetPoint("TOPRIGHT", v.titre, "TOPRIGHT", -14, -76 - (i - 1) * 14)
+		seuil:SetPoint("TOPRIGHT", v.titre, "TOPRIGHT", -14, -76 - (i - 1) * pasTitre)
 		seuil:SetJustifyH("RIGHT")
 		v.titre.echelle[i] = { nom = nom, seuil = seuil }
 	end
 	v.niveaux = UI.Carte(v, "Par niveau")
 	v.niveaux:SetPoint("TOPLEFT", v.titre, "BOTTOMLEFT", 0, -10)
-	v.niveaux:SetSize(lg, 152)
+	v.niveaux:SetSize(lg, hNiveaux)
 	v.niveaux.lignes = {}
-	for i = 1, #TRANCHES do v.niveaux.lignes[i] = LigneBarre(v.niveaux, i, lg, 16) end
+	for i = 1, #TRANCHES do v.niveaux.lignes[i] = LigneBarre(v.niveaux, i, lg, pasNiveaux) end
 	v.reglages = UI.Carte(v, "Alertes")
 	v.reglages:SetPoint("TOPLEFT", v.niveaux, "BOTTOMLEFT", 0, -10)
-	v.reglages:SetSize(lg, 86)
+	v.reglages:SetSize(lg, math.max(86, haut - hTitre - hNiveaux - 20))
 	v.alertes = UI.Case(v.reglages, "Alerte quand un rare à capturer est en vue", function(oui)
 		local w = Moi()
 		if w then w.alertes = oui and true or false end
@@ -2222,19 +2239,19 @@ local function CreerVueCarnet(p)
 	-- colonne de droite : progression par rang, monstres pistés, dernières captures
 	v.rangs = UI.Carte(v, "Par rang")
 	v.rangs:SetPoint("TOPLEFT", v.titre, "TOPRIGHT", 10, 0)
-	v.rangs:SetSize(ld, 130)
+	v.rangs:SetSize(ld, hRangs)
 	v.rangs.lignes = {}
-	for i = 1, #ORDRE_RANGS do v.rangs.lignes[i] = LigneBarre(v.rangs, i, ld, 18) end
+	for i = 1, #ORDRE_RANGS do v.rangs.lignes[i] = LigneBarre(v.rangs, i, ld, pasRangs) end
 	v.pistes = UI.Carte(v, "À pister")
 	v.pistes:SetPoint("TOPLEFT", v.rangs, "BOTTOMLEFT", 0, -10)
-	v.pistes:SetSize(ld, 152)
+	v.pistes:SetSize(ld, hListe)
 	v.pistes.lignes = {}
-	for i = 1, 6 do v.pistes.lignes[i] = LigneMonstre(v.pistes, i, ld) end
+	for i = 1, nListe do v.pistes.lignes[i] = LigneMonstre(v.pistes, i, ld) end
 	v.captures = UI.Carte(v, "Dernières captures")
 	v.captures:SetPoint("TOPLEFT", v.pistes, "BOTTOMLEFT", 0, -10)
-	v.captures:SetSize(ld, 152)
+	v.captures:SetSize(ld, haut - hRangs - 20 - hListe)
 	v.captures.lignes = {}
-	for i = 1, 6 do v.captures.lignes[i] = LigneMonstre(v.captures, i, ld) end
+	for i = 1, nListe do v.captures.lignes[i] = LigneMonstre(v.captures, i, ld) end
 
 	local function NomColore(id)
 		local f = Bestiaire().par[id]
@@ -2351,7 +2368,8 @@ local function CreerVueGuilde(p)
 	local lg = 480
 	local ld = largeur - 10 - lg
 	-- (hauteur de la vue, moins le résumé et les marges)
-	local hauteur = (ns.TAILLE_PAGE and ns.TAILLE_PAGE[2] or 586) + HAUT_VUES - 4 - 62 - 10 - 12
+	local hauteur = HauteurPage() + HAUT_VUES - 4 - 62 - 10 - 12
+	local nLignes = math.max(8, math.floor((hauteur - 62) / 23)) -- lignes du classement et des premières
 	v.resume = UI.Carte(v, "WoWdex de la guilde")
 	v.resume:SetPoint("TOPLEFT", v, "TOPLEFT", MARGE, -4)
 	v.resume:SetSize(largeur, 62)
@@ -2371,7 +2389,7 @@ local function CreerVueGuilde(p)
 	filet:SetPoint("TOPLEFT", v.classement, "TOPLEFT", 14, -54)
 	filet:SetPoint("TOPRIGHT", v.classement, "TOPRIGHT", -14, -54)
 	v.classement.lignes = {}
-	for i = 1, 14 do
+	for i = 1, nLignes do
 		local l = CreateFrame("Frame", nil, v.classement)
 		l:SetSize(lg - 16, 22)
 		l:SetPoint("TOPLEFT", v.classement, "TOPLEFT", 8, -58 - (i - 1) * 23)
@@ -2395,7 +2413,7 @@ local function CreerVueGuilde(p)
 	v.premieres:SetPoint("TOPLEFT", v.classement, "TOPRIGHT", 10, 0)
 	v.premieres:SetSize(ld, hauteur)
 	v.premieres.lignes = {}
-	for i = 1, 14 do
+	for i = 1, nLignes do
 		local l = LigneMonstre(v.premieres, i, ld)
 		l:ClearAllPoints()
 		l:SetPoint("TOPLEFT", v.premieres, "TOPLEFT", 12, -36 - (i - 1) * 23)
@@ -2463,7 +2481,7 @@ local function CreerVueGuilde(p)
 				l:Hide()
 			end
 		end
-		v.classement.compte:SetText(#liste > 14 and ("les 14 premiers sur " .. #liste) or "")
+		v.classement.compte:SetText(#liste > nLignes and (("les %d premiers sur %d"):format(nLignes, #liste)) or "")
 		-- premières captures de rares, les plus récentes d'abord
 		table.sort(premieres, function(x, y)
 			if x.j ~= y.j then return x.j > y.j end

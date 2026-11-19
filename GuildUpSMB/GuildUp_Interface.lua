@@ -35,7 +35,7 @@ local C = UI.C
 local Habiller, Cadre, Texte, Bouton, Infobulle, Pastille = UI.Habiller, UI.Cadre, UI.Texte, UI.Bouton, UI.Infobulle, UI.Pastille
 local IlYa, Chuchoter = UI.IlYa, UI.Chuchoter
 local ROND = UI.ROND
-local LARGEUR, HAUTEUR = 980, 640
+local LARGEUR, HAUTEUR = 1120, 700 -- (980 × 640 jusqu'à la 7.3.0)
 local LARGEUR_MENU, HAUTEUR_TETE = 184, 52
 ns.TAILLE_PAGE = { LARGEUR - LARGEUR_MENU - 2, HAUTEUR - HAUTEUR_TETE - 2 } -- zone des pages
 
@@ -209,6 +209,15 @@ local function CreerAccueil(parent)
 	local MARGE, ECART = 16, 12
 	local largeur = LARGEUR - LARGEUR_MENU - 2 * MARGE
 	local demi = (largeur - ECART) / 2
+	-- sous « Dans ta zone », deux rangées de cartes se partagent la hauteur de la page ; chacune a autant de
+	-- lignes que sa hauteur le permet (deux au moins)
+	local hautCarte = math.floor((HAUTEUR - HAUTEUR_TETE - 2 - MARGE - 96 - 2 * ECART - MARGE) / 2)
+	local nLignes = math.max(2, math.floor((hautCarte - 72) / 44))
+	local function Lignes(c)
+		local t = {}
+		for i = 1, nLignes do t[i] = LigneCarte(c, i) end
+		return t
+	end
 
 	-- Dans ta zone : jusqu'à 5 membres (portrait, nom, distance) ; clic : chuchoter
 	local zone = CarteAccueil(p, "Dans ta zone")
@@ -235,8 +244,8 @@ local function CreerAccueil(parent)
 	-- Demandes de la guilde que je peux honorer (ou que j'ai prises)
 	local demandes = CarteAccueil(p, "Tu peux aider")
 	demandes:SetPoint("TOPLEFT", zone, "BOTTOMLEFT", 0, -ECART)
-	demandes:SetSize(demi, 182)
-	demandes.lignes = { LigneCarte(demandes, 1), LigneCarte(demandes, 2) }
+	demandes:SetSize(demi, hautCarte)
+	demandes.lignes = Lignes(demandes)
 	demandes.voir = Bouton(demandes, "Voir les demandes", "fantome", 130, 22)
 	demandes.voir:SetPoint("BOTTOMLEFT", demandes, "BOTTOMLEFT", 14, 10)
 	demandes.voir:SetScript("OnClick", function() Aller("demandes") end)
@@ -244,10 +253,10 @@ local function CreerAccueil(parent)
 	-- Appels à l'aide
 	local aide = CarteAccueil(p, "Appels à l'aide")
 	aide:SetPoint("TOPLEFT", demandes, "TOPRIGHT", ECART, 0)
-	aide:SetSize(demi, 182)
+	aide:SetSize(demi, hautCarte)
 	aide.titre:SetTextColor(unpack(C.aide))
 	aide:SetBackdropBorderColor(0.43, 0.2, 0.14, 1)
-	aide.lignes = { LigneCarte(aide, 1), LigneCarte(aide, 2) }
+	aide.lignes = Lignes(aide)
 	aide.note = Texte(aide, "GameFontDisableSmall")
 	aide.note:SetPoint("BOTTOMLEFT", aide, "BOTTOMLEFT", 14, 12)
 	aide.note:SetText("Seuls les membres qui ont le niveau reçoivent l'appel.")
@@ -255,8 +264,8 @@ local function CreerAccueil(parent)
 	-- Mes demandes en cours
 	local mes = CarteAccueil(p, "Mes demandes")
 	mes:SetPoint("TOPLEFT", demandes, "BOTTOMLEFT", 0, -ECART)
-	mes:SetSize(demi, 160)
-	mes.lignes = { LigneCarte(mes, 1), LigneCarte(mes, 2) }
+	mes:SetSize(demi, hautCarte)
+	mes.lignes = Lignes(mes)
 	mes.nouvelle = Bouton(mes, "Nouvelle demande", "fantome", 130, 22)
 	mes.nouvelle:SetPoint("BOTTOMLEFT", mes, "BOTTOMLEFT", 14, 10)
 	mes.nouvelle:SetScript("OnClick", function() Aller("demandes") end)
@@ -264,8 +273,8 @@ local function CreerAccueil(parent)
 	-- Prochains événements de la guilde (calendrier du jeu, GuildUp_Evenements.lua)
 	local evts = CarteAccueil(p, "Prochains événements")
 	evts:SetPoint("TOPLEFT", mes, "TOPRIGHT", ECART, 0)
-	evts:SetSize(demi, 160)
-	evts.lignes = { LigneCarte(evts, 1), LigneCarte(evts, 2) }
+	evts:SetSize(demi, hautCarte)
+	evts.lignes = Lignes(evts)
 	evts.vide:SetText("Aucun événement prévu dans les 30 prochains jours.")
 	evts.tous = Bouton(evts, "Tous les événements", "fantome", 150, 22)
 	evts.tous:SetPoint("BOTTOMLEFT", evts, "BOTTOMLEFT", 14, 10)
@@ -430,7 +439,14 @@ end
 local ECHELLE_DEFAUT = 1.1
 local function Echelle()
 	local e = tonumber(Reglages().echelle) or ECHELLE_DEFAUT
-	return math.max(0.7, math.min(1.6, e))
+	e = math.max(0.7, math.min(1.6, e))
+	-- la fenêtre tient toujours dans l'écran : sur un petit écran, ou quand l'interface du jeu est agrandie
+	-- (l'écran ne fait alors que 768 unités de haut), l'échelle est réduite d'autant
+	local l, h = UIParent:GetWidth(), UIParent:GetHeight()
+	if type(l) == "number" and type(h) == "number" and l > 200 and h > 200 then
+		e = math.min(e, (l - 16) / LARGEUR, (h - 16) / HAUTEUR)
+	end
+	return e
 end
 -- ns.EchelleInterface(e) : change la taille (nil = la lire) ; renvoie la taille en vigueur
 ns.EchelleInterface = function(e)
@@ -678,6 +694,7 @@ local function CreerFenetre()
 	-- (une seule fois : ensuite, l'alerte du bandeau suffit)
 	local profilPropose = false
 	f:SetScript("OnShow", function()
+		f:SetScale(Echelle()) -- (l'écran ou l'échelle de l'interface du jeu ont pu changer)
 		ns.MajInterface()
 		if profilPropose then return end
 		profilPropose = true
