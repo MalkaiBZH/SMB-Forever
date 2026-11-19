@@ -776,6 +776,20 @@ MajFiche = function()
 		end
 		Espace()
 	end
+	-- trouvé par la guilde sur les corps fouillés (WoWdex, GuildUp_Wowdex.lua), du meilleur taux au plus faible
+	local trouves = ns.SourcesWowdex and ns.SourcesWowdex(objet)
+	if trouves and #trouves > 0 then
+		Ajouter(("Trouvé par la guilde (%d monstre%s)"):format(#trouves, #trouves > 1 and "s" or ""), 0,
+			{ titre = true, icone = "Interface\\Icons\\Ability_Hunter_BeastTaming" })
+		for k = 1, math.min(#trouves, 10) do
+			local x = trouves[k]
+			Ajouter(("- %s%s · |cff6fd08c%d %%|r |cff999999(%d sur %d corps fouillés)|r"):format(MarqueRang(x.rang), x.nom,
+				math.floor(100 * x.n / x.k + 0.5), x.n, x.k), 1, {
+				action = function() if ns.OuvrirInterface then ns.OuvrirInterface("wowdex", x.id) end end,
+				bulle = "Clic : sa fiche dans le WoWdex" .. (x.zone and (" (" .. x.zone .. ")") or "") })
+		end
+		Espace()
+	end
 	local s = Sources().objets[objet]
 	if s then
 		if #s.recolte > 0 then

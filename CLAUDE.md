@@ -86,7 +86,8 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
 - `GuildUp_Wowdex.lua` : page **WoWdex** (`ns.AjouterPage("wowdex")`, `/smb wowdex`) : le bestiaire de
   `GuildUp_Bestiaire.lua` à compléter (vu, capturé = vaincu, dépouillé), détection sur les barres de nom, la cible, le
   survol, `PARTY_KILL` du journal de combat et `LOOT_OPENED` (`GetLootSourceInfo`) ; monstres hors bestiaire appris
-  sur l'unité ; ligne dans l'infobulle des monstres ; `ns.NomWowdex(pnj)` (fil d'activité, genre `W`).
+  sur l'unité ; butin des récoltes (dépeçage, vol à la tire…) ignoré ; recherche par monstre, zone ou objet ; ligne dans
+  l'infobulle des monstres ; `ns.NomWowdex(pnj)` (fil d'activité, genre `W`), `ns.SourcesWowdex(objet)` (Encyclopédie).
 - `GuildUp_Config.lua` : **réglages propres à la guilde** (`ns.Config` : nom public, cri de guilde, emote animée,
   membre vedette). Chargé en premier, sans dépendance ; les autres modules le lisent via `ns.Config`.
 - `GuildUp_Commandes.lua` : page « Aide », la liste de toutes les commandes de `/smb`. Elles y sont déclarées à la
@@ -117,8 +118,8 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   les grands moments de chacun, à sa position, gardés sans limite de durée, dessinés par `GuildUp_Carte.lua`),
   `GuildUpLay` (layers, `GuildUp_Layers.lua` : signature des GUID des PNJ observés, comparée entre membres de la
   même carte ; demande d'invitation en chuchotement d'addon), `GuildUpDex` (WoWdex, `GuildUp_Wowdex.lua` : captures
-  `N`, butin des corps fouillés `L` sans rattrapage, scores `S`, rattrapage des premières captures de la guilde par le
-  relais à la connexion).
+  `N`, relevés de butin `B` (totaux de chaque membre, fusionnés au plus grand : le taux de la guilde est leur somme),
+  scores `S`, rattrapage des premières captures `Q`/`E` et des relevés `P`/`R`/`F` par le relais à la connexion).
   Exception : `GuildUpObj` (`GuildUp_Objectifs.lua`, « ! » des ennemis de quête) passe par `PARTY` / `RAID`.
 - Protocoles texte : champs séparés par `~`, identifiants en base 36, **255 caractères maximum par
   message** (découpage en morceaux de 200 si besoin). Nettoyer `~` et `|` dans les textes saisis.

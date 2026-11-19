@@ -5,24 +5,38 @@
 --   vu        barre de nom, cible ou survol d'un monstre qu'on peut attaquer : son nom et son modèle s'affichent
 --   vaincu    (« capturé ») tué par moi ou mon groupe (PARTY_KILL du journal de combat, sinon cible ou survol
 --             d'un corps qui n'est pas « pris par un autre »), ou dépouillé
---   dépouillé fouillé : ce qu'il a lâché est compté, pour donner les taux de butin
+--   dépouillé fouillé : ce qu'il a lâché est compté, pour donner les taux de butin. Pas le butin d'une récolte
+--             (dépeçage, vol à la tire, minage, herboristerie : sort lancé moins de 2 s avant l'ouverture du
+--             butin, reconnu à son numéro ou à son nom), ni celui d'un monstre ciblé encore vivant
 -- Un monstre absent du bestiaire mais rencontré en jeu est gardé aussi (nom, niveau, rang, type, zone appris sur
 -- l'unité), sans numéro : le WoWdex vit de ce que croisent les joueurs.
 -- Mon WoWdex est commun aux personnages du compte : GuildUpDB.wowdex.m[pnj] = { v = vu le, k = vaincus,
--- d = dépouilles, tk = premier vaincu le, b = { [objet] = corps qui l'ont lâché }, ty = type, et pour un
--- monstre hors bestiaire : n = nom, l = niveau, r = rang, c = carte, z = zone }.
+-- d = dépouilles, tk = premier vaincu le, tb = dernière dépouille le, b = { [objet] = corps qui l'ont lâché },
+-- ty = type, et pour un monstre hors bestiaire : n = nom, l = niveau, r = rang, c = carte, z = zone }.
 -- La guilde (GuildUpDB.wowdexGuilde[guilde]) : d[pnj] = { c = premier membre à l'avoir vaincu, j = jour },
--- s[clé] = { v, k, d, t } (score de chaque membre), b[pnj] = { k = corps fouillés, o = { [objet] = n } }.
+-- s[clé] = { v, k, d, t } (score de chaque membre), butin[pnj][clé] = { k = corps fouillés, o = { [objet] = n },
+-- t = date } (le relevé de chaque autre membre ; le mien est lu dans mon WoWdex), curseurButin (rattrapage).
+-- Taux de drop de la guilde = somme des relevés de chaque membre. Chaque relevé appartient à son membre et ses
+-- comptes ne font que monter : on garde le plus grand reçu, donc rien n'est compté deux fois (ni un message reçu
+-- deux fois, ni un relevé reçu en direct puis par le relais).
 -- Un monstre est « connu » (nom affiché, sinon « ??? ») si je l'ai vu ou si la guilde l'a vaincu.
--- Messages (pnj et objets en base 36, jour = jours depuis le 1er janvier 2024) :
+-- Recherche de la page : nom du monstre, zone, ou nom d'un objet (les monstres qui le lâchent : ceux où la guilde
+-- l'a trouvé d'abord, puis ceux du bestiaire). ns.SourcesWowdex(objet) : les monstres où la guilde l'a trouvé,
+-- avec le taux (Encyclopédie de GuildUp_Carnet.lua).
+-- Messages (pnj et objets en base 36, jour = jours depuis le 1er janvier 2024, t = heure du serveur) :
 --   "N~pnj,pnj,…"                     mes nouvelles captures (regroupées, toutes les 15 s au plus)
---   "L~pnj:corps:objet.n.objet.n;…"   mes dépouilles depuis le dernier envoi (toutes les 60 s au plus) :
---                                     chacun les ajoute aux taux de la guilde ; pas de rattrapage
+--   "B~pnj:corps:t.objet.n.objet.n;…" mes relevés de butin (totaux) des monstres fouillés depuis le dernier envoi
+--                                     (toutes les 60 s au plus) ; un monstre au butin très varié tient en
+--                                     plusieurs mots. (« L », les écarts de la 7.0.0, est ignoré.)
 --   "S~vus~vaincus~dépouillés"        mon score (à la connexion, puis 2 min après un changement)
 --   "Q~jour"                          je me connecte : envoyez-moi les découvertes depuis ce jour
 --   "E~clé~pnj.jour,pnj.jour,…"       découvertes de la guilde, par le seul relais (ns.EstLeRelais), les plus
 --                                     anciennes d'abord, 400 au plus par demande (la suite à la connexion suivante)
 --   "T~clé,vus,vaincus,dépouillés,t;…" scores des membres, par le même relais
+--   "P~t"                             je me connecte : envoyez-moi les relevés de butin changés depuis t
+--   "R~clé~pnj:corps:t.objet.n…;…"    relevés de ce membre, par le seul relais, les plus anciens d'abord, 300 au
+--                                     plus par demande ; tout le monde les lit
+--   "F~demandeur~t"                   fin du rattrapage : le demandeur reprendra à t la prochaine fois
 -- Une découverte : le jour le plus ancien gagne (à égalité, la plus petite clé). La première capture d'un rare,
 -- d'un rare élite ou d'un boss par la guilde entre dans le fil d'activité (genre « W », GuildUp_Journal.lua).
 -- Bulles (catégorie « wowdex ») : capture d'un rare ou d'un boss, tous les 25 monstres capturés ; une ligne dans la
@@ -33,6 +47,7 @@ local NOM_ADDON, ns = ...
 local PREFIXE = "GuildUpDex"
 local EPOQUE = 1704067200        -- 1er janvier 2024 : jour 0
 local MAX_RELAIS = 400
+local MAX_RELAIS_BUTIN = 300
 local MAX_HORS = 1000             -- monstres hors bestiaire gardés au plus
 local PALIER_BULLE = 25
 local OCTETS = 240
@@ -148,9 +163,10 @@ local function Guilde()
 	if type(db.wowdexGuilde) ~= "table" then db.wowdexGuilde = {} end
 	local g = db.wowdexGuilde[nom]
 	if type(g) ~= "table" then g = {}; db.wowdexGuilde[nom] = g end
-	for _, k in ipairs({ "d", "s", "b" }) do
+	for _, k in ipairs({ "d", "s", "butin" }) do
 		if type(g[k]) ~= "table" then g[k] = {} end
 	end
+	g.b = nil -- (7.0.0 : totaux de tous mélangés, impossibles à répartir par membre)
 	return g
 end
 
@@ -231,7 +247,7 @@ local function EnvoyerMots(tete, mots, sep)
 end
 
 local captures = {}        -- nouvelles captures à annoncer
-local depouilles = {}      -- [pnj] = { k, o = { [objet] = n } } à annoncer
+local butinChange = {}     -- [pnj] = true : mes relevés de butin à annoncer
 local captureLancee, butinLance, scoreLance = false, false, false
 
 local function EnvoyerScore()
@@ -259,39 +275,74 @@ local function AnnoncerCapture(id)
 	ScorePlusTard()
 end
 
-local function AnnoncerButin(id, objets)
-	local d = depouilles[id]
-	if not d then d = { k = 0, o = {} }; depouilles[id] = d end
-	d.k = d.k + 1
-	for o in pairs(objets) do d.o[o] = (d.o[o] or 0) + 1 end
+-- un relevé de butin en mots de message : "pnj:corps:t.objet.n.objet.n" ; un monstre au butin très varié prend
+-- plusieurs mots, chacun avec ses corps et sa date (la fusion garde le plus grand de chaque compte)
+local function MotsButin(id, r, mots)
+	local tete = ("%s:%d:%s"):format(Base36(id), r.k or 0, Base36(r.t or 0))
+	local mot = tete
+	for o, n in pairs(r.o or {}) do
+		local bout = "." .. Base36(o) .. "." .. n
+		if #mot + #bout > OCTETS - 40 then mots[#mots + 1] = mot; mot = tete end
+		mot = mot .. bout
+	end
+	mots[#mots + 1] = mot
+end
+
+-- mon relevé de butin d'un monstre (mes corps fouillés, sur tous mes personnages), ou nil
+local function MonReleve(id)
+	local e = Entree(id)
+	if not e or (e.d or 0) <= 0 then return nil end
+	return { k = e.d, o = type(e.b) == "table" and e.b or {}, t = e.tb or e.tk or e.v or 1 }
+end
+
+local function AnnoncerButin(id)
+	butinChange[id] = true
 	if butinLance then return end
 	butinLance = true
 	C_Timer.After(60, function()
 		butinLance = false
 		local mots = {}
-		for pnj, x in pairs(depouilles) do
-			local mot = Base36(pnj) .. ":" .. x.k
-			for o, n in pairs(x.o) do
-				local bout = "." .. Base36(o) .. "." .. n
-				-- (un monstre au butin très varié : le reste attend le prochain envoi, compté à part)
-				if #mot + #bout > OCTETS - 8 then break end
-				mot = mot .. bout
-			end
-			mots[#mots + 1] = mot
+		for pnj in pairs(butinChange) do
+			local r = MonReleve(pnj)
+			if r then MotsButin(pnj, r, mots) end
 		end
-		depouilles = {}
-		EnvoyerMots("L~", mots, ";")
+		butinChange = {}
+		EnvoyerMots("B~", mots, ";")
 	end)
 end
 
--- butin observé ajouté aux taux de la guilde (le mien tout de suite, celui des autres par « L »)
-local function ButinGuilde(id, corps, objets)
+-- le relevé d'un autre membre : ses comptes ne font que monter, on garde le plus grand de chacun
+local function RecevoirReleve(cle, id, k, objets, t)
 	local g = Guilde()
-	if not g then return end
-	local b = g.b[id]
-	if not b then b = { k = 0, o = {} }; g.b[id] = b end
-	b.k = b.k + corps
-	for o, n in pairs(objets) do b.o[o] = (b.o[o] or 0) + n end
+	if not g or not cle or cle == MaCle() or not id or not k or k <= 0 then return end
+	local parPnj = g.butin[id]
+	if not parPnj then parPnj = {}; g.butin[id] = parPnj end
+	local r = parPnj[cle]
+	if not r then r = { k = 0, o = {}, t = 0 }; parPnj[cle] = r end
+	if k > r.k then r.k = k end
+	for o, n in pairs(objets) do
+		if n > (r.o[o] or 0) then r.o[o] = n end
+	end
+	if t and t > (r.t or 0) then r.t = t end
+end
+
+-- taux de la guilde pour un monstre : corps fouillés, { [objet] = corps qui l'ont lâché }, membres qui l'ont
+-- fouillé (moi compris ; hors guilde : moi seul)
+local function TotauxButin(id)
+	local k, o, membres = 0, {}, 0
+	local function Ajout(r)
+		if not r or (r.k or 0) <= 0 then return end
+		k = k + r.k
+		membres = membres + 1
+		for x, n in pairs(r.o or {}) do o[x] = (o[x] or 0) + n end
+	end
+	Ajout(MonReleve(id))
+	local g = Guilde()
+	local moi = MaCle()
+	for cle, r in pairs(g and g.butin[id] or {}) do
+		if cle ~= moi then Ajout(r) end
+	end
+	return k, o, membres
 end
 
 --------------------------------------------------------------------------------
@@ -428,9 +479,46 @@ local function Vaincre(id, guid, unite)
 	end
 end
 
+-- Récoltes : leur butin n'est pas celui du monstre (le cuir d'un loup dépecé, l'objet volé à un monstre vivant).
+-- Rangs 1 à 4 du dépeçage, vol à la tire, minage, herboristerie ; les noms en plus, si Forever a ses propres numéros.
+local SORTS_RECOLTE = { [8613] = true, [8617] = true, [8618] = true, [10768] = true, [921] = true,
+	[2575] = true, [2576] = true, [3564] = true, [10248] = true,
+	[2366] = true, [2368] = true, [3570] = true, [11993] = true }
+local NOMS_RECOLTE = { ["Dépeçage"] = true, ["Skinning"] = true, ["Vol à la tire"] = true, ["Pick Pocket"] = true }
+do
+	local nomSort = (C_Spell and C_Spell.GetSpellName) or GetSpellInfo
+	if nomSort then
+		for id in pairs(SORTS_RECOLTE) do
+			local ok, nom = pcall(nomSort, id)
+			if ok and type(nom) == "string" and nom ~= "" then NOMS_RECOLTE[nom] = true end
+		end
+	end
+end
+local DELAI_RECOLTE = 2 -- secondes entre la fin du sort et l'ouverture du butin
+local finRecolte = -math.huge
+
+local function SortLance(sort)
+	if not sort or Secrete(sort) then return end
+	local recolte = SORTS_RECOLTE[sort]
+	if not recolte then
+		local nomSort = (C_Spell and C_Spell.GetSpellName) or GetSpellInfo
+		local ok, nom = false, nil
+		if nomSort then ok, nom = pcall(nomSort, sort) end
+		recolte = ok and type(nom) == "string" and not Secrete(nom) and NOMS_RECOLTE[nom]
+	end
+	if recolte then finRecolte = GetTime() end
+end
+
+-- un monstre ciblé encore vivant (vol à la tire) n'a rien lâché
+local function Vivant(guid)
+	if not (UnitExists("target") and UnitGUID("target") == guid) then return false end
+	return not UnitIsDead("target")
+end
+
 -- corps fouillés : chaque corps (GUID) compte une fois, avec les objets qu'il a lâchés
 local function Fouiller()
 	if IsFishingLoot and IsFishingLoot() then return end
+	if GetTime() - finRecolte < DELAI_RECOLTE then return end
 	local n = GetNumLootItems and GetNumLootItems() or 0
 	local corps = {} -- [GUID] = { id, objets = { [objet] = true } }
 	local avecSources = GetLootSourceInfo ~= nil
@@ -463,7 +551,7 @@ local function Fouiller()
 		end
 	end
 	for guid, c in pairs(corps) do
-		if not fouilles[guid] and (Bestiaire().par[c.id] or Entree(c.id)) then
+		if not fouilles[guid] and not Vivant(guid) and (Bestiaire().par[c.id] or Entree(c.id)) then
 			fouilles[guid] = true
 			nFouilles = nFouilles + 1
 			if nFouilles > 3000 then wipe(fouilles); nFouilles = 0 end
@@ -472,13 +560,9 @@ local function Fouiller()
 			if e then
 				e.d = (e.d or 0) + 1
 				if type(e.b) ~= "table" then e.b = {} end
-				local un = {}
-				for o in pairs(c.objets) do
-					e.b[o] = (e.b[o] or 0) + 1
-					un[o] = 1
-				end
-				ButinGuilde(c.id, 1, un)
-				AnnoncerButin(c.id, c.objets)
+				for o in pairs(c.objets) do e.b[o] = (e.b[o] or 0) + 1 end
+				e.tb = Maintenant()
+				AnnoncerButin(c.id)
 				if e.d == 1 then ScorePlusTard() end
 				MajBientot()
 			end
@@ -536,6 +620,41 @@ local function Relayer(depuis)
 	EnvoyerMots("T~", scores, ";")
 end
 
+-- relevés de butin changés depuis « depuis » (de tous les membres, moi compris), les plus anciens d'abord, 300 au
+-- plus ; puis la fin du rattrapage, qui dit au demandeur où reprendre
+local function RelayerButin(depuis, demandeur)
+	local g = Guilde()
+	local moi = MaCle()
+	if not g or not moi then return end
+	local liste = {}
+	for id, parPnj in pairs(g.butin) do
+		for cle, r in pairs(parPnj) do
+			if cle ~= moi and (r.t or 0) > depuis then liste[#liste + 1] = { cle = cle, id = id, r = r } end
+		end
+	end
+	local w = Moi()
+	for id in pairs(w and w.m or {}) do
+		local r = MonReleve(id)
+		if r and r.t > depuis then liste[#liste + 1] = { cle = moi, id = id, r = r } end
+	end
+	table.sort(liste, function(a, b)
+		if a.r.t ~= b.r.t then return a.r.t < b.r.t end
+		if a.id ~= b.id then return a.id < b.id end
+		return a.cle < b.cle
+	end)
+	local n = math.min(#liste, MAX_RELAIS_BUTIN)
+	local parMembre, ordre = {}, {}
+	for i = 1, n do
+		local x = liste[i]
+		if not parMembre[x.cle] then parMembre[x.cle] = {}; ordre[#ordre + 1] = x.cle end
+		MotsButin(x.id, x.r, parMembre[x.cle])
+	end
+	for _, cle in ipairs(ordre) do EnvoyerMots("R~" .. cle .. "~", parMembre[cle], ";") end
+	-- (tout envoyé : le demandeur reprendra à maintenant ; coupé : au dernier relevé envoyé)
+	local fin = (#liste > n) and liste[n].r.t or Maintenant()
+	Envoyer("F~" .. demandeur .. "~" .. Base36(fin))
+end
+
 local function Recevoir(prefixe, msg, canal, expediteur)
 	if prefixe ~= PREFIXE or canal ~= "GUILD" or type(msg) ~= "string" or not expediteur then return end
 	local qui = Normaliser(expediteur)
@@ -553,20 +672,35 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			end
 		end
 		MajBientot()
-	elseif genre == "L" then
-		for mot in suite:gmatch("[^;]+") do
-			local pnj, corps, reste = mot:match("^(%w+):(%d+)(.*)$")
+	elseif genre == "B" or genre == "R" then
+		-- (B : les relevés de l'expéditeur ; R : ceux d'un membre, renvoyés par le relais)
+		local cle, liste = qui, suite
+		if genre == "R" then
+			cle, liste = suite:match("^([^~]+)~(.*)$")
+			if not cle or cle:find("[,;|:]") then return end
+		end
+		for mot in liste:gmatch("[^;]+") do
+			local pnj, corps, t, reste = mot:match("^(%w+):(%d+):(%w+)(.*)$")
 			local id, k = pnj and tonumber(pnj, 36), tonumber(corps)
-			if id and k and k > 0 and k < 1000 then
+			t = t and tonumber(t, 36)
+			if id and k and k > 0 and t and t <= Maintenant() + 120 then
 				local objets = {}
 				for o, n in (reste or ""):gmatch("%.(%w+)%.(%d+)") do
 					o, n = tonumber(o, 36), tonumber(n)
 					if o and n and n <= k then objets[o] = n end
 				end
-				ButinGuilde(id, k, objets)
+				RecevoirReleve(cle, id, k, objets, t)
 			end
 		end
 		MajBientot()
+	elseif genre == "P" then
+		local depuis = tonumber(suite, 36)
+		if not depuis or not pret or not (ns.EstLeRelais and ns.EstLeRelais(qui)) then return end
+		C_Timer.After(8 + math.random() * 4, function() RelayerButin(depuis, qui) end)
+	elseif genre == "F" then
+		local demandeur, t = suite:match("^([^~]+)~(%w+)$")
+		t = t and tonumber(t, 36)
+		if demandeur == MaCle() and t and t > (g.curseurButin or 0) then g.curseurButin = t end
 	elseif genre == "S" then
 		local v, k, d = suite:match("^(%d+)~(%d+)~(%d+)$")
 		if v then
@@ -663,6 +797,47 @@ local function ZonesDeMaCarte()
 	return res, carte
 end
 
+-- Recherche d'un objet : les objets dont le nom contient le texte (liste de tous les objets du jeu,
+-- GuildUp_Demandes.lua), puis les monstres qui les lâchent : trouvés par la guilde (ou moi), ou dans le bestiaire.
+-- objetDe[pnj] = { objet, guilde = vrai si trouvé en jeu } (remis à zéro à chaque construction de la liste)
+local objetDe = {}
+
+local function ChercherParObjet(b, g, w)
+	wipe(objetDe)
+	if #recherche < 3 or not ns.IndexObjets then return false end
+	local cherches, n = {}, 0
+	for _, o in ipairs(ns.IndexObjets()) do
+		if o[4]:find(recherche, 1, true) then
+			cherches[o[1]] = true
+			n = n + 1
+			if n >= 300 then break end
+		end
+	end
+	if n == 0 then return false end
+	local function Trouve(id, objet, guilde)
+		local x = objetDe[id]
+		if not x or (guilde and not x.guilde) then objetDe[id] = { objet = objet, guilde = guilde } end
+	end
+	for id, e in pairs(w and w.m or {}) do
+		for o in pairs(type(e.b) == "table" and e.b or {}) do
+			if cherches[o] then Trouve(id, o, true) end
+		end
+	end
+	for id, parPnj in pairs(g and g.butin or {}) do
+		for _, r in pairs(parPnj) do
+			for o in pairs(r.o or {}) do
+				if cherches[o] then Trouve(id, o, true) end
+			end
+		end
+	end
+	for _, f in ipairs(b.liste) do
+		for _, o in ipairs(ButinFiche(f)) do
+			if cherches[o] then Trouve(f.id, o, false); break end
+		end
+	end
+	return true
+end
+
 local function Construire()
 	wipe(affiches)
 	local b = Bestiaire()
@@ -670,6 +845,7 @@ local function Construire()
 	local w = Moi()
 	local maZone, maCarte
 	if zoneChoisie == "ici" then maZone, maCarte = ZonesDeMaCarte() end
+	local parObjet = ChercherParObjet(b, g, w)
 	local function Garder(id, rang, zones, nomVisible, texteZone)
 		local e = w and w.m[id]
 		local p = Palier(e)
@@ -683,7 +859,7 @@ local function Construire()
 			end
 			if not ici then return false end
 		end
-		if recherche ~= "" then
+		if recherche ~= "" and not (parObjet and objetDe[id]) then
 			local cle = Simplifier((nomVisible or "") .. " " .. (texteZone or ""))
 			if not cle:find(recherche, 1, true) then return false end
 		end
@@ -711,6 +887,23 @@ local function Construire()
 		table.sort(hors, function(x, y) return (x.e.l or 0) < (y.e.l or 0) or ((x.e.l or 0) == (y.e.l or 0) and x.hors < y.hors) end)
 		for _, h in ipairs(hors) do affiches[#affiches + 1] = h end
 	end
+	-- recherche d'un objet : les monstres où la guilde l'a trouvé d'abord (dans l'ordre du WoWdex)
+	if parObjet then
+		local trouves, autres = {}, {}
+		for _, a in ipairs(affiches) do
+			local x = objetDe[a.hors or a.id]
+			if x and x.guilde then trouves[#trouves + 1] = a else autres[#autres + 1] = a end
+		end
+		wipe(affiches)
+		for _, a in ipairs(trouves) do affiches[#affiches + 1] = a end
+		for _, a in ipairs(autres) do affiches[#affiches + 1] = a end
+	end
+end
+
+local function NomObjet(objet)
+	local nom = ns.InfoObjet(objet)
+	if not nom and ns.Precharger then ns.Precharger(objet) end
+	return nom or (ns.NomObjetListe and ns.NomObjetListe(objet)) or ("objet n° " .. objet)
 end
 
 -- infos d'un élément affiché : id, numéro, nom (ou nil si inconnu), rang, niveau, zone, entrée
@@ -771,6 +964,12 @@ local function Remplir(r, a)
 	if niveau then d[#d + 1] = "Niv. " .. niveau end
 	if rang and rang > 0 then d[#d + 1] = Couleur(cr) .. NOMS_RANGS[rang] .. "|r" end
 	if zone then d[#d + 1] = zone end
+	local x = objetDe[id]
+	if x then
+		local k, o = TotauxButin(id)
+		local taux = (x.guilde and k > 0 and o[x.objet]) and (" " .. VERT .. math.floor(100 * o[x.objet] / k + 0.5) .. " %|r") or ""
+		d[#d + 1] = OR .. NomObjet(x.objet) .. "|r" .. taux .. (x.guilde and "" or (GRIS .. " (bestiaire)|r"))
+	end
 	r.sous:SetText(table.concat(d, " · "))
 	if p >= 2 then
 		r.droite:SetText(VERT .. "×" .. (e.k or 0) .. "|r")
@@ -812,23 +1011,67 @@ end
 -- butin d'un monstre : objets observés (taux sur les corps fouillés, guilde ou moi), puis ceux du bestiaire
 -- jamais vus tomber ; { objet, n, corps } du plus fréquent au plus rare
 local function ButinAffiche(id)
-	local g = Guilde()
-	local e = Entree(id)
-	local guilde = g and g.b[id] and true or false
-	local source = (g and g.b[id]) or (e and e.b and { k = e.d or 0, o = e.b }) or nil
+	local k, objets, membres = TotauxButin(id)
 	local liste, deja = {}, {}
-	if source and source.k > 0 then
-		for o, n in pairs(source.o) do
-			liste[#liste + 1] = { objet = o, n = n, corps = source.k, guilde = guilde }
-			deja[o] = true
-		end
-		table.sort(liste, function(a, b) if a.n ~= b.n then return a.n > b.n end return a.objet < b.objet end)
+	for o, n in pairs(objets) do
+		liste[#liste + 1] = { objet = o, n = n, corps = k, membres = membres }
+		deja[o] = true
 	end
+	-- (l'objet cherché d'abord, puis du plus fréquent au plus rare)
+	local cherche = objetDe[id] and objetDe[id].objet
+	table.sort(liste, function(a, b)
+		if (a.objet == cherche) ~= (b.objet == cherche) then return a.objet == cherche end
+		if a.n ~= b.n then return a.n > b.n end
+		return a.objet < b.objet
+	end)
 	local f = Bestiaire().par[id]
+	local base = {}
 	for _, o in ipairs(f and ButinFiche(f) or {}) do
-		if not deja[o] then liste[#liste + 1] = { objet = o } end
+		if not deja[o] then
+			if o == cherche then table.insert(base, 1, { objet = o }) else base[#base + 1] = { objet = o } end
+		end
 	end
-	return liste, source and source.k or 0
+	if cherche and not deja[cherche] then
+		for _, x in ipairs(base) do table.insert(liste, 1, x) end -- (pas encore trouvé : en tête quand même)
+	else
+		for _, x in ipairs(base) do liste[#liste + 1] = x end
+	end
+	return liste, k, membres
+end
+
+-- Pour l'Encyclopédie (GuildUp_Carnet.lua) : les monstres où la guilde (ou moi) a trouvé cet objet, du meilleur taux
+-- au plus faible : { { id, nom, rang, zone, n = corps qui l'ont lâché, k = corps fouillés, membres }, … }
+ns.SourcesWowdex = function(objet)
+	objet = tonumber(objet)
+	if not objet then return {} end
+	local res, vus = {}, {}
+	local function Essayer(id)
+		if vus[id] then return end
+		vus[id] = true
+		local k, o, membres = TotauxButin(id)
+		if k > 0 and (o[objet] or 0) > 0 then
+			local f = Bestiaire().par[id]
+			local e = Entree(id)
+			res[#res + 1] = { id = id, nom = NomMonstre(id), rang = f and f.rang or (e and e.r) or 0,
+				zone = f and NomZone(f.zone) or (e and e.z), n = o[objet], k = k, membres = membres }
+		end
+	end
+	local w = Moi()
+	for id, e in pairs(w and w.m or {}) do
+		if type(e.b) == "table" and e.b[objet] then Essayer(id) end
+	end
+	local g = Guilde()
+	for id, parPnj in pairs(g and g.butin or {}) do
+		for _, r in pairs(parPnj) do
+			if r.o and r.o[objet] then Essayer(id); break end
+		end
+	end
+	table.sort(res, function(a, b)
+		local ta, tb = a.n / a.k, b.n / b.k
+		if ta ~= tb then return ta > tb end
+		return a.k > b.k
+	end)
+	return res
 end
 
 local MAX_LIGNES_BUTIN = 7
@@ -1016,10 +1259,11 @@ local function MajFiche()
 	fiche.infos:SetText(table.concat(t, "\n"))
 	fiche.infos:Show()
 	-- butin
-	local liste, corps = ButinAffiche(id)
+	local liste, corps, membres = ButinAffiche(id)
 	fiche.titreButin:ClearAllPoints()
 	fiche.titreButin:SetPoint("TOPLEFT", fiche.infos, "BOTTOMLEFT", 0, -12)
-	fiche.titreButin:SetText("Butin" .. (corps > 0 and (GRIS .. ("  sur %d corps fouillé%s"):format(corps, corps > 1 and "s" or "") .. "|r") or ""))
+	fiche.titreButin:SetText("Butin" .. (corps > 0 and (GRIS .. ("  %d corps fouillé%s par %d membre%s"):format(corps,
+		corps > 1 and "s" or "", membres, membres > 1 and "s" or "") .. "|r") or ""))
 	fiche.titreButin:Show()
 	local y = 0
 	for i, l in ipairs(fiche.lignes) do
@@ -1033,11 +1277,11 @@ local function MajFiche()
 			l.nom:SetText(((qc and qc.hex) or "|cffffffff") .. (nomO or ("objet n° " .. x.objet)) .. "|r")
 			if x.n then
 				l.taux:SetText(("%d %%"):format(math.floor(100 * x.n / math.max(1, x.corps) + 0.5)))
-				l.aide = ("Tombé sur %d corps fouillé%s sur %d (%s)."):format(x.n, x.n > 1 and "s" or "", x.corps,
-					x.guilde and "toute la guilde" or "toi")
+				l.aide = ("Tombé sur %d des %d corps fouillés par la guilde (%d membre%s)."):format(x.n, x.corps,
+					x.membres or 1, (x.membres or 1) > 1 and "s" or "")
 			else
 				l.taux:SetText(GRIS .. "jamais vu|r")
-				l.aide = "Peut tomber sur ce monstre (bestiaire), pas encore vu par la guilde."
+				l.aide = "Peut tomber sur ce monstre (bestiaire), pas encore trouvé par la guilde."
 			end
 			l:ClearAllPoints()
 			l:SetPoint("TOPLEFT", fiche.titreButin, "BOTTOMLEFT", 0, -6 - y)
@@ -1103,7 +1347,7 @@ local function CreerPage(parent)
 	p.pourcent:SetPoint("RIGHT", p.barre, "LEFT", -8, 0)
 	p.pourcent:SetJustifyH("RIGHT")
 
-	p.recherche = UI.Champ(p, 170, "Nom, zone…")
+	p.recherche = UI.Champ(p, 170, "Monstre, zone, objet…")
 	p.recherche:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -60)
 	p.recherche.SurTexte = function(t)
 		recherche = Simplifier(strtrim(t or ""))
@@ -1214,11 +1458,13 @@ for _, nom in ipairs({ "PLAYER_ENTERING_WORLD", "UPDATE_MOUSEOVER_UNIT", "PLAYER
 	pcall(ev.RegisterEvent, ev, nom)
 end
 -- (mort de la cible pendant qu'elle est ciblée : aucun changement de cible)
+-- (sort de récolte qui va ouvrir un butin : dépeçage, vol à la tire…)
+pcall(ev.RegisterUnitEvent, ev, "UNIT_SPELLCAST_SUCCEEDED", "player")
 if not pcall(ev.RegisterUnitEvent, ev, "UNIT_HEALTH", "target") then
 	pcall(ev.RegisterUnitEvent, ev, "UNIT_HEALTH_FREQUENT", "target")
 end
 local premiere = true
-ev:SetScript("OnEvent", function(_, evenement, unite)
+ev:SetScript("OnEvent", function(_, evenement, unite, _, sort)
 	if evenement == "COMBAT_LOG_EVENT_UNFILTERED" then
 		JournalCombat()
 	elseif evenement == "UPDATE_MOUSEOVER_UNIT" then
@@ -1229,6 +1475,8 @@ ev:SetScript("OnEvent", function(_, evenement, unite)
 		pcall(Vu, unite)
 	elseif evenement == "UNIT_HEALTH" or evenement == "UNIT_HEALTH_FREQUENT" then
 		if UnitIsDead("target") then pcall(Observer, "target") end
+	elseif evenement == "UNIT_SPELLCAST_SUCCEEDED" then
+		pcall(SortLance, sort)
 	elseif evenement == "LOOT_OPENED" then
 		local ok, err = pcall(Fouiller)
 		if not ok and ns.Erreur then ns.Erreur("WoWdex : " .. tostring(err)) end
@@ -1241,6 +1489,7 @@ ev:SetScript("OnEvent", function(_, evenement, unite)
 				local depuis = 0
 				for _, d in pairs(g.d) do if d.j > depuis then depuis = d.j end end
 				Envoyer("Q~" .. Base36(depuis))
+				Envoyer("P~" .. Base36(g.curseurButin or 0))
 			end
 			pret = true
 		end)

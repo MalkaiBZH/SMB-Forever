@@ -141,17 +141,19 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   *dépouillé* (son corps fouillé). Recherche (nom, zone), filtres Tous / Capturés / À capturer / Rares et boss,
   Ma zone ; barre de progression. La fiche d'un monstre : modèle 3D, niveau, rang, type, zones (« Voir sur la carte »),
   tes captures, le premier membre de la guilde à l'avoir capturé, et son butin : objets particuliers tirés de
-  QuestieDB, et taux mesurés par la guilde à chaque corps fouillé (« 34 % sur 212 corps fouillés »). Un monstre
-  absent de la liste mais croisé en jeu y entre aussi, « hors liste ». Ton WoWdex est commun à tes personnages ;
-  celui de la guilde réunit les captures de tous et se rattrape à la connexion (les taux de butin, eux, ne
-  s'échangent qu'entre membres connectés). Bouton « Classement » : les membres qui ont capturé le plus de monstres.
+  QuestieDB, et taux de drop de toute la guilde, mesurés à chaque corps fouillé par un membre (« 34 % », 212 corps
+  fouillés par 5 membres ; le dépeçage et le vol à la tire ne comptent pas). La recherche trouve aussi un objet :
+  les monstres qui le lâchent, ceux où la guilde l'a trouvé en premier. Un monstre absent de la liste mais croisé
+  en jeu y entre aussi, « hors liste ». Ton WoWdex est commun à tes personnages ; celui de la guilde (captures,
+  taux de drop) se rattrape à la connexion. Bouton « Classement » : les membres qui ont capturé le plus de monstres.
   Une ligne dans la discussion à chaque nouvelle capture, une bulle pour un rare ou un boss et tous les 25 monstres
   (case « WoWdex » des notifications) ; la première capture d'un rare ou d'un boss par la guilde entre dans le fil
   d'activité. Infobulle des monstres : « à capturer » ou « capturé ×12 ».
 - **Artisanat** :
   - *Registre* des métiers et recettes de chaque membre ; clic sur une recette d'un membre : demande d'artisanat ;
   - *Crafts* : tous les objets fabricables, par catégorie, avec des filtres (ma classe, mon niveau, niveau requis, fabricable par la guilde) ; un clic sur un objet montre à droite qui, dans la guilde, sait le fabriquer (chuchoter), et « Demander » prépare une demande d'artisanat ;
-  - *Encyclopédie* des objets (Alt + clic sur un objet) ; « Demander » (page Demandes) et « Voir dans Crafts ».
+  - *Encyclopédie* des objets (Alt + clic sur un objet) ; « Demander » (page Demandes) et « Voir dans Crafts » ;
+    « Trouvé par la guilde » : les monstres où la guilde l'a trouvé, avec le taux (WoWdex).
 - **Annonces** en bulle : montées de niveau (« Nom a up ! », avec des chopes à l'écran : 4, 8 aux paliers 10, 20,
   30… et 12 au niveau maximum ; celui qui monte voit aussi les siennes), nouveaux métiers, paliers de métier.
 - **À l'aide !** (`/smb sos`) : appel à la guilde avec sa position.

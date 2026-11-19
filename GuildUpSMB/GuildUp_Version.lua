@@ -135,8 +135,14 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "7.0.0", "6.0.0", "5.5.0", "5.4.0", "5.3.1", "5.3.0", "5.2.0", "5.1.1", "5.1.0", "5.0.0", "4.3.2", "4.3.1", "4.3.0", "4.2.0", "4.1.0", "4.0.6", "4.0.5", "4.0.4", "4.0.3", "4.0.2", "4.0.1", "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "7.1.0", "7.0.0", "6.0.0", "5.5.0", "5.4.0", "5.3.1", "5.3.0", "5.2.0", "5.1.1", "5.1.0", "5.0.0", "4.3.2", "4.3.1", "4.3.0", "4.2.0", "4.1.0", "4.0.6", "4.0.5", "4.0.4", "4.0.3", "4.0.2", "4.0.1", "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["7.1.0"] = {
+		"|cffffd100WoWdex|r : les taux de drop sont maintenant ceux de |cffffd100toute la guilde|r : chaque corps fouillé par un membre compte, même pendant ton absence (rattrapé à la connexion). La fiche dit combien de corps et combien de membres.",
+		"|cffffd100WoWdex|r : cherche un |cffffd100objet|r ! Tape son nom dans la recherche : les monstres qui le lâchent s'affichent, ceux où la guilde l'a déjà trouvé en premier, avec le taux.",
+		"|cffffd100Encyclopédie|r (Alt + clic sur un objet) : nouvelle section « Trouvé par la guilde » avec les monstres et leur taux ; un clic ouvre leur fiche dans le WoWdex.",
+		"|cffffd100WoWdex|r : dépecer un corps (même vide) ne compte plus comme une dépouille, et le cuir n'entre plus dans le butin du monstre. Le vol à la tire ne compte plus comme une capture : le monstre est toujours vivant !",
+	},
 	["7.0.0"] = {
 		"Nouveau : le |cffffd100WoWdex|r (menu WoWdex, ou /smb wowdex) ! Plus de 3 300 monstres de Forever à compléter, du plus faible au plus fort. Chacun se |cffffd100voit|r (barre de nom, cible), se |cffffd100capture|r (le vaincre, seul ou en groupe) et se |cffffd100dépouille|r. Un monstre jamais croisé reste « ??? ».",
 		"|cffffd100WoWdex|r : chaque fiche montre le monstre en 3D, son niveau, ses zones (« Voir sur la carte »), et son butin avec les taux mesurés par toute la guilde à chaque corps fouillé. Un monstre absent de la liste mais croisé en jeu y entre aussi.",
