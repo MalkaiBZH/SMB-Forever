@@ -152,6 +152,8 @@ local ns = {
 	Notifier = function(cat, titre, texte, son, action) bulles[#bulles + 1] = { titre = titre, texte = texte, son = son, action = action } return true end,
 	NoterActivite = function(g, q, v) activite[#activite + 1] = g .. " " .. q .. " " .. v end,
 	MaPosition = function() return CARTE_ELWYNN, 0.4321, 0.6543 end,
+	PositionMonde = function(carte, x, y) return x * 1000, y * 1000, 0 end,
+	MontrerAppelSurCarte = function(a) assert(type(a) == "table" and a.carte and a.x and a.y, "repère de carte incomplet") end,
 	EstLeRelais = function() return true end,
 	AfficherSurCarte = function(titre, groupes) assert(type(titre) == "string" and groupes[1].carte) end,
 	OuvrirInterface = function() end,

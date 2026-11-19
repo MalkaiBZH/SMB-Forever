@@ -24,7 +24,8 @@
 -- s[clé] = { v, k, d, t, r } (score de chaque membre ; r = rares et boss capturés, absent pour une version d'avant
 -- la 7.3.0), butin[pnj][clé] = { k = corps fouillés, o = { [objet] = n }, t = date } (le relevé de chaque autre
 -- membre ; le mien est lu dans mon WoWdex), curseurButin (rattrapage), r[pnj] = { c = membre, t = date, carte, x,
--- y } (dernier repérage d'un rare du monde).
+-- y } (dernier repérage d'un rare du monde), morts[pnj] = { c = membre, t = date } (dernière fois qu'un membre a
+-- vaincu ce rare : un repérage plus ancien que cette mort n'est plus montré).
 -- Taux de drop de la guilde = somme des relevés de chaque membre. Chaque relevé appartient à son membre et ses
 -- comptes ne font que monter : on garde le plus grand reçu, donc rien n'est compté deux fois (ni un message reçu
 -- deux fois, ni un relevé reçu en direct puis par le relais).
@@ -34,7 +35,10 @@
 -- grandes cartes), « Bestiaire » (tous les monstres, en cases), « Zones » (un WoWdex par zone, ses rares d'abord),
 -- « Carnet de chasse » (titres, progression par rang et par niveau, monstres pistés, dernières captures,
 -- réglages), « Guilde » (classement par rares, premières captures de rares). Les deux premiers partagent la
--- grille et la fiche (modèle 3D, paliers, guilde, repérage, butin, « Pister », « Sur la carte », « Lier »).
+-- grille et la fiche (modèle 3D, paliers, guilde, repérage, dernière mort, butin, « Pister », « Sur la carte »,
+-- « Lier »). Un rare repéré depuis moins d'une heure, avec sa position, a un bouton « Y aller » : le repère du
+-- jeu est posé à cet endroit et la carte s'ouvre (ns.MontrerAppelSurCarte de GuildUp_Aide.lua). Les distances
+-- (apparition la plus proche, repérage, monstres pistés) viennent de ns.PositionMonde (GuildUp_Reperes.lua).
 -- Recherche : nom du monstre, zone, ou nom d'un objet (les monstres qui le lâchent : ceux où la guilde l'a trouvé
 -- d'abord, puis ceux du bestiaire). ns.SourcesWowdex(objet) : les monstres où la guilde l'a trouvé, avec le taux
 -- (Encyclopédie de GuildUp_Carnet.lua).
@@ -49,6 +53,8 @@
 --   "V~pnj~carte~x~y"                 je vois un rare du monde vivant (7.3.0) : une fois toutes les 10 min par rare
 --                                     pour toute la guilde ; carte et position (dix-millièmes) vides si je ne
 --                                     partage pas ma position. Pas de rattrapage : c'est une nouvelle du moment.
+--   "K~pnj"                           je viens de vaincre un rare du monde (7.5.0), à chaque fois : la guilde sait
+--                                     depuis quand il est mort. Pas de rattrapage non plus.
 --   "Q~jour"                          je me connecte : envoyez-moi les découvertes depuis ce jour
 --   "E~clé~pnj.jour,pnj.jour,…"       découvertes de la guilde, par le seul relais (ns.EstLeRelais), les plus
 --                                     anciennes d'abord, 400 au plus par demande (la suite à la connexion suivante)
@@ -58,7 +64,8 @@
 --   "R~clé~pnj:corps:t.objet.n…;…"    relevés de ce membre, par le seul relais, les plus anciens d'abord, 300 au
 --                                     plus par demande ; tout le monde les lit
 --   "F~demandeur~t"                   fin du rattrapage : le demandeur reprendra à t la prochaine fois
--- Les versions d'avant la 7.3.0 ignorent « C », « U » et « V » : rien ne change pour elles.
+-- Les versions d'avant la 7.3.0 ignorent « C », « U » et « V », celles d'avant la 7.5.0 ignorent « K » : rien ne
+-- change pour elles.
 -- Une découverte : le jour le plus ancien gagne (à égalité, la plus petite clé). La capture d'un rare, d'un rare
 -- élite ou d'un boss entre dans le fil d'activité (GuildUp_Journal.lua) : genre « W » pour la première de la
 -- guilde, « R » pour les suivantes.
@@ -207,7 +214,7 @@ local function Guilde()
 	if type(db.wowdexGuilde) ~= "table" then db.wowdexGuilde = {} end
 	local g = db.wowdexGuilde[nom]
 	if type(g) ~= "table" then g = {}; db.wowdexGuilde[nom] = g end
-	for _, k in ipairs({ "d", "s", "butin", "r" }) do
+	for _, k in ipairs({ "d", "s", "butin", "r", "morts" }) do
 		if type(g[k]) ~= "table" then g[k] = {} end
 	end
 	g.b = nil -- (7.0.0 : totaux de tous mélangés, impossibles à répartir par membre)
@@ -592,6 +599,15 @@ local function Vaincre(id, guid, unite)
 	e.v = e.v or Maintenant()
 	e.k = (e.k or 0) + 1
 	MajBientot()
+	-- un rare du monde vaincu : la guilde apprend l'heure de sa mort (à chaque fois, pas seulement la première)
+	local fr = Bestiaire().par[id]
+	if fr and TRAQUES[fr.rang] then
+		local g = Guilde()
+		if g then
+			g.morts[id] = { c = MaCle(), t = Maintenant() }
+			Envoyer("K~" .. Base36(id))
+		end
+	end
 	if e.k > 1 then return end
 	-- nouvelle capture
 	e.tk = Maintenant()
@@ -896,6 +912,13 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			if s and cle ~= MaCle() then s.r = math.max(s.r or 0, tonumber(r)) end
 		end
 		MajBientot()
+	elseif genre == "K" then
+		local id = tonumber(suite, 36)
+		local f = id and Bestiaire().par[id]
+		if f and TRAQUES[f.rang] then
+			g.morts[id] = { c = qui, t = Maintenant() }
+			MajBientot()
+		end
 	elseif genre == "V" then
 		local pnj, carte, x, y = suite:match("^(%w+)~(%d*)~(%d*)~(%d*)$")
 		local id = pnj and tonumber(pnj, 36)
@@ -1055,14 +1078,64 @@ local function Recensement(zones)
 	return res
 end
 
--- dernier repérage d'un rare par la guilde : « il y a 12 min », nom du membre (recent : nil au-delà d'une heure)
+-- dernier repérage d'un rare par la guilde : « il y a 12 min », nom du membre, repérage (recent : nil au-delà
+-- d'une heure) ; nil s'il a été vaincu depuis : il n'est plus là
 local function Reperage(id, recent)
 	local g = Guilde()
 	local r = g and g.r[id]
 	if not r or not r.t then return nil end
+	local mort = g.morts[id]
+	if mort and (mort.t or 0) >= r.t then return nil end
 	if recent and Maintenant() - r.t > 3600 then return nil end
-	return IlYa(r.t), r.c and NomJoueur(r.c) or nil
+	return IlYa(r.t), r.c and NomJoueur(r.c) or nil, r
 end
+
+-- dernière fois qu'un membre a vaincu ce rare : « il y a 40 min », nom du membre
+local function DerniereMort(id, recent)
+	local g = Guilde()
+	local m = g and g.morts[id]
+	if not m or not m.t then return nil end
+	if recent and Maintenant() - m.t > 3600 then return nil end
+	return IlYa(m.t), m.c and NomJoueur(m.c) or nil
+end
+
+-- Distances, en mètres du jeu : entre moi et un point de carte (x, y de 0 à 1), entre moi et l'apparition la plus
+-- proche d'un monstre ; nil si la position est inconnue ou sur un autre continent
+local Distance = {}
+function Distance.A(carte, x, y)
+	if not (ns.MaPosition and ns.PositionMonde and carte and x and y) then return nil end
+	local maCarte, mx, my = ns.MaPosition()
+	if not maCarte then return nil end
+	local n1, o1, c1 = ns.PositionMonde(maCarte, mx, my)
+	local n2, o2, c2 = ns.PositionMonde(carte, x, y)
+	if not (n1 and n2) or c1 ~= c2 then return nil end
+	return math.sqrt((n1 - n2) ^ 2 + (o1 - o2) ^ 2)
+end
+function Distance.Monstre(f)
+	local proche
+	local zones = Bestiaire().zones
+	for _, z in ipairs(f and ZonesFiche(f) or {}) do
+		local carte = zones[z.zone] and zones[z.zone].carte
+		for _, pt in ipairs(carte and z.points or {}) do
+			local d = Distance.A(carte, pt[1] / 100, pt[2] / 100)
+			if d and (not proche or d < proche) then proche = d end
+		end
+	end
+	return proche
+end
+function Distance.Texte(d)
+	return d and (math.floor(d + 0.5) .. " m") or nil
+end
+
+-- ce que veut dire chaque ligne de la fiche (infobulle au survol)
+local AIDES = {
+	Vu = "Tu l'as croisé : sa barre de nom est apparue, tu l'as ciblé ou survolé. Son nom et son modèle se dévoilent.",
+	["Capturé"] = "Toi ou ton groupe l'avez vaincu. C'est le palier qui compte pour le WoWdex, et pour un rare, ton titre et le classement. Il est noté quand tu cibles, survoles ou fouilles son corps.",
+	["Dépouillé"] = "Tu as fouillé son corps. Chaque corps fouillé alimente les taux de butin de la guilde. Le dépeçage et le vol à la tire ne comptent pas.",
+	Guilde = "Le premier membre de la guilde à l'avoir capturé.",
+	["Repéré"] = "La dernière fois qu'un membre l'a vu vivant. Le bouton « Y aller » pose un repère à cet endroit.",
+	["Tué"] = "La dernière fois qu'un membre l'a vaincu : il lui faut le temps de réapparaître.",
+}
 
 -- Recherche d'un objet : les objets dont le nom contient le texte (liste de tous les objets du jeu,
 -- GuildUp_Demandes.lua), puis les monstres qui les lâchent : trouvés par la guilde (ou moi), ou dans le bestiaire.
@@ -1410,7 +1483,7 @@ local function RemplirCase(c, a, grand)
 	if rang > 0 then d[#d + 1] = Couleur(cr) .. NOMS_RANGS[rang] .. "|r" end
 	if niveau then d[#d + 1] = "niv. " .. niveau end
 	c.sous:SetText(table.concat(d, " · "))
-	-- dernière ligne : l'objet cherché, un repérage de moins d'une heure, « capturé », sinon la zone
+	-- dernière ligne : l'objet cherché, un repérage ou une mort de moins d'une heure, « capturé », sinon la zone
 	local x = objetDe[id]
 	local quand, qui = Reperage(id, true)
 	if x then
@@ -1419,6 +1492,8 @@ local function RemplirCase(c, a, grand)
 		c.etat:SetText(OR .. NomObjet(x.objet) .. "|r" .. taux)
 	elseif quand and p < 2 then
 		c.etat:SetText(OR .. "Repéré " .. quand .. "|r")
+	elseif p < 2 and DerniereMort(id, true) then
+		c.etat:SetText(GRIS .. "Tué " .. DerniereMort(id, true) .. "|r")
 	elseif p >= 2 then
 		c.etat:SetText(VERT .. "Capturé|r" .. (zone and (GRIS .. " · " .. zone .. "|r") or ""))
 	else
@@ -1605,15 +1680,35 @@ local function CreerFiche(p, parent)
 	fiche.mystere:SetText("?")
 	fiche.bandeau = UI.Texte(dessus, "GameFontHighlightSmall", C.texte)
 	fiche.bandeau:SetPoint("TOPLEFT", fiche.scene, "TOPLEFT", 7, -6)
-	-- tableau : zone, vu, capturé, dépouillé, guilde, repéré
+	-- rare repéré il y a peu : le repère du jeu à l'endroit du repérage, et la carte
+	fiche.yAller = UI.Bouton(dessus, "Y aller", "or", 66, 20)
+	fiche.yAller:SetPoint("TOPRIGHT", fiche.scene, "TOPRIGHT", -5, -5)
+	fiche.yAller:SetScript("OnClick", function(self)
+		if self.point and ns.MontrerAppelSurCarte then ns.MontrerAppelSurCarte(self.point) end
+	end)
+	UI.Infobulle(fiche.yAller, "Y aller", "Pose un repère sur la carte là où ce rare vient d'être repéré, et ouvre la carte.")
+	fiche.yAller:Hide()
+	-- tableau : zone, vu, capturé, dépouillé, guilde, repéré, tué ; une infobulle explique chaque ligne
 	fiche.rangs = {}
-	for i = 1, 6 do
+	for i = 1, 7 do
 		local cle = UI.Texte(k, "GameFontHighlightSmall", C.gris)
 		local val = UI.Texte(k, "GameFontHighlightSmall", C.texte)
 		val:SetWidth(LARGEUR_FICHE - 20 - 78 - 6)
 		val:SetWordWrap(true)
 		val:SetSpacing(2)
-		fiche.rangs[i] = { cle = cle, val = val }
+		local survol = CreateFrame("Frame", nil, k)
+		survol:SetPoint("TOPLEFT", cle, "TOPLEFT", 0, 2)
+		survol:SetPoint("BOTTOMRIGHT", val, "BOTTOMRIGHT", 0, -2)
+		survol:EnableMouse(true)
+		survol:SetScript("OnEnter", function(self)
+			if not self.aide then return end
+			GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+			GameTooltip:SetText(self.titre or "")
+			GameTooltip:AddLine(self.aide, 1, 1, 1, true)
+			GameTooltip:Show()
+		end)
+		survol:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		fiche.rangs[i] = { cle = cle, val = val, survol = survol }
 	end
 	fiche.titreButin = UI.Texte(k, "GameFontNormal", C.ors)
 	fiche.lignes = {}
@@ -1674,8 +1769,14 @@ local function CreerFiche(p, parent)
 	fiche.carte = UI.Bouton(k, "Sur la carte", "fantome", 92, 24)
 	fiche.carte:SetPoint("LEFT", fiche.pister, "RIGHT", 6, 0)
 	fiche.carte:SetScript("OnClick", function(self)
-		if ns.AfficherSurCarte and self.groupes and self.groupes[1] then
-			ns.AfficherSurCarte(self.titre or "WoWdex", { self.groupes[1] })
+		-- (les apparitions de sa première zone, et le dernier repérage s'il est sur la même carte)
+		local premier = self.groupes and self.groupes[1]
+		if ns.AfficherSurCarte and premier then
+			local groupes = { premier }
+			for i = 2, #self.groupes do
+				if self.groupes[i].icone and self.groupes[i].carte == premier.carte then groupes[#groupes + 1] = self.groupes[i] end
+			end
+			ns.AfficherSurCarte(self.titre or "WoWdex", groupes)
 		end
 	end)
 	fiche.lier = UI.Bouton(k, "Lier", "fantome", 72, 24)
@@ -1833,12 +1934,15 @@ MajFiche = function()
 		r.val:SetPoint("TOPLEFT", fiche.scene, "BOTTOMLEFT", 82, -10 - y)
 		r.cle:Show()
 		r.val:Show()
+		r.survol.titre, r.survol.aide = cle2, AIDES[cle2]
+		r.survol:SetShown(AIDES[cle2] ~= nil)
 		y = y + math.max(11, tonumber(r.val:GetStringHeight()) or 11) + 5
 	end
 	local zones = {}
 	for _, z in ipairs(f and ZonesFiche(f) or {}) do zones[#zones + 1] = NomZone(z.zone) end
 	if #zones == 0 and e and e.z then zones[1] = e.z end
-	Rang("Zone", #zones > 0 and table.concat(zones, ", ") or nil)
+	local proche = Distance.Texte(Distance.Monstre(f))
+	Rang("Zone", #zones > 0 and (table.concat(zones, ", ") .. (proche and (GRIS .. " · à " .. proche .. "|r") or "")) or nil)
 	Rang("Vu", (p >= 1 and e.v) and ("le " .. date("%d/%m/%Y", e.v)) or (GRIS .. "pas encore|r"))
 	Rang("Capturé", p >= 2 and (VERT .. "×" .. (e.k or 0) .. "|r" .. (e.tk and (GRIS .. " · le " .. date("%d/%m/%Y", e.tk) .. "|r") or ""))
 		or (GRIS .. "pas encore|r"))
@@ -1850,12 +1954,23 @@ MajFiche = function()
 	elseif g then
 		Rang("Guilde", GRIS .. "personne ne l'a encore capturé|r")
 	end
-	local quand, qui = Reperage(id)
-	if quand then Rang("Repéré", OR .. quand .. "|r" .. (qui and (" par " .. qui) or "")) end
+	local quand, qui, rep = Reperage(id)
+	local ici = rep and rep.carte and rep.x and rep.y and true or false
+	if quand then
+		local loin = ici and Distance.Texte(Distance.A(rep.carte, rep.x, rep.y))
+		Rang("Repéré", OR .. quand .. "|r" .. (qui and (" par " .. qui) or "") .. (loin and (GRIS .. " · à " .. loin .. "|r") or ""))
+	end
+	local mortQuand, mortQui = DerniereMort(id)
+	if mortQuand then Rang("Tué", mortQuand .. (mortQui and (" par " .. mortQui) or "")) end
 	for i = n + 1, #fiche.rangs do
 		fiche.rangs[i].cle:Hide()
 		fiche.rangs[i].val:Hide()
+		fiche.rangs[i].survol:Hide()
 	end
+	-- « Y aller » : un repérage de moins d'une heure, dont la position est connue
+	local frais = ici and (Maintenant() - rep.t <= 3600)
+	fiche.yAller.point = frais and { carte = rep.carte, x = rep.x, y = rep.y } or nil
+	fiche.yAller:SetShown(frais)
 	-- butin : autant de lignes que la place le permet
 	local liste, corps, membres = ButinAffiche(id)
 	local haut = tonumber(fiche:GetHeight()) or 0
@@ -1918,6 +2033,12 @@ MajFiche = function()
 		if info and info.carte and #z.points > 0 then
 			groupes[#groupes + 1] = { carte = info.carte, points = z.points, couleur = { 0.95, 0.35, 0.25 } }
 		end
+	end
+	if frais then
+		local repere = { carte = rep.carte, points = { { rep.x * 100, rep.y * 100 } },
+			icone = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_8" }
+		-- (sans apparition connue : le repérage seul, sur sa carte)
+		if #groupes == 0 then groupes[1] = repere else groupes[#groupes + 1] = repere end
 	end
 	fiche.carte.groupes = groupes
 	fiche.carte.titre = "WoWdex : " .. nom .. " — " .. (NomZone(f and f.zone) or "")
@@ -2321,7 +2442,8 @@ local function CreerVueCarnet(p)
 				local e = Entree(x.id)
 				l.id = x.id
 				l.texte:SetText(texte)
-				l.droite:SetText((f and NomZone(f.zone)) or (e and e.z) or "")
+				local loin = f and Distance.Texte(Distance.Monstre(f))
+				l.droite:SetText(((f and NomZone(f.zone)) or (e and e.z) or "") .. (loin and (" · " .. loin) or ""))
 				l:Show()
 			else
 				l:Hide()
@@ -2694,14 +2816,15 @@ ns.DiagWowdex = function(L)
 	local s = MonScore()
 	local g = Guilde()
 	local w = Moi()
-	local nGuilde, nScores, nPistes, nReperes = 0, 0, 0, 0
+	local nGuilde, nScores, nPistes, nReperes, nMorts = 0, 0, 0, 0, 0
+	for _ in pairs(g and g.morts or {}) do nMorts = nMorts + 1 end
 	for _ in pairs(g and g.d or {}) do nGuilde = nGuilde + 1 end
 	for _ in pairs(g and g.s or {}) do nScores = nScores + 1 end
 	for _ in pairs(g and g.r or {}) do nReperes = nReperes + 1 end
 	for _ in pairs(w and w.pistes or {}) do nPistes = nPistes + 1 end
 	local _, titre = Titre(s.r)
-	L(("wowdex : %d monstres au bestiaire dont %d rares et boss, moi %d vus / %d capturés / %d dépouillés (%d hors liste), %d rares et boss (%s), %d pistés, guilde %d capturés, %d scores, %d rares repérés, sources du butin %s"):format(
-		Bestiaire().nombre, Bestiaire().rares, s.v, s.k, s.d, s.hors, s.r, titre, nPistes, nGuilde, nScores, nReperes,
+	L(("wowdex : %d monstres au bestiaire dont %d rares et boss, moi %d vus / %d capturés / %d dépouillés (%d hors liste), %d rares et boss (%s), %d pistés, guilde %d capturés, %d scores, %d rares repérés, %d rares tués, sources du butin %s"):format(
+		Bestiaire().nombre, Bestiaire().rares, s.v, s.k, s.d, s.hors, s.r, titre, nPistes, nGuilde, nScores, nReperes, nMorts,
 		GetLootSourceInfo and "oui" or "non"))
 end
 
