@@ -4,6 +4,8 @@
 --   P  palier de métier (valeur = « 150 Forge »)   D  demande honorée (membre = celui qui l'a honorée,
 --   T  tirage au sort gagné (valeur = « i<objet> » ou le lot)   valeur = « objet:clé de l'auteur » ;
 --                                                  GuildUp_Demandes.lua ; avant la 4.0.0 : don remercié)
+--   W  WoWdex : première capture par la guilde d'un rare, d'un rare élite ou d'un boss (valeur = numéro de PNJ ;
+--      GuildUp_Wowdex.lua ; ignoré par les versions d'avant la 7.0.0)
 -- Chaque addon note ce qu'il voit passer (les autres modules appellent ns.NoterActivite ou
 -- ns.ActiviteAnnonce) dans GuildUpDB.journal[guilde] = { e = { { t, g, q, v }, … }, present, vu } :
 -- 300 entrées au plus, oubliées après 30 jours ; « present » = dernière fois où un de mes personnages
@@ -30,7 +32,7 @@ local MAX_RELAIS = 60           -- entrées renvoyées à un membre qui revient
 local RATTRAPAGE = 14 * 86400   -- on ne redemande jamais plus loin
 local PODIUM = 7 * 86400
 local AFFICHEES = 120           -- lignes du fil au plus
-local GENRES = { N = true, M = true, P = true, D = true, T = true }
+local GENRES = { N = true, M = true, P = true, D = true, T = true, W = true }
 
 local Normaliser = ns.Normaliser
 local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
@@ -253,6 +255,10 @@ local function Phrase(e)
 		local objet = e.v:match("^i(%d+)$")
 		local lot = objet and NomObjet(tonumber(objet)) or (e.v ~= "" and (OR .. e.v .. "|r") or "un lot")
 		return ("%s a remporté le tirage : %s"):format(qui, lot)
+	elseif e.g == "W" then
+		local pnj = tonumber(e.v)
+		local nom = (pnj and ns.NomWowdex and ns.NomWowdex(pnj)) or "un monstre rare"
+		return ("%s a capturé %s%s|r, une première pour le WoWdex de la guilde"):format(qui, OR, nom)
 	end
 	return qui
 end
@@ -260,7 +266,7 @@ ns.PhraseActivite = Phrase
 
 -- « 3 montées de niveau, 1 don, 1 tirage gagné »
 local function Resume(liste)
-	local n = { N = 0, M = 0, P = 0, D = 0, T = 0 }
+	local n = { N = 0, M = 0, P = 0, D = 0, T = 0, W = 0 }
 	for _, e in ipairs(liste) do n[e.g] = (n[e.g] or 0) + 1 end
 	local mots = {}
 	local function Mot(nombre, un, plusieurs)
@@ -270,6 +276,7 @@ local function Resume(liste)
 	Mot(n.M + n.P, "progrès de métier", "progrès de métier")
 	Mot(n.D, "demande honorée", "demandes honorées")
 	Mot(n.T, "tirage gagné", "tirages gagnés")
+	Mot(n.W, "capture rare", "captures rares")
 	return table.concat(mots, ", ")
 end
 

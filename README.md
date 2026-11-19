@@ -135,6 +135,19 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   remontent dans la liste. Quand un membre qui a une de tes quêtes arrive à moins de 300 m sans être dans ton groupe,
   une bulle le signale (au plus une toutes les trois minutes, jamais en instance ni en vol). Les distances viennent
   des positions déjà partagées entre membres : aucun message de plus.
+- **WoWdex** (`/smb wowdex`) : le bestiaire de Forever à compléter, comme un Pokédex. Plus de 3 300 monstres
+  hostiles, numérotés du plus faible au plus fort, chacun avec trois paliers : *vu* (sa barre de nom, ta cible ou
+  ton survol : son nom et son modèle apparaissent, sinon « ??? »), *capturé* (vaincu par toi ou ton groupe) et
+  *dépouillé* (son corps fouillé). Recherche (nom, zone), filtres Tous / Capturés / À capturer / Rares et boss,
+  Ma zone ; barre de progression. La fiche d'un monstre : modèle 3D, niveau, rang, type, zones (« Voir sur la carte »),
+  tes captures, le premier membre de la guilde à l'avoir capturé, et son butin : objets particuliers tirés de
+  QuestieDB, et taux mesurés par la guilde à chaque corps fouillé (« 34 % sur 212 corps fouillés »). Un monstre
+  absent de la liste mais croisé en jeu y entre aussi, « hors liste ». Ton WoWdex est commun à tes personnages ;
+  celui de la guilde réunit les captures de tous et se rattrape à la connexion (les taux de butin, eux, ne
+  s'échangent qu'entre membres connectés). Bouton « Classement » : les membres qui ont capturé le plus de monstres.
+  Une ligne dans la discussion à chaque nouvelle capture, une bulle pour un rare ou un boss et tous les 25 monstres
+  (case « WoWdex » des notifications) ; la première capture d'un rare ou d'un boss par la guilde entre dans le fil
+  d'activité. Infobulle des monstres : « à capturer » ou « capturé ×12 ».
 - **Artisanat** :
   - *Registre* des métiers et recettes de chaque membre ; clic sur une recette d'un membre : demande d'artisanat ;
   - *Crafts* : tous les objets fabricables, par catégorie, avec des filtres (ma classe, mon niveau, niveau requis, fabricable par la guilde) ; un clic sur un objet montre à droite qui, dans la guilde, sait le fabriquer (chuchoter), et « Demander » prépare une demande d'artisanat ;
@@ -234,6 +247,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 | `/smb metiers` | Artisanat : registre des métiers |
 | `/smb crafts` | Artisanat : tous les objets fabricables |
 | `/smb quetes` | Quêtes en commun |
+| `/smb wowdex` | WoWdex : les monstres vus, capturés et dépouillés, seul et en guilde (`dex`, `bestiaire`) |
 | `/smb jeux` | Jeux de la guilde (tirage au sort, Bizkit) |
 | `/smb bizkit` | Le Bizkit, jeu de dés de la guilde |
 | `/smb evenements` | Créer un événement de guilde |
@@ -270,6 +284,8 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 - `GuildUpDB` (par compte) : réglages, demandes de la guilde (`demandes`), objets de ta banque (`banque`, pour
   « tu en as N »), identité, listes reçues des autres membres, dernière version de SMB Forever vue de chaque membre
   (`versionsVues`, oubliée après 60 jours).
+- `GuildUpDB.wowdex` : ton WoWdex (commun à tes personnages) ; `GuildUpDB.wowdexGuilde` : celui de la guilde
+  (premières captures, scores des membres, taux de butin).
 - `GuildUpMetiersDB` (par compte) : métiers et recettes de ses personnages et des membres de la guilde.
 
 Les listes des membres hors ligne sont gardées et relayées par les membres connectés ; celles sans
@@ -282,6 +298,8 @@ nouvelles depuis 30 jours sont oubliées.
 - Provenance des composants (`GuildUp_Sources.lua`) et objectifs des quêtes (`GuildUp_ObjectifsQuetes.lua`,
   `python outils/generer_objectifs.py`) tirés de **QuestieDB** (version Forever, GPL-3.0) :
   merci à ses auteurs. GuildUpSMB n'a pas besoin de Questie pour fonctionner.
+- Bestiaire du WoWdex (`GuildUp_Bestiaire.lua`, `python outils/generer_bestiaire.py`) : monstres, niveaux, rangs,
+  apparitions, butin et noms français tirés de **QuestieDB** (version Forever, GPL-3.0).
 - Images (`GuildUpSMB/media/`) : anneau de Miko ; chope en bois du cri de guilde (`gu_emote.tga`,
   `emote_animee.tga`), disque de la carte (`point.tga`) et bannières au nain (`M_DC_Banner_*.tga`, qui ne sont
   plus affichées) propres à cette version.

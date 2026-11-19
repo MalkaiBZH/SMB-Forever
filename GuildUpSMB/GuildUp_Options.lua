@@ -57,6 +57,7 @@ local function Aide()
 	print("  /smb metiers — registre des métiers de la guilde")
 	print("  /smb crafts — tous les objets fabricables")
 	print("  /smb quetes — quêtes en commun avec la guilde")
+	print("  /smb wowdex — le WoWdex : les monstres vus, capturés et dépouillés, seul et en guilde")
 	print("  /smb jeux — jeux de la guilde (tirage au sort, Bizkit)")
 	print("  /smb bizkit — le Bizkit, jeu de dés de la guilde")
 	print("  /smb evenements — ouvrir la page Événements (calendrier de la guilde)")
@@ -353,7 +354,7 @@ local function Diag()
 		if not ok then L("carte : ERREUR " .. tostring(err)) end
 	end
 	for _, d in ipairs({ { "métiers", ns.DiagMetiers }, { "version", ns.DiagVersion }, { "quêtes", ns.DiagQuetes }, { "objectifs", ns.DiagObjectifs },
-		{ "événements", ns.DiagEvenements }, { "demandes", ns.DiagDemandes }, { "discord", ns.DiagDiscord }, { "carnet", ns.DiagCarnet }, { "carnet2", ns.DiagCarnet2 }, { "identité", ns.DiagIdentite }, { "gu", ns.DiagGU }, { "layers", ns.DiagLayers } }) do
+		{ "événements", ns.DiagEvenements }, { "demandes", ns.DiagDemandes }, { "discord", ns.DiagDiscord }, { "carnet", ns.DiagCarnet }, { "carnet2", ns.DiagCarnet2 }, { "identité", ns.DiagIdentite }, { "gu", ns.DiagGU }, { "layers", ns.DiagLayers }, { "wowdex", ns.DiagWowdex } }) do
 		if d[2] then
 			local ok, err = pcall(d[2], L)
 			if not ok then L(d[1] .. " : ERREUR " .. tostring(err)) end
@@ -375,7 +376,7 @@ local HAUT_CARTE, HAUT_NOTIFS, HAUT_ECRAN = 186, 126, 86
 local NOTIFS = {
 	{ "demandes", "Demandes" }, { "aide", "Aide" }, { "niveaux", "Niveaux" }, { "metiers", "Métiers" },
 	{ "evenements", "Événements" }, { "quetes", "Quêtes" }, { "tirages", "Tirages" }, { "sondages", "Sondages" },
-	{ "version", "Version" }, { "cena", "Surprise" }, -- (explosion des montées de niveau, GuildUp_Cena.lua : surprise)
+	{ "version", "Version" }, { "wowdex", "WoWdex" }, { "cena", "Surprise" }, -- (explosion des montées de niveau, GuildUp_Cena.lua : surprise)
 	{ "gu", (ns.Config and ns.Config.cri) and (tostring(ns.Config.cri):upper() .. "!") or "Cri" },
 }
 local MES_ROLES = { "auto", "tank", "heal", "dps" }                  -- puces « Mon rôle »
@@ -661,6 +662,9 @@ SlashCmdList.GUILDUP = function(msg)
 		return
 	elseif cmd == "sos" then
 		if ns.DemanderAide then ns.DemanderAide() end
+		return
+	elseif cmd == "wowdex" or cmd == "dex" or cmd == "bestiaire" then
+		if ns.OuvrirInterface then ns.OuvrirInterface("wowdex") end
 		return
 	elseif cmd == "stats" or cmd == "statistiques" or cmd == "presence" or cmd == "présence" then
 		if ns.OuvrirInterface then ns.OuvrirInterface("stats") end

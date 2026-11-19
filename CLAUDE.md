@@ -55,7 +55,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
 - Pages de la fenêtre GuildUpSMB (chacune enregistrée par son module avec `ns.AjouterPage`), **un menu par fonction**,
   dans cet ordre (4.0.0) : Accueil (`GuildUp_Interface.lua`), Demandes (`GuildUp_Demandes.lua`), Artisanat
   (`GuildUp_Carnet.lua` : onglets Registre dans `GuildUp_Metiers.lua` et Crafts dans `GuildUp_Carnet.lua`), Quêtes
-  (`GuildUp_Quetes.lua`), Guilde (`GuildUp_Membres.lua`), Jeux (`GuildUp_Tirage.lua` : onglet Tirage au sort ; un jeu de
+  (`GuildUp_Quetes.lua`), WoWdex (`GuildUp_Wowdex.lua`, 7.0.0), Guilde (`GuildUp_Membres.lua`), Jeux (`GuildUp_Tirage.lua` : onglet Tirage au sort ; un jeu de
   plus = un onglet de plus, déclaré avec `ns.AjouterJeu(nom, creer, id)` par un fichier chargé après `GuildUp_Tirage.lua` :
   Bizkit dans `GuildUp_Bizkit.lua`), Événements (`GuildUp_Evenements.lua`), Activité (`GuildUp_Journal.lua`), Statistiques
   (`GuildUp_Stats.lua`) ; Options (`GuildUp_Options.lua`) en bas du menu. Les anciennes fonctions `ns.Ouvrir*` /
@@ -83,6 +83,10 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
 - `GuildUp_Objectifs.lua` : « ! » sur les barres de nom des ennemis de quête (jaune moi, bleu groupe, vert les deux).
   Croise `ns.OBJECTIFS_QUETES` (données générées) avec le journal de quêtes, par numéro de PNJ (GUID) ; complété par
   l'infobulle du jeu (`C_TooltipInfo.GetUnit`) ; listes des coéquipiers reçues sur `PARTY` / `RAID` (`GuildUpObj`).
+- `GuildUp_Wowdex.lua` : page **WoWdex** (`ns.AjouterPage("wowdex")`, `/smb wowdex`) : le bestiaire de
+  `GuildUp_Bestiaire.lua` à compléter (vu, capturé = vaincu, dépouillé), détection sur les barres de nom, la cible, le
+  survol, `PARTY_KILL` du journal de combat et `LOOT_OPENED` (`GetLootSourceInfo`) ; monstres hors bestiaire appris
+  sur l'unité ; ligne dans l'infobulle des monstres ; `ns.NomWowdex(pnj)` (fil d'activité, genre `W`).
 - `GuildUp_Config.lua` : **réglages propres à la guilde** (`ns.Config` : nom public, cri de guilde, emote animée,
   membre vedette). Chargé en premier, sans dépendance ; les autres modules le lisent via `ns.Config`.
 - `GuildUp_Commandes.lua` : page « Aide », la liste de toutes les commandes de `/smb`. Elles y sont déclarées à la
@@ -112,7 +116,9 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   toutes les 10 min, partagé par le relais à la connexion), `GuildUpSvn` (carte des souvenirs, `GuildUp_Souvenirs.lua` :
   les grands moments de chacun, à sa position, gardés sans limite de durée, dessinés par `GuildUp_Carte.lua`),
   `GuildUpLay` (layers, `GuildUp_Layers.lua` : signature des GUID des PNJ observés, comparée entre membres de la
-  même carte ; demande d'invitation en chuchotement d'addon).
+  même carte ; demande d'invitation en chuchotement d'addon), `GuildUpDex` (WoWdex, `GuildUp_Wowdex.lua` : captures
+  `N`, butin des corps fouillés `L` sans rattrapage, scores `S`, rattrapage des premières captures de la guilde par le
+  relais à la connexion).
   Exception : `GuildUpObj` (`GuildUp_Objectifs.lua`, « ! » des ennemis de quête) passe par `PARTY` / `RAID`.
 - Protocoles texte : champs séparés par `~`, identifiants en base 36, **255 caractères maximum par
   message** (découpage en morceaux de 200 si besoin). Nettoyer `~` et `|` dans les textes saisis.
@@ -143,6 +149,11 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   `ns.DONJONS_QUETES` (quêtes de chaque donjon, par numéro de zone) et `ns.SUITES_QUETES` (suites de quêtes :
   première quête, étape, nombre d'étapes), qui ne sont plus lus depuis le retrait de « Jouer ensemble » (3.7.0) :
   à retirer de `generer_objectifs.py` à la prochaine régénération.
+- `GuildUp_Bestiaire.lua` (`ns.BESTIAIRE` : monstres hostiles, ou neutres avec du butin, placés dans le monde ;
+  numéro du WoWdex = ordre du fichier, du plus faible au plus fort ; niveau, rang, deux zones et 8 apparitions au plus,
+  butin particulier ; `ns.BESTIAIRE_ZONES`) : généré par `python outils/generer_bestiaire.py` depuis QuestieDB
+  (`data/Forever` et `l10n/Forever/lookupNpcs/frFR.lua` ; noms des zones lus dans `GuildUp_Sources.lua` ; même cache,
+  `--ref` et `--verifier` que `generer_objectifs.py`). Lu par `GuildUp_Wowdex.lua`.
 - Ces fichiers font plusieurs milliers de lignes : **ne pas les lire en entier**, utiliser Grep.
 
 ## Particularités de Forever

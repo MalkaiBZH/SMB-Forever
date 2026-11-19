@@ -25,6 +25,7 @@ local CHAPITRES = {
 		{ "metiers", "metier", "Le registre des métiers : qui sait fabriquer quoi, et à quel niveau de métier." },
 		{ "items", "crafts, craft", "L'Artisanat, sur l'onglet des objets que la guilde sait fabriquer." },
 		{ "quetes", nil, "La page Quêtes : les quêtes que d'autres membres font aussi, les plus proches en premier." },
+		{ "wowdex", "dex, bestiaire", "Le WoWdex : tous les monstres du jeu à voir, capturer (vaincre) et dépouiller, avec leur butin, et le classement de la guilde." },
 		{ "jeux", "jeu", "La page Jeux : tirage au sort et Bizkit, le jeu de dés de la guilde." },
 		{ "evenements", "events", "La page Événements : le calendrier de la guilde sur les 30 prochains jours." },
 		{ "activite", "fil, podium", "La page Activité : le fil des 30 derniers jours et le podium de la semaine." },

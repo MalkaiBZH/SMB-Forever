@@ -9,7 +9,7 @@
 --   Les autres sections sont des pages fournies par leur module (ns.AjouterPage), avec le kit
 --   d'interface ns.UI (GuildUp_Style.lua), dans cet ordre : Demandes (GuildUp_Demandes.lua), Artisanat
 --   (GuildUp_Carnet.lua : onglets Registre de GuildUp_Metiers.lua et Crafts), Quêtes (GuildUp_Quetes.lua),
---   Guilde (GuildUp_Membres.lua), Jeux (GuildUp_Tirage.lua : onglet Tirage au sort), Événements
+--   WoWdex (GuildUp_Wowdex.lua : le bestiaire à compléter), Guilde (GuildUp_Membres.lua), Jeux (GuildUp_Tirage.lua : onglet Tirage au sort), Événements
 --   (GuildUp_Evenements.lua), Activité (GuildUp_Journal.lua : fil d'activité et podium ; sa pastille
 --   compte les nouveautés depuis la dernière visite), Statistiques (GuildUp_Stats.lua : présence de la
 --   guilde par jour et par heure), et Options (GuildUp_Options.lua) en bas.
@@ -67,6 +67,7 @@ local SECTIONS = {
 	{ id = "quetes", nom = "Quêtes", icone = "Interface\\Icons\\INV_Misc_Note_06", neutre = true,
 		ouvrir = function() if ns.BasculerQuetes then ns.BasculerQuetes(true) end end,
 		badge = function() return ns.QuetesEnCommun and #ns.QuetesEnCommun() or 0 end },
+	{ id = "wowdex", nom = "WoWdex", icone = "Interface\\Icons\\Ability_Hunter_BeastTaming" },
 	{ id = "guilde", nom = "Guilde", icone = "Interface\\Icons\\INV_Shirt_GuildTabard_01" },
 	{ id = "jeux", nom = "Jeux", icone = "Interface\\Icons\\INV_Misc_Dice_01",
 		badge = function() return ns.TirageEnAttente and ns.TirageEnAttente() or 0 end },
