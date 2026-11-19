@@ -1,0 +1,37 @@
+# Essais automatiques de l'addon, à chaque push sur main qui le touche : la syntaxe de chaque fichier avec Lua 5.1
+# (celui du jeu), puis les essais de outils/essais/ dans un faux client WoW (outils/essais/faux_client.lua).
+# Un échec fait échouer la tâche (GitHub prévient par e-mail). Il n'empêche ni l'annonce Discord ni la mise à jour
+# chez les joueurs, qui suivent main : il dit qu'il faut corriger tout de suite.
+name: Essais
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - GuildUpSMB/**
+      - outils/essais/**
+      - .github/workflows/essais.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  essais:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer Lua 5.1
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1
+      - name: Syntaxe de chaque fichier (Lua 5.1)
+        run: |
+          for f in GuildUpSMB/*.lua; do
+            luac5.1 -p "$f" || exit 1
+          done
+      - name: Essais dans le faux client
+        run: |
+          for f in outils/essais/*.lua; do
+            [ "$(basename "$f")" = "faux_client.lua" ] && continue
+            echo "== $f"
+            lua5.1 "$f" GuildUpSMB || exit 1
+          done

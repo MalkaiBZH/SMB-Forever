@@ -178,7 +178,14 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
 
 ## Tester
 
-Pas de build ni de tests automatisés : on teste **en jeu**, après `/reload`.
+Le vrai test se fait **en jeu**, après `/reload`. Avant de pousser, les essais automatiques attrapent les erreurs de
+script (fonction appelée avant d'être définie, nom mal écrit, texte ou nombre absent, « %s » qui reçoit nil), pas
+les défauts d'affichage :
+- `lua outils/essais/wowdex.lua GuildUpSMB` (depuis la racine) : le WoWdex dans un faux client WoW
+  (`outils/essais/faux_client.lua` : cadres factices où toute méthode existe, unités, messages, bulles). Code de
+  sortie 1 au moindre échec. Un essai par page : un fichier de plus dans `outils/essais/`, sur le même modèle.
+- GitHub (`.github/workflows/essais.yml`) relance à chaque push qui touche l'addon la syntaxe de chaque fichier avec
+  Lua 5.1 (celui du jeu) et tous les essais. Quand une page change, son essai change avec elle.
 - Mode Debug : mettre `afficherDebug = true` dans `GuildUpDB`
   (`WTF/Account/<compte>/SavedVariables/GuildUpSMB.lua`, jeu fermé). Les cases Debug apparaissent alors
   dans `/smb` : `test` (tout le monde compte comme membre de la guilde), `testSolo` (ses propres
