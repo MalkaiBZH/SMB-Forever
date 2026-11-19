@@ -98,7 +98,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   qui attend tes dés). Halo doré quand un tirage au sort t'attend. Clic : la fenêtre GuildUpSMB ; clic droit :
   menu rapide (rôle, partage de position, demandes, tirage au sort, sondage, appel à l'aide, options).
 - **Fenêtre GuildUpSMB** (style sombre et doré) : un menu par fonction à gauche (Accueil, Demandes, Artisanat,
-  Quêtes, Guilde, Jeux, Événements, Activité, Statistiques, puis À l'aide ! et Options) et choix du rôle en
+  Quêtes, WoWdex, Guilde, Jeux, Événements, Activité, Statistiques, puis À l'aide ! et Options) et choix du rôle en
   haut. L'accueil résume la guilde : membres sur ta carte, demandes que tu peux honorer (« Je m'en occupe » en
   un clic), appels à l'aide, tes demandes en cours, les deux prochains événements.
 - **Demandes** (`/smb demandes`) : chacun publie ce qu'il lui faut, une *ressource* (« 20 Étoffe de lin ») ou de
@@ -135,20 +135,40 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   remontent dans la liste. Quand un membre qui a une de tes quêtes arrive à moins de 300 m sans être dans ton groupe,
   une bulle le signale (au plus une toutes les trois minutes, jamais en instance ni en vol). Les distances viennent
   des positions déjà partagées entre membres : aucun message de plus.
-- **WoWdex** (`/smb wowdex`) : le bestiaire de Forever à compléter, comme un Pokédex. Plus de 3 300 monstres
-  hostiles, numérotés du plus faible au plus fort, chacun avec trois paliers : *vu* (sa barre de nom, ta cible ou
-  ton survol : son nom et son modèle apparaissent, sinon « ??? »), *capturé* (vaincu par toi ou ton groupe) et
-  *dépouillé* (son corps fouillé). Recherche (nom, zone), filtres Tous / Capturés / À capturer / Rares et boss,
-  Ma zone ; barre de progression. La fiche d'un monstre : modèle 3D, niveau, rang, type, zones (« Voir sur la carte »),
-  tes captures, le premier membre de la guilde à l'avoir capturé, et son butin : objets particuliers tirés de
-  QuestieDB, et taux de drop de toute la guilde, mesurés à chaque corps fouillé par un membre (« 34 % », 212 corps
-  fouillés par 5 membres ; le dépeçage et le vol à la tire ne comptent pas). La recherche trouve aussi un objet :
-  les monstres qui le lâchent, ceux où la guilde l'a trouvé en premier. Un monstre absent de la liste mais croisé
-  en jeu y entre aussi, « hors liste ». Ton WoWdex est commun à tes personnages ; celui de la guilde (captures,
-  taux de drop) se rattrape à la connexion. Bouton « Classement » : les membres qui ont capturé le plus de monstres.
-  Une ligne dans la discussion à chaque nouvelle capture, une bulle pour un rare ou un boss et tous les 25 monstres
-  (case « WoWdex » des notifications) ; la première capture d'un rare ou d'un boss par la guilde entre dans le fil
-  d'activité. Infobulle des monstres : « à capturer » ou « capturé ×12 ».
+- **WoWdex** (`/smb wowdex`) : le bestiaire de Forever à compléter, comme un carnet de collection. Plus de
+  3 300 monstres hostiles, numérotés du plus faible au plus fort, chacun avec trois paliers : *vu* (sa barre de nom,
+  ta cible ou ton survol : son nom et son modèle apparaissent, sinon « ??? »), *capturé* (vaincu par toi ou ton
+  groupe) et *dépouillé* (son corps fouillé). **Les rares sont l'objectif** : le compteur de l'entête compte les
+  rares, rares élites et boss capturés (400), et ils donnent ton titre de chasseur, de Novice à Légende de Forever.
+  Cinq onglets :
+  - *Avis de recherche* : les rares et boss en grandes cartes, avec leur modèle 3D, leur zone, et « repéré il y a
+    12 min » quand un membre vient d'en voir un ;
+  - *Bestiaire* : tous les monstres en cases numérotées (modèle, losange de rang, trois crans vu / capturé /
+    dépouillé) ; filtres Tous / Vus / Capturés / À capturer ;
+  - *Zones* : ta progression zone par zone, ses rares d'abord, avec « Tu es ici » et la part de la guilde ; un clic
+    ouvre les monstres de la zone ;
+  - *Carnet de chasse* : les titres et leurs seuils, ta progression par rang et par niveau, les monstres pistés, tes
+    dernières captures, et les réglages des alertes et des losanges ;
+  - *Guilde* : le WoWdex commun, le classement par rares capturés (avec le titre de chacun) et les premières
+    captures de rares.
+
+  La recherche (nom, zone, objet) et le choix de la zone (toutes, la mienne, celle choisie dans l'onglet Zones)
+  valent pour les deux premiers onglets. La fiche d'un monstre : modèle 3D, rang, niveau, type, zones, tes paliers
+  datés, le premier membre de la guilde à l'avoir capturé, le dernier repérage, et son butin, toujours visible :
+  objets particuliers tirés de QuestieDB, et taux de drop de toute la guilde, mesurés à chaque corps fouillé par un
+  membre (« 34 % », 212 corps fouillés par 5 membres ; le dépeçage et le vol à la tire ne comptent pas). Trois
+  boutons : « Pister » (10 monstres au plus), « Sur la carte », « Lier » (dans la discussion). La recherche trouve
+  aussi un objet : les monstres qui le lâchent, ceux où la guilde l'a trouvé en premier.
+
+  **Rare en vue !** Quand un rare ou un rare élite que tu n'as pas capturé apparaît près de toi (barre de nom,
+  cible, survol), une alerte sonne ; la guilde est prévenue, et les membres à qui il manque reçoivent une bulle
+  (une fois toutes les 10 minutes par rare ; ta position n'est jointe que si tu la partages). Un monstre pisté
+  déclenche la même alerte. Les rares à capturer et les monstres pistés portent un losange sur leur barre de nom.
+  Un monstre absent de la liste mais croisé en jeu y entre aussi, « hors liste ». Ton WoWdex est commun à tes
+  personnages ; celui de la guilde (captures, taux de drop, scores) se rattrape à la connexion. Une ligne dans la
+  discussion à chaque nouvelle capture ; une bulle pour un rare ou un boss, un nouveau titre, une zone terminée, et
+  tous les 25 monstres (case « WoWdex » des notifications) ; chaque rare capturé par un membre entre dans le fil
+  d'activité. Infobulle des monstres : « à capturer », « Rare à capturer ! » ou « capturé ×12 ».
 - **Artisanat** :
   - *Registre* des métiers et recettes de chaque membre ; clic sur une recette d'un membre : demande d'artisanat ;
   - *Crafts* : tous les objets fabricables, par catégorie, avec des filtres (ma classe, mon niveau, niveau requis, fabricable par la guilde) ; un clic sur un objet montre à droite qui, dans la guilde, sait le fabriquer (chuchoter), et « Demander » prépare une demande d'artisanat ;
@@ -286,8 +306,9 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 - `GuildUpDB` (par compte) : réglages, demandes de la guilde (`demandes`), objets de ta banque (`banque`, pour
   « tu en as N »), identité, listes reçues des autres membres, dernière version de SMB Forever vue de chaque membre
   (`versionsVues`, oubliée après 60 jours).
-- `GuildUpDB.wowdex` : ton WoWdex (commun à tes personnages) ; `GuildUpDB.wowdexGuilde` : celui de la guilde
-  (premières captures, scores des membres, taux de butin).
+- `GuildUpDB.wowdex` : ton WoWdex (commun à tes personnages), tes monstres pistés et tes réglages d'alerte ;
+  `GuildUpDB.wowdexGuilde` : celui de la guilde (premières captures, scores des membres, taux de butin, derniers
+  repérages de rares).
 - `GuildUpMetiersDB` (par compte) : métiers et recettes de ses personnages et des membres de la guilde.
 
 Les listes des membres hors ligne sont gardées et relayées par les membres connectés ; celles sans

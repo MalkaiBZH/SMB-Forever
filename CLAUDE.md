@@ -90,7 +90,12 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   survol et `LOOT_OPENED` (`GetLootSourceInfo`) ; pas de journal de combat (`COMBAT_LOG_EVENT_UNFILTERED` est interdit
   aux addons sur ce client : l'enregistrer, même sous `pcall`, affiche une erreur) ; monstres hors bestiaire appris
   sur l'unité ; butin des récoltes (dépeçage, vol à la tire…) ignoré ; recherche par monstre, zone ou objet ; ligne dans
-  l'infobulle des monstres ; `ns.NomWowdex(pnj)` (fil d'activité, genre `W`), `ns.SourcesWowdex(objet)` (Encyclopédie).
+  l'infobulle des monstres ; `ns.NomWowdex(pnj)` (fil d'activité, genres `W` et `R`), `ns.SourcesWowdex(objet)` (Encyclopédie).
+  Depuis la 7.3.0, **les rares sont l'objectif** : rares, rares élites et boss (`RARES`) font le compteur de l'entête, le
+  titre de chasseur (`TITRES`) et le classement ; un rare du monde vu vivant déclenche une alerte et son repérage part à
+  la guilde. Cinq onglets : Avis de recherche et Bestiaire (même grille, à lignes entières car un modèle 3D ne se
+  découpe pas dans une zone qui défile, et même fiche), Zones, Carnet de chasse, Guilde. Monstres pistés
+  (`GuildUpDB.wowdex.pistes`), losange sur les barres de nom (`ns.MajPlaquesWowdex`).
 - `GuildUp_Config.lua` : **réglages propres à la guilde** (`ns.Config` : nom public, cri de guilde, emote animée,
   membre vedette). Chargé en premier, sans dépendance ; les autres modules le lisent via `ns.Config`.
 - `GuildUp_Commandes.lua` : page « Aide », la liste de toutes les commandes de `/smb`. Elles y sont déclarées à la
@@ -122,7 +127,9 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   `GuildUpLay` (layers, `GuildUp_Layers.lua` : signature des GUID des PNJ observés, comparée entre membres de la
   même carte ; demande d'invitation en chuchotement d'addon), `GuildUpDex` (WoWdex, `GuildUp_Wowdex.lua` : captures
   `N`, relevés de butin `B` (totaux de chaque membre, fusionnés au plus grand : le taux de la guilde est leur somme),
-  scores `S`, rattrapage des premières captures `Q`/`E` et des relevés `P`/`R`/`F` par le relais à la connexion).
+  scores `S`, rares et boss capturés `C`, rare en vue `V`, rattrapage des premières captures `Q`/`E`, des scores `T`/`U`
+  et des relevés `P`/`R`/`F` par le relais à la connexion ; un champ de plus ne s'ajoute jamais à un message existant,
+  que les anciennes versions ne liraient plus : il part dans un nouveau genre, qu'elles ignorent).
   Exception : `GuildUpObj` (`GuildUp_Objectifs.lua`, « ! » des ennemis de quête) passe par `PARTY` / `RAID`.
 - Protocoles texte : champs séparés par `~`, identifiants en base 36, **255 caractères maximum par
   message** (découpage en morceaux de 200 si besoin). Nettoyer `~` et `|` dans les textes saisis.

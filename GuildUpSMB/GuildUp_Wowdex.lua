@@ -1,7 +1,7 @@
 -- GuildUpSMB : WoWdex, le bestiaire à compléter, seul et en guilde (page « WoWdex », /smb wowdex ; préfixe
 -- "GuildUpDex").
 -- Le bestiaire (ns.BESTIAIRE, GuildUp_Bestiaire.lua, généré depuis QuestieDB) numérote les monstres de Forever
--- du plus faible au plus fort. Chaque monstre a trois paliers, comme dans un Pokédex :
+-- du plus faible au plus fort. Chaque monstre a trois paliers, comme dans un carnet de collection :
 --   vu        barre de nom, cible ou survol d'un monstre qu'on peut attaquer : son nom et son modèle s'affichent
 --   vaincu    (« capturé ») tué par moi ou mon groupe : cible ou survol d'un corps qui n'est pas « pris par un
 --             autre », ou dépouillé. (Pas de journal de combat : le client interdit aux addons d'écouter
@@ -9,40 +9,63 @@
 --   dépouillé fouillé : ce qu'il a lâché est compté, pour donner les taux de butin. Pas le butin d'une récolte
 --             (dépeçage, vol à la tire, minage, herboristerie : sort lancé moins de 2 s avant l'ouverture du
 --             butin, reconnu à son numéro ou à son nom), ni celui d'un monstre ciblé encore vivant
+-- Les rares sont le cœur du WoWdex (7.3.0) : rares, rares élites et boss (RARES) font le compteur de l'entête, le
+-- titre de chasseur (TITRES : seuils en rares et boss capturés), le classement de la guilde et l'onglet « Avis de
+-- recherche ». Un rare du monde (TRAQUES : rare, rare élite) vu vivant déclenche une alerte si je ne l'ai pas
+-- capturé, et son repérage part à la guilde.
 -- Un monstre absent du bestiaire mais rencontré en jeu est gardé aussi (nom, niveau, rang, type, zone appris sur
 -- l'unité), sans numéro : le WoWdex vit de ce que croisent les joueurs.
 -- Mon WoWdex est commun aux personnages du compte : GuildUpDB.wowdex.m[pnj] = { v = vu le, k = vaincus,
 -- d = dépouilles, tk = premier vaincu le, tb = dernière dépouille le, b = { [objet] = corps qui l'ont lâché },
--- ty = type, et pour un monstre hors bestiaire : n = nom, l = niveau, r = rang, c = carte, z = zone }.
+-- ty = type, et pour un monstre hors bestiaire : n = nom, l = niveau, r = rang, c = carte, z = zone } ;
+-- GuildUpDB.wowdex.pistes[pnj] = date : les monstres que je piste (10 au plus ; alerte quand ils sont en vue,
+-- losange sur leur barre de nom ; retirés à la capture) ; alertes = false, plaques = false : réglages coupés.
 -- La guilde (GuildUpDB.wowdexGuilde[guilde]) : d[pnj] = { c = premier membre à l'avoir vaincu, j = jour },
--- s[clé] = { v, k, d, t } (score de chaque membre), butin[pnj][clé] = { k = corps fouillés, o = { [objet] = n },
--- t = date } (le relevé de chaque autre membre ; le mien est lu dans mon WoWdex), curseurButin (rattrapage).
+-- s[clé] = { v, k, d, t, r } (score de chaque membre ; r = rares et boss capturés, absent pour une version d'avant
+-- la 7.3.0), butin[pnj][clé] = { k = corps fouillés, o = { [objet] = n }, t = date } (le relevé de chaque autre
+-- membre ; le mien est lu dans mon WoWdex), curseurButin (rattrapage), r[pnj] = { c = membre, t = date, carte, x,
+-- y } (dernier repérage d'un rare du monde).
 -- Taux de drop de la guilde = somme des relevés de chaque membre. Chaque relevé appartient à son membre et ses
 -- comptes ne font que monter : on garde le plus grand reçu, donc rien n'est compté deux fois (ni un message reçu
 -- deux fois, ni un relevé reçu en direct puis par le relais).
--- Un monstre est « connu » (nom affiché, sinon « ??? ») si je l'ai vu ou si la guilde l'a vaincu.
--- Recherche de la page : nom du monstre, zone, ou nom d'un objet (les monstres qui le lâchent : ceux où la guilde
--- l'a trouvé d'abord, puis ceux du bestiaire). ns.SourcesWowdex(objet) : les monstres où la guilde l'a trouvé,
--- avec le taux (Encyclopédie de GuildUp_Carnet.lua).
+-- Un monstre est « connu » (nom et modèle affichés, sinon « ??? ») si je l'ai vu, si la guilde l'a vaincu ou si un
+-- membre l'a repéré. Son butin, lui, est toujours affiché.
+-- Page : entête (rares et boss capturés, titre), puis cinq onglets : « Avis de recherche » (les rares et boss, en
+-- grandes cartes), « Bestiaire » (tous les monstres, en cases), « Zones » (un WoWdex par zone, ses rares d'abord),
+-- « Carnet de chasse » (titres, progression par rang et par niveau, monstres pistés, dernières captures,
+-- réglages), « Guilde » (classement par rares, premières captures de rares). Les deux premiers partagent la
+-- grille et la fiche (modèle 3D, paliers, guilde, repérage, butin, « Pister », « Sur la carte », « Lier »).
+-- Recherche : nom du monstre, zone, ou nom d'un objet (les monstres qui le lâchent : ceux où la guilde l'a trouvé
+-- d'abord, puis ceux du bestiaire). ns.SourcesWowdex(objet) : les monstres où la guilde l'a trouvé, avec le taux
+-- (Encyclopédie de GuildUp_Carnet.lua).
 -- Messages (pnj et objets en base 36, jour = jours depuis le 1er janvier 2024, t = heure du serveur) :
 --   "N~pnj,pnj,…"                     mes nouvelles captures (regroupées, toutes les 15 s au plus)
 --   "B~pnj:corps:t.objet.n.objet.n;…" mes relevés de butin (totaux) des monstres fouillés depuis le dernier envoi
 --                                     (toutes les 60 s au plus) ; un monstre au butin très varié tient en
 --                                     plusieurs mots. (« L », les écarts de la 7.0.0, est ignoré.)
 --   "S~vus~vaincus~dépouillés"        mon score (à la connexion, puis 2 min après un changement)
+--   "C~rares"                         mes rares et boss capturés, envoyé avec « S » (7.3.0 ; un message à part : les
+--                                     versions d'avant ne liraient pas un « S » plus long)
+--   "V~pnj~carte~x~y"                 je vois un rare du monde vivant (7.3.0) : une fois toutes les 10 min par rare
+--                                     pour toute la guilde ; carte et position (dix-millièmes) vides si je ne
+--                                     partage pas ma position. Pas de rattrapage : c'est une nouvelle du moment.
 --   "Q~jour"                          je me connecte : envoyez-moi les découvertes depuis ce jour
 --   "E~clé~pnj.jour,pnj.jour,…"       découvertes de la guilde, par le seul relais (ns.EstLeRelais), les plus
 --                                     anciennes d'abord, 400 au plus par demande (la suite à la connexion suivante)
 --   "T~clé,vus,vaincus,dépouillés,t;…" scores des membres, par le même relais
+--   "U~clé,rares;…"                   rares et boss capturés des membres, par le même relais, après « T » (7.3.0)
 --   "P~t"                             je me connecte : envoyez-moi les relevés de butin changés depuis t
 --   "R~clé~pnj:corps:t.objet.n…;…"    relevés de ce membre, par le seul relais, les plus anciens d'abord, 300 au
 --                                     plus par demande ; tout le monde les lit
 --   "F~demandeur~t"                   fin du rattrapage : le demandeur reprendra à t la prochaine fois
--- Une découverte : le jour le plus ancien gagne (à égalité, la plus petite clé). La première capture d'un rare,
--- d'un rare élite ou d'un boss par la guilde entre dans le fil d'activité (genre « W », GuildUp_Journal.lua).
--- Bulles (catégorie « wowdex ») : capture d'un rare ou d'un boss, tous les 25 monstres capturés ; une ligne dans la
--- discussion pour chaque nouvelle capture. Ligne « WoWdex » dans l'infobulle des monstres.
-
+-- Les versions d'avant la 7.3.0 ignorent « C », « U » et « V » : rien ne change pour elles.
+-- Une découverte : le jour le plus ancien gagne (à égalité, la plus petite clé). La capture d'un rare, d'un rare
+-- élite ou d'un boss entre dans le fil d'activité (GuildUp_Journal.lua) : genre « W » pour la première de la
+-- guilde, « R » pour les suivantes.
+-- Bulles (catégorie « wowdex ») : rare en vue (moi : son d'alerte ; un membre : bulle simple), monstre pisté en
+-- vue, capture d'un rare ou d'un boss (avec le nouveau titre et la zone terminée s'il y a lieu), zone complète,
+-- tous les 25 monstres capturés ; une ligne dans la discussion pour chaque nouvelle capture. Ligne « WoWdex » dans
+-- l'infobulle des monstres. Losange sur la barre de nom des rares à capturer et des monstres pistés.
 local NOM_ADDON, ns = ...
 
 local PREFIXE = "GuildUpDex"
@@ -52,6 +75,9 @@ local MAX_RELAIS_BUTIN = 300
 local MAX_HORS = 1000             -- monstres hors bestiaire gardés au plus
 local PALIER_BULLE = 25
 local OCTETS = 240
+local DELAI_ALERTE = 300          -- secondes entre deux alertes « en vue » pour le même monstre
+local DELAI_REPERAGE = 600        -- secondes entre deux repérages du même rare annoncés à la guilde
+local MAX_PISTES = 10             -- monstres pistés au plus
 
 local Normaliser = ns.Normaliser
 local MaCle = ns.MaCle
@@ -64,7 +90,11 @@ local Secrete = ns.Secrete
 local ANGLAIS = GetLocale() == "enUS" or GetLocale() == "enGB"
 local NOMS_RANGS = { [0] = "Normal", "Élite", "Rare élite", "Boss", "Rare" }
 local COULEURS_RANGS = { [0] = { 0.91, 0.886, 0.83 }, { 1, 0.82, 0 }, { 0.75, 0.75, 1 }, { 1, 0.35, 0.3 }, { 0.75, 0.75, 1 } }
-local RARES = { [2] = true, [3] = true, [4] = true } -- rare élite, boss, rare
+local RARES = { [2] = true, [3] = true, [4] = true } -- rare élite, boss, rare : le cœur du WoWdex
+local TRAQUES = { [2] = true, [4] = true }           -- rares du monde : alerte « en vue », repérage partagé
+-- Titres de chasseur : seuil en rares et boss capturés (le dernier : tous ceux du bestiaire)
+local TITRES = { { 0, "Novice" }, { 5, "Pisteur" }, { 15, "Traqueur" }, { 40, "Chasseur" }, { 80, "Grand veneur" },
+	{ 150, "Maître de chasse" }, { 250, "Maître du bestiaire" }, { false, "Légende de Forever" } }
 local CLASSEMENTS = { elite = 1, rareelite = 2, worldboss = 3, rare = 4 }
 
 local function Jour(t) return math.floor(((t or Maintenant()) - EPOQUE) / 86400) end
@@ -75,11 +105,12 @@ local function Message(t) if ns.Coeur and ns.Coeur.Message then ns.Coeur.Message
 -- Bestiaire (lu une fois, à la première utilisation)
 --------------------------------------------------------------------------------
 
-local bestiaire -- { liste = { fiche… } dans l'ordre des numéros, par = { [pnj] = fiche }, zones, nombre }
+local bestiaire -- { liste = { fiche… } dans l'ordre des numéros, par = { [pnj] = fiche }, zones, nombre,
+                -- rares = nombre de rares, rares élites et boss, parRang = { [rang] = nombre } }
 
 local function Bestiaire()
 	if bestiaire then return bestiaire end
-	local b = { liste = {}, par = {}, zones = {} }
+	local b = { liste = {}, par = {}, zones = {}, rares = 0, parRang = { [0] = 0, 0, 0, 0, 0 } }
 	for z, nom, carte in (ns.BESTIAIRE_ZONES or ""):gmatch("(%d+)|([^|\n]*)|(%d*)") do
 		b.zones[tonumber(z)] = { nom = nom, carte = tonumber(carte) }
 	end
@@ -92,6 +123,8 @@ local function Bestiaire()
 			f.num = #b.liste + 1
 			b.liste[f.num] = f
 			b.par[f.id] = f
+			b.parRang[f.rang] = (b.parRang[f.rang] or 0) + 1
+			if RARES[f.rang] then b.rares = b.rares + 1 end
 		end
 	end
 	b.nombre = #b.liste
@@ -122,6 +155,15 @@ local function ButinFiche(f)
 	return f.butin
 end
 
+-- ensemble des zones d'une fiche : { [zone] = true }
+local function ZonesDe(f)
+	if not f.ensembleZones then
+		f.ensembleZones = {}
+		for z in (f.zonesTexte or ""):gmatch("(%d+):") do f.ensembleZones[tonumber(z)] = true end
+	end
+	return f.ensembleZones
+end
+
 local function NomZone(z)
 	local b = Bestiaire()
 	return z and b.zones[z] and b.zones[z].nom or nil
@@ -136,6 +178,7 @@ local function Moi()
 	if not db then return nil end
 	if type(db.wowdex) ~= "table" then db.wowdex = {} end
 	if type(db.wowdex.m) ~= "table" then db.wowdex.m = {} end
+	if type(db.wowdex.pistes) ~= "table" then db.wowdex.pistes = {} end
 	return db.wowdex
 end
 
@@ -164,19 +207,20 @@ local function Guilde()
 	if type(db.wowdexGuilde) ~= "table" then db.wowdexGuilde = {} end
 	local g = db.wowdexGuilde[nom]
 	if type(g) ~= "table" then g = {}; db.wowdexGuilde[nom] = g end
-	for _, k in ipairs({ "d", "s", "butin" }) do
+	for _, k in ipairs({ "d", "s", "butin", "r" }) do
 		if type(g[k]) ~= "table" then g[k] = {} end
 	end
 	g.b = nil -- (7.0.0 : totaux de tous mélangés, impossibles à répartir par membre)
 	return g
 end
 
--- mes compteurs : vus, vaincus (capturés), dépouillés, hors bestiaire
+-- mes compteurs : vus, vaincus (capturés), dépouillés, hors bestiaire, et r = rares, rares élites et boss
+-- du bestiaire capturés
 local scoreCache
 local function MonScore()
 	if scoreCache then return scoreCache end
 	local w = Moi()
-	local s = { v = 0, k = 0, d = 0, hors = 0 }
+	local s = { v = 0, k = 0, d = 0, hors = 0, r = 0 }
 	if w then
 		local par = Bestiaire().par
 		for id, e in pairs(w.m) do
@@ -184,11 +228,57 @@ local function MonScore()
 			if p >= 1 then s.v = s.v + 1 end
 			if p >= 2 then s.k = s.k + 1 end
 			if p >= 3 then s.d = s.d + 1 end
-			if not par[id] then s.hors = s.hors + 1 end
+			local f = par[id]
+			if not f then s.hors = s.hors + 1
+			elseif p >= 2 and RARES[f.rang] then s.r = s.r + 1 end
 		end
 	end
 	scoreCache = s
 	return s
+end
+
+-- Titre de chasseur pour r rares et boss capturés : rang (1 à 8), nom, seuil du titre suivant (nil au dernier)
+local function SeuilTitre(i)
+	local t = TITRES[i]
+	if not t then return nil end
+	return t[1] or Bestiaire().rares
+end
+local function Titre(r)
+	r = r or 0
+	local rang = 1
+	for i = 2, #TITRES do
+		local seuil = SeuilTitre(i)
+		if seuil > 0 and r >= seuil then rang = i end
+	end
+	return rang, TITRES[rang][2], SeuilTitre(rang + 1)
+end
+
+-- Par zone : n monstres, k capturés par moi, g par la guilde (ou moi) ; rares, raresK, raresG : pareil pour les
+-- rares, rares élites et boss. Recalculé après chaque changement.
+local statsZones
+local function StatsZones()
+	if statsZones then return statsZones end
+	local w, g = Moi(), Guilde()
+	local st = {}
+	for _, f in ipairs(Bestiaire().liste) do
+		local pris = w and Palier(w.m[f.id]) >= 2 or false
+		local guilde = pris or (g and g.d[f.id] ~= nil) or false
+		local rare = RARES[f.rang]
+		for z in pairs(ZonesDe(f)) do
+			local s = st[z]
+			if not s then s = { n = 0, k = 0, g = 0, rares = 0, raresK = 0, raresG = 0 }; st[z] = s end
+			s.n = s.n + 1
+			if pris then s.k = s.k + 1 end
+			if guilde then s.g = s.g + 1 end
+			if rare then
+				s.rares = s.rares + 1
+				if pris then s.raresK = s.raresK + 1 end
+				if guilde then s.raresG = s.raresG + 1 end
+			end
+		end
+	end
+	statsZones = st
+	return st
 end
 
 -- un membre de la guilde a vaincu ce monstre (le jour le plus ancien gagne) ; true si la guilde ne l'avait pas
@@ -208,7 +298,7 @@ local function Connu(id)
 	local e = Entree(id)
 	if e and e.v then return true end
 	local g = Guilde()
-	return g and g.d[id] ~= nil or false
+	return g and (g.d[id] ~= nil or g.r[id] ~= nil) or false
 end
 
 --------------------------------------------------------------------------------
@@ -219,6 +309,7 @@ local page
 local majPrevue = false
 local function MajBientot()
 	scoreCache = nil
+	statsZones = nil
 	if majPrevue then return end
 	majPrevue = true
 	C_Timer.After(0.5, function()
@@ -255,6 +346,7 @@ local function EnvoyerScore()
 	scoreLance = false
 	local s = MonScore()
 	Envoyer(("S~%d~%d~%d"):format(s.v, s.k, s.d), true)
+	Envoyer("C~" .. s.r) -- (pas jetable : il remplacerait « S » dans la file)
 end
 
 local function ScorePlusTard()
@@ -423,10 +515,51 @@ local function NomMonstre(id)
 end
 ns.NomWowdex = NomMonstre
 
-local function Notif(categorie, titre, texte)
-	if ns.Notifier then ns.Notifier(categorie, titre, texte, nil, function()
-		if ns.OuvrirInterface then ns.OuvrirInterface("wowdex") end
+-- bulle ; un clic ouvre le WoWdex, sur la fiche du monstre s'il est donné
+local function Notif(categorie, titre, texte, son, id)
+	if ns.Notifier then ns.Notifier(categorie, titre, texte, son, function()
+		if ns.OuvrirInterface then ns.OuvrirInterface("wowdex", id) end
 	end) end
+end
+
+local function AlertesActives()
+	local w = Moi()
+	return w and w.alertes ~= false or false
+end
+
+-- Je vois un rare du bestiaire : la guilde l'apprend (une fois toutes les 10 min par rare, pour toute la guilde),
+-- avec ma position si je la partage (réglage partagePosition)
+local function Signaler(id)
+	local g = Guilde()
+	if not g then return end
+	local t = Maintenant()
+	local r = g.r[id]
+	if r and t - (r.t or 0) < DELAI_REPERAGE then return end
+	local carte, x, y
+	local db = ns.DB and ns.DB()
+	if db and db.partagePosition and ns.MaPosition then carte, x, y = ns.MaPosition() end
+	g.r[id] = { c = MaCle(), t = t, carte = carte, x = x, y = y }
+	Envoyer(("V~%s~%s~%s~%s"):format(Base36(id), carte and tostring(carte) or "",
+		x and tostring(math.floor(x * 10000 + 0.5)) or "", y and tostring(math.floor(y * 10000 + 0.5)) or ""))
+	MajBientot()
+end
+
+-- Un rare du monde, ou un monstre que je piste, est vivant devant moi : alerte (au plus une toutes les 5 min par
+-- monstre) si je ne l'ai pas encore capturé, et repérage pour la guilde si c'est un rare
+local alertes = {} -- [pnj] = GetTime() de la dernière fois
+local function EnVue(id, e)
+	local f = Bestiaire().par[id]
+	local rang = f and f.rang or e.r or 0
+	local w = Moi()
+	local piste = w and w.pistes[id]
+	if not TRAQUES[rang] and not piste then return end
+	local maintenant = GetTime()
+	if alertes[id] and maintenant - alertes[id] < DELAI_ALERTE then return end
+	alertes[id] = maintenant
+	if f and TRAQUES[rang] then Signaler(id) end
+	if Palier(e) >= 2 or not AlertesActives() then return end
+	Notif("wowdex", TRAQUES[rang] and ("WoWdex : " .. NOMS_RANGS[rang] .. " en vue !") or "WoWdex : monstre pisté en vue !",
+		(e.n or (f and f.nom) or "Un monstre") .. " est à capturer.", "RAID_WARNING", id)
 end
 
 local function Vu(unite)
@@ -437,8 +570,11 @@ local function Vu(unite)
 		e.v = Maintenant()
 		MajBientot()
 	end
+	if e and not UnitIsDead(unite) then EnVue(id, e) end
 	return id, e
 end
+
+local MasquerMarques -- (losanges des barres de nom, plus bas)
 
 local function Vaincre(id, guid, unite)
 	if not id or (guid and vaincus[guid]) then return end
@@ -462,19 +598,58 @@ local function Vaincre(id, guid, unite)
 	local moi = MaCle()
 	local nouveauGuilde = Decouverte(id, moi, Jour())
 	AnnoncerCapture(id)
-	local f = Bestiaire().par[id]
+	local b = Bestiaire()
+	local f = b.par[id]
 	local rang = f and f.rang or e.r or 0
+	local rare = RARES[rang] or false
 	local s = MonScore()
+	local w = Moi()
+	if w then w.pistes[id] = nil end -- (capturé : plus besoin de le pister)
+	if MasquerMarques then MasquerMarques(id) end
 	local db = ns.DB and ns.DB()
 	local bavard = not (db and type(db.notifs) == "table" and db.notifs.wowdex == false)
+	local nom = NomMonstre(id)
 	if bavard then
-		Message(("WoWdex : %s%s|r capturé ! (%d sur %d)"):format("|cffffd100",
-			(f and ("n°%04d "):format(f.num) or "") .. NomMonstre(id), s.k, Bestiaire().nombre))
+		if rare and f then
+			Message(("WoWdex : |cffbfbfff%s|r %s%s|r capturé ! (rares et boss : %d sur %d)"):format(NOMS_RANGS[rang],
+				"|cffffd100", ("n°%04d "):format(f.num) .. nom, s.r, b.rares))
+		else
+			Message(("WoWdex : %s%s|r capturé ! (%d sur %d)"):format("|cffffd100",
+				(f and ("n°%04d "):format(f.num) or "") .. nom, s.k, b.nombre))
+		end
 	end
-	if RARES[rang] then
-		Notif("wowdex", "WoWdex : " .. NOMS_RANGS[rang] .. " capturé !", NomMonstre(id)
-			.. (nouveauGuilde and " : une première pour la guilde !" or ""))
-		if nouveauGuilde and ns.NoterActivite and moi then ns.NoterActivite("W", moi, tostring(id)) end
+	-- ce que cette capture débloque : un titre (rares et boss), une zone (ses rares, ou tous ses monstres)
+	local suites = {}
+	if rare and f then
+		local avant = Titre(s.r - 1)
+		local apres, nomTitre = Titre(s.r)
+		if apres > avant then suites[#suites + 1] = "Nouveau titre : " .. nomTitre end
+	end
+	if f then
+		local st = StatsZones()
+		for z in pairs(ZonesDe(f)) do
+			local x = st[z]
+			if x and x.k >= x.n then
+				suites[#suites + 1] = (NomZone(z) or "Zone") .. " : zone complète !"
+			elseif x and rare and x.raresK >= x.rares then
+				suites[#suites + 1] = (NomZone(z) or "Zone") .. " : tous les rares capturés !"
+			end
+		end
+	end
+	if bavard then
+		for _, ligne in ipairs(suites) do Message("WoWdex : |cffffd100" .. ligne .. "|r") end
+	end
+	if rare then
+		local texte = nom .. (f and (" · %d sur %d"):format(s.r, b.rares) or "")
+		if nouveauGuilde then texte = texte .. "\nUne première pour la guilde !" end
+		if #suites > 0 then texte = texte .. "\n" .. table.concat(suites, "\n") end
+		Notif("wowdex", "WoWdex : " .. NOMS_RANGS[rang] .. " capturé !", texte, nil, id)
+		-- (fil d'activité : « W » la première capture de la guilde, « R » les suivantes)
+		if ns.NoterActivite and moi and (nouveauGuilde or f) then
+			ns.NoterActivite(nouveauGuilde and "W" or "R", moi, tostring(id))
+		end
+	elseif #suites > 0 then
+		Notif("wowdex", "WoWdex", table.concat(suites, "\n"), nil, id)
 	elseif s.k % PALIER_BULLE == 0 then
 		Notif("wowdex", "WoWdex", ("%d monstres capturés !"):format(s.k))
 	end
@@ -610,6 +785,11 @@ local function Relayer(depuis)
 		end
 	end
 	EnvoyerMots("T~", scores, ";")
+	local rares = {}
+	for cle, s in pairs(g.s) do
+		if s.r and (s.t or 0) >= limite then rares[#rares + 1] = ("%s,%d"):format(cle, s.r) end
+	end
+	EnvoyerMots("U~", rares, ";")
 end
 
 -- relevés de butin changés depuis « depuis » (de tous les membres, moi compris), les plus anciens d'abord, 300 au
@@ -658,9 +838,12 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		local j = Jour()
 		for mot in suite:gmatch("[^,]+") do
 			local id = tonumber(mot, 36)
-			if id and Decouverte(id, qui, j) then
+			if id then
+				local premiere = Decouverte(id, qui, j)
 				local f = Bestiaire().par[id]
-				if f and RARES[f.rang] and ns.NoterActivite then ns.NoterActivite("W", qui, tostring(id)) end
+				if f and RARES[f.rang] and ns.NoterActivite then
+					ns.NoterActivite(premiere and "W" or "R", qui, tostring(id))
+				end
 			end
 		end
 		MajBientot()
@@ -696,8 +879,37 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	elseif genre == "S" then
 		local v, k, d = suite:match("^(%d+)~(%d+)~(%d+)$")
 		if v then
-			g.s[qui] = { v = tonumber(v), k = tonumber(k), d = tonumber(d), t = Maintenant() }
+			g.s[qui] = { v = tonumber(v), k = tonumber(k), d = tonumber(d), t = Maintenant(), r = g.s[qui] and g.s[qui].r }
 			MajBientot()
+		end
+	elseif genre == "C" then
+		local r = tonumber(suite:match("^(%d+)"))
+		if r then
+			local s = g.s[qui]
+			if not s then s = { v = 0, k = 0, d = 0, t = Maintenant() }; g.s[qui] = s end
+			s.r = r
+			MajBientot()
+		end
+	elseif genre == "U" then
+		for cle, r in suite:gmatch("([^,;]+),(%d+)") do
+			local s = g.s[cle]
+			if s and cle ~= MaCle() then s.r = math.max(s.r or 0, tonumber(r)) end
+		end
+		MajBientot()
+	elseif genre == "V" then
+		local pnj, carte, x, y = suite:match("^(%w+)~(%d*)~(%d*)~(%d*)$")
+		local id = pnj and tonumber(pnj, 36)
+		local f = id and Bestiaire().par[id]
+		if f and TRAQUES[f.rang] then
+			local t = Maintenant()
+			local recent = g.r[id] and t - (g.r[id].t or 0) < DELAI_REPERAGE
+			x, y = tonumber(x), tonumber(y)
+			g.r[id] = { c = qui, t = t, carte = tonumber(carte), x = x and x / 10000, y = y and y / 10000 }
+			MajBientot()
+			if not recent and Palier(Entree(id)) < 2 and AlertesActives() then
+				Notif("wowdex", "WoWdex : " .. NOMS_RANGS[f.rang] .. " en vue !", ("%s (%s)\nRepéré par %s."):format(f.nom,
+					NomZone(f.zone) or "zone inconnue", NomJoueur(qui)), nil, id)
+			end
 		end
 	elseif genre == "Q" then
 		local depuis = tonumber(suite, 36)
@@ -714,7 +926,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 			local cle, v, k, d, t = mot:match("^([^,]+),(%d+),(%d+),(%d+),(%w+)$")
 			t = t and tonumber(t, 36)
 			if cle and t and cle ~= MaCle() and (not g.s[cle] or (g.s[cle].t or 0) < t) then
-				g.s[cle] = { v = tonumber(v), k = tonumber(k), d = tonumber(d), t = t }
+				g.s[cle] = { v = tonumber(v), k = tonumber(k), d = tonumber(d), t = t, r = g.s[cle] and g.s[cle].r }
 			end
 		end
 		MajBientot()
@@ -722,7 +934,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 end
 
 --------------------------------------------------------------------------------
--- Infobulle des monstres : « WoWdex n°0016 · capturé ×12 » ou « Nouveau ! »
+-- Infobulle des monstres : « WoWdex n°0016  capturé ×12 », « à capturer », « Rare à capturer ! », « (pisté) »
 --------------------------------------------------------------------------------
 
 local function BulleUnite(tt)
@@ -740,7 +952,11 @@ local function BulleUnite(tt)
 		if (e.d or 0) > 0 then texte = texte .. ("|cff9c9380, dépouillé ×%d|r"):format(e.d) end
 	else
 		local g = Guilde()
-		texte = texte .. "  |cffff9f40à capturer|r" .. ((g and g.d[id]) and "|cff9c9380 (déjà dans le WoWdex de la guilde)|r" or "")
+		local rang = f and f.rang or (e and e.r) or 0
+		texte = texte .. (RARES[rang] and ("  |cffbfbfff" .. NOMS_RANGS[rang] .. " à capturer !|r") or "  |cffff9f40à capturer|r")
+			.. ((g and g.d[id]) and "|cff9c9380 (déjà dans le WoWdex de la guilde)|r" or "")
+		local w = Moi()
+		if w and w.pistes[id] then texte = texte .. "  |cfff1cf6b(pisté)|r" end
 	end
 	tt:AddLine(texte)
 end
@@ -752,33 +968,56 @@ elseif GameTooltip and GameTooltip.HookScript then
 end
 
 --------------------------------------------------------------------------------
--- Page « WoWdex »
+-- Page « WoWdex » : entête (rares et boss, titre), onglets, vues
 --------------------------------------------------------------------------------
 
 local UI = ns.UI
 local C = UI and UI.C
 local MARGE = 16
-local HAUTEUR_RANGEE, ECART_RANGEE = 40, 4
-local PAS = HAUTEUR_RANGEE + ECART_RANGEE
-local LARGEUR_FICHE = 330
-local HAUT_LISTE = -100
-local FILTRES = { "Tous", "Capturés", "À capturer", "Rares et boss" }
-local GRIS, VERT, OR = "|cff9c9380", "|cff6fd08c", "|cfff1cf6b"
+local LARGEUR_FICHE = 300
+local HAUT_VUES = -92            -- sous l'entête et les onglets
+local HAUT_GRILLE = 434
+local ONGLETS = { "Avis de recherche", "Bestiaire", "Zones", "Carnet de chasse", "Guilde" }
+local FILTRES = { { "Tous", "À capturer", "Capturés" }, { "Tous", "Vus", "Capturés", "À capturer" } }
+local GRIS, VERT, OR, BLEU = "|cff9c9380", "|cff6fd08c", "|cfff1cf6b", "|cffbfbfff"
+local COULEUR_RARE = { 0.75, 0.75, 1 }
 local COULEURS_PALIERS = { [0] = { 0.3, 0.27, 0.22 }, { 0.75, 0.72, 0.65 }, { 0.44, 0.82, 0.55 }, { 0.945, 0.81, 0.42 } }
-local NOMS_PALIERS = { [0] = "Inconnu", "Vu", "Capturé", "Capturé et dépouillé" }
+local NOMS_PALIERS = { [0] = "Jamais rencontré", "Vu", "Capturé", "Capturé et dépouillé" }
+-- La grille : « cases » (bestiaire, 6 par ligne) ou « cartes » (avis de recherche et recherche d'un objet, 3 par
+-- ligne, avec le nom). Toujours des lignes entières : un modèle 3D ne se découpe pas au bord d'une zone qui défile.
+local MODES = {
+	cases = { col = 6, lignes = 5, hauteur = 82, ecart = 6 },
+	cartes = { col = 3, lignes = 3, hauteur = 140, ecart = 6 },
+}
+local TRANCHES = { { 1, 9 }, { 10, 19 }, { 20, 29 }, { 30, 39 }, { 40, 49 }, { 50, 59 }, { 60, 999 } }
+local ORDRE_RANGS = { 4, 2, 3, 1, 0 } -- rare, rare élite, boss, élite, normal
 
-local filtre, recherche, zoneChoisie = 1, "", "toutes"
-local affiches = {}       -- éléments affichés : { fiche } ou { hors = id }
-local choisi              -- pnj de la fiche ouverte (nil : classement)
+-- ce que la page montre : onglet, puce choisie dans chaque grille, recherche, zone ("toutes", "ici" ou un numéro
+-- de zone), première ligne affichée de la grille
+local etat = { onglet = 1, filtres = { 1, 1 }, filtreZones = 1, recherche = "", zone = "toutes", ligne = 0, parObjet = false }
+local affiches = {}       -- éléments de la grille : une fiche du bestiaire, ou { hors = pnj, e = entrée }
+local choisi              -- pnj de la fiche ouverte
+local DessinerGrille, MajFiche -- (définis plus bas)
 
 local function Couleur(c) return ("|cff%02x%02x%02x"):format(math.floor(c[1] * 255), math.floor(c[2] * 255), math.floor(c[3] * 255)) end
+
+local function LargeurPage() return (ns.TAILLE_PAGE and ns.TAILLE_PAGE[1] or 794) end
 
 local function NiveauTexte(mi, ma)
 	if not mi or mi <= 0 then return nil end
 	return (ma and ma ~= mi) and (mi .. "-" .. ma) or tostring(mi)
 end
 
--- les zones de ma carte actuelle (filtre « Ma zone »)
+-- « il y a 12 min » (heure du serveur, comme les dates gardées)
+local function IlYa(t)
+	local s = math.max(0, Maintenant() - (t or 0))
+	if s < 90 then return "à l'instant" end
+	if s < 3600 then return "il y a " .. math.floor(s / 60) .. " min" end
+	if s < 86400 then return "il y a " .. math.floor(s / 3600) .. " h" end
+	return "il y a " .. math.floor(s / 86400) .. " j"
+end
+
+-- les zones de ma carte actuelle (filtre « Ma zone », carte « Tu es ici »)
 local function ZonesDeMaCarte()
 	local res = {}
 	local carte = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
@@ -789,6 +1028,40 @@ local function ZonesDeMaCarte()
 	return res, carte
 end
 
+-- les monstres d'un ensemble de zones : n, k capturés par moi, g par la guilde (ou moi), rares = leurs fiches,
+-- raresK = rares capturés par moi
+local function Recensement(zones)
+	local res = { n = 0, k = 0, g = 0, rares = {}, raresK = 0 }
+	if not zones or not next(zones) then return res end
+	local w, g = Moi(), Guilde()
+	for _, f in ipairs(Bestiaire().liste) do
+		local ici = false
+		for z in pairs(ZonesDe(f)) do
+			if zones[z] then ici = true; break end
+		end
+		if ici then
+			local pris = w and Palier(w.m[f.id]) >= 2 or false
+			res.n = res.n + 1
+			if pris then res.k = res.k + 1 end
+			if pris or (g and g.d[f.id]) then res.g = res.g + 1 end
+			if RARES[f.rang] then
+				res.rares[#res.rares + 1] = f
+				if pris then res.raresK = res.raresK + 1 end
+			end
+		end
+	end
+	return res
+end
+
+-- dernier repérage d'un rare par la guilde : « il y a 12 min », nom du membre (recent : nil au-delà d'une heure)
+local function Reperage(id, recent)
+	local g = Guilde()
+	local r = g and g.r[id]
+	if not r or not r.t then return nil end
+	if recent and Maintenant() - r.t > 3600 then return nil end
+	return IlYa(r.t), r.c and NomJoueur(r.c) or nil
+end
+
 -- Recherche d'un objet : les objets dont le nom contient le texte (liste de tous les objets du jeu,
 -- GuildUp_Demandes.lua), puis les monstres qui les lâchent : trouvés par la guilde (ou moi), ou dans le bestiaire.
 -- objetDe[pnj] = { objet, guilde = vrai si trouvé en jeu } (remis à zéro à chaque construction de la liste)
@@ -796,6 +1069,7 @@ local objetDe = {}
 
 local function ChercherParObjet(b, g, w)
 	wipe(objetDe)
+	local recherche = etat.recherche
 	if #recherche < 3 or not ns.IndexObjets then return false end
 	local cherches, n = {}, 0
 	for _, o in ipairs(ns.IndexObjets()) do
@@ -830,24 +1104,39 @@ local function ChercherParObjet(b, g, w)
 	return true
 end
 
+-- la liste de la grille : l'avis de recherche ne garde que les rares, rares élites et boss
 local function Construire()
 	wipe(affiches)
-	local b = Bestiaire()
-	local g = Guilde()
-	local w = Moi()
+	local b, g, w = Bestiaire(), Guilde(), Moi()
+	local raresSeuls = (etat.onglet == 1)
+	local filtre = etat.filtres[raresSeuls and 1 or 2]
+	local recherche = etat.recherche
 	local maZone, maCarte
-	if zoneChoisie == "ici" then maZone, maCarte = ZonesDeMaCarte() end
+	if etat.zone == "ici" then
+		maZone, maCarte = ZonesDeMaCarte()
+	elseif type(etat.zone) == "number" then
+		maZone = { [etat.zone] = true }
+	end
 	local parObjet = ChercherParObjet(b, g, w)
+	etat.parObjet = parObjet
 	local function Garder(id, rang, zones, nomVisible, texteZone)
 		local e = w and w.m[id]
 		local p = Palier(e)
-		if filtre == 2 and p < 2 then return false end
-		if filtre == 3 and p >= 2 then return false end
-		if filtre == 4 and not RARES[rang or 0] then return false end
+		if raresSeuls then
+			if not RARES[rang or 0] then return false end
+			if filtre == 2 and p >= 2 then return false end
+			if filtre == 3 and p < 2 then return false end
+		else
+			if filtre == 2 and p < 1 then return false end
+			if filtre == 3 and p < 2 then return false end
+			if filtre == 4 and p >= 2 then return false end
+		end
 		if maZone then
 			local ici = zones.ici
 			if not ici then
-				for z in pairs(zones) do if maZone[z] then ici = true; break end end
+				for z in pairs(zones) do
+					if maZone[z] then ici = true; break end
+				end
 			end
 			if not ici then return false end
 		end
@@ -858,14 +1147,8 @@ local function Construire()
 		return true
 	end
 	for _, f in ipairs(b.liste) do
-		local zones = f.ensembleZones
-		if not zones then
-			zones = {}
-			for z in f.zonesTexte:gmatch("(%d+):") do zones[tonumber(z)] = true end
-			f.ensembleZones = zones
-		end
-		local connu = (w and w.m[f.id] and w.m[f.id].v) or (g and g.d[f.id])
-		if Garder(f.id, f.rang, zones, connu and f.nom or nil, NomZone(f.zone)) then affiches[#affiches + 1] = f end
+		local connu = (w and w.m[f.id] and w.m[f.id].v) or (g and (g.d[f.id] or g.r[f.id]))
+		if Garder(f.id, f.rang, ZonesDe(f), connu and f.nom or nil, NomZone(f.zone)) then affiches[#affiches + 1] = f end
 	end
 	-- hors bestiaire, après les numéros
 	if w then
@@ -909,95 +1192,496 @@ local function Infos(a)
 	return f.id, f.num, Connu(f.id) and f.nom or nil, f.rang, NiveauTexte(f.min, f.max), NomZone(f.zone), e
 end
 
-local function CreerRangee(parent)
-	local r = UI.Rangee(parent, HAUTEUR_RANGEE)
-	r.point = r:CreateTexture(nil, "ARTWORK")
-	r.point:SetTexture(UI.ROND)
-	r.point:SetSize(14, 14)
-	r.point:SetPoint("LEFT", r, "LEFT", 10, 0)
-	r.num = UI.Texte(r, "GameFontHighlightSmall", C.gris)
-	r.num:SetPoint("LEFT", r.point, "RIGHT", 8, 0)
-	r.num:SetWidth(52)
-	r.droite = UI.Texte(r, "GameFontHighlightSmall", C.gris)
-	r.droite:SetPoint("RIGHT", r, "RIGHT", -10, 0)
-	r.droite:SetJustifyH("RIGHT")
-	r.nom = UI.Texte(r, "GameFontHighlight", C.texte)
-	r.nom:SetPoint("TOPLEFT", r.num, "TOPRIGHT", 4, 8)
-	r.nom:SetPoint("RIGHT", r.droite, "LEFT", -8, 0)
-	r.sous = UI.Texte(r, "GameFontHighlightSmall", C.gris)
-	r.sous:SetPoint("TOPLEFT", r.nom, "BOTTOMLEFT", 0, -3)
-	r.sous:SetPoint("RIGHT", r.droite, "LEFT", -8, 0)
-	r:SetScript("OnClick", function(self)
-		if not self.id then return end
-		choisi = self.id
-		if page then page.MajFiche() end
-		if page and page.Dessiner then page.Dessiner() end
-	end)
-	UI.SonClic(r)
-	return r
+--------------------------------------------------------------------------------
+-- Petits éléments : losange de rang, barre de progression, pilule
+--------------------------------------------------------------------------------
+
+-- carré posé sur la pointe (repli : un carré droit si le client ne sait pas tourner une texture)
+local function Losange(parent, taille)
+	local t = parent:CreateTexture(nil, "OVERLAY")
+	t:SetColorTexture(1, 1, 1, 1)
+	t:SetSize(taille, taille)
+	if t.SetRotation then pcall(t.SetRotation, t, math.rad(45)) end
+	return t
 end
 
-local function Remplir(r, a)
-	local id, num, nom, rang, niveau, zone, e = Infos(a)
-	r.id = id
-	local p = Palier(e)
-	local c = COULEURS_PALIERS[p]
-	r.point:SetVertexColor(c[1], c[2], c[3], 1)
-	r.num:SetText(num and ("n°%04d"):format(num) or "hors liste")
-	local cr = COULEURS_RANGS[rang or 0] or COULEURS_RANGS[0]
-	if nom then
-		r.nom:SetText(((rang == 1 or rang == 2) and "|TInterface\\Tooltips\\EliteNameplateIcon:14:14:0:0|t" or "") .. nom)
-		r.nom:SetTextColor(cr[1], cr[2], cr[3])
-	else
-		r.nom:SetText("???")
-		r.nom:SetTextColor(unpack(C.gris))
+-- barre : b:Poser(part, couleur, partGuilde) ; la part de la guilde est un trait vertical
+local function Barre(parent, largeur, hauteur)
+	local f = UI.Cadre(parent, C.champ, C.bord)
+	f:SetSize(largeur, hauteur)
+	f.plein = f:CreateTexture(nil, "ARTWORK")
+	f.plein:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -1)
+	f.plein:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 1, 1)
+	f.trait = f:CreateTexture(nil, "OVERLAY")
+	f.trait:SetSize(2, hauteur + 4)
+	f.trait:SetColorTexture(C.texte[1], C.texte[2], C.texte[3], 0.85)
+	f.trait:Hide()
+	f.Poser = function(self, part, couleur, partGuilde)
+		part = math.max(0, math.min(1, part or 0))
+		couleur = couleur or C.orFonce
+		self.plein:SetColorTexture(couleur[1], couleur[2], couleur[3], 1)
+		self.plein:SetWidth(math.max(1, (largeur - 2) * part))
+		self.plein:SetShown(part > 0)
+		if partGuilde and partGuilde > 0 then
+			self.trait:ClearAllPoints()
+			self.trait:SetPoint("CENTER", self, "LEFT", 1 + (largeur - 2) * math.min(1, partGuilde), 0)
+			self.trait:Show()
+		else
+			self.trait:Hide()
+		end
 	end
+	return f
+end
+
+-- pilule : petit texte sur un fond teinté ; p:Ecrire(texte, couleur) renvoie sa largeur (0 : cachée)
+local function Pilule(parent)
+	local f = UI.Cadre(parent, C.voile)
+	f:SetHeight(18)
+	f.texte = UI.Texte(f, "GameFontHighlightSmall", C.texte)
+	f.texte:SetPoint("CENTER", f, "CENTER", 0, 0)
+	f.Ecrire = function(self, texte, couleur)
+		if not texte or texte == "" then self:Hide(); return 0 end
+		couleur = couleur or C.texte
+		self.texte:SetText(texte)
+		self.texte:SetTextColor(couleur[1], couleur[2], couleur[3])
+		self:SetBackdropColor(couleur[1], couleur[2], couleur[3], 0.13)
+		local l = (tonumber(self.texte:GetStringWidth()) or 40) + 14
+		self:SetWidth(l)
+		self:Show()
+		return l
+	end
+	return f
+end
+
+-- un modèle 3D montre le monstre (faux si le client refuse)
+local function PoserModele(m, id, angle)
+	if not m then return false end
+	pcall(m.ClearModel, m)
+	local ok = pcall(m.SetCreature, m, id)
+	if ok and angle then pcall(m.SetFacing, m, angle) end
+	return ok
+end
+
+--------------------------------------------------------------------------------
+-- Grille des monstres
+--------------------------------------------------------------------------------
+
+local pools = { cases = {}, cartes = {} } -- cases déjà créées, par mode
+
+local function ModeGrille() return (etat.onglet == 1 or etat.parObjet) and "cartes" or "cases" end
+
+-- rend visible l'élément i de la grille
+local function Montrer(i)
+	local m = MODES[ModeGrille()]
+	local ligne = math.floor((i - 1) / m.col)
+	if ligne < etat.ligne then
+		etat.ligne = ligne
+	elseif ligne >= etat.ligne + m.lignes then
+		etat.ligne = ligne - m.lignes + 1
+	end
+end
+
+local function BulleCase(c)
+	if not c.element then return end
+	local id, num, nom, rang, niveau, zone, e = Infos(c.element)
+	local cr = COULEURS_RANGS[rang or 0] or COULEURS_RANGS[0]
+	GameTooltip:SetOwner(c, "ANCHOR_RIGHT")
+	GameTooltip:SetText((num and ("n° %04d  "):format(num) or "") .. (nom or "???"), cr[1], cr[2], cr[3])
 	local d = {}
-	if niveau then d[#d + 1] = "Niv. " .. niveau end
-	if rang and rang > 0 then d[#d + 1] = Couleur(cr) .. NOMS_RANGS[rang] .. "|r" end
-	if zone then d[#d + 1] = zone end
+	if rang and rang > 0 then d[#d + 1] = NOMS_RANGS[rang] end
+	if niveau then d[#d + 1] = "niveau " .. niveau end
+	if #d > 0 then GameTooltip:AddLine(table.concat(d, " · "), 1, 1, 1) end
+	if zone then GameTooltip:AddLine(zone, C.gris[1], C.gris[2], C.gris[3]) end
+	local p = Palier(e)
+	local pc = COULEURS_PALIERS[p]
+	GameTooltip:AddLine(NOMS_PALIERS[p], math.max(0.6, pc[1]), math.max(0.57, pc[2]), math.max(0.5, pc[3]))
+	local w = Moi()
+	if w and w.pistes[id] then GameTooltip:AddLine("Pisté", C.ors[1], C.ors[2], C.ors[3]) end
+	GameTooltip:Show()
+end
+
+local function CreerCase(parent, grand)
+	local c = CreateFrame("Button", nil, parent, "BackdropTemplate")
+	UI.Habiller(c, C.carte, C.bord)
+	local okM, m = pcall(CreateFrame, "PlayerModel", nil, c)
+	if okM and m then
+		m:SetPoint("TOPLEFT", c, "TOPLEFT", 2, grand and -2 or -12)
+		m:SetPoint("BOTTOMRIGHT", c, "BOTTOMRIGHT", -2, grand and 54 or 9)
+		if m.EnableMouse then pcall(m.EnableMouse, m, false) end
+		c.modele = m
+	end
+	-- textes et marques : dans un cadre posé au-dessus du modèle
+	local d = CreateFrame("Frame", nil, c)
+	d:SetAllPoints(c)
+	d:SetFrameLevel((c:GetFrameLevel() or 1) + 4)
+	c.num = UI.Texte(d, "GameFontHighlightSmall", C.gris)
+	c.num:SetPoint("TOPLEFT", c, "TOPLEFT", 4, -3)
+	c.losange = Losange(d, 7)
+	c.losange:SetPoint("TOPRIGHT", c, "TOPRIGHT", -5, -5)
+	c.mystere = UI.Texte(d, "GameFontNormalLarge", C.bordFort)
+	c.mystere:SetText("?")
+	if c.modele then
+		c.mystere:SetPoint("CENTER", c.modele, "CENTER", 0, 0)
+	else
+		c.mystere:SetPoint("CENTER", c, "CENTER", 0, grand and 24 or 0)
+	end
+	c.crans = {}
+	for i = 1, 3 do
+		local t = d:CreateTexture(nil, "OVERLAY")
+		t:SetSize(12, 3)
+		if grand then
+			t:SetPoint("BOTTOMRIGHT", c, "BOTTOMRIGHT", -6 - (3 - i) * 14, 6)
+		else
+			t:SetPoint("BOTTOM", c, "BOTTOM", (i - 2) * 14, 4)
+		end
+		c.crans[i] = t
+	end
+	if grand then
+		c.nom = UI.Texte(d, "GameFontHighlight", C.texte)
+		c.nom:SetPoint("BOTTOMLEFT", c, "BOTTOMLEFT", 7, 37)
+		c.nom:SetPoint("RIGHT", c, "RIGHT", -6, 0)
+		c.sous = UI.Texte(d, "GameFontHighlightSmall", C.gris)
+		c.sous:SetPoint("BOTTOMLEFT", c, "BOTTOMLEFT", 7, 22)
+		c.sous:SetPoint("RIGHT", c, "RIGHT", -6, 0)
+		c.etat = UI.Texte(d, "GameFontHighlightSmall", C.gris)
+		c.etat:SetPoint("BOTTOMLEFT", c, "BOTTOMLEFT", 7, 7)
+		c.etat:SetPoint("RIGHT", c, "RIGHT", -50, 0)
+	end
+	c.accent = UI.Accent(c)
+	UI.Survol(c, 0.05)
+	c:SetScript("OnClick", function(self)
+		if not self.id then return end
+		choisi = self.id
+		MajFiche()
+		DessinerGrille()
+	end)
+	UI.SonClic(c)
+	c:SetScript("OnEnter", BulleCase)
+	c:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	return c
+end
+
+local function RemplirCase(c, a, grand)
+	local id, num, nom, rang, niveau, zone, e = Infos(a)
+	rang = rang or 0
+	local p = Palier(e)
+	local connu = (nom ~= nil)
+	local cr = COULEURS_RANGS[rang] or COULEURS_RANGS[0]
+	-- modèle : rechargé seulement quand la case change de monstre
+	local cle = id .. (connu and ":1" or ":0")
+	if c.cle ~= cle then
+		c.cle = cle
+		local montre = connu and PoserModele(c.modele, id, 0.45) or false
+		if c.modele then c.modele:SetShown(montre) end
+		c.mystere:SetShown(not montre)
+	end
+	c.id, c.element = id, a
+	-- (vu ou connu par la guilde, pas encore capturé : dans l'ombre)
+	if c.modele then pcall(c.modele.SetAlpha, c.modele, p >= 2 and 1 or 0.4) end
+	c.num:SetText(num and ("%04d"):format(num) or "hors")
+	if rang > 0 then
+		c.losange:SetColorTexture(cr[1], cr[2], cr[3], 1)
+		c.losange:Show()
+	else
+		c.losange:Hide()
+	end
+	for i, t in ipairs(c.crans) do
+		local col = (p >= i) and COULEURS_PALIERS[i] or C.bord
+		t:SetColorTexture(col[1], col[2], col[3], 1)
+	end
+	-- choisie : fond clair et trait doré ; rare pas encore capturé : contour bleuté ; pisté : contour doré
+	local w = Moi()
+	local ouvert = (id == choisi)
+	c:SetBackdropColor(unpack(ouvert and C.actif or C.carte))
+	c.accent:SetShown(ouvert)
+	if RARES[rang] and p < 2 then
+		c:SetBackdropBorderColor(cr[1] * 0.6, cr[2] * 0.6, cr[3] * 0.6, 1)
+	elseif w and w.pistes[id] then
+		c:SetBackdropBorderColor(unpack(C.bordFort))
+	else
+		c:SetBackdropBorderColor(unpack(C.bord))
+	end
+	if not grand then return end
+	c.nom:SetText(nom or "???")
+	if nom then c.nom:SetTextColor(cr[1], cr[2], cr[3]) else c.nom:SetTextColor(unpack(C.gris)) end
+	local d = {}
+	if rang > 0 then d[#d + 1] = Couleur(cr) .. NOMS_RANGS[rang] .. "|r" end
+	if niveau then d[#d + 1] = "niv. " .. niveau end
+	c.sous:SetText(table.concat(d, " · "))
+	-- dernière ligne : l'objet cherché, un repérage de moins d'une heure, « capturé », sinon la zone
 	local x = objetDe[id]
+	local quand, qui = Reperage(id, true)
 	if x then
 		local k, o = TotauxButin(id)
 		local taux = (x.guilde and k > 0 and o[x.objet]) and (" " .. VERT .. math.floor(100 * o[x.objet] / k + 0.5) .. " %|r") or ""
-		d[#d + 1] = OR .. NomObjet(x.objet) .. "|r" .. taux .. (x.guilde and "" or (GRIS .. " (bestiaire)|r"))
-	end
-	r.sous:SetText(table.concat(d, " · "))
-	if p >= 2 then
-		r.droite:SetText(VERT .. "×" .. (e.k or 0) .. "|r")
+		c.etat:SetText(OR .. NomObjet(x.objet) .. "|r" .. taux)
+	elseif quand and p < 2 then
+		c.etat:SetText(OR .. "Repéré " .. quand .. "|r")
+	elseif p >= 2 then
+		c.etat:SetText(VERT .. "Capturé|r" .. (zone and (GRIS .. " · " .. zone .. "|r") or ""))
 	else
-		local g = Guilde()
-		r.droite:SetText((g and g.d[id]) and (GRIS .. "guilde|r") or "")
+		c.etat:SetText(zone or "")
 	end
-	r:Fort(id == choisi)
 end
 
-local function Dessiner()
-	if not page then return end
-	local l = page.liste
-	local haut = tonumber(l:GetVerticalScroll()) or 0
-	local vue = tonumber(l:GetHeight()) or 0
-	if vue < 50 then vue = 460 end
-	local premier = math.max(1, math.floor(haut / PAS) + 1)
-	local dernier = math.min(#affiches, premier + math.ceil(vue / PAS))
-	local k = 0
-	for i = premier, dernier do
-		k = k + 1
-		local r = page.rangees[k]
-		if not r then
-			r = CreerRangee(l.contenu)
-			page.rangees[k] = r
+DessinerGrille = function()
+	local gr = page and page.grille
+	if not gr then return end
+	local mode = ModeGrille()
+	local m = MODES[mode]
+	local grand = (mode == "cartes")
+	local largeur = math.floor((gr.largeur - (m.col - 1) * m.ecart) / m.col)
+	local total = math.ceil(#affiches / m.col)
+	local dernier = math.max(0, total - m.lignes)
+	etat.ligne = math.max(0, math.min(dernier, etat.ligne))
+	for nom, autre in pairs(pools) do
+		if nom ~= mode then
+			for _, c in pairs(autre) do c:Hide() end
 		end
-		Remplir(r, affiches[i])
-		r:ClearAllPoints()
-		r:SetPoint("TOPLEFT", l.contenu, "TOPLEFT", 0, -(i - 1) * PAS)
-		r:SetPoint("RIGHT", l.contenu, "RIGHT", 0, 0)
-		r:Show()
 	end
-	for i = k + 1, #page.rangees do
-		page.rangees[i]:Hide()
-		page.rangees[i].id = nil
+	-- chaque monstre garde sa case tant qu'il est à l'écran : faire défiler d'une ligne ne recharge que les
+	-- modèles de la ligne qui entre
+	local N = m.col * m.lignes
+	local pool = pools[mode]
+	local pris = {}
+	local base = etat.ligne * m.col
+	for pos = 1, N do
+		local i = base + pos
+		local a = affiches[i]
+		if a then
+			local place = (i - 1) % N + 1
+			local c = pool[place]
+			if not c then
+				c = CreerCase(gr, grand)
+				pool[place] = c
+			end
+			pris[place] = true
+			c:SetSize(largeur, m.hauteur)
+			c:ClearAllPoints()
+			c:SetPoint("TOPLEFT", gr, "TOPLEFT", ((pos - 1) % m.col) * (largeur + m.ecart),
+				-math.floor((pos - 1) / m.col) * (m.hauteur + m.ecart))
+			RemplirCase(c, a, grand)
+			c:Show()
+		end
 	end
+	for place, c in pairs(pool) do
+		if not pris[place] then c:Hide() end
+	end
+	-- repère de défilement
+	local piste = gr.piste
+	if total > m.lignes then
+		local hp = math.max(24, HAUT_GRILLE * m.lignes / total)
+		piste.poignee:ClearAllPoints()
+		piste.poignee:SetPoint("TOP", piste, "TOP", 0, -(dernier > 0 and (etat.ligne / dernier) * (HAUT_GRILLE - hp) or 0))
+		piste.poignee:SetHeight(hp)
+		piste:Show()
+	else
+		piste:Hide()
+	end
+end
+
+local function CreerGrille(parent)
+	local gr = CreateFrame("Frame", nil, parent)
+	gr.largeur = LargeurPage() - 2 * MARGE - LARGEUR_FICHE - 10 - 12
+	gr:SetSize(gr.largeur, HAUT_GRILLE)
+	gr:EnableMouseWheel(true)
+	gr:SetScript("OnMouseWheel", function(_, sens)
+		local pas = (IsShiftKeyDown and IsShiftKeyDown()) and MODES[ModeGrille()].lignes or 1
+		etat.ligne = etat.ligne - sens * pas
+		DessinerGrille()
+	end)
+	-- piste à droite : cliquer ou glisser pour aller loin (plus de 500 lignes dans le bestiaire)
+	local piste = CreateFrame("Button", nil, gr)
+	piste:SetSize(8, HAUT_GRILLE)
+	piste:SetPoint("TOPLEFT", gr, "TOPRIGHT", 4, 0)
+	local fond = piste:CreateTexture(nil, "BACKGROUND")
+	fond:SetAllPoints()
+	fond:SetColorTexture(C.champ[1], C.champ[2], C.champ[3], 1)
+	piste.poignee = piste:CreateTexture(nil, "ARTWORK")
+	piste.poignee:SetColorTexture(C.orFonce[1], C.orFonce[2], C.orFonce[3], 0.6)
+	piste.poignee:SetWidth(8)
+	piste:SetScript("OnMouseDown", function(self) self.glisse = true; self.dernier = 0 end)
+	piste:SetScript("OnMouseUp", function(self) self.glisse = false end)
+	piste:SetScript("OnHide", function(self) self.glisse = false end)
+	piste:SetScript("OnUpdate", function(self)
+		if not self.glisse then return end
+		if IsMouseButtonDown and not IsMouseButtonDown("LeftButton") then self.glisse = false; return end
+		local maintenant = GetTime()
+		if maintenant - (self.dernier or 0) < 0.08 then return end
+		self.dernier = maintenant
+		local _, y = GetCursorPosition()
+		local echelle = self:GetEffectiveScale()
+		local haut, bas = self:GetTop(), self:GetBottom()
+		if not (y and echelle and haut and bas) or echelle <= 0 or haut <= bas then return end
+		local part = math.max(0, math.min(1, (haut - y / echelle) / (haut - bas)))
+		local m = MODES[ModeGrille()]
+		local ligne = math.floor(part * math.max(0, math.ceil(#affiches / m.col) - m.lignes) + 0.5)
+		if ligne ~= etat.ligne then
+			etat.ligne = ligne
+			DessinerGrille()
+		end
+	end)
+	gr.piste = piste
+	return gr
+end
+
+--------------------------------------------------------------------------------
+-- Fiche d'un monstre
+--------------------------------------------------------------------------------
+
+local LIGNES_BUTIN = 7
+local HAUT_SCENE = 104
+
+local function Voisin(sens)
+	local n = #affiches
+	if n == 0 then return end
+	local place = 0
+	for i, a in ipairs(affiches) do
+		if (a.hors or a.id) == choisi then place = i; break end
+	end
+	place = math.max(1, math.min(n, place + sens))
+	local a = affiches[place]
+	choisi = a.hors or a.id
+	Montrer(place)
+	DessinerGrille()
+	MajFiche()
+end
+
+local function CreerFiche(p, parent)
+	local fiche = UI.Cadre(parent, C.carte, C.bord)
+	fiche:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -MARGE, -4)
+	fiche:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -MARGE, 12)
+	fiche:SetWidth(LARGEUR_FICHE)
+	fiche.vide = UI.Texte(fiche, "GameFontHighlight", C.gris)
+	fiche.vide:SetPoint("TOPLEFT", fiche, "TOPLEFT", 14, -16)
+	fiche.vide:SetWidth(LARGEUR_FICHE - 28)
+	fiche.vide:SetWordWrap(true)
+	fiche.vide:SetText("Clique sur un monstre pour ouvrir sa fiche.")
+	local k = CreateFrame("Frame", nil, fiche)
+	k:SetAllPoints(fiche)
+	fiche.corps = k
+	fiche.num = UI.Texte(k, "GameFontHighlightSmall", C.gris)
+	fiche.num:SetPoint("TOPLEFT", k, "TOPLEFT", 14, -13)
+	fiche.suiv = UI.Bouton(k, ">", "fantome", 24, 20)
+	fiche.suiv:SetPoint("TOPRIGHT", k, "TOPRIGHT", -10, -8)
+	fiche.suiv:SetScript("OnClick", function() Voisin(1) end)
+	fiche.prec = UI.Bouton(k, "<", "fantome", 24, 20)
+	fiche.prec:SetPoint("RIGHT", fiche.suiv, "LEFT", -4, 0)
+	fiche.prec:SetScript("OnClick", function() Voisin(-1) end)
+	fiche.nom = UI.Texte(k, "GameFontNormalLarge", C.ors)
+	fiche.nom:SetPoint("TOPLEFT", k, "TOPLEFT", 14, -30)
+	fiche.nom:SetPoint("RIGHT", k, "RIGHT", -14, 0)
+	fiche.pilules = { Pilule(k), Pilule(k), Pilule(k) }
+	-- scène : le modèle 3D tourne
+	fiche.scene = UI.Cadre(k, C.champ, C.bord)
+	fiche.scene:SetPoint("TOPLEFT", k, "TOPLEFT", 10, -76)
+	fiche.scene:SetPoint("TOPRIGHT", k, "TOPRIGHT", -10, -76)
+	fiche.scene:SetHeight(HAUT_SCENE)
+	local okM, m = pcall(CreateFrame, "PlayerModel", nil, fiche.scene)
+	if okM and m then
+		m:SetPoint("TOPLEFT", fiche.scene, "TOPLEFT", 1, -1)
+		m:SetPoint("BOTTOMRIGHT", fiche.scene, "BOTTOMRIGHT", -1, 1)
+		fiche.modele = m
+		local angle = 0
+		fiche.scene:SetScript("OnUpdate", function(_, ecoule)
+			angle = (angle + (ecoule or 0) * 0.6) % (2 * math.pi)
+			pcall(m.SetFacing, m, angle)
+		end)
+	end
+	local dessus = CreateFrame("Frame", nil, fiche.scene)
+	dessus:SetAllPoints(fiche.scene)
+	dessus:SetFrameLevel((fiche.scene:GetFrameLevel() or 1) + 4)
+	fiche.mystere = UI.Texte(dessus, "GameFontNormalLarge", C.bordFort)
+	fiche.mystere:SetPoint("CENTER", fiche.scene, "CENTER", 0, 0)
+	fiche.mystere:SetText("?")
+	fiche.bandeau = UI.Texte(dessus, "GameFontHighlightSmall", C.texte)
+	fiche.bandeau:SetPoint("TOPLEFT", fiche.scene, "TOPLEFT", 7, -6)
+	-- tableau : zone, vu, capturé, dépouillé, guilde, repéré
+	fiche.rangs = {}
+	for i = 1, 6 do
+		local cle = UI.Texte(k, "GameFontHighlightSmall", C.gris)
+		local val = UI.Texte(k, "GameFontHighlightSmall", C.texte)
+		val:SetWidth(LARGEUR_FICHE - 20 - 78 - 6)
+		val:SetWordWrap(true)
+		val:SetSpacing(2)
+		fiche.rangs[i] = { cle = cle, val = val }
+	end
+	fiche.titreButin = UI.Texte(k, "GameFontNormal", C.ors)
+	fiche.lignes = {}
+	for i = 1, LIGNES_BUTIN do
+		local l = CreateFrame("Button", nil, k)
+		l:SetHeight(20)
+		l.icone = l:CreateTexture(nil, "ARTWORK")
+		l.icone:SetSize(18, 18)
+		l.icone:SetPoint("LEFT", l, "LEFT", 0, 0)
+		l.icone:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		l.taux = UI.Texte(l, "GameFontHighlightSmall", C.gris)
+		l.taux:SetPoint("RIGHT", l, "RIGHT", 0, 0)
+		l.taux:SetJustifyH("RIGHT")
+		l.nom = UI.Texte(l, "GameFontHighlightSmall", C.texte)
+		l.nom:SetPoint("LEFT", l.icone, "RIGHT", 6, 0)
+		l.nom:SetPoint("RIGHT", l.taux, "LEFT", -6, 0)
+		UI.Survol(l, 0.06)
+		l:SetScript("OnEnter", function(self)
+			if not self.objet then return end
+			GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+			if GameTooltip.SetItemByID then pcall(GameTooltip.SetItemByID, GameTooltip, self.objet)
+			else GameTooltip:SetHyperlink("item:" .. self.objet) end
+			if self.aide then GameTooltip:AddLine(self.aide, 0.6, 0.6, 0.6, true) end
+			GameTooltip:Show()
+		end)
+		l:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		l:SetScript("OnClick", function(self)
+			if self.objet and IsModifiedClick and IsModifiedClick("CHATLINK") then
+				local _, lien = ns.InfoObjet(self.objet)
+				if lien and ChatEdit_InsertLink then ChatEdit_InsertLink(lien) end
+			end
+		end)
+		fiche.lignes[i] = l
+	end
+	fiche.reste = UI.Texte(k, "GameFontHighlightSmall", C.gris)
+	fiche.reste:SetWidth(LARGEUR_FICHE - 28)
+	fiche.reste:SetWordWrap(true)
+	-- actions
+	fiche.pister = UI.Bouton(k, "Pister", "fantome", 104, 24)
+	fiche.pister:SetPoint("BOTTOMLEFT", k, "BOTTOMLEFT", 10, 10)
+	fiche.pister:SetScript("OnClick", function()
+		local w = Moi()
+		if not w or not choisi then return end
+		if w.pistes[choisi] then
+			w.pistes[choisi] = nil
+		else
+			local n = 0
+			for _ in pairs(w.pistes) do n = n + 1 end
+			if n >= MAX_PISTES then
+				Message(("WoWdex : tu pistes déjà %d monstres. Retires-en un dans le carnet de chasse."):format(MAX_PISTES))
+				return
+			end
+			w.pistes[choisi] = Maintenant()
+		end
+		if ns.MajPlaquesWowdex then ns.MajPlaquesWowdex() end
+		p.Maj()
+	end)
+	fiche.carte = UI.Bouton(k, "Sur la carte", "fantome", 92, 24)
+	fiche.carte:SetPoint("LEFT", fiche.pister, "RIGHT", 6, 0)
+	fiche.carte:SetScript("OnClick", function(self)
+		if ns.AfficherSurCarte and self.groupes and self.groupes[1] then
+			ns.AfficherSurCarte(self.titre or "WoWdex", { self.groupes[1] })
+		end
+	end)
+	fiche.lier = UI.Bouton(k, "Lier", "fantome", 72, 24)
+	fiche.lier:SetPoint("LEFT", fiche.carte, "RIGHT", 6, 0)
+	fiche.lier:SetScript("OnClick", function(self)
+		if not self.lien then return end
+		local boite = ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow()
+		if boite and boite.Insert then
+			boite:Insert(self.lien)
+		elseif ChatFrame_OpenChat then
+			ChatFrame_OpenChat(self.lien)
+		end
+	end)
+	UI.Infobulle(fiche.lier, "Lier dans la discussion", "Écrit le nom, le rang, le niveau et la zone du monstre dans la zone de saisie.")
+	return fiche
 end
 
 -- butin d'un monstre : objets observés (taux sur les corps fouillés, guilde ou moi), puis ceux du bestiaire
@@ -1066,238 +1750,159 @@ ns.SourcesWowdex = function(objet)
 	return res
 end
 
-local MAX_LIGNES_BUTIN = 7
-
-local function CreerFiche(p)
-	local fiche = UI.Carte(p, "")
-	fiche:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, HAUT_LISTE)
-	fiche:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -MARGE, 12)
-	fiche:SetWidth(LARGEUR_FICHE)
-	fiche.titre:SetPoint("RIGHT", fiche, "RIGHT", -14, 0)
-	-- modèle 3D
-	fiche.scene = CreateFrame("Frame", nil, fiche)
-	fiche.scene:SetPoint("TOPLEFT", fiche, "TOPLEFT", 10, -34)
-	fiche.scene:SetPoint("TOPRIGHT", fiche, "TOPRIGHT", -10, -34)
-	fiche.scene:SetHeight(120)
-	local fond = fiche.scene:CreateTexture(nil, "BACKGROUND")
-	fond:SetAllPoints()
-	fond:SetColorTexture(unpack(C.champ))
-	local okM, m = pcall(CreateFrame, "PlayerModel", nil, fiche.scene)
-	if okM and m then
-		m:SetAllPoints(fiche.scene)
-		fiche.modele = m
-		local angle = 0
-		fiche.scene:SetScript("OnUpdate", function(_, ecoule)
-			angle = (angle + (ecoule or 0) * 0.6) % (2 * math.pi)
-			pcall(m.SetFacing, m, angle)
-		end)
-	end
-	fiche.mystere = UI.Texte(fiche.scene, "GameFontNormalLarge", C.bordFort)
-	fiche.mystere:SetPoint("CENTER")
-	fiche.mystere:SetText("?")
-	fiche.infos = UI.Texte(fiche, "GameFontHighlightSmall", C.texte)
-	fiche.infos:SetPoint("TOPLEFT", fiche.scene, "BOTTOMLEFT", 4, -8)
-	fiche.infos:SetPoint("RIGHT", fiche, "RIGHT", -14, 0)
-	fiche.infos:SetWordWrap(true)
-	fiche.infos:SetSpacing(3)
-	fiche.carte = UI.Bouton(fiche, "Voir sur la carte", "fantome", 130, 22)
-	fiche.carte:SetPoint("BOTTOMLEFT", fiche, "BOTTOMLEFT", 12, 10)
-	fiche.classement = UI.Bouton(fiche, "Classement", "fantome", 100, 22)
-	fiche.classement:SetPoint("BOTTOMRIGHT", fiche, "BOTTOMRIGHT", -12, 10)
-	fiche.classement:SetScript("OnClick", function()
-		choisi = nil
-		p.MajFiche()
-		Dessiner()
-	end)
-	UI.Infobulle(fiche.classement, "Classement", "Les membres de la guilde qui ont capturé le plus de monstres.")
-	fiche.titreButin = UI.Texte(fiche, "GameFontNormal", C.ors)
-	fiche.titreButin:SetText("Butin")
-	fiche.lignes = {}
-	for i = 1, MAX_LIGNES_BUTIN do
-		local l = CreateFrame("Button", nil, fiche)
-		l:SetHeight(20)
-		l.icone = l:CreateTexture(nil, "ARTWORK")
-		l.icone:SetSize(18, 18)
-		l.icone:SetPoint("LEFT", l, "LEFT", 0, 0)
-		l.icone:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-		l.taux = UI.Texte(l, "GameFontHighlightSmall", C.gris)
-		l.taux:SetPoint("RIGHT", l, "RIGHT", 0, 0)
-		l.taux:SetJustifyH("RIGHT")
-		l.nom = UI.Texte(l, "GameFontHighlightSmall", C.texte)
-		l.nom:SetPoint("LEFT", l.icone, "RIGHT", 6, 0)
-		l.nom:SetPoint("RIGHT", l.taux, "LEFT", -6, 0)
-		UI.Survol(l, 0.06)
-		l:SetScript("OnEnter", function(self)
-			if not self.objet then return end
-			GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-			if GameTooltip.SetItemByID then pcall(GameTooltip.SetItemByID, GameTooltip, self.objet)
-			else GameTooltip:SetHyperlink("item:" .. self.objet) end
-			if self.aide then GameTooltip:AddLine(self.aide, 0.6, 0.6, 0.6, true) end
-			GameTooltip:Show()
-		end)
-		l:SetScript("OnLeave", function() GameTooltip:Hide() end)
-		l:SetScript("OnClick", function(self)
-			if self.objet and IsModifiedClick and IsModifiedClick("CHATLINK") then
-				local _, lien = ns.InfoObjet(self.objet)
-				if lien and ChatEdit_InsertLink then ChatEdit_InsertLink(lien) end
-			end
-		end)
-		fiche.lignes[i] = l
-	end
-	fiche.reste = UI.Texte(fiche, "GameFontHighlightSmall", C.gris)
-	-- classement (quand aucun monstre n'est choisi)
-	fiche.rangs = UI.Texte(fiche, "GameFontHighlight", C.texte)
-	fiche.rangs:SetPoint("TOPLEFT", fiche, "TOPLEFT", 14, -40)
-	fiche.rangs:SetPoint("RIGHT", fiche, "RIGHT", -14, 0)
-	fiche.rangs:SetWordWrap(true)
-	fiche.rangs:SetSpacing(6)
-	return fiche
-end
-
-local function MajClassement(fiche)
-	fiche.titre:SetText("Classement de la guilde")
-	fiche.titre:SetTextColor(unpack(C.ors))
-	fiche.scene:Hide()
-	fiche.infos:Hide()
-	fiche.carte:Hide()
-	fiche.classement:Hide()
-	fiche.titreButin:Hide()
-	fiche.reste:Hide()
-	for _, l in ipairs(fiche.lignes) do l:Hide() end
-	local g = Guilde()
-	local liste = {}
-	local moi = MaCle()
-	local s = MonScore()
-	if moi then liste[1] = { cle = moi, k = s.k, d = s.d } end
-	for cle, x in pairs(g and g.s or {}) do
-		if cle ~= moi and (x.k or 0) > 0 then liste[#liste + 1] = { cle = cle, k = x.k or 0, d = x.d or 0 } end
-	end
-	table.sort(liste, function(a, b) if a.k ~= b.k then return a.k > b.k end return a.cle < b.cle end)
-	local lignes = {}
-	for i = 1, math.min(#liste, 14) do
-		local x = liste[i]
-		local nom = ns.NomMembreColore and ns.NomMembreColore(x.cle, NomJoueur(x.cle)) or NomJoueur(x.cle)
-		lignes[#lignes + 1] = ("%s%d.|r %s  %s%d capturés|r%s"):format(i <= 3 and OR or GRIS, i, nom, VERT, x.k,
-			x.d > 0 and (GRIS .. " · " .. x.d .. " dépouillés|r") or "")
-	end
-	local nGuilde = 0
-	for _ in pairs(g and g.d or {}) do nGuilde = nGuilde + 1 end
-	lignes[#lignes + 1] = ""
-	lignes[#lignes + 1] = GRIS .. ("WoWdex de la guilde : %d monstres capturés sur %d."):format(nGuilde, Bestiaire().nombre) .. "|r"
-	lignes[#lignes + 1] = GRIS .. "Clique sur un monstre pour ouvrir sa fiche.|r"
-	fiche.rangs:SetText(table.concat(lignes, "\n"))
-	fiche.rangs:Show()
-end
-
-local function MajFiche()
+MajFiche = function()
 	local fiche = page and page.fiche
 	if not fiche then return end
-	if not choisi then MajClassement(fiche); return end
-	fiche.rangs:Hide()
 	local id = choisi
 	local b = Bestiaire()
-	local f = b.par[id]
-	local e = Entree(id)
-	local connu = Connu(id) or (e and e.n)
+	local f = id and b.par[id]
+	local e = id and Entree(id)
+	if not id or not (f or (e and e.n)) then
+		fiche.corps:Hide()
+		fiche.vide:Show()
+		return
+	end
+	fiche.vide:Hide()
+	fiche.corps:Show()
+	local connu = Connu(id) or (e and e.n ~= nil) or false
 	local rang = f and f.rang or (e and e.r) or 0
 	local cr = COULEURS_RANGS[rang] or COULEURS_RANGS[0]
 	local nom = connu and NomMonstre(id) or "???"
-	fiche.titre:SetText((f and ("n°%04d  "):format(f.num) or "") .. nom)
-	fiche.titre:SetTextColor(cr[1], cr[2], cr[3])
-	-- modèle : seulement pour un monstre connu
-	fiche.scene:Show()
-	local modele = false
-	if fiche.modele then
-		pcall(fiche.modele.ClearModel, fiche.modele)
-		if connu then
-			modele = pcall(fiche.modele.SetCreature, fiche.modele, id)
-			fiche.modele:SetShown(modele)
-		else
-			fiche.modele:Hide()
+	local p = Palier(e)
+	local w = Moi()
+	local piste = w and w.pistes[id] and true or false
+	fiche.num:SetText(f and ("n° %04d"):format(f.num) or "Hors liste")
+	fiche.nom:SetText(nom)
+	fiche.nom:SetTextColor(cr[1], cr[2], cr[3])
+	-- pilules : rang, niveau, type de créature
+	local niveau = f and NiveauTexte(f.min, f.max) or (e and NiveauTexte(e.l))
+	local x = 0
+	local function Pil(i, texte, couleur)
+		local pil = fiche.pilules[i]
+		local l = pil:Ecrire(texte, couleur)
+		if l > 0 then
+			pil:ClearAllPoints()
+			pil:SetPoint("TOPLEFT", fiche.corps, "TOPLEFT", 14 + x, -52)
+			x = x + l + 5
 		end
 	end
-	fiche.mystere:SetShown(not modele)
-	-- informations
-	local t = {}
-	local quoi = {}
-	local niveau = f and NiveauTexte(f.min, f.max) or (e and NiveauTexte(e.l))
-	if niveau then quoi[#quoi + 1] = "Niveau " .. niveau end
-	if rang > 0 then quoi[#quoi + 1] = Couleur(cr) .. NOMS_RANGS[rang] .. "|r" end
-	if e and e.ty then quoi[#quoi + 1] = e.ty end
-	if #quoi > 0 then t[#t + 1] = table.concat(quoi, " · ") end
+	Pil(1, NOMS_RANGS[rang] or "Normal", rang > 0 and cr or C.gris)
+	Pil(2, niveau and ("Niveau " .. niveau) or nil, C.texte)
+	Pil(3, e and e.ty or nil, C.texte)
+	-- modèle : seulement pour un monstre connu, rechargé quand la fiche change de monstre
+	local cle = id .. (connu and ":1" or ":0")
+	if fiche.cleModele ~= cle then
+		fiche.cleModele = cle
+		local montre = connu and PoserModele(fiche.modele, id) or false
+		if fiche.modele then fiche.modele:SetShown(montre) end
+		fiche.mystere:SetShown(not montre)
+	end
+	if fiche.modele then pcall(fiche.modele.SetAlpha, fiche.modele, p >= 2 and 1 or 0.55) end
+	local rare = RARES[rang]
+	if rare and p < 2 then
+		fiche.scene:SetBackdropBorderColor(cr[1] * 0.6, cr[2] * 0.6, cr[3] * 0.6, 1)
+	else
+		fiche.scene:SetBackdropBorderColor(unpack(C.bord))
+	end
+	local marques = {}
+	if rare then marques[#marques + 1] = (p >= 2) and (VERT .. NOMS_RANGS[rang] .. " capturé|r") or (Couleur(cr) .. NOMS_RANGS[rang] .. " à capturer|r") end
+	if piste then marques[#marques + 1] = OR .. "Pisté|r" end
+	fiche.bandeau:SetText(table.concat(marques, GRIS .. " · |r"))
+	-- tableau
+	local y = 0
+	local n = 0
+	local function Rang(cle2, valeur)
+		if not valeur then return end
+		n = n + 1
+		local r = fiche.rangs[n]
+		if not r then return end
+		r.cle:SetText(cle2)
+		r.val:SetText(valeur)
+		r.cle:ClearAllPoints()
+		r.cle:SetPoint("TOPLEFT", fiche.scene, "BOTTOMLEFT", 4, -10 - y)
+		r.val:ClearAllPoints()
+		r.val:SetPoint("TOPLEFT", fiche.scene, "BOTTOMLEFT", 82, -10 - y)
+		r.cle:Show()
+		r.val:Show()
+		y = y + math.max(11, tonumber(r.val:GetStringHeight()) or 11) + 5
+	end
 	local zones = {}
 	for _, z in ipairs(f and ZonesFiche(f) or {}) do zones[#zones + 1] = NomZone(z.zone) end
 	if #zones == 0 and e and e.z then zones[1] = e.z end
-	if #zones > 0 then t[#t + 1] = GRIS .. "Zone :|r " .. table.concat(zones, ", ") end
-	local p = Palier(e)
-	local pc = COULEURS_PALIERS[p]
-	if p == 0 then
-		t[#t + 1] = GRIS .. "Toi :|r " .. Couleur(pc) .. "pas encore rencontré|r"
-	else
-		local moi = { Couleur(pc) .. NOMS_PALIERS[p] .. "|r" }
-		if (e.k or 0) > 0 then moi[#moi + 1] = e.k .. " vaincu" .. (e.k > 1 and "s" or "") end
-		if (e.d or 0) > 0 then moi[#moi + 1] = e.d .. " dépouillé" .. (e.d > 1 and "s" or "") end
-		local quand = e.tk or e.v
-		if quand then moi[#moi + 1] = GRIS .. (e.tk and "capturé le " or "vu le ") .. date("%d/%m/%Y", quand) .. "|r" end
-		t[#t + 1] = GRIS .. "Toi :|r " .. table.concat(moi, " · ")
-	end
+	Rang("Zone", #zones > 0 and table.concat(zones, ", ") or nil)
+	Rang("Vu", (p >= 1 and e.v) and ("le " .. date("%d/%m/%Y", e.v)) or (GRIS .. "pas encore|r"))
+	Rang("Capturé", p >= 2 and (VERT .. "×" .. (e.k or 0) .. "|r" .. (e.tk and (GRIS .. " · le " .. date("%d/%m/%Y", e.tk) .. "|r") or ""))
+		or (GRIS .. "pas encore|r"))
+	Rang("Dépouillé", p >= 3 and (OR .. "×" .. (e.d or 0) .. "|r" .. GRIS .. " corps|r") or (GRIS .. "pas encore|r"))
 	local g = Guilde()
 	local d = g and g.d[id]
 	if d then
-		t[#t + 1] = GRIS .. "Guilde :|r premier capturé par " .. NomJoueur(d.c) .. GRIS .. ", le " .. DateJour(d.j) .. "|r"
+		Rang("Guilde", "première capture par " .. NomJoueur(d.c) .. GRIS .. ", le " .. DateJour(d.j) .. "|r")
 	elseif g then
-		t[#t + 1] = GRIS .. "Guilde : personne ne l'a encore capturé.|r"
+		Rang("Guilde", GRIS .. "personne ne l'a encore capturé|r")
 	end
-	fiche.infos:SetText(table.concat(t, "\n"))
-	fiche.infos:Show()
-	-- butin
+	local quand, qui = Reperage(id)
+	if quand then Rang("Repéré", OR .. quand .. "|r" .. (qui and (" par " .. qui) or "")) end
+	for i = n + 1, #fiche.rangs do
+		fiche.rangs[i].cle:Hide()
+		fiche.rangs[i].val:Hide()
+	end
+	-- butin : autant de lignes que la place le permet
 	local liste, corps, membres = ButinAffiche(id)
+	local haut = tonumber(fiche:GetHeight()) or 0
+	if haut < 200 then haut = 478 end
+	local places = math.floor((haut - 76 - HAUT_SCENE - 10 - y - 10 - 20 - 20 - 44) / 21)
+	places = math.max(1, math.min(LIGNES_BUTIN, places))
 	fiche.titreButin:ClearAllPoints()
-	fiche.titreButin:SetPoint("TOPLEFT", fiche.infos, "BOTTOMLEFT", 0, -12)
+	fiche.titreButin:SetPoint("TOPLEFT", fiche.scene, "BOTTOMLEFT", 4, -18 - y)
 	fiche.titreButin:SetText("Butin" .. (corps > 0 and (GRIS .. ("  %d corps fouillé%s par %d membre%s"):format(corps,
 		corps > 1 and "s" or "", membres, membres > 1 and "s" or "") .. "|r") or ""))
-	fiche.titreButin:Show()
-	local y = 0
+	local yb = 0
 	for i, l in ipairs(fiche.lignes) do
-		local x = liste[i]
-		if x then
-			local nomO, _, qualite, icone = ns.InfoObjet(x.objet)
-			if not nomO and ns.Precharger then ns.Precharger(x.objet) end
-			l.objet = x.objet
+		local o = (i <= places) and liste[i] or nil
+		if o then
+			local nomO, _, qualite, icone = ns.InfoObjet(o.objet)
+			if not nomO and ns.Precharger then ns.Precharger(o.objet) end
+			l.objet = o.objet
 			l.icone:SetTexture(icone or "Interface\\Icons\\INV_Misc_QuestionMark")
 			local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
-			l.nom:SetText(((qc and qc.hex) or "|cffffffff") .. (nomO or ("objet n° " .. x.objet)) .. "|r")
-			if x.n then
-				l.taux:SetText(("%d %%"):format(math.floor(100 * x.n / math.max(1, x.corps) + 0.5)))
-				l.aide = ("Tombé sur %d des %d corps fouillés par la guilde (%d membre%s)."):format(x.n, x.corps,
-					x.membres or 1, (x.membres or 1) > 1 and "s" or "")
+			l.nom:SetText(((qc and qc.hex) or "|cffffffff") .. (nomO or ("objet n° " .. o.objet)) .. "|r")
+			if o.n then
+				l.taux:SetText(("%d %%"):format(math.floor(100 * o.n / math.max(1, o.corps) + 0.5)))
+				l.aide = ("Tombé sur %d des %d corps fouillés par la guilde (%d membre%s)."):format(o.n, o.corps,
+					o.membres or 1, (o.membres or 1) > 1 and "s" or "")
 			else
 				l.taux:SetText(GRIS .. "jamais vu|r")
 				l.aide = "Peut tomber sur ce monstre (bestiaire), pas encore trouvé par la guilde."
 			end
 			l:ClearAllPoints()
-			l:SetPoint("TOPLEFT", fiche.titreButin, "BOTTOMLEFT", 0, -6 - y)
+			l:SetPoint("TOPLEFT", fiche.titreButin, "BOTTOMLEFT", 0, -6 - yb)
 			l:SetPoint("RIGHT", fiche, "RIGHT", -14, 0)
 			l:Show()
-			y = y + 21
+			yb = yb + 21
 		else
 			l:Hide()
 			l.objet = nil
 		end
 	end
 	fiche.reste:ClearAllPoints()
-	fiche.reste:SetPoint("TOPLEFT", fiche.titreButin, "BOTTOMLEFT", 0, -8 - y)
-	if #liste > MAX_LIGNES_BUTIN then
-		fiche.reste:SetText(("et %d autres objets"):format(#liste - MAX_LIGNES_BUTIN))
+	fiche.reste:SetPoint("TOPLEFT", fiche.titreButin, "BOTTOMLEFT", 0, -8 - yb)
+	if #liste > places then
+		fiche.reste:SetText(("et %d autre%s"):format(#liste - places, #liste - places > 1 and "s objets" or " objet"))
 	elseif #liste == 0 then
 		fiche.reste:SetText("Rien de particulier : le butin commun (étoffes, objets gris) apparaîtra ici quand la guilde l'aura fouillé.")
 	else
 		fiche.reste:SetText("")
 	end
-	fiche.reste:SetWidth(LARGEUR_FICHE - 28)
-	fiche.reste:SetWordWrap(true)
-	fiche.reste:Show()
-	-- carte
+	-- actions
+	if p >= 2 then
+		fiche.pister:Ecrire("Capturé")
+		fiche.pister:Activer(false)
+	else
+		fiche.pister:Ecrire(piste and "Ne plus pister" or "Pister")
+		fiche.pister:Activer(true)
+	end
+	fiche.pister:SetBackdropColor(unpack(piste and C.actif or C.voile))
 	local groupes = {}
 	for _, z in ipairs(f and ZonesFiche(f) or {}) do
 		local info = b.zones[z.zone]
@@ -1305,117 +1910,680 @@ local function MajFiche()
 			groupes[#groupes + 1] = { carte = info.carte, points = z.points, couleur = { 0.95, 0.35, 0.25 } }
 		end
 	end
-	fiche.carte:SetShown(#groupes > 0)
-	fiche.carte:SetScript("OnClick", function()
-		if ns.AfficherSurCarte then
-			ns.AfficherSurCarte("WoWdex : " .. nom .. " — " .. (NomZone(f and f.zone) or ""), { groupes[1] })
-		end
-	end)
-	fiche.classement:Show()
+	fiche.carte.groupes = groupes
+	fiche.carte.titre = "WoWdex : " .. nom .. " — " .. (NomZone(f and f.zone) or "")
+	fiche.carte:Activer(#groupes > 0)
+	local quoi = {}
+	if rang > 0 then quoi[#quoi + 1] = NOMS_RANGS[rang] end
+	if niveau then quoi[#quoi + 1] = "niveau " .. niveau end
+	if zones[1] then quoi[#quoi + 1] = zones[1] end
+	fiche.lier.lien = "WoWdex " .. (f and ("n°%04d "):format(f.num) or "") .. nom .. (#quoi > 0 and (" (" .. table.concat(quoi, ", ") .. ")") or "")
 end
+
+--------------------------------------------------------------------------------
+-- Vue « Avis de recherche » et « Bestiaire » : recherche, puces, grille, fiche
+--------------------------------------------------------------------------------
+
+local function CreerVueGrille(p)
+	local v = CreateFrame("Frame", nil, p)
+	v:SetPoint("TOPLEFT", p, "TOPLEFT", 0, HAUT_VUES)
+	v:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 0)
+	v.recherche = UI.Champ(v, 140, "Monstre, zone, objet…")
+	v.recherche:SetPoint("TOPLEFT", v, "TOPLEFT", MARGE, -4)
+	v.recherche.SurTexte = function(t)
+		etat.recherche = Simplifier(strtrim(t or ""))
+		etat.ligne = 0
+		MajBientot()
+	end
+	v.recherche.saisie:SetScript("OnEscapePressed", function(self)
+		self:SetText("")
+		self:ClearFocus()
+		etat.recherche = ""
+		etat.ligne = 0
+		MajBientot()
+	end)
+	v.puces = {}
+	for i, noms in ipairs(FILTRES) do
+		local pu = UI.Puces(v, noms, function(j)
+			etat.filtres[i] = j
+			etat.ligne = 0
+			p.Maj()
+		end)
+		pu:SetPoint("LEFT", v.recherche, "RIGHT", 8, 0)
+		v.puces[i] = pu
+	end
+	p.fiche = CreerFiche(p, v)
+	p.grille = CreerGrille(v)
+	p.grille:SetPoint("TOPLEFT", v, "TOPLEFT", MARGE, -40)
+	v.vide = UI.Texte(v, "GameFontHighlight", C.gris)
+	v.vide:SetPoint("TOPLEFT", p.grille, "TOPLEFT", 4, -8)
+	v.vide:SetWidth(p.grille.largeur - 8)
+	v.vide:SetWordWrap(true)
+	v.Maj = function()
+		local i = (etat.onglet == 1) and 1 or 2
+		for j, pu in ipairs(v.puces) do pu:SetShown(j == i) end
+		v.puces[i]:Choisir(etat.filtres[i])
+		Construire()
+		-- une fiche toujours ouverte : à défaut, le premier monstre de la liste
+		local present = false
+		for _, a in ipairs(affiches) do
+			if (a.hors or a.id) == choisi then present = true; break end
+		end
+		if not present and affiches[1] then choisi = affiches[1].hors or affiches[1].id end
+		DessinerGrille()
+		v.vide:SetShown(#affiches == 0)
+		if #affiches == 0 then
+			if etat.recherche ~= "" then
+				v.vide:SetText(etat.onglet == 1 and "Aucun rare ne correspond à ta recherche. L'onglet Bestiaire cherche parmi tous les monstres."
+					or "Aucun monstre ne correspond à ta recherche (les monstres inconnus se cherchent par leur zone).")
+			else
+				v.vide:SetText(etat.onglet == 1 and "Aucun rare ni boss ici." or "Aucun monstre ici.")
+			end
+		end
+		MajFiche()
+	end
+	return v
+end
+
+--------------------------------------------------------------------------------
+-- Vue « Zones » : un WoWdex par zone, ses rares d'abord
+--------------------------------------------------------------------------------
+
+-- ouvre la grille sur une zone (ses rares s'il y en a, sinon tous ses monstres)
+local function OuvrirZone(z, rares)
+	etat.zone = z
+	etat.onglet = rares and 1 or 2
+	etat.filtres[etat.onglet] = 1
+	etat.ligne = 0
+	if page then page.Maj() end
+end
+
+local function CreerRangeeZone(parent, largeur)
+	local r = UI.Rangee(parent, 36)
+	r.nom = UI.Texte(r, "GameFontHighlight", C.texte)
+	r.nom:SetPoint("LEFT", r, "LEFT", 12, 0)
+	r.nom:SetWidth(210)
+	r.rares = UI.Texte(r, "GameFontHighlightSmall", COULEUR_RARE)
+	r.rares:SetPoint("LEFT", r, "LEFT", 232, 0)
+	r.rares:SetWidth(150)
+	r.barre = Barre(r, 250, 8)
+	r.barre:SetPoint("LEFT", r, "LEFT", 392, 0)
+	r.compte = UI.Texte(r, "GameFontHighlightSmall", C.gris)
+	r.compte:SetPoint("RIGHT", r, "RIGHT", -12, 0)
+	r.compte:SetJustifyH("RIGHT")
+	r:SetScript("OnClick", function(self)
+		if self.zone then OuvrirZone(self.zone, self.aDesRares) end
+	end)
+	UI.SonClic(r)
+	return r
+end
+
+local function CreerVueZones(p)
+	local v = CreateFrame("Frame", nil, p)
+	v:SetPoint("TOPLEFT", p, "TOPLEFT", 0, HAUT_VUES)
+	v:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 0)
+	local largeur = LargeurPage() - 2 * MARGE
+	v.ici = UI.Carte(v, "Tu es ici")
+	v.ici:SetPoint("TOPLEFT", v, "TOPLEFT", MARGE, -4)
+	v.ici:SetSize(largeur, 88)
+	v.ici.texte = UI.Texte(v.ici, "GameFontHighlightSmall", C.texte)
+	v.ici.texte:SetPoint("TOPLEFT", v.ici, "TOPLEFT", 14, -36)
+	v.ici.texte:SetWidth(largeur - 28 - 150)
+	v.ici.texte:SetWordWrap(true)
+	v.ici.texte:SetSpacing(4)
+	v.ici.voir = UI.Bouton(v.ici, "Voir ses rares", "or", 130, 26)
+	v.ici.voir:SetPoint("RIGHT", v.ici, "RIGHT", -14, 0)
+	v.ici.voir:SetScript("OnClick", function() OuvrirZone("ici", true) end)
+	v.puces = UI.Puces(v, { "Toutes", "Rares à capturer", "Rares complets" }, function(i)
+		etat.filtreZones = i
+		v.liste:Haut()
+		p.Maj()
+	end)
+	v.puces:SetPoint("TOPLEFT", v.ici, "BOTTOMLEFT", 0, -8)
+	v.legende = UI.Texte(v, "GameFontHighlightSmall", C.gris)
+	v.legende:SetPoint("TOPRIGHT", v.ici, "BOTTOMRIGHT", 0, -15)
+	v.legende:SetJustifyH("RIGHT")
+	v.legende:SetText("Barre : tes captures · trait clair : la guilde")
+	v.liste = UI.Liste(v)
+	v.liste:SetPoint("TOPLEFT", v.puces, "BOTTOMLEFT", 0, -8)
+	v.liste:SetPoint("BOTTOMRIGHT", v, "BOTTOMRIGHT", -MARGE, 12)
+	v.rangees = {}
+	v.vide = UI.Texte(v, "GameFontHighlight", C.gris)
+	v.vide:SetPoint("TOPLEFT", v.liste, "TOPLEFT", 4, -8)
+	v.Maj = function()
+		local b = Bestiaire()
+		local st = StatsZones()
+		-- tu es ici
+		local mesZones = ZonesDeMaCarte()
+		local noms = {}
+		for z in pairs(mesZones) do noms[#noms + 1] = b.zones[z] and b.zones[z].nom or nil end
+		table.sort(noms)
+		local ici = Recensement(mesZones)
+		if ici.n > 0 then
+			v.ici.titre:SetText("Tu es ici : " .. table.concat(noms, ", "))
+			local lignes = {}
+			if #ici.rares > 0 then
+				-- (ceux dont je connais le nom, puis le nombre des autres)
+				local manque, inconnus = {}, 0
+				for _, f in ipairs(ici.rares) do
+					if Palier(Entree(f.id)) < 2 then
+						if Connu(f.id) then
+							manque[#manque + 1] = Couleur(COULEURS_RANGS[f.rang] or COULEUR_RARE) .. f.nom .. "|r"
+						else
+							inconnus = inconnus + 1
+						end
+					end
+				end
+				if inconnus > 0 then manque[#manque + 1] = inconnus .. (inconnus > 1 and " inconnus" or " inconnu") end
+				lignes[#lignes + 1] = ("%sRares et boss : %d sur %d|r"):format(BLEU, ici.raresK, #ici.rares)
+					.. (#manque > 0 and (GRIS .. " · à capturer : |r" .. table.concat(manque, GRIS .. ", |r")) or (VERT .. " · tous capturés !|r"))
+			else
+				lignes[#lignes + 1] = GRIS .. "Pas de rare ni de boss au bestiaire pour cette carte.|r"
+			end
+			lignes[#lignes + 1] = ("Monstres : %s%d|r sur %d%s"):format(VERT, ici.k, ici.n,
+				Guilde() and (GRIS .. (" · guilde : %d"):format(ici.g) .. "|r") or "")
+			v.ici.texte:SetText(table.concat(lignes, "\n"))
+			v.ici.voir:SetShown(#ici.rares > 0)
+		else
+			v.ici.titre:SetText("Tu es ici")
+			v.ici.texte:SetText(GRIS .. "Le bestiaire n'a pas de monstre pour la carte où tu te trouves.|r")
+			v.ici.voir:Hide()
+		end
+		-- les zones : la mienne d'abord, puis par nom
+		v.puces:Choisir(etat.filtreZones)
+		local liste = {}
+		for z, s in pairs(st) do
+			local info = b.zones[z]
+			local garde = info and info.nom and info.nom ~= ""
+			if etat.filtreZones == 2 and not (s.rares > s.raresK) then garde = false end
+			if etat.filtreZones == 3 and not (s.rares > 0 and s.raresK >= s.rares) then garde = false end
+			if garde then liste[#liste + 1] = { z = z, nom = info.nom, cle = Simplifier(info.nom), s = s, ici = mesZones[z] or false } end
+		end
+		table.sort(liste, function(x, y)
+			if x.ici ~= y.ici then return x.ici end
+			if x.cle ~= y.cle then return x.cle < y.cle end
+			return x.z < y.z
+		end)
+		local largeurListe = largeur - 8
+		for i, x in ipairs(liste) do
+			local r = v.rangees[i]
+			if not r then
+				r = CreerRangeeZone(v.liste.contenu, largeurListe)
+				r:SetPoint("TOPLEFT", v.liste.contenu, "TOPLEFT", 0, -(i - 1) * 40)
+				r:SetPoint("RIGHT", v.liste.contenu, "RIGHT", 0, 0)
+				v.rangees[i] = r
+			end
+			local s = x.s
+			r.zone, r.aDesRares = x.z, s.rares > 0
+			r.nom:SetText(x.nom)
+			r.nom:SetTextColor(unpack(x.ici and C.ors or C.texte))
+			if s.rares == 0 then
+				r.rares:SetText(GRIS .. "pas de rare|r")
+			elseif s.raresK >= s.rares then
+				r.rares:SetText(OR .. ("Rares %d / %d · complets"):format(s.raresK, s.rares) .. "|r")
+			else
+				r.rares:SetText(("Rares %d / %d"):format(s.raresK, s.rares))
+			end
+			local complet = s.k >= s.n
+			r.barre:Poser(s.n > 0 and s.k / s.n or 0, complet and C.ors or C.orFonce, Guilde() and s.n > 0 and s.g / s.n or nil)
+			r.compte:SetText((complet and OR or "") .. s.k .. " / " .. s.n .. (complet and "|r" or ""))
+			r:Fort(x.ici)
+			r:Show()
+		end
+		for i = #liste + 1, #v.rangees do v.rangees[i]:Hide() end
+		v.liste:Hauteur(#liste * 40)
+		v.vide:SetShown(#liste == 0)
+		v.vide:SetText(etat.filtreZones == 3 and "Aucune zone dont tu as capturé tous les rares, pour l'instant." or "Aucune zone ici.")
+	end
+	return v
+end
+
+--------------------------------------------------------------------------------
+-- Vue « Carnet de chasse » : titre, progression, monstres pistés, dernières captures, réglages
+--------------------------------------------------------------------------------
+
+-- ligne cliquable d'une carte : texte à gauche, précision à droite ; ouvre la fiche du monstre
+local function LigneMonstre(carte, i, largeur)
+	local l = CreateFrame("Button", nil, carte)
+	l:SetSize(largeur - 24, 18)
+	l:SetPoint("TOPLEFT", carte, "TOPLEFT", 12, -34 - (i - 1) * 19)
+	l.droite = UI.Texte(l, "GameFontHighlightSmall", C.gris)
+	l.droite:SetPoint("RIGHT", l, "RIGHT", -2, 0)
+	l.droite:SetJustifyH("RIGHT")
+	l.texte = UI.Texte(l, "GameFontHighlightSmall", C.texte)
+	l.texte:SetPoint("LEFT", l, "LEFT", 2, 0)
+	l.texte:SetPoint("RIGHT", l.droite, "LEFT", -8, 0)
+	UI.Survol(l, 0.06)
+	l:SetScript("OnClick", function(self)
+		if self.id and page then page.Ouvrir(self.id) end
+	end)
+	UI.SonClic(l)
+	return l
+end
+
+-- ligne de progression : nom, barre, « 12 / 244 »
+local function LigneBarre(carte, i, largeur, pas)
+	local l = {}
+	local y = -36 - (i - 1) * pas
+	l.nom = UI.Texte(carte, "GameFontHighlightSmall", C.texte)
+	l.nom:SetPoint("TOPLEFT", carte, "TOPLEFT", 14, y)
+	l.nom:SetWidth(78)
+	l.barre = Barre(carte, largeur - 14 - 82 - 86, 8)
+	l.barre:SetPoint("TOPLEFT", carte, "TOPLEFT", 14 + 82, y - 2)
+	l.compte = UI.Texte(carte, "GameFontHighlightSmall", C.gris)
+	l.compte:SetPoint("TOPRIGHT", carte, "TOPRIGHT", -14, y)
+	l.compte:SetJustifyH("RIGHT")
+	return l
+end
+
+local function CreerVueCarnet(p)
+	local v = CreateFrame("Frame", nil, p)
+	v:SetPoint("TOPLEFT", p, "TOPLEFT", 0, HAUT_VUES)
+	v:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 0)
+	local largeur = LargeurPage() - 2 * MARGE
+	local lg = math.floor((largeur - 10) / 2)
+	local ld = largeur - 10 - lg
+	-- colonne de gauche : titre, progression par niveau, réglages
+	v.titre = UI.Carte(v, "Titre de chasseur")
+	v.titre:SetPoint("TOPLEFT", v, "TOPLEFT", MARGE, -4)
+	v.titre:SetSize(lg, 196)
+	v.titre.nom = UI.Texte(v.titre, "GameFontNormalLarge", C.ors)
+	v.titre.nom:SetPoint("TOPLEFT", v.titre, "TOPLEFT", 14, -34)
+	v.titre.detail = UI.Texte(v.titre, "GameFontHighlightSmall", C.gris)
+	v.titre.detail:SetPoint("TOPLEFT", v.titre.nom, "BOTTOMLEFT", 0, -4)
+	v.titre.echelle = {}
+	for i = 1, #TITRES do
+		local nom = UI.Texte(v.titre, "GameFontHighlightSmall", C.gris)
+		nom:SetPoint("TOPLEFT", v.titre, "TOPLEFT", 14, -76 - (i - 1) * 14)
+		local seuil = UI.Texte(v.titre, "GameFontHighlightSmall", C.gris)
+		seuil:SetPoint("TOPRIGHT", v.titre, "TOPRIGHT", -14, -76 - (i - 1) * 14)
+		seuil:SetJustifyH("RIGHT")
+		v.titre.echelle[i] = { nom = nom, seuil = seuil }
+	end
+	v.niveaux = UI.Carte(v, "Par niveau")
+	v.niveaux:SetPoint("TOPLEFT", v.titre, "BOTTOMLEFT", 0, -10)
+	v.niveaux:SetSize(lg, 152)
+	v.niveaux.lignes = {}
+	for i = 1, #TRANCHES do v.niveaux.lignes[i] = LigneBarre(v.niveaux, i, lg, 16) end
+	v.reglages = UI.Carte(v, "Alertes")
+	v.reglages:SetPoint("TOPLEFT", v.niveaux, "BOTTOMLEFT", 0, -10)
+	v.reglages:SetSize(lg, 86)
+	v.alertes = UI.Case(v.reglages, "Alerte quand un rare à capturer est en vue", function(oui)
+		local w = Moi()
+		if w then w.alertes = oui and true or false end
+	end)
+	v.alertes:SetPoint("TOPLEFT", v.reglages, "TOPLEFT", 14, -32)
+	v.plaques = UI.Case(v.reglages, "Losange sur la barre de nom des rares à capturer", function(oui)
+		local w = Moi()
+		if w then w.plaques = oui and true or false end
+		if ns.MajPlaquesWowdex then ns.MajPlaquesWowdex() end
+	end)
+	v.plaques:SetPoint("TOPLEFT", v.reglages, "TOPLEFT", 14, -56)
+	-- colonne de droite : progression par rang, monstres pistés, dernières captures
+	v.rangs = UI.Carte(v, "Par rang")
+	v.rangs:SetPoint("TOPLEFT", v.titre, "TOPRIGHT", 10, 0)
+	v.rangs:SetSize(ld, 130)
+	v.rangs.lignes = {}
+	for i = 1, #ORDRE_RANGS do v.rangs.lignes[i] = LigneBarre(v.rangs, i, ld, 18) end
+	v.pistes = UI.Carte(v, "À pister")
+	v.pistes:SetPoint("TOPLEFT", v.rangs, "BOTTOMLEFT", 0, -10)
+	v.pistes:SetSize(ld, 152)
+	v.pistes.lignes = {}
+	for i = 1, 6 do v.pistes.lignes[i] = LigneMonstre(v.pistes, i, ld) end
+	v.captures = UI.Carte(v, "Dernières captures")
+	v.captures:SetPoint("TOPLEFT", v.pistes, "BOTTOMLEFT", 0, -10)
+	v.captures:SetSize(ld, 152)
+	v.captures.lignes = {}
+	for i = 1, 6 do v.captures.lignes[i] = LigneMonstre(v.captures, i, ld) end
+
+	local function NomColore(id)
+		local f = Bestiaire().par[id]
+		local e = Entree(id)
+		local rang = f and f.rang or (e and e.r) or 0
+		local nom = (Connu(id) or (e and e.n)) and NomMonstre(id) or "???"
+		return (f and (GRIS .. ("%04d|r "):format(f.num)) or "") .. Couleur(COULEURS_RANGS[rang] or COULEURS_RANGS[0]) .. nom .. "|r", f
+	end
+
+	v.Maj = function()
+		local b = Bestiaire()
+		local s = MonScore()
+		local w = Moi()
+		-- titre et échelle
+		local rang, nomTitre, suivant = Titre(s.r)
+		v.titre.nom:SetText(nomTitre)
+		v.titre.detail:SetText(("%d rare%s et boss capturé%s sur %d"):format(s.r, s.r > 1 and "s" or "", s.r > 1 and "s" or "", b.rares)
+			.. (suivant and (" · encore %d pour « %s »"):format(math.max(0, suivant - s.r), TITRES[rang + 1][2]) or ""))
+		for i, l in ipairs(v.titre.echelle) do
+			local c = (i == rang) and C.ors or (i < rang and C.texte or C.gris)
+			l.nom:SetText(((i == rang) and "› " or "   ") .. TITRES[i][2])
+			l.nom:SetTextColor(c[1], c[2], c[3])
+			l.seuil:SetText(tostring(SeuilTitre(i) or 0))
+			l.seuil:SetTextColor(c[1], c[2], c[3])
+		end
+		-- progression par rang et par niveau
+		local parRang, parNiveau = {}, {}
+		for i = 1, #TRANCHES do parNiveau[i] = { n = 0, k = 0 } end
+		for _, f in ipairs(b.liste) do
+			local pris = w and Palier(w.m[f.id]) >= 2 or false
+			local r = parRang[f.rang]
+			if not r then r = { n = 0, k = 0 }; parRang[f.rang] = r end
+			r.n = r.n + 1
+			if pris then r.k = r.k + 1 end
+			for i, t in ipairs(TRANCHES) do
+				if f.min >= t[1] and f.min <= t[2] then
+					parNiveau[i].n = parNiveau[i].n + 1
+					if pris then parNiveau[i].k = parNiveau[i].k + 1 end
+					break
+				end
+			end
+		end
+		for i, rg in ipairs(ORDRE_RANGS) do
+			local l = v.rangs.lignes[i]
+			local x = parRang[rg] or { n = 0, k = 0 }
+			local c = COULEURS_RANGS[rg] or COULEURS_RANGS[0]
+			l.nom:SetText(NOMS_RANGS[rg])
+			l.nom:SetTextColor(c[1], c[2], c[3])
+			l.barre:Poser(x.n > 0 and x.k / x.n or 0, rg == 0 and C.orFonce or c)
+			l.compte:SetText(x.k .. " / " .. x.n)
+		end
+		for i, t in ipairs(TRANCHES) do
+			local l = v.niveaux.lignes[i]
+			local x = parNiveau[i]
+			l.nom:SetText(t[2] > 100 and (t[1] .. " et plus") or (t[1] .. " à " .. t[2]))
+			l.barre:Poser(x.n > 0 and x.k / x.n or 0)
+			l.compte:SetText(x.k .. " / " .. x.n)
+		end
+		-- monstres pistés (les plus récents d'abord)
+		local pistes = {}
+		for id, t in pairs(w and w.pistes or {}) do pistes[#pistes + 1] = { id = id, t = tonumber(t) or 0 } end
+		table.sort(pistes, function(x, y) if x.t ~= y.t then return x.t > y.t end return x.id < y.id end)
+		for i, l in ipairs(v.pistes.lignes) do
+			local x = pistes[i]
+			if x then
+				local texte, f = NomColore(x.id)
+				local e = Entree(x.id)
+				l.id = x.id
+				l.texte:SetText(texte)
+				l.droite:SetText((f and NomZone(f.zone)) or (e and e.z) or "")
+				l:Show()
+			else
+				l:Hide()
+			end
+		end
+		v.pistes.compte:SetText(#pistes > 0 and (#pistes .. " / " .. MAX_PISTES) or "")
+		v.pistes.vide:SetText(#pistes == 0 and "Rien à pister. Ouvre la fiche d'un monstre et clique sur « Pister » : une alerte te préviendra quand il sera en vue." or "")
+		-- dernières captures
+		local captures = {}
+		for id, e in pairs(w and w.m or {}) do
+			if (e.k or 0) > 0 and e.tk then captures[#captures + 1] = { id = id, t = e.tk } end
+		end
+		table.sort(captures, function(x, y) if x.t ~= y.t then return x.t > y.t end return x.id < y.id end)
+		for i, l in ipairs(v.captures.lignes) do
+			local x = captures[i]
+			if x then
+				l.id = x.id
+				l.texte:SetText((NomColore(x.id)))
+				l.droite:SetText(IlYa(x.t))
+				l:Show()
+			else
+				l:Hide()
+			end
+		end
+		v.captures.compte:SetText(s.hors > 0 and (s.hors .. " hors liste") or "")
+		v.captures.vide:SetText(#captures == 0 and "Pas encore de capture : vaincs un monstre, seul ou en groupe." or "")
+		v.alertes:Poser(not w or w.alertes ~= false)
+		v.plaques:Poser(not w or w.plaques ~= false)
+	end
+	return v
+end
+
+--------------------------------------------------------------------------------
+-- Vue « Guilde » : le WoWdex commun, le classement par rares, les premières captures de rares
+--------------------------------------------------------------------------------
+
+local COLONNES = { { "Rares", 250 }, { "Capturés", 322 }, { "Dépouillés", 396 }, { "Premières", 466 } }
+
+local function CreerVueGuilde(p)
+	local v = CreateFrame("Frame", nil, p)
+	v:SetPoint("TOPLEFT", p, "TOPLEFT", 0, HAUT_VUES)
+	v:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 0)
+	local largeur = LargeurPage() - 2 * MARGE
+	local lg = 480
+	local ld = largeur - 10 - lg
+	-- (hauteur de la vue, moins le résumé et les marges)
+	local hauteur = (ns.TAILLE_PAGE and ns.TAILLE_PAGE[2] or 586) + HAUT_VUES - 4 - 62 - 10 - 12
+	v.resume = UI.Carte(v, "WoWdex de la guilde")
+	v.resume:SetPoint("TOPLEFT", v, "TOPLEFT", MARGE, -4)
+	v.resume:SetSize(largeur, 62)
+	v.resume.texte = UI.Texte(v.resume, "GameFontHighlight", C.texte)
+	v.resume.texte:SetPoint("TOPLEFT", v.resume, "TOPLEFT", 14, -34)
+	v.resume.texte:SetPoint("RIGHT", v.resume, "RIGHT", -14, 0)
+	v.classement = UI.Carte(v, "Classement des chasseurs")
+	v.classement:SetPoint("TOPLEFT", v.resume, "BOTTOMLEFT", 0, -10)
+	v.classement:SetSize(lg, hauteur)
+	for _, col in ipairs(COLONNES) do
+		local t = UI.Texte(v.classement, "GameFontHighlightSmall", C.gris)
+		t:SetPoint("TOPRIGHT", v.classement, "TOPLEFT", col[2], -38)
+		t:SetJustifyH("RIGHT")
+		t:SetText(col[1])
+	end
+	local filet = UI.Filet(v.classement)
+	filet:SetPoint("TOPLEFT", v.classement, "TOPLEFT", 14, -54)
+	filet:SetPoint("TOPRIGHT", v.classement, "TOPRIGHT", -14, -54)
+	v.classement.lignes = {}
+	for i = 1, 14 do
+		local l = CreateFrame("Frame", nil, v.classement)
+		l:SetSize(lg - 16, 22)
+		l:SetPoint("TOPLEFT", v.classement, "TOPLEFT", 8, -58 - (i - 1) * 23)
+		l.fond = l:CreateTexture(nil, "BACKGROUND")
+		l.fond:SetAllPoints()
+		l.fond:SetColorTexture(C.actif[1], C.actif[2], C.actif[3], 1)
+		l.accent = UI.Accent(l)
+		l.nom = UI.Texte(l, "GameFontHighlightSmall", C.texte)
+		l.nom:SetPoint("LEFT", l, "LEFT", 8, 0)
+		l.nom:SetWidth(196)
+		l.cols = {}
+		for j, col in ipairs(COLONNES) do
+			local t = UI.Texte(l, "GameFontHighlightSmall", C.texte)
+			t:SetPoint("RIGHT", l, "LEFT", col[2] - 8, 0)
+			t:SetJustifyH("RIGHT")
+			l.cols[j] = t
+		end
+		v.classement.lignes[i] = l
+	end
+	v.premieres = UI.Carte(v, "Premières captures de rares")
+	v.premieres:SetPoint("TOPLEFT", v.classement, "TOPRIGHT", 10, 0)
+	v.premieres:SetSize(ld, hauteur)
+	v.premieres.lignes = {}
+	for i = 1, 14 do
+		local l = LigneMonstre(v.premieres, i, ld)
+		l:ClearAllPoints()
+		l:SetPoint("TOPLEFT", v.premieres, "TOPLEFT", 12, -36 - (i - 1) * 23)
+		v.premieres.lignes[i] = l
+	end
+
+	v.Maj = function()
+		local b = Bestiaire()
+		local g = Guilde()
+		local s = MonScore()
+		local moi = MaCle()
+		if not g then
+			v.resume.texte:SetText(GRIS .. "Tu n'es pas dans une guilde : le classement et les premières captures se jouent en guilde.|r")
+		end
+		-- la guilde : monstres et rares capturés, corps fouillés, premières de chaque membre
+		local nGuilde, raresGuilde, corps = 0, 0, 0
+		local premieres, parMembre = {}, {}
+		for id, d in pairs(g and g.d or {}) do
+			nGuilde = nGuilde + 1
+			local f = b.par[id]
+			if f and RARES[f.rang] then
+				raresGuilde = raresGuilde + 1
+				parMembre[d.c] = (parMembre[d.c] or 0) + 1
+				premieres[#premieres + 1] = { id = id, f = f, c = d.c, j = d.j }
+			end
+		end
+		for _, parPnj in pairs(g and g.butin or {}) do
+			for cle, r in pairs(parPnj) do
+				if cle ~= moi then corps = corps + (r.k or 0) end
+			end
+		end
+		for _, e in pairs(Moi() and Moi().m or {}) do corps = corps + (e.d or 0) end
+		if g then
+			v.resume.texte:SetText(("%sRares et boss : %d sur %d|r%s · |rmonstres : %d sur %d%s · |r%d corps fouillé%s"):format(
+				BLEU, raresGuilde, b.rares, GRIS, nGuilde, b.nombre, GRIS, corps, corps > 1 and "s" or ""))
+		end
+		-- classement : les rares d'abord (un membre resté à une version d'avant la 7.3.0 n'annonce pas les siens)
+		local liste = {}
+		if moi then liste[1] = { cle = moi, r = s.r, k = s.k, d = s.d } end
+		for cle, x in pairs(g and g.s or {}) do
+			if cle ~= moi and ((x.k or 0) > 0 or (x.r or 0) > 0) then
+				liste[#liste + 1] = { cle = cle, r = x.r, k = x.k or 0, d = x.d or 0 }
+			end
+		end
+		table.sort(liste, function(x, y)
+			local rx, ry = x.r or -1, y.r or -1
+			if rx ~= ry then return rx > ry end
+			if x.k ~= y.k then return x.k > y.k end
+			return x.cle < y.cle
+		end)
+		for i, l in ipairs(v.classement.lignes) do
+			local x = liste[i]
+			if x then
+				local nom = ns.NomMembreColore and ns.NomMembreColore(x.cle, NomJoueur(x.cle)) or NomJoueur(x.cle)
+				local _, titre = Titre(x.r or 0)
+				l.nom:SetText(("%s%d.|r %s%s"):format(i <= 3 and OR or GRIS, i, nom, x.r and (GRIS .. "  " .. titre .. "|r") or ""))
+				l.cols[1]:SetText(x.r and (BLEU .. x.r .. "|r") or (GRIS .. "—|r"))
+				l.cols[2]:SetText(tostring(x.k))
+				l.cols[3]:SetText(tostring(x.d))
+				l.cols[4]:SetText(parMembre[x.cle] and (OR .. parMembre[x.cle] .. "|r") or (GRIS .. "0|r"))
+				l.fond:SetShown(x.cle == moi)
+				l.accent:SetShown(x.cle == moi)
+				l:Show()
+			else
+				l:Hide()
+			end
+		end
+		v.classement.compte:SetText(#liste > 14 and ("les 14 premiers sur " .. #liste) or "")
+		-- premières captures de rares, les plus récentes d'abord
+		table.sort(premieres, function(x, y)
+			if x.j ~= y.j then return x.j > y.j end
+			return x.id < y.id
+		end)
+		for i, l in ipairs(v.premieres.lignes) do
+			local x = premieres[i]
+			if x then
+				l.id = x.id
+				l.texte:SetText(Couleur(COULEURS_RANGS[x.f.rang] or COULEUR_RARE) .. x.f.nom .. "|r")
+				l.droite:SetText(NomJoueur(x.c) .. " · " .. date("%d/%m", EPOQUE + x.j * 86400 + 43200))
+				l:Show()
+			else
+				l:Hide()
+			end
+		end
+		v.premieres.compte:SetText(#premieres > 0 and tostring(#premieres) or "")
+		v.premieres.vide:SetText(#premieres == 0 and "Aucun rare capturé par la guilde pour l'instant. Le premier à en capturer un l'inscrit ici." or "")
+	end
+	return v
+end
+
+--------------------------------------------------------------------------------
+-- La page
+--------------------------------------------------------------------------------
+
+local CREER_VUES = { [1] = CreerVueGrille, [3] = CreerVueZones, [4] = CreerVueCarnet, [5] = CreerVueGuilde }
 
 local function CreerPage(parent)
 	local p = CreateFrame("Frame", nil, parent)
 	p:SetAllPoints()
-	p.rafraichirAuto = false -- (liste lourde : rafraîchie par ses propres évènements)
+	p.rafraichirAuto = false -- (page lourde : rafraîchie par ses propres évènements)
 	page = p
 
 	local titre = UI.Texte(p, "GameFontNormalLarge", C.ors)
-	titre:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -18)
+	titre:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -12)
 	titre:SetText("WoWdex")
+	p.titreChasseur = Pilule(p)
+	p.titreChasseur:SetPoint("LEFT", titre, "RIGHT", 10, 0)
 	p.sous = UI.Texte(p, "GameFontHighlightSmall", C.gris)
-	p.sous:SetPoint("TOPLEFT", titre, "BOTTOMLEFT", 0, -6)
-	p.sous:SetPoint("RIGHT", p, "RIGHT", -MARGE, 0)
+	p.sous:SetPoint("TOPLEFT", titre, "BOTTOMLEFT", 0, -7)
+	p.sous:SetWidth(LargeurPage() - 2 * MARGE - 260)
 
-	-- barre de progression (capturés)
-	p.barre = UI.Cadre(p, C.champ, C.bord)
-	p.barre:SetSize(200, 10)
-	p.barre:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -22)
-	p.barre.plein = p.barre:CreateTexture(nil, "ARTWORK")
-	p.barre.plein:SetColorTexture(C.orFonce[1], C.orFonce[2], C.orFonce[3], 1)
-	p.barre.plein:SetPoint("TOPLEFT", 1, -1)
-	p.barre.plein:SetPoint("BOTTOMLEFT", 1, 1)
-	p.pourcent = UI.Texte(p, "GameFontHighlightSmall", C.ors)
-	p.pourcent:SetPoint("RIGHT", p.barre, "LEFT", -8, 0)
-	p.pourcent:SetJustifyH("RIGHT")
+	-- à droite : le compteur qui compte, les rares et boss capturés
+	p.rares = UI.Texte(p, "GameFontNormalLarge", COULEUR_RARE)
+	p.rares:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -8)
+	p.rares:SetJustifyH("RIGHT")
+	p.barre = Barre(p, 240, 8)
+	p.barre:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -30)
+	p.prochain = UI.Texte(p, "GameFontHighlightSmall", C.gris)
+	p.prochain:SetPoint("TOPRIGHT", p.barre, "BOTTOMRIGHT", 0, -4)
+	p.prochain:SetJustifyH("RIGHT")
 
-	p.recherche = UI.Champ(p, 170, "Monstre, zone, objet…")
-	p.recherche:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -60)
-	p.recherche.SurTexte = function(t)
-		recherche = Simplifier(strtrim(t or ""))
-		p.liste:Haut()
-		MajBientot()
-	end
-	p.recherche.saisie:SetScript("OnEscapePressed", function(self)
-		self:SetText("")
-		self:ClearFocus()
-		recherche = ""
-		MajBientot()
-	end)
-	p.puces = UI.Puces(p, FILTRES, function(i)
-		filtre = i
-		p.puces:Choisir(i)
-		p.liste:Haut()
+	p.onglets = UI.Onglets(p, ONGLETS, function(i)
+		etat.onglet = i
+		etat.ligne = 0
 		p.Maj()
 	end)
-	p.puces:SetPoint("LEFT", p.recherche, "RIGHT", 10, 0)
-	p.puces:Choisir(filtre)
-	-- zones : toutes ou la mienne (une zone précise : la recherche lit aussi le nom de la zone)
-	p.zone = UI.Choix(p, 140, { { "toutes", "Toutes les zones" }, { "ici", "Ma zone" } }, function(v)
-		zoneChoisie = v
-		p.liste:Haut()
+	p.onglets:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, -54)
+	p.onglets:SetPoint("RIGHT", p, "RIGHT", -MARGE, 0)
+	-- zone des grilles : toutes, la mienne, ou celle choisie dans l'onglet Zones
+	p.zone = UI.Choix(p, 170, { { "toutes", "Toutes les zones" }, { "ici", "Ma zone" } }, function(valeur)
+		etat.zone = valeur
+		etat.ligne = 0
 		p.Maj()
 	end)
-	p.zone:SetPoint("TOPRIGHT", p, "TOPRIGHT", -MARGE, -60)
-	p.zone:Poser(zoneChoisie)
+	p.zone:SetPoint("BOTTOMRIGHT", p.onglets, "BOTTOMRIGHT", 0, 4)
 
-	p.fiche = CreerFiche(p)
-
-	p.liste = UI.Liste(p)
-	p.liste:SetPoint("TOPLEFT", p, "TOPLEFT", MARGE, HAUT_LISTE)
-	p.liste:SetPoint("BOTTOMRIGHT", p.fiche, "BOTTOMLEFT", -10, 0)
-	p.liste:SetScript("OnVerticalScroll", function() Dessiner() end)
-	p.liste:HookScript("OnMouseWheel", function() Dessiner() end)
-	p.liste:HookScript("OnSizeChanged", function() Dessiner() end)
-	p.rangees = {}
-	p.vide = UI.Texte(p, "GameFontHighlight", C.gris)
-	p.vide:SetPoint("TOPLEFT", p.liste, "TOPLEFT", 4, -8)
-	p.vide:SetPoint("RIGHT", p.liste, "RIGHT", -4, 0)
-	p.vide:SetWordWrap(true)
-
-	p.Dessiner = Dessiner
+	p.vues = {}
 	p.MajFiche = MajFiche
 	p.Maj = function()
 		local b = Bestiaire()
 		local s = MonScore()
-		Construire()
 		local g = Guilde()
-		local nGuilde = 0
-		for _ in pairs(g and g.d or {}) do nGuilde = nGuilde + 1 end
+		-- entête
+		local rang, nomTitre, suivant = Titre(s.r)
+		p.titreChasseur:Ecrire(nomTitre, C.ors)
 		local d = { ("%sCapturés : %d|r sur %d"):format(VERT, s.k, b.nombre), "vus : " .. s.v, "dépouillés : " .. s.d }
 		if s.hors > 0 then d[#d + 1] = "hors liste : " .. s.hors end
-		if g then d[#d + 1] = "guilde : " .. nGuilde end
+		if g then
+			local nGuilde = 0
+			for _ in pairs(g.d) do nGuilde = nGuilde + 1 end
+			d[#d + 1] = "guilde : " .. nGuilde
+		end
 		p.sous:SetText(table.concat(d, GRIS .. " · |r"))
-		local part = b.nombre > 0 and s.k / b.nombre or 0
-		p.pourcent:SetText((("%.1f %%"):format(100 * part):gsub("%.", ",")))
-		p.barre.plein:SetWidth(math.max(1, 198 * math.min(1, part)))
-		p.liste:Hauteur(#affiches * PAS)
-		Dessiner()
-		p.vide:SetShown(#affiches == 0)
-		p.vide:SetText(recherche ~= "" and "Aucun monstre ne correspond à ta recherche (les monstres inconnus se cherchent par leur zone)."
-			or "Aucun monstre ici.")
-		MajFiche()
+		p.rares:SetText(s.r .. GRIS .. " / " .. b.rares .. " rares et boss|r")
+		p.barre:Poser(b.rares > 0 and s.r / b.rares or 0, COULEUR_RARE)
+		p.prochain:SetText(suivant and ("Prochain titre : %s, à %d"):format(TITRES[rang + 1][2], suivant)
+			or "Tous les rares et boss sont capturés !")
+		-- onglets : les rares et boss de ma carte qui restent à capturer
+		local ici = Recensement((ZonesDeMaCarte()))
+		p.onglets:Compte(1, #ici.rares - ici.raresK)
+		p.onglets:Choisir(etat.onglet)
+		local options = { { "toutes", "Toutes les zones" }, { "ici", "Ma zone" } }
+		if type(etat.zone) == "number" then options[3] = { etat.zone, NomZone(etat.zone) or "Zone choisie" } end
+		p.zone.options = options
+		p.zone:Poser(etat.zone)
+		p.zone:SetShown(etat.onglet <= 2)
+		-- vue de l'onglet (créée à la première visite)
+		local cle = (etat.onglet <= 2) and 1 or etat.onglet
+		if not p.vues[cle] then p.vues[cle] = CREER_VUES[cle](p) end
+		for k, v in pairs(p.vues) do v:SetShown(k == cle) end
+		p.vues[cle].Maj()
 	end
-	-- ns.OuvrirInterface("wowdex", pnj) : la fiche d'un monstre
+	-- ns.OuvrirInterface("wowdex", pnj) : la fiche d'un monstre (avis de recherche pour un rare, sinon bestiaire)
 	p.Ouvrir = function(id)
 		id = tonumber(id)
 		if not id then return end
+		local f = Bestiaire().par[id]
+		local e = Entree(id)
 		choisi = id
+		etat.onglet = RARES[f and f.rang or (e and e.r) or 0] and 1 or 2
+		etat.filtres[1], etat.filtres[2] = 1, 1
+		etat.zone, etat.recherche = "toutes", ""
+		if p.vues[1] then p.vues[1].recherche:Ecrire("") end
 		p.Maj()
 		for i, a in ipairs(affiches) do
 			if (a.hors or a.id) == id then
-				p.liste:SetVerticalScroll(math.max(0, (i - 3) * PAS))
-				Dessiner()
+				Montrer(i)
+				DessinerGrille()
 				break
 			end
 		end
@@ -1426,17 +2594,96 @@ end
 if ns.AjouterPage then ns.AjouterPage("wowdex", CreerPage) end
 
 --------------------------------------------------------------------------------
+-- Losange sur la barre de nom des rares à capturer et des monstres pistés
+--------------------------------------------------------------------------------
+
+local marques = {} -- [cadre de barre de nom] = losange
+
+local function MajPlaque(unite)
+	if not (unite and C_NamePlate and C_NamePlate.GetNamePlateForUnit) then return end
+	local plaque = C_NamePlate.GetNamePlateForUnit(unite)
+	if not plaque then return end
+	local w = Moi()
+	local couleur, pnj
+	if w and w.plaques ~= false then
+		local id = Lire(unite)
+		if id and not UnitIsDead(unite) and Palier(w.m[id]) < 2 then
+			local f = Bestiaire().par[id]
+			local rang = f and f.rang or (w.m[id] and w.m[id].r) or 0
+			if RARES[rang] then
+				couleur, pnj = COULEURS_RANGS[rang], id
+			elseif w.pistes[id] then
+				couleur, pnj = C and C.ors or { 0.945, 0.81, 0.42 }, id
+			end
+		end
+	end
+	local m = marques[plaque]
+	if not couleur then
+		if m then m:Hide(); m.id = nil end
+		return
+	end
+	if not m then
+		m = CreateFrame("Frame", nil, plaque)
+		m:SetSize(11, 11)
+		m:SetFrameLevel((plaque:GetFrameLevel() or 0) + 20)
+		m.t = m:CreateTexture(nil, "OVERLAY")
+		m.t:SetAllPoints()
+		m.t:SetColorTexture(1, 1, 1, 1)
+		if m.t.SetRotation then pcall(m.t.SetRotation, m.t, math.rad(45)) end
+		marques[plaque] = m
+	end
+	m.id = pnj
+	m.t:SetColorTexture(couleur[1], couleur[2], couleur[3], 1)
+	-- à gauche de la barre de vie (le « ! » des quêtes est à droite), sinon à gauche de la barre de nom
+	m:ClearAllPoints()
+	local uf = plaque.UnitFrame
+	local barre = uf and not (uf.IsForbidden and uf:IsForbidden()) and (uf.healthBar or uf.HealthBarsContainer)
+	if barre and barre:IsShown() and uf:IsShown() then
+		m:SetPoint("RIGHT", barre, "LEFT", -6, 0)
+	else
+		m:SetPoint("RIGHT", plaque, "LEFT", 6, 0)
+	end
+	m:Show()
+end
+
+local function RetirerPlaque(unite)
+	local plaque = unite and C_NamePlate and C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit(unite)
+	local m = plaque and marques[plaque]
+	if m then m:Hide(); m.id = nil end
+end
+
+-- un monstre vient d'être capturé : ses losanges disparaissent
+MasquerMarques = function(id)
+	for _, m in pairs(marques) do
+		if m.id == id then m:Hide(); m.id = nil end
+	end
+end
+
+-- réglage ou liste des monstres pistés changés : toutes les barres de nom affichées sont relues
+ns.MajPlaquesWowdex = function()
+	if not (C_NamePlate and C_NamePlate.GetNamePlates) then return end
+	for _, plaque in ipairs(C_NamePlate.GetNamePlates() or {}) do
+		local unite = plaque.namePlateUnitToken or (plaque.UnitFrame and plaque.UnitFrame.unit)
+		if unite then pcall(MajPlaque, unite) end
+	end
+end
+
+--------------------------------------------------------------------------------
 -- /smb diag
 --------------------------------------------------------------------------------
 
 ns.DiagWowdex = function(L)
 	local s = MonScore()
 	local g = Guilde()
-	local nGuilde, nScores = 0, 0
+	local w = Moi()
+	local nGuilde, nScores, nPistes, nReperes = 0, 0, 0, 0
 	for _ in pairs(g and g.d or {}) do nGuilde = nGuilde + 1 end
 	for _ in pairs(g and g.s or {}) do nScores = nScores + 1 end
-	L(("wowdex : %d monstres au bestiaire, moi %d vus / %d capturés / %d dépouillés (%d hors liste), guilde %d capturés, %d scores, sources du butin %s"):format(
-		Bestiaire().nombre, s.v, s.k, s.d, s.hors, nGuilde, nScores,
+	for _ in pairs(g and g.r or {}) do nReperes = nReperes + 1 end
+	for _ in pairs(w and w.pistes or {}) do nPistes = nPistes + 1 end
+	local _, titre = Titre(s.r)
+	L(("wowdex : %d monstres au bestiaire dont %d rares et boss, moi %d vus / %d capturés / %d dépouillés (%d hors liste), %d rares et boss (%s), %d pistés, guilde %d capturés, %d scores, %d rares repérés, sources du butin %s"):format(
+		Bestiaire().nombre, Bestiaire().rares, s.v, s.k, s.d, s.hors, s.r, titre, nPistes, nGuilde, nScores, nReperes,
 		GetLootSourceInfo and "oui" or "non"))
 end
 
@@ -1446,7 +2693,7 @@ end
 
 local ev = CreateFrame("Frame")
 for _, nom in ipairs({ "PLAYER_ENTERING_WORLD", "UPDATE_MOUSEOVER_UNIT", "PLAYER_TARGET_CHANGED",
-	"NAME_PLATE_UNIT_ADDED", "LOOT_OPENED" }) do
+	"NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "LOOT_OPENED" }) do
 	pcall(ev.RegisterEvent, ev, nom)
 end
 -- (mort de la cible pendant qu'elle est ciblée : aucun changement de cible)
@@ -1463,6 +2710,9 @@ ev:SetScript("OnEvent", function(_, evenement, unite, _, sort)
 		pcall(Observer, "target")
 	elseif evenement == "NAME_PLATE_UNIT_ADDED" then
 		pcall(Vu, unite)
+		pcall(MajPlaque, unite)
+	elseif evenement == "NAME_PLATE_UNIT_REMOVED" then
+		pcall(RetirerPlaque, unite)
 	elseif evenement == "UNIT_HEALTH" or evenement == "UNIT_HEALTH_FREQUENT" then
 		if UnitIsDead("target") then pcall(Observer, "target") end
 	elseif evenement == "UNIT_SPELLCAST_SUCCEEDED" then
