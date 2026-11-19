@@ -35,7 +35,9 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   `ns.Notifier(catégorie, titre, texte, son, action)`.
 - `GuildUp_Style.lua` : **kit d'interface** `ns.UI` (couleurs `UI.C`, `Bouton`, `BoutonAlerte`, `Carte`, `Rangee`,
   `Onglets`, `Puces`, `Liste`, `Champ`, `Case`, `Choix`, `Places`, `Portrait`…). Toute nouvelle interface passe par lui (style sombre et
-  doré des maquettes) : pas de modèle du jeu (`UIPanelButtonTemplate`, parchemins…) dans les pages.
+  doré des maquettes) : pas de modèle du jeu (`UIPanelButtonTemplate`, parchemins…) dans les pages. Depuis la 7.2.0, des
+  surfaces plutôt que des cadres : `C.bord` est à peine visible, un élément choisi a le fond `C.actif` et le trait doré
+  `UI.Accent` à gauche (menu, `Rangee:Fort`), un élément cliquable au repos le fond `C.voile` ; l'or reste aux accents.
 - `GuildUp_Interface.lua` : fenêtre principale (style sombre et doré : `Habiller`, `Bouton`, `CarteAccueil`…),
   menu des sections et page Accueil ; `ns.OuvrirInterface(page)`, `ns.MajInterface()`, `ns.NouveautesGuilde()`.
   Un module fournit sa page avec `ns.AjouterPage(id, creer)` (`creer(parent)` renvoie un cadre avec `Maj()` et

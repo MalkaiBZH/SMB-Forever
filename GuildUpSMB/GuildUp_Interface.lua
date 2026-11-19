@@ -474,8 +474,11 @@ local function MajEntete()
 	for _, b in ipairs(boutonsMenu) do
 		local s = b.section
 		local actif = (s.id == pageActive)
+		-- (section ouverte : fond plus clair, trait doré à gauche, icône en couleurs ; les autres en gris)
 		b:SetBackdropColor(unpack(actif and C.actif or { 0, 0, 0, 0 }))
-		b:SetBackdropBorderColor(unpack(actif and { 0.35, 0.29, 0.17, 1 } or { 0, 0, 0, 0 }))
+		b.accent:SetShown(actif)
+		if b.icone.SetDesaturated then pcall(b.icone.SetDesaturated, b.icone, not actif) end
+		b.icone:SetAlpha(actif and 1 or 0.75)
 		b.texte:SetTextColor(unpack(actif and C.ors or C.texte))
 		if b.pastille then b.pastille:Ecrire(s.badge and s.badge() or 0) end
 	end
@@ -520,6 +523,7 @@ local function ElementMenu(parent, s, y)
 	b.texte = Texte(b, "GameFontHighlight", C.texte)
 	b.texte:SetPoint("LEFT", b.icone, "RIGHT", 10, 0)
 	b.texte:SetText(s.nom)
+	b.accent = UI.Accent(b, 3)
 	b.pastille = false
 	if s.badge then
 		b.pastille = Pastille(b, s.neutre)
@@ -536,7 +540,7 @@ end
 
 local function CreerFenetre()
 	local f = CreateFrame("Frame", "GuildUpInterface", UIParent, "BackdropTemplate")
-	Habiller(f, C.fond, C.bordFort)
+	Habiller(f, C.fond, C.bordMoyen)
 	f:SetSize(LARGEUR, HAUTEUR)
 	f:SetScale(Echelle())
 	f:SetFrameStrata("HIGH")

@@ -1,4 +1,6 @@
 -- GuildUpSMB : kit d'interface de la fenêtre GuildUpSMB (style sombre et doré des maquettes).
+-- Depuis la 7.2.0, des surfaces plutôt que des cadres : les bordures sont à peine visibles, un élément choisi
+-- se reconnaît à son fond plus clair et à un trait doré à gauche, l'or est gardé pour les accents.
 -- Tous les éléments graphiques des pages viennent d'ici (ns.UI) : couleurs, cadres plats, textes,
 -- boutons (or, fantôme, aide, alerte avec icône), pastilles, cartes, rangées, onglets soulignés, puces de filtre, liste
 -- défilante, champ de saisie, case à cocher, liste de choix, curseur, places par rôle, portrait de joueur.
@@ -17,15 +19,16 @@ local ANNEAU = MEDIA .. "anneau"  -- anneau blanc (Miko), teinté
 UI.ROND, UI.ANNEAU = ROND, ANNEAU
 
 UI.C = {
-	fond      = { 0.082, 0.071, 0.055, 0.97 },
-	bandeau   = { 0.067, 0.055, 0.043, 1 },
-	menu      = { 0.071, 0.059, 0.047, 1 },
-	carte     = { 0.114, 0.098, 0.078, 1 },
-	champ     = { 0.067, 0.055, 0.043, 1 },
-	bord      = { 0.227, 0.192, 0.141, 1 },
-	bordMoyen = { 0.35, 0.29, 0.17, 1 },
+	fond      = { 0.078, 0.068, 0.055, 0.98 },
+	bandeau   = { 0.055, 0.047, 0.039, 1 },
+	menu      = { 0.059, 0.051, 0.042, 1 },
+	carte     = { 0.118, 0.103, 0.084, 1 },  -- surface posée sur le fond
+	champ     = { 0.051, 0.044, 0.036, 1 },
+	bord      = { 0.168, 0.147, 0.118, 1 },  -- à peine visible : contour des surfaces, filets
+	bordMoyen = { 0.31, 0.26, 0.165, 1 },    -- boutons secondaires, éléments choisis
 	bordFort  = { 0.42, 0.33, 0.19, 1 },
-	actif     = { 0.165, 0.133, 0.086, 1 },
+	actif     = { 0.185, 0.157, 0.112, 1 },  -- fond d'un élément choisi
+	voile     = { 1, 1, 1, 0.035 },          -- fond d'un élément cliquable au repos (puce, bouton secondaire)
 	ors       = { 0.945, 0.81, 0.42 },
 	orFonce   = { 0.85, 0.66, 0.25 },
 	texte     = { 0.91, 0.886, 0.83 },
@@ -135,7 +138,7 @@ function UI.Bouton(parent, texte, style, largeur, hauteur)
 		b.texte:SetFontObject("GameFontNormal")
 		b.texte:SetTextColor(unpack(C.aide))
 	else
-		UI.Habiller(b, { 0, 0, 0, 0 }, C.bordMoyen)
+		UI.Habiller(b, C.voile, C.bordMoyen)
 		b.texte:SetTextColor(unpack(C.ors))
 	end
 	Survol(b)
@@ -182,7 +185,7 @@ end
 function UI.Fermer(parent, fermer, taille)
 	taille = taille or 28
 	local b = CreateFrame("Button", nil, parent, "BackdropTemplate")
-	UI.Habiller(b, { 0, 0, 0, 0 }, C.bordMoyen)
+	UI.Habiller(b, { 0, 0, 0, 0 }) -- (pas de cadre : la croix seule, éclairée au survol)
 	b:SetSize(taille, taille)
 	local tourne = true
 	for _, angle in ipairs({ 45, -45 }) do
@@ -240,13 +243,29 @@ function UI.Carte(parent, titre)
 	return c
 end
 
--- rangée cliquable façon carte (une ligne de liste) ; fortes = bordure dorée (mise en avant)
+-- trait doré à gauche d'un élément choisi (caché au départ)
+function UI.Accent(cadre, largeur)
+	local t = cadre:CreateTexture(nil, "OVERLAY")
+	t:SetColorTexture(C.orFonce[1], C.orFonce[2], C.orFonce[3], 1)
+	t:SetWidth(largeur or 2)
+	t:SetPoint("TOPLEFT", cadre, "TOPLEFT", 0, 0)
+	t:SetPoint("BOTTOMLEFT", cadre, "BOTTOMLEFT", 0, 0)
+	t:Hide()
+	return t
+end
+
+-- rangée cliquable façon carte (une ligne de liste) ; forte = choisie ou mise en avant : fond plus clair et
+-- trait doré à gauche
 function UI.Rangee(parent, hauteur)
 	local r = CreateFrame("Button", nil, parent, "BackdropTemplate")
 	UI.Habiller(r, C.carte, C.bord)
 	r:SetHeight(hauteur or 64)
 	Survol(r, 0.04)
-	r.Fort = function(self, oui) self:SetBackdropBorderColor(unpack(oui and C.bordMoyen or C.bord)) end
+	r.accent = UI.Accent(r)
+	r.Fort = function(self, oui)
+		self:SetBackdropColor(unpack(oui and C.actif or C.carte))
+		self.accent:SetShown(oui and true or false)
+	end
 	return r
 end
 
@@ -377,7 +396,7 @@ function UI.Puces(parent, noms, choisir)
 	local x = 0
 	for i, nom in ipairs(noms) do
 		local b = CreateFrame("Button", nil, p, "BackdropTemplate")
-		UI.Habiller(b, { 0, 0, 0, 0 }, C.bord)
+		UI.Habiller(b, C.voile)
 		b.texte = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 		b.texte:SetPoint("CENTER")
 		b.texte:SetText(nom)
@@ -394,8 +413,8 @@ function UI.Puces(parent, noms, choisir)
 	p.Choisir = function(self, i)
 		for j, b in ipairs(self.boutons) do
 			local oui = (j == i)
-			b:SetBackdropColor(unpack(oui and C.actif or { 0, 0, 0, 0 }))
-			b:SetBackdropBorderColor(unpack(oui and C.bordMoyen or C.bord))
+			b:SetBackdropColor(unpack(oui and C.actif or C.voile))
+			b:SetBackdropBorderColor(unpack(oui and C.bordMoyen or { 0, 0, 0, 0 }))
 			b.texte:SetTextColor(unpack(oui and C.ors or C.texte))
 		end
 	end
