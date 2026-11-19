@@ -135,8 +135,17 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "7.4.0", "7.3.0", "7.2.0", "7.1.1", "7.1.0", "7.0.0", "6.0.0", "5.5.0", "5.4.0", "5.3.1", "5.3.0", "5.2.0", "5.1.1", "5.1.0", "5.0.0", "4.3.2", "4.3.1", "4.3.0", "4.2.0", "4.1.0", "4.0.6", "4.0.5", "4.0.4", "4.0.3", "4.0.2", "4.0.1", "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "7.5.1", "7.5.0", "7.4.0", "7.3.0", "7.2.0", "7.1.1", "7.1.0", "7.0.0", "6.0.0", "5.5.0", "5.4.0", "5.3.1", "5.3.0", "5.2.0", "5.1.1", "5.1.0", "5.0.0", "4.3.2", "4.3.1", "4.3.0", "4.2.0", "4.1.0", "4.0.6", "4.0.5", "4.0.4", "4.0.3", "4.0.2", "4.0.1", "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["7.5.1"] = {
+		"Le |cffffd100« ! »|r des objectifs de quête ne s'affiche plus sur des monstres sans rapport avec tes quêtes. Les données décrivent parfois une quête avec plus d'objectifs que le jeu n'en montre : les monstres de ces objectifs en trop étaient marqués en permanence.",
+	},
+	["7.5.0"] = {
+		"|cffffd100WoWdex|r : bouton |cffffd100« Y aller »|r sur la fiche d'un rare repéré depuis moins d'une heure. Il pose le repère du jeu à l'endroit du repérage et ouvre la carte.",
+		"|cffffd100WoWdex|r : la fiche d'un rare dit quand un membre l'a |cffffd100tué|r pour la dernière fois, pour savoir s'il a eu le temps de réapparaître. Un rare tué depuis son repérage n'est plus signalé comme repéré.",
+		"|cffffd100WoWdex|r : distances ! La fiche donne la distance de l'apparition la plus proche et celle du repérage ; le carnet de chasse, celle de chaque monstre pisté.",
+		"|cffffd100WoWdex|r : passe la souris sur « Vu », « Capturé » ou « Dépouillé » dans une fiche pour lire ce que veut dire chaque palier.",
+	},
 	["7.4.0"] = {
 		"|cffffd100Fenêtre SMB Forever|r plus grande, pour donner de la place à toutes les pages. L'accueil montre une ligne de plus dans chaque carte ; le WoWdex affiche 35 monstres à la fois, quatre rares par ligne, et un butin plus long dans la fiche.",
 		"Elle tient toujours dans l'écran : si ton écran est petit ou si l'interface de ton jeu est agrandie, sa taille se réduit toute seule. Le réglage « Taille de la fenêtre » des options (ou /smb taille) reste là pour l'ajuster.",

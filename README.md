@@ -158,7 +158,10 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   objets particuliers tirés de QuestieDB, et taux de drop de toute la guilde, mesurés à chaque corps fouillé par un
   membre (« 34 % », 212 corps fouillés par 5 membres ; le dépeçage et le vol à la tire ne comptent pas). Trois
   boutons : « Pister » (10 monstres au plus), « Sur la carte », « Lier » (dans la discussion). La recherche trouve
-  aussi un objet : les monstres qui le lâchent, ceux où la guilde l'a trouvé en premier.
+  aussi un objet : les monstres qui le lâchent, ceux où la guilde l'a trouvé en premier. La fiche donne aussi la
+  distance de l'apparition la plus proche, et pour un rare : qui l'a repéré et quand (bouton « Y aller » pendant
+  une heure : le repère du jeu est posé à cet endroit), qui l'a tué en dernier et quand. Une infobulle explique
+  chaque ligne (vu, capturé, dépouillé…).
 
   **Rare en vue !** Quand un rare ou un rare élite que tu n'as pas capturé apparaît près de toi (barre de nom,
   cible, survol), une alerte sonne ; la guilde est prévenue, et les membres à qui il manque reçoivent une bulle

@@ -129,7 +129,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   `GuildUpLay` (layers, `GuildUp_Layers.lua` : signature des GUID des PNJ observés, comparée entre membres de la
   même carte ; demande d'invitation en chuchotement d'addon), `GuildUpDex` (WoWdex, `GuildUp_Wowdex.lua` : captures
   `N`, relevés de butin `B` (totaux de chaque membre, fusionnés au plus grand : le taux de la guilde est leur somme),
-  scores `S`, rares et boss capturés `C`, rare en vue `V`, rattrapage des premières captures `Q`/`E`, des scores `T`/`U`
+  scores `S`, rares et boss capturés `C`, rare en vue `V`, rare tué `K`, rattrapage des premières captures `Q`/`E`, des scores `T`/`U`
   et des relevés `P`/`R`/`F` par le relais à la connexion ; un champ de plus ne s'ajoute jamais à un message existant,
   que les anciennes versions ne liraient plus : il part dans un nouveau genre, qu'elles ignorent).
   Exception : `GuildUpObj` (`GuildUp_Objectifs.lua`, « ! » des ennemis de quête) passe par `PARTY` / `RAID`.

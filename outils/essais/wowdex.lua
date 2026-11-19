@@ -64,6 +64,9 @@ Etape("capture du rare : bulle, fil d'activité, losange retiré", function()
 	assert(#bulles == avant + 1, "pas de bulle de capture")
 	print("      " .. bulles[#bulles].titre .. " / " .. bulles[#bulles].texte:gsub("\n", " | "))
 	assert(activite[#activite] and activite[#activite]:find("^W "), "pas de première dans le fil")
+	local mort = false
+	for _, m in ipairs(envoyes) do if m:find("^K~") then mort = m end end
+	assert(mort and db.wowdexGuilde["Donjons et Dindons"].morts[rare.id], "la mort du rare n'est pas annoncée")
 	OnEvent(ev, "NAME_PLATE_UNIT_REMOVED", "nameplate1")
 end)
 Etape("messages reçus : scores, rares, repérage, captures, relais", function()
@@ -81,6 +84,30 @@ Etape("messages reçus : scores, rares, repérage, captures, relais", function()
 		print("      " .. bulles[#bulles].titre .. " / " .. bulles[#bulles].texte:gsub("\n", " | "))
 		ecouteur("GuildUpDex", "N~" .. ns.Base36(rare2.id) .. "," .. ns.Base36(boss.id), "GUILD", "Tarkh-Forever")
 		ecouteur("GuildUpDex", "N~" .. ns.Base36(rare2.id), "GUILD", "Brindille-Forever")
+		-- la fiche d'un rare repéré : « Y aller », lignes expliquées au survol, puis sa mort annoncée par un membre
+		Etape("fiche d'un rare repéré : « Y aller », infobulles, mort annoncée", function()
+			page.Ouvrir(rare2.id)
+			local fiche = page.fiche
+			assert(fiche.yAller.__montre and fiche.yAller.point, "pas de bouton « Y aller »")
+			fiche.yAller.__scripts.OnClick(fiche.yAller)
+			fiche.carte.__scripts.OnClick(fiche.carte)
+			local lignes = {}
+			for _, r in ipairs(fiche.rangs) do
+				if r.cle.__montre then
+					lignes[#lignes + 1] = r.cle.__texte .. " = " .. r.val.__texte
+					r.survol.__scripts.OnEnter(r.survol)
+				end
+			end
+			print("      " .. table.concat(lignes, " | "))
+			client.Avancer(60)
+			ecouteur("GuildUpDex", "K~" .. ns.Base36(rare2.id), "GUILD", "Tarkh-Forever")
+			page.Ouvrir(rare2.id)
+			assert(not fiche.yAller.__montre, "« Y aller » reste après la mort du rare")
+			local tue = false
+			for _, r in ipairs(fiche.rangs) do if r.cle.__montre and r.cle.__texte == "Tué" then tue = r.val.__texte end end
+			assert(tue, "pas de ligne « Tué »")
+			print("      Tué = " .. tue)
+		end)
 		print("      fil : " .. table.concat(activite, " ; "))
 	end
 	ecouteur("GuildUpDex", "Q~0", "GUILD", "Brindille-Forever")

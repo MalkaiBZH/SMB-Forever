@@ -109,6 +109,26 @@ local function ObjectifDuGenre(q, genre, k)
 	end
 end
 
+-- combien d'objectifs de ce genre le jeu donne pour cette quête
+local function NombreObjectifs(q, genre)
+	local n = 0
+	for _, o in ipairs(q.objectifs) do
+		if o.genre == genre then n = n + 1 end
+	end
+	return n
+end
+
+-- Ce groupe des données compte-t-il ? Les données décrivent parfois plus d'objectifs que le journal
+-- n'en montre (quête découpée autrement sur ce serveur, objectif rangé dans un autre genre par le
+-- jeu) : sans objectif correspondant, le groupe ne compte pas, sinon ses monstres porteraient le
+-- « ! » en permanence pour un objectif que je n'ai pas. Exception : si le jeu ne donne aucun objectif
+-- de ce genre (journal illisible), on garde tout, comme avant.
+local function GroupeCompte(q, genre, k, total)
+	local o = ObjectifDuGenre(q, genre, k)
+	if o then return not o.fini end
+	return total == 0
+end
+
 local mesPnj = {}        -- [numéro de PNJ] = true : monstres dont j'ai besoin (données + journal)
 local textesATuer = {}   -- secours : textes de mes objectifs « à tuer » pas terminés
 
@@ -124,15 +144,14 @@ local function CalculerMesBesoins()
 		end
 		local d = not q.complete and DonneesQuete(q.id)
 		if d then
+			local nTuer, nButin = NombreObjectifs(q, "monster"), NombreObjectifs(q, "item")
 			for k, ids in ipairs(d.tuer) do
-				local o = ObjectifDuGenre(q, "monster", k)
-				if not (o and o.fini) then
+				if GroupeCompte(q, "monster", k, nTuer) then
 					for _, id in ipairs(ids) do pnj[id] = true end
 				end
 			end
 			for k, b in ipairs(d.butin) do
-				local o = ObjectifDuGenre(q, "item", k)
-				if not (o and o.fini) then
+				if GroupeCompte(q, "item", k, nButin) then
 					for _, id in ipairs(b.pnj) do pnj[id] = true end
 				end
 			end
