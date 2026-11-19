@@ -85,7 +85,8 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   l'infobulle du jeu (`C_TooltipInfo.GetUnit`) ; listes des coéquipiers reçues sur `PARTY` / `RAID` (`GuildUpObj`).
 - `GuildUp_Wowdex.lua` : page **WoWdex** (`ns.AjouterPage("wowdex")`, `/smb wowdex`) : le bestiaire de
   `GuildUp_Bestiaire.lua` à compléter (vu, capturé = vaincu, dépouillé), détection sur les barres de nom, la cible, le
-  survol, `PARTY_KILL` du journal de combat et `LOOT_OPENED` (`GetLootSourceInfo`) ; monstres hors bestiaire appris
+  survol et `LOOT_OPENED` (`GetLootSourceInfo`) ; pas de journal de combat (`COMBAT_LOG_EVENT_UNFILTERED` est interdit
+  aux addons sur ce client : l'enregistrer, même sous `pcall`, affiche une erreur) ; monstres hors bestiaire appris
   sur l'unité ; butin des récoltes (dépeçage, vol à la tire…) ignoré ; recherche par monstre, zone ou objet ; ligne dans
   l'infobulle des monstres ; `ns.NomWowdex(pnj)` (fil d'activité, genre `W`), `ns.SourcesWowdex(objet)` (Encyclopédie).
 - `GuildUp_Config.lua` : **réglages propres à la guilde** (`ns.Config` : nom public, cri de guilde, emote animée,

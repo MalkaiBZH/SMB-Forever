@@ -3,8 +3,9 @@
 -- Le bestiaire (ns.BESTIAIRE, GuildUp_Bestiaire.lua, généré depuis QuestieDB) numérote les monstres de Forever
 -- du plus faible au plus fort. Chaque monstre a trois paliers, comme dans un Pokédex :
 --   vu        barre de nom, cible ou survol d'un monstre qu'on peut attaquer : son nom et son modèle s'affichent
---   vaincu    (« capturé ») tué par moi ou mon groupe (PARTY_KILL du journal de combat, sinon cible ou survol
---             d'un corps qui n'est pas « pris par un autre »), ou dépouillé
+--   vaincu    (« capturé ») tué par moi ou mon groupe : cible ou survol d'un corps qui n'est pas « pris par un
+--             autre », ou dépouillé. (Pas de journal de combat : le client interdit aux addons d'écouter
+--             COMBAT_LOG_EVENT_UNFILTERED ; le demander, même sous pcall, affiche une erreur d'addon.)
 --   dépouillé fouillé : ce qu'il a lâché est compté, pour donner les taux de butin. Pas le butin d'une récolte
 --             (dépeçage, vol à la tire, minage, herboristerie : sort lancé moins de 2 s avant l'ouverture du
 --             butin, reconnu à son numéro ou à son nom), ni celui d'un monstre ciblé encore vivant
@@ -577,15 +578,6 @@ local function Observer(unite)
 	if UnitIsDead(unite) and UnitIsTapDenied and not UnitIsTapDenied(unite) then
 		Vaincre(id, UnitGUID(unite), unite)
 	end
-end
-
--- journal de combat : un membre de mon groupe (ou moi) donne le coup de grâce
-local function JournalCombat()
-	if not CombatLogGetCurrentEventInfo then return end
-	local ok, _, evenement, _, _, _, _, _, guid = pcall(CombatLogGetCurrentEventInfo)
-	if not ok or Secrete(evenement) or evenement ~= "PARTY_KILL" then return end
-	local id = PnjDuGuid(guid)
-	if id then Vaincre(id, guid) end
 end
 
 --------------------------------------------------------------------------------
@@ -1443,9 +1435,9 @@ ns.DiagWowdex = function(L)
 	local nGuilde, nScores = 0, 0
 	for _ in pairs(g and g.d or {}) do nGuilde = nGuilde + 1 end
 	for _ in pairs(g and g.s or {}) do nScores = nScores + 1 end
-	L(("wowdex : %d monstres au bestiaire, moi %d vus / %d capturés / %d dépouillés (%d hors liste), guilde %d capturés, %d scores, journal de combat %s, sources du butin %s"):format(
+	L(("wowdex : %d monstres au bestiaire, moi %d vus / %d capturés / %d dépouillés (%d hors liste), guilde %d capturés, %d scores, sources du butin %s"):format(
 		Bestiaire().nombre, s.v, s.k, s.d, s.hors, nGuilde, nScores,
-		CombatLogGetCurrentEventInfo and "oui" or "non", GetLootSourceInfo and "oui" or "non"))
+		GetLootSourceInfo and "oui" or "non"))
 end
 
 --------------------------------------------------------------------------------
@@ -1454,7 +1446,7 @@ end
 
 local ev = CreateFrame("Frame")
 for _, nom in ipairs({ "PLAYER_ENTERING_WORLD", "UPDATE_MOUSEOVER_UNIT", "PLAYER_TARGET_CHANGED",
-	"NAME_PLATE_UNIT_ADDED", "LOOT_OPENED", "COMBAT_LOG_EVENT_UNFILTERED" }) do
+	"NAME_PLATE_UNIT_ADDED", "LOOT_OPENED" }) do
 	pcall(ev.RegisterEvent, ev, nom)
 end
 -- (mort de la cible pendant qu'elle est ciblée : aucun changement de cible)
@@ -1465,9 +1457,7 @@ if not pcall(ev.RegisterUnitEvent, ev, "UNIT_HEALTH", "target") then
 end
 local premiere = true
 ev:SetScript("OnEvent", function(_, evenement, unite, _, sort)
-	if evenement == "COMBAT_LOG_EVENT_UNFILTERED" then
-		JournalCombat()
-	elseif evenement == "UPDATE_MOUSEOVER_UNIT" then
+	if evenement == "UPDATE_MOUSEOVER_UNIT" then
 		pcall(Observer, "mouseover")
 	elseif evenement == "PLAYER_TARGET_CHANGED" then
 		pcall(Observer, "target")
