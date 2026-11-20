@@ -21,6 +21,7 @@ Usage :
 
 Lignes produites (format inchangé : les lecteurs existants n'ont pas à bouger) :
   objets : id|marchands|butin (les plus répandus)|nombre total de monstres|récolte|contenants|quêtes
+  récompenses : quête|argent en pièces de cuivre|XP|nombre d'objets au choix (0 = récompense imposée)
   pnj    : id|nom|niv min|niv max|zone principale|faction (A, H, AH)|positions x,y;x,y (0-100)|sous-titre|rang
   récolte: id|nom|zone:nombre:x,y;x,y#zone:…
   zones  : id|nom|carte du monde        quêtes : id|nom
@@ -106,10 +107,14 @@ def champ(p, i, d):
 
 # ---------------------------------------------------------------- ForeverDB
 
-def table_db(textes, nom):
-    """Une table de ForeverDB : { clé : « contenu entre accolades » }."""
+def table_db(textes, nom, imbrique=False):
+    """Une table de ForeverDB : { clé : « contenu entre accolades » }.
+
+    imbrique : la valeur contient elle-même des accolades (qrw), il faut alors aller jusqu'au bout de la
+    ligne et non jusqu'à la première fermante.
+    """
     bloc = re.compile(r"local t = D\.%s\b(.*?)(?=;\(function\(\) local t = D\.|\nD\.|\Z)" % nom, re.S)
-    entree = re.compile(r"^t\[(\d+)\]=\{([^}]*)\}", re.M)
+    entree = re.compile(r"^t\[(\d+)\]=\{(.*)\}\s*$" if imbrique else r"^t\[(\d+)\]=\{([^}]*)\}", re.M)
     out, trouve = {}, False
     for texte in textes:
         for b in bloc.finditer(texte):
@@ -269,6 +274,8 @@ def construire(ref, ref_db):
     odrop = dict((k, paires(v)) for k, v in table_db(textes_db, "odrop").items())
     idrop = dict((k, paires(v)) for k, v in table_db(textes_db, "idrop").items())
     rew = dict((k, nombres(v)) for k, v in table_db(textes_db, "rew").items())
+    # qrw : [quête] = { argent en cuivre, XP, { objets au choix }, { objets imposés } }
+    qrw = table_db(textes_db, "qrw", imbrique=True)
 
     # rew est rangée par objet et donne les quêtes qui le récompensent (rew[60]={6} = l'objet 60 vient
     # de la quête 6), comme le champ « quêtes » du fichier d'origine.
@@ -355,6 +362,20 @@ def construire(ref, ref_db):
     noms_quetes = fr.get("quest", {})
     lignes_quetes = ["%d|%s" % (q, propre(noms_quetes[q])) for q in sorted(vus_quetes) if q in noms_quetes]
 
+    # --- récompenses des quêtes citées : ce que le jeu ne dit pas avant d'avoir la quête
+    lignes_recompenses = []
+    for q in sorted(vus_quetes):
+        brut = qrw.get(q)
+        if not brut:
+            continue
+        tete = re.match(r"\s*(\d+)\s*,\s*(\d+)", brut)
+        listes = re.findall(r"\{([^}]*)\}", brut)
+        argent = int(tete.group(1)) if tete else 0
+        xp = int(tete.group(2)) if tete else 0
+        choix = len(nombres(listes[0])) if listes else 0
+        if argent or xp or choix:
+            lignes_recompenses.append("%d|%d|%d|%d" % (q, argent, xp, choix))
+
     # --- ce que l'export d'origine savait et que les bases ne redonnent pas
     for nom, lignes in (("PNJ", lignes_pnj), ("RECOLTE", lignes_recolte), ("QUETES", lignes_quetes)):
         connus = set(int(l.split("|")[0]) for l in lignes)
@@ -382,10 +403,11 @@ def construire(ref, ref_db):
             continue
         lignes_zones.append("%d|%s|%s" % (z, nom, carte))
 
-    return (lignes_objets, lignes_pnj, lignes_recolte, lignes_zones, lignes_quetes, manquantes)
+    return (lignes_objets, lignes_pnj, lignes_recolte, lignes_zones, lignes_quetes,
+            lignes_recompenses, manquantes)
 
 
-def contenu(ref, ref_db, objets, pnj, recolte, zones, quetes):
+def contenu(ref, ref_db, objets, pnj, recolte, zones, quetes, recompenses):
     return ("-- GuildUpSMB : d'où viennent les objets (marchands, butin, récolte, contenants, quêtes).\n"
             "-- FICHIER GÉNÉRÉ par outils/generer_sources.py : ne pas modifier à la main.\n"
             "-- Relations (qui vend, qui lâche, où ça se récolte, quelle quête le donne) : base ForeverDB\n"
@@ -397,6 +419,7 @@ def contenu(ref, ref_db, objets, pnj, recolte, zones, quetes):
             "-- pnj    : id|nom|niv min|niv max|zone principale|faction (A, H, AH)|positions x,y;x,y (0-100)"
             "|sous-titre|rang (0 normal, 1 élite, 2 rare élite, 3 boss, 4 rare)\n"
             "-- récolte: id|nom|zone:nombre:x,y;x,y#zone:…   zones : id|nom|carte du monde   quêtes : id|nom\n"
+            "-- récompenses : quête|argent en cuivre|XP|nombre d'objets au choix (0 = récompense imposée)\n"
             "\n"
             "local NOM_ADDON, ns = ...\n"
             "\n"
@@ -408,9 +431,11 @@ def contenu(ref, ref_db, objets, pnj, recolte, zones, quetes):
             "\n"
             "ns.SOURCES_ZONES = [==[\n%s\n]==]\n"
             "\n"
-            "ns.SOURCES_QUETES = [==[\n%s\n]==]\n") % (
+            "ns.SOURCES_QUETES = [==[\n%s\n]==]\n"
+            "\n"
+            "ns.SOURCES_RECOMPENSES = [==[\n%s\n]==]\n") % (
         ref_db, ref, date.today().isoformat(), "\n".join(objets), "\n".join(pnj),
-        "\n".join(recolte), "\n".join(zones), "\n".join(quetes))
+        "\n".join(recolte), "\n".join(zones), "\n".join(quetes), "\n".join(recompenses))
 
 
 def main():
@@ -422,9 +447,9 @@ def main():
         ref = args[args.index("--ref") + 1]
     if "--ref-db" in args:
         ref_db = args[args.index("--ref-db") + 1]
-    objets, pnj, recolte, zones, quetes, manquantes = construire(ref, ref_db)
-    print("%d objets, %d PNJ, %d points de récolte, %d zones, %d quêtes"
-          % (len(objets), len(pnj), len(recolte), len(zones), len(quetes)))
+    objets, pnj, recolte, zones, quetes, recompenses, manquantes = construire(ref, ref_db)
+    print("%d objets, %d PNJ, %d points de récolte, %d zones, %d quêtes, %d récompenses"
+          % (len(objets), len(pnj), len(recolte), len(zones), len(quetes), len(recompenses)))
     if manquantes:
         print("%d zone(s) sans nom français, ignorée(s) : %s" % (len(manquantes), manquantes[:20]))
         print("  les ajouter à ZONES_FR en tête de ce script pour qu'elles apparaissent")
@@ -434,7 +459,7 @@ def main():
             return
         actuel = open(SORTIE, encoding="utf-8").read()
         for nom, lignes in (("OBJETS", objets), ("PNJ", pnj), ("RECOLTE", recolte),
-                            ("ZONES", zones), ("QUETES", quetes)):
+                            ("ZONES", zones), ("QUETES", quetes), ("RECOMPENSES", recompenses)):
             cle = "ns.SOURCES_%s = [==[" % nom
             if cle not in actuel:
                 print("  %-8s absent du fichier actuel" % nom)
@@ -445,7 +470,7 @@ def main():
                   % (nom, len(neuves) - len(vieilles), len(neuves - vieilles), len(vieilles - neuves)))
         return
     with open(SORTIE, "w", encoding="utf-8") as f:
-        f.write(contenu(ref, ref_db, objets, pnj, recolte, zones, quetes))
+        f.write(contenu(ref, ref_db, objets, pnj, recolte, zones, quetes, recompenses))
     print("écrit :", SORTIE)
 
 

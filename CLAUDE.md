@@ -169,7 +169,9 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   fichier existant et fusionne** : l'export d'origine (11 novembre) connaît des sources que ForeverDB n'a
   pas, et les noms de zones ne sont traduits par aucune des deux bases. Ne jamais partir d'un fichier vide.
   Une zone nouvelle sort sans nom français et est signalée : l'ajouter à `ZONES_FR` en tête du script.
-  `--verifier` compare sans rien écrire.
+  `--verifier` compare sans rien écrire. `ns.SOURCES_RECOMPENSES` (`quête|argent en cuivre|XP|nombre
+  d'objets au choix`) vient de la table `qrw`, dont les valeurs contiennent elles-mêmes des accolades :
+  `table_db(..., imbrique=True)` va jusqu'au bout de la ligne, sinon les objets au choix sont perdus.
 - `GuildUp_ObjectifsQuetes.lua` (`ns.OBJECTIFS_QUETES` : pour chaque quête, monstres à tuer et monstres qui
   lâchent les objets demandés, dans l'ordre des objectifs du jeu) : généré par `python outils/generer_objectifs.py`
   depuis QuestieDB (`data/Forever` du dépôt Questie/QuestieDB, GPL-3.0 ; `--ref` pour une version précise,

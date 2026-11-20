@@ -140,6 +140,7 @@ local NOTES = {
 	["7.6.1"] = {
 		"Les |cffffd100taux de butin|r du WoWdex sont maintenant dans l'addon : rien à installer, rien à télécharger, ils arrivent avec la mise à jour comme le bestiaire. Ils viennent de la base ForeverDB, qui réunit QuestieDB, VMaNGOS, cMaNGOS et pfQuest.",
 		"L'|cffffd100Encyclopédie|r en sait bien plus : elle connaît maintenant d'où viennent |cffffd10017 856 objets|r au lieu de 8 259, dont 1 504 qu'on ne savait pas où acheter. Marchands, butin, récolte, contenants et quêtes : rien de ce qu'elle savait n'a été perdu, tout a été complété.",
+		"Quand un objet vient d'une |cffffd100quête|r, l'Encyclopédie dit maintenant ce qu'elle rapporte et s'il faudra le |cffffd100choisir|r parmi plusieurs récompenses. Le jeu ne te le dit qu'une fois la quête prise : là, tu le sais avant de partir.",
 		"Le |cffffd100programme de mise à jour|r se renouvelle maintenant tout seul, comme l'addon : plus besoin de le retélécharger à la main quand il change. Sa nouvelle version prend la main au lancement suivant.",
 	},
 	["7.6.0"] = {

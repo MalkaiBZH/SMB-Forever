@@ -163,7 +163,7 @@ end
 
 local function Sources()
 	if sources then return sources end
-	sources = { zones = {}, quetes = {} }
+	sources = { zones = {}, quetes = {}, recompenses = {} }
 	local VIDE = {} -- liste vide partagée (jamais modifiée)
 	local function ids(t)
 		if not t or t == "" then return VIDE end
@@ -207,7 +207,11 @@ local function Sources()
 		sources.zones[tonumber(id)] = { nom = nom, carte = tonumber(carte) }
 	end
 	for id, nom in (ns.SOURCES_QUETES or ""):gmatch("(%d+)|([^\n]*)") do sources.quetes[tonumber(id)] = nom end
+	for id, a, x, c in (ns.SOURCES_RECOMPENSES or ""):gmatch("(%d+)|(%d+)|(%d+)|(%d+)") do
+		sources.recompenses[tonumber(id)] = { argent = tonumber(a), xp = tonumber(x), choix = tonumber(c) }
+	end
 	ns.SOURCES_OBJETS, ns.SOURCES_PNJ, ns.SOURCES_RECOLTE, ns.SOURCES_ZONES, ns.SOURCES_QUETES = nil, nil, nil, nil, nil
+	ns.SOURCES_RECOMPENSES = nil
 	return sources
 end
 
@@ -325,6 +329,33 @@ local MARGE = 16
 local PISTE = { 0.165, 0.137, 0.094, 1 }          -- piste des barres, filets légers entre les lignes
 local FOND_MENU = { 0.05, 0.043, 0.035, 0.98 }
 local VERT, GRIS = "|cff6fd08c", "|cff9c937f"  -- réuni / discret
+
+-- Ce que rapporte une quête, en gris à la suite de son nom. Le jeu ne le dit qu'une fois la quête prise :
+-- savoir d'avance laquelle donne l'objet qu'on cherche, et s'il faudra le choisir, est tout l'intérêt.
+local function Recompense(q)
+	local r = Sources().recompenses[q]
+	if not r then return "" end
+	local bouts = {}
+	if r.choix > 1 then bouts[#bouts + 1] = ("au choix parmi %d"):format(r.choix) end
+	if r.xp > 0 then bouts[#bouts + 1] = r.xp .. " XP" end
+	if r.argent > 0 then
+		local ok, texte = pcall(GetCoinTextureString, r.argent)
+		if ok and type(texte) == "string" then
+			bouts[#bouts + 1] = texte
+		else
+			local po = math.floor(r.argent / 10000)
+			local pa = math.floor(r.argent % 10000 / 100)
+			local pc = r.argent % 100
+			local m = {}
+			if po > 0 then m[#m + 1] = po .. " po" end
+			if pa > 0 then m[#m + 1] = pa .. " pa" end
+			if pc > 0 and po == 0 then m[#m + 1] = pc .. " pc" end
+			bouts[#bouts + 1] = table.concat(m, " ")
+		end
+	end
+	if #bouts == 0 then return "" end
+	return GRIS .. "  " .. table.concat(bouts, " · ") .. "|r"
+end
 local ICONE_INCONNUE = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 -- Barre d'avancement plate (piste sombre, remplissage doré) : SetMinMaxValues / SetValue
@@ -851,7 +882,9 @@ MajFiche = function()
 		end
 		if #s.quetes > 0 then
 			Ajouter("Quêtes", 0, { titre = true, icone = "Interface\\GossipFrame\\AvailableQuestIcon" })
-			for _, q in ipairs(s.quetes) do Ajouter("- " .. (Sources().quetes[q] or "?"), 1) end
+			for _, q in ipairs(s.quetes) do
+				Ajouter("- " .. (Sources().quetes[q] or "?") .. Recompense(q), 1)
+			end
 			Espace()
 		end
 	end
