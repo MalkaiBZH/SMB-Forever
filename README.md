@@ -173,7 +173,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
   tous les 25 monstres (case « WoWdex » des notifications) ; chaque rare capturé par un membre entre dans le fil
   d'activité. Infobulle des monstres : « à capturer », « Rare à capturer ! » ou « capturé ×12 ».
 - **Artisanat** :
-  - *Registre* des métiers et recettes de chaque membre ; clic sur une recette d'un membre : demande d'artisanat ;
+  - *Registre* par métier : un panneau par métier avec ses quatre meilleurs artisans (niveau, nombre de recettes, en ligne ou non) ; un clic ouvre le métier : classement complet à gauche, recettes que la guilde connaît à droite, avec qui sait les faire (« Un seul artisan » : celles qu'une seule personne détient) ; recherche d'une recette ou d'un joueur ; clic sur une recette : demande d'artisanat ;
   - *Crafts* : tous les objets fabricables, par catégorie, avec des filtres (ma classe, mon niveau, niveau requis, fabricable par la guilde) ; un clic sur un objet montre à droite qui, dans la guilde, sait le fabriquer (chuchoter), et « Demander » prépare une demande d'artisanat ;
   - *Encyclopédie* des objets (Alt + clic sur un objet) ; « Demander » (page Demandes) et « Voir dans Crafts » ;
     « Trouvé par la guilde » : les monstres où la guilde l'a trouvé, avec le taux (WoWdex).

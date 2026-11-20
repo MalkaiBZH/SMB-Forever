@@ -207,7 +207,8 @@ script (fonction appelée avant d'être définie, nom mal écrit, texte ou nombr
 les défauts d'affichage :
 - `lua outils/essais/wowdex.lua GuildUpSMB` (depuis la racine) : le WoWdex dans un faux client WoW
   (`outils/essais/faux_client.lua` : cadres factices où toute méthode existe, unités, messages, bulles). Code de
-  sortie 1 au moindre échec. Un essai par page : un fichier de plus dans `outils/essais/`, sur le même modèle.
+  sortie 1 au moindre échec. Un essai par page : un fichier de plus dans `outils/essais/`, sur le même modèle
+  (`outils/essais/registre.lua` : l'onglet Registre de l'Artisanat, avec des fiches de membres reçues par messages).
 - GitHub (`.github/workflows/essais.yml`) relance à chaque push qui touche l'addon la syntaxe de chaque fichier avec
   Lua 5.1 (celui du jeu) et tous les essais. Quand une page change, son essai change avec elle.
 - Mode Debug : mettre `afficherDebug = true` dans `GuildUpDB`
