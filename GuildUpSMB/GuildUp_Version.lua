@@ -135,8 +135,15 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "7.6.1", "7.6.0", "7.5.1", "7.5.0", "7.4.0", "7.3.0", "7.2.0", "7.1.1", "7.1.0", "7.0.0", "6.0.0", "5.5.0", "5.4.0", "5.3.1", "5.3.0", "5.2.0", "5.1.1", "5.1.0", "5.0.0", "4.3.2", "4.3.1", "4.3.0", "4.2.0", "4.1.0", "4.0.6", "4.0.5", "4.0.4", "4.0.3", "4.0.2", "4.0.1", "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "7.6.3", "7.6.2", "7.6.1", "7.6.0", "7.5.1", "7.5.0", "7.4.0", "7.3.0", "7.2.0", "7.1.1", "7.1.0", "7.0.0", "6.0.0", "5.5.0", "5.4.0", "5.3.1", "5.3.0", "5.2.0", "5.1.1", "5.1.0", "5.0.0", "4.3.2", "4.3.1", "4.3.0", "4.2.0", "4.1.0", "4.0.6", "4.0.5", "4.0.4", "4.0.3", "4.0.2", "4.0.1", "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["7.6.3"] = {
+		"L'|cffffd100Encyclopédie|r en sait bien plus : elle connaît maintenant d'où viennent |cffffd10017 856 objets|r au lieu de 8 259, dont 1 504 qu'on ne savait pas où acheter. Marchands, butin, récolte, contenants et quêtes : rien de ce qu'elle savait n'a été perdu, tout a été complété.",
+		"Quand un objet vient d'une |cffffd100quête|r, l'Encyclopédie dit maintenant ce qu'elle rapporte et s'il faudra le |cffffd100choisir|r parmi plusieurs récompenses. Le jeu ne te le dit qu'une fois la quête prise : là, tu le sais avant de partir.",
+	},
+	["7.6.2"] = {
+		"Les |cffffd100taux de butin|r du WoWdex sont maintenant dans l'addon : rien à installer, rien à télécharger, ils arrivent avec la mise à jour comme le bestiaire. Ils viennent de la base ForeverDB, qui réunit QuestieDB, VMaNGOS, cMaNGOS et pfQuest.",
+	},
 	["7.6.1"] = {
 		"Les |cffffd100taux de butin|r du WoWdex sont maintenant dans l'addon : rien à installer, rien à télécharger, ils arrivent avec la mise à jour comme le bestiaire. Ils viennent de la base ForeverDB, qui réunit QuestieDB, VMaNGOS, cMaNGOS et pfQuest.",
 		"L'|cffffd100Encyclopédie|r en sait bien plus : elle connaît maintenant d'où viennent |cffffd10017 856 objets|r au lieu de 8 259, dont 1 504 qu'on ne savait pas où acheter. Marchands, butin, récolte, contenants et quêtes : rien de ce qu'elle savait n'a été perdu, tout a été complété.",
