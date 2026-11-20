@@ -159,9 +159,17 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   `ns.DONNEES_OBJETS*` que si `GetLocale()` lui correspond (`enUS`/`enGB` → anglais, sinon français) :
   les modules consommateurs n'ont rien à savoir. Après une régénération des recettes, relancer
   `generer_objets.py` (les objets liés ne gardent que ceux fabriqués par une recette de `GuildUp_Craft.lua`).
-- `GuildUp_Recettes.lua` (recettes apprises avec un plan) et `GuildUp_Sources.lua` (tiré de QuestieDB,
-  GPL-3.0) : générés par l'outil d'export de l'auteur d'origine (`ns.Exporter`, `/gup export`), absent de
-  ce dépôt.
+- `GuildUp_Recettes.lua` (recettes apprises avec un plan) : généré par l'outil d'export de l'auteur d'origine
+  (`ns.Exporter`, `/gup export`), absent de ce dépôt. **C'est le dernier fichier qu'on ne sait pas
+  régénérer** : le garder tel quel.
+- `GuildUp_Sources.lua` (`ns.SOURCES_OBJETS`, `_PNJ`, `_RECOLTE`, `_ZONES`, `_QUETES` : d'où viennent les
+  objets) : généré par `python outils/generer_sources.py`. Les relations viennent de **ForeverDB** (GPL-3.0,
+  tables `vend`, `drop`, `odrop`, `idrop`, `rew` — attention, `rew` est rangée **par objet** et donne les
+  quêtes), les noms français, zones et positions de **QuestieDB** version Forever. Le script **relit le
+  fichier existant et fusionne** : l'export d'origine (11 novembre) connaît des sources que ForeverDB n'a
+  pas, et les noms de zones ne sont traduits par aucune des deux bases. Ne jamais partir d'un fichier vide.
+  Une zone nouvelle sort sans nom français et est signalée : l'ajouter à `ZONES_FR` en tête du script.
+  `--verifier` compare sans rien écrire.
 - `GuildUp_ObjectifsQuetes.lua` (`ns.OBJECTIFS_QUETES` : pour chaque quête, monstres à tuer et monstres qui
   lâchent les objets demandés, dans l'ordre des objectifs du jeu) : généré par `python outils/generer_objectifs.py`
   depuis QuestieDB (`data/Forever` du dépôt Questie/QuestieDB, GPL-3.0 ; `--ref` pour une version précise,
