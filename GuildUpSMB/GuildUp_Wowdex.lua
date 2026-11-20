@@ -1794,6 +1794,14 @@ local function CreerFiche(p, parent)
 	return fiche
 end
 
+-- un taux de la base ForeverDB en texte court : « 100 % », « 8,4 % », « 0,3 % », « <0,1 % »
+local function TexteTaux(t)
+	if not t then return nil end
+	if t >= 10 then return ("%d %%"):format(math.floor(t + 0.5)) end
+	if t < 0.1 then return "<0,1 %" end
+	local s = (("%.1f %%"):format(t)):gsub("%.", ",")
+	return s
+end
 -- butin d'un monstre : objets observés (taux sur les corps fouillés, guilde ou moi), puis ceux du bestiaire
 -- jamais vus tomber ; { objet, n, corps } du plus fréquent au plus rare
 local function ButinAffiche(id)
@@ -1817,6 +1825,30 @@ local function ButinAffiche(id)
 			if o == cherche then table.insert(base, 1, { objet = o }) else base[#base + 1] = { objet = o } end
 		end
 	end
+	-- La base ForeverDB (dépendance optionnelle, GuildUp_Butin.lua) : le taux des objets que la guilde n'a pas
+	-- encore vus tomber, et les objets que le bestiaire ne liste pas (il laisse de côté le butin commun).
+	for _, x in ipairs(base) do deja[x.objet] = true end
+	if ns.ButinBase then
+		for _, x in ipairs(ns.ButinBase(id)) do
+			if not deja[x.objet] then
+				deja[x.objet] = true
+				base[#base + 1] = { objet = x.objet, tauxBase = x.taux }
+			end
+		end
+	end
+	if ns.TauxBase then
+		for _, x in ipairs(liste) do x.tauxBase = ns.TauxBase(id, x.objet) end
+		for _, x in ipairs(base) do
+			if x.tauxBase == nil then x.tauxBase = ns.TauxBase(id, x.objet) end
+		end
+	end
+	-- (jamais vus par la guilde : l'objet cherché d'abord, puis le meilleur taux de la base)
+	table.sort(base, function(a, b)
+		if (a.objet == cherche) ~= (b.objet == cherche) then return a.objet == cherche end
+		if (a.tauxBase == nil) ~= (b.tauxBase == nil) then return b.tauxBase == nil end
+		if a.tauxBase and b.tauxBase and a.tauxBase ~= b.tauxBase then return a.tauxBase > b.tauxBase end
+		return a.objet < b.objet
+	end)
 	if cherche and not deja[cherche] then
 		for _, x in ipairs(base) do table.insert(liste, 1, x) end -- (pas encore trouvé : en tête quand même)
 	else
@@ -1991,10 +2023,16 @@ MajFiche = function()
 			l.icone:SetTexture(icone or "Interface\\Icons\\INV_Misc_QuestionMark")
 			local qc = qualite and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[qualite]
 			l.nom:SetText(((qc and qc.hex) or "|cffffffff") .. (nomO or ("objet n° " .. o.objet)) .. "|r")
+			local deLaBase = TexteTaux(o.tauxBase)
 			if o.n then
 				l.taux:SetText(("%d %%"):format(math.floor(100 * o.n / math.max(1, o.corps) + 0.5)))
 				l.aide = ("Tombé sur %d des %d corps fouillés par la guilde (%d membre%s)."):format(o.n, o.corps,
 					o.membres or 1, (o.membres or 1) > 1 and "s" or "")
+					.. (deLaBase and ("|nLa base ForeverDB donne " .. deLaBase .. ".") or "")
+			elseif deLaBase then
+				l.taux:SetText(GRIS .. deLaBase .. "|r")
+				l.aide = "Taux de la base ForeverDB. La guilde ne l'a pas encore vu tomber : dès qu'elle aura fouillé "
+					.. "assez de corps, son propre taux prendra la place."
 			else
 				l.taux:SetText(GRIS .. "jamais vu|r")
 				l.aide = "Peut tomber sur ce monstre (bestiaire), pas encore trouvé par la guilde."
