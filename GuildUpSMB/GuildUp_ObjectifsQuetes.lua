@@ -7,7 +7,7 @@
 -- chacun (« , ») ; butin = objectifs « objet » dans l'ordre du jeu (« ; ») : objet:monstre,monstre.
 -- Lu par GuildUp_Objectifs.lua.
 -- DONJONS_QUETES : aire du donjon|quêtes qui s'y passent ; SUITES_QUETES : quête|première quête de la
--- suite|étape|nombre d'étapes. Lus par GuildUp_Ensemble.lua.
+-- suite|étape|nombre d'étapes. SUITES_QUETES est lue par GuildUp_Quetes.lua.
 
 local NOM_ADDON, ns = ...
 

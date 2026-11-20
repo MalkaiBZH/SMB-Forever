@@ -233,15 +233,56 @@ local function Metres(d) return ("%d %s"):format(math.floor(d + 0.5), UNITE) end
 
 -- Chaque quête : membres qui l'ont (groupe = déjà dans mon groupe), et aInviter = ceux qui sont en ligne
 -- mais pas encore dans mon groupe (le bouton de la ligne en dépend : Inviter / Déjà groupés / Hors ligne)
+-- Suites de quêtes : ns.SUITES_QUETES (GuildUp_ObjectifsQuetes.lua, chargé APRÈS ce fichier, donc lu
+-- seulement au premier besoin). Ligne : quête|première quête de la suite|étape|nombre d'étapes.
+--
+-- Une même racine peut porter un éventail plutôt qu'une chaîne : 104 des 689 racines ont plus de quêtes
+-- que d'étapes (jusqu'à 73 quêtes pour 2 étapes), ce sont des quêtes sœurs et non une suite. Leur numéro
+-- d'étape ne veut rien dire et les apparier mettrait ensemble des gens qui ne font pas la même chose : on
+-- ne garde que les suites linéaires (autant de quêtes que d'étapes, ou moins).
+local suites
+local function Suite(id)
+	if not suites then
+		suites = {}
+		local parRacine = {}
+		for q, racine, etape, total in (ns.SUITES_QUETES or ""):gmatch("(%d+)|(%d+)|(%d+)|(%d+)") do
+			racine, etape, total = tonumber(racine), tonumber(etape), tonumber(total)
+			suites[tonumber(q)] = { racine = racine, etape = etape, total = total }
+			parRacine[racine] = (parRacine[racine] or 0) + 1
+		end
+		for q, s in pairs(suites) do
+			if parRacine[s.racine] > s.total then suites[q] = nil end
+		end
+		ns.SUITES_QUETES = nil -- le texte brut n'est plus utile
+	end
+	return suites[id]
+end
+
+-- L'étape à laquelle ce membre se trouve dans la même suite que moi, ou nil s'il n'y est pas. Deux membres
+-- aux étapes 2 et 4 d'une même suite vont au même endroit à quelques minutes près : sans ça, ils ne se
+-- voient pas, puisque leurs quêtes n'ont pas le même numéro.
+local function EtapeDansMaSuite(mienne, sesQuetes)
+	if not mienne then return nil end
+	local etape
+	for id in pairs(sesQuetes) do
+		local s = Suite(id)
+		if s and s.racine == mienne.racine and (not etape or s.etape < etape) then etape = s.etape end
+	end
+	return etape
+end
+
 local function Partages()
 	local res = {}
 	local groupe = MonGroupe()
 	local function DansMonGroupe(cle) return groupe ~= nil and groupe[cle] == true end
 	for id, q in pairs(mesQuetes) do
 		local membres, aInviter, groupes = {}, {}, 0
+		local maSuite = Suite(id)
 		for cle, a in pairs(autres) do
-			if a.quetes[id] then
-				local m = { cle = cle, nom = a.nom, enLigne = EstEnLigne(cle) }
+			-- la même quête, ou à défaut la même suite à une autre étape
+			local etape = not a.quetes[id] and EtapeDansMaSuite(maSuite, a.quetes) or nil
+			if a.quetes[id] or etape then
+				local m = { cle = cle, nom = a.nom, enLigne = EstEnLigne(cle), etape = etape }
 				m.groupe = DansMonGroupe(cle)
 				m.distance = DistanceDe(cle)
 				if m.groupe then groupes = groupes + 1
@@ -252,6 +293,8 @@ local function Partages()
 		if #membres > 0 then
 			-- les plus proches d'abord : c'est avec eux qu'on peut faire la quête tout de suite
 			table.sort(membres, function(x, y)
+				-- ceux qui ont exactement la même quête d'abord : avec eux, c'est faisable tout de suite
+				if (x.etape == nil) ~= (y.etape == nil) then return x.etape == nil end
 				if x.groupe ~= y.groupe then return x.groupe end
 				if (x.distance ~= nil) ~= (y.distance ~= nil) then return x.distance ~= nil end
 				if x.distance and y.distance and x.distance ~= y.distance then return x.distance < y.distance end
@@ -260,7 +303,7 @@ local function Partages()
 			end)
 			local plusProche = membres[1] and not membres[1].groupe and membres[1].distance or nil
 			res[#res + 1] = { id = id, titre = q.titre, zone = q.zone, niveau = q.niveau, membres = membres,
-				aInviter = aInviter, groupes = groupes, plusProche = plusProche }
+				aInviter = aInviter, groupes = groupes, plusProche = plusProche, suite = maSuite }
 		end
 	end
 	-- une quête dont un membre est tout près passe devant, sinon par zone
@@ -304,14 +347,19 @@ local function InfobulleQuete(self)
 	GameTooltip:SetText(q.titre)
 	if q.niveau and q.niveau > 0 then GameTooltip:AddLine("Niveau " .. q.niveau, 1, 0.82, 0) end
 	if q.zone then GameTooltip:AddLine(q.zone, 0.8, 0.8, 0.8) end
+	if q.suite and q.suite.total > 1 then
+		GameTooltip:AddLine(("Étape %d sur %d de la suite"):format(q.suite.etape, q.suite.total), 0.8, 0.8, 0.8)
+	end
 	GameTooltip:AddLine(" ")
 	for _, m in ipairs(q.membres) do
 		if m.enLigne then
 			local zone = enLigne[m.cle] and enLigne[m.cle].zone
 			local ou = m.distance and ("  |cfff1cf6b" .. Metres(m.distance) .. "|r") or (zone and ("  |cff999999" .. zone .. "|r")) or ""
-			GameTooltip:AddLine("|cff33dd55●|r " .. NomJoueur(m.nom) .. ou, 1, 1, 1)
+			GameTooltip:AddLine("|cff33dd55●|r " .. NomJoueur(m.nom) .. ou
+				.. (m.etape and ("  |cff999999étape " .. m.etape .. "|r") or ""), 1, 1, 1)
 		else
-			GameTooltip:AddLine("|cff888888○ " .. NomJoueur(m.nom) .. " (hors ligne)|r", 1, 1, 1)
+			GameTooltip:AddLine("|cff888888○ " .. NomJoueur(m.nom)
+				.. (m.etape and (" — étape " .. m.etape) or "") .. " (hors ligne)|r", 1, 1, 1)
 		end
 	end
 	GameTooltip:AddLine(" ")
@@ -413,11 +461,14 @@ local function CreerPage(parent)
 			local r = p.lignes[i]
 			if not r then r = CreerLigne(p.liste.contenu); p.lignes[i] = r end
 			r.q = q
-			r.titre:SetText((q.niveau and q.niveau > 0) and ("|cff999999[" .. q.niveau .. "]|r " .. q.titre) or q.titre)
+			r.titre:SetText(((q.niveau and q.niveau > 0) and ("|cff999999[" .. q.niveau .. "]|r " .. q.titre) or q.titre)
+				.. ((q.suite and q.suite.total > 1)
+					and ("  |cff999999étape " .. q.suite.etape .. "/" .. q.suite.total .. "|r") or ""))
 			r.zone:SetText(q.zone or "")
 			local noms = {}
 			for _, m in ipairs(q.membres) do
 				noms[#noms + 1] = (m.enLigne and "|cff6fd08c" or "|cff8a826f") .. NomJoueur(m.nom) .. "|r"
+					.. (m.etape and (" |cff999999(étape " .. m.etape .. ")|r") or "")
 					.. (m.groupe and " |cfff1cf6b(groupe)|r"
 						or (m.distance and m.distance <= PROCHE and (" |cfff1cf6b(" .. Metres(m.distance) .. ")|r") or ""))
 			end

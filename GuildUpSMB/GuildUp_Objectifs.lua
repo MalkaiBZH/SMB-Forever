@@ -43,6 +43,7 @@ local Base36 = ns.Base36 or function(n) return tostring(n) end
 --------------------------------------------------------------------------------
 
 local DONNEES = ns.OBJECTIFS_QUETES and ("\n" .. ns.OBJECTIFS_QUETES) or nil
+ns.OBJECTIFS_QUETES = nil -- DONNEES en est une copie : garder l'original coûtait un demi-mégaoctet pour rien
 local quetesLues = {} -- [quête] = { tuer = { {pnj,…}, … }, butin = { { objet, pnj = {…} }, … } } ou false
 
 local function Nombres(texte)

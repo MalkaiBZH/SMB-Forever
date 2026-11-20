@@ -98,6 +98,12 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   la guilde. Cinq onglets : Avis de recherche et Bestiaire (même grille, à lignes entières car un modèle 3D ne se
   découpe pas dans une zone qui défile, et même fiche), Zones, Carnet de chasse, Guilde. Monstres pistés
   (`GuildUpDB.wowdex.pistes`), losange sur les barres de nom (`ns.MajPlaquesWowdex`).
+- `GuildUp_Quetes.lua` lit aussi `ns.SUITES_QUETES` (`GuildUp_ObjectifsQuetes.lua`, chargé **après** lui :
+  la lecture est donc différée au premier besoin, puis le texte brut est libéré). Elle sert à apparier deux
+  membres sur la **même suite de quêtes à des étapes différentes**, et pas seulement sur une quête identique.
+  **Attention** : 104 des 689 racines portent un éventail de quêtes sœurs et non une chaîne (jusqu'à 73 quêtes
+  pour 2 étapes) ; leur numéro d'étape ne veut rien dire, donc seules les suites linéaires (autant de quêtes
+  que d'étapes, ou moins) sont gardées — 1 979 quêtes sur 2 959. `ns.DONJONS_QUETES` n'est lue par personne.
 - `GuildUp_Butin.lua` : **taux de butin** des monstres, lus dans `GuildUp_Taux.lua` (généré) et montrés dans la
   fiche du WoWdex. Aucune dépendance ni réseau : les taux arrivent avec l'addon, comme le bestiaire. La ligne
   est en base 36 (`pnj|objet:chance,…`, chance en dix-millièmes, `0` = lâché mais taux inconnu, 20 objets au

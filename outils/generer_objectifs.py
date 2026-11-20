@@ -22,7 +22,8 @@ Format d'une ligne (voir GuildUp_Objectifs.lua) :
          « : » si aucun monstre ne le lâche : coffre, marchand, autre quête)
 Seules les quêtes qui ont au moins un monstre à tuer ou à dépouiller sont gardées.
 
-Deux autres listes dans le même fichier (« Jouer ensemble », GuildUp_Ensemble.lua) :
+Deux autres listes dans le même fichier (SUITES_QUETES est lue par GuildUp_Quetes.lua ;
+DONJONS_QUETES n'est encore lue par personne) :
   ns.DONJONS_QUETES  aire|quête,quête,…  les quêtes dont la zone (zoneOrSort = 17) est ce donjon (numéro
                      de zone AreaTable, voir DONJONS)
   ns.SUITES_QUETES   quête|racine|étape|longueur  les quêtes qui font partie d'une suite d'au moins deux
@@ -262,7 +263,7 @@ def contenu(ref, lignes, lignes_donjons, lignes_suites):
             "-- chacun (« , ») ; butin = objectifs « objet » dans l'ordre du jeu (« ; ») : objet:monstre,monstre.\n"
             "-- Lu par GuildUp_Objectifs.lua.\n"
             "-- DONJONS_QUETES : aire du donjon|quêtes qui s'y passent ; SUITES_QUETES : quête|première quête de la\n"
-            "-- suite|étape|nombre d'étapes. Lus par GuildUp_Ensemble.lua.\n"
+            "-- suite|étape|nombre d'étapes. SUITES_QUETES est lue par GuildUp_Quetes.lua.\n"
             "\n"
             "local NOM_ADDON, ns = ...\n"
             "\n"
