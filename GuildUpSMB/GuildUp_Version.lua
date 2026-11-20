@@ -139,7 +139,7 @@ local ORDRE = { "7.6.0", "7.5.1", "7.5.0", "7.4.0", "7.3.0", "7.2.0", "7.1.1", "
 local NOTES = {
 	["7.6.0"] = {
 		"|cffffd100WoWdex|r : la fiche d'un monstre donne maintenant un |cffffd100taux de butin|r pour les objets que la guilde n'a pas encore vus tomber. Ils viennent de la base ForeverDB, qui réunit QuestieDB, VMaNGOS, cMaNGOS et pfQuest. Le taux mesuré par la guilde passe toujours avant.",
-		"La base ajoute aussi les objets que le bestiaire ne listait pas, comme le butin commun. |cffffd100ForeverDB est un addon à part|r, mais tu n'as rien à faire : le programme de mise à jour SMB Forever l'installe et l'entretient tout seul. Sans lui, tout marche comme avant, il manque juste ces taux.",
+		"La base ajoute aussi les objets que le bestiaire ne listait pas, comme le butin commun. |cffffd100ForeverDB est un addon à part|r : le programme de mise à jour l'installe tout seul, à condition d'avoir sa dernière version. Si elle manque, le WoWdex te le dira et t'expliquera quoi faire — et en attendant tout marche comme avant.",
 	},
 	["7.5.1"] = {
 		"Le |cffffd100« ! »|r des objectifs de quête ne s'affiche plus sur des monstres sans rapport avec tes quêtes. Les données décrivent parfois une quête avec plus d'objectifs que le jeu n'en montre : les monstres de ces objectifs en trop étaient marqués en permanence.",

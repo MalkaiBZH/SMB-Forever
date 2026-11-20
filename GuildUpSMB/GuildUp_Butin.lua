@@ -15,6 +15,9 @@
 -- Construire l'index inverse complet coûterait 179 000 entrées de table : on cherche plutôt monstre par monstre,
 -- en gardant le résultat en cache. Dans l'autre sens (les sources d'un objet), c'est un accès direct.
 --
+-- Si ForeverDB manque, une bulle le dit une seule fois après la connexion (db.baseAvertie) : le programme de
+-- mise à jour SMB Forever l'installe tout seul, mais seulement depuis la version publiée avec la 7.6.0.
+--
 -- Fournit : ns.BaseButin (la table ou nil), ns.ButinBase(pnj), ns.TauxBase(pnj, objet), ns.SourcesBase(objet),
 -- ns.MetaBase().
 
@@ -134,3 +137,33 @@ ns.SourcesBase = function(objet)
 	table.sort(res, Avant)
 	return res
 end
+
+--------------------------------------------------------------------------------
+-- La base manque : le dire, une fois
+--------------------------------------------------------------------------------
+
+-- Le programme de mise à jour installe ForeverDB tout seul, mais un membre resté à l'ancien programme ne la
+-- recevra jamais sans rien faire : lui, le programme ne se met pas à jour. L'addon, lui, arrive bien jusqu'à
+-- lui, puisqu'il vient d'être mis à jour : c'est donc à l'addon de le prévenir.
+local LIEN = "https://github.com/MalkaiBZH/SMB-Forever/releases/tag/miseajour"
+local DELAI_AVERTIR = 20 -- secondes après la connexion, le temps que l'écran se calme
+
+local function Avertir()
+	local db = ns.DB and ns.DB()
+	if not db or db.baseAvertie then return end
+	if ns.BaseButinPresente() then return end
+	db.baseAvertie = true -- une fois suffit : on ne harcèle personne
+	if ns.Notifier then
+		ns.Notifier("version", "Taux de butin",
+			"Le WoWdex sait afficher les taux de butin, mais il lui manque la base. Voir la discussion.")
+	end
+	print("|cffffd100SMB Forever|r : pour voir les taux de butin dans le WoWdex, prends la dernière version du "
+		.. "programme de mise à jour, il installera la base tout seul. " .. LIEN)
+end
+
+local cadre = CreateFrame("Frame")
+cadre:RegisterEvent("PLAYER_LOGIN")
+cadre:SetScript("OnEvent", function(self)
+	self:UnregisterAllEvents()
+	if C_Timer and C_Timer.After then C_Timer.After(DELAI_AVERTIR, Avertir) else Avertir() end
+end)

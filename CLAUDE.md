@@ -240,6 +240,18 @@ dans un fichier. `python outils/annoncer_version.py --depuis 3.3.0 --essai` mont
   fichiers que si le `## Version:` de son `.toc` a changé. Un échec n'interrompt jamais la mise à jour de
   l'addon. Réglages : `basedonnees=0` pour ne pas l'installer, `basejours=<n>` pour l'intervalle (0 = à chaque
   passage). Marque `ForeverDB/.miseajour-smb` : date UTC du dernier coup d'œil.
+- **L'exécutable Windows se remplace lui-même** depuis la 7.6.0, comme le fait déjà la version Linux depuis le
+  dépôt. Il n'est pas dans le dépôt : il est pris dans la release à **étiquette fixe `miseajour`**
+  (`releases/download/miseajour/GuildUpSMB-MiseAJour.exe`), dont l'adresse ne bouge jamais — pas d'appel à
+  l'API, pas de JSON à analyser en .NET 4. **Publier chaque nouvel `.exe` sous cette étiquette**, en la
+  recréant, et non plus sous `miseajour-<version>`, sinon plus personne ne le recevra. Comparaison par
+  empreinte, vérification de l'en-tête `MZ`, un coup d'œil par jour (`autoprogramme=0` pour couper,
+  `programmevu` garde la date). Windows interdit d'écraser un programme en cours mais autorise à le renommer :
+  l'ancien devient `.exe.vieux`, effacé au démarrage suivant. Pas de redémarrage automatique (le mutex d'instance
+  unique rendrait la course perdue d'avance) : la nouvelle version prend la main au prochain lancement.
+- Un membre resté à un ancien `.exe` n'aura jamais rien de tout ça : c'est l'addon qui le rattrape.
+  `GuildUp_Butin.lua` affiche une bulle unique 20 s après la connexion quand la base manque
+  (`db.baseAvertie`), avec un message en discussion qui pointe la release.
   Les joueurs l'ont tiré de `main` et il se remplace lui-même quand ce fichier change : **tout commit sur `main`
   qui le touche part chez eux**, le garder exécutable (`compile` vérifié avant remplacement) et en fins de ligne LF.
 - Les deux suivent la même logique (empreinte du commit de `main` dans `GuildUpSMB/.miseajour`, synchronisation,
