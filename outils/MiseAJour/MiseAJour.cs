@@ -10,6 +10,9 @@
 //     « Accept: application/vnd.github.sha », réponse sans JSON). Si elle diffère de celle notée dans
 //     Interface\AddOns\GuildUpSMB\.miseajour, télécharge l'archive de ce commit, en extrait le
 //     dossier GuildUpSMB/ (sans les *.bak / *.previous) et synchronise le dossier installé ;
+//   * la même archive porte ce programme (outils/MiseAJour/) : il se remplace par celui du dépôt quand il a
+//     changé, comme le fait la version Linux. L'exécutable et l'addon avancent donc toujours ensemble.
+//     Réglage « autoprogramme=0 » pour ne pas le faire ;
 //   * notification Windows ensuite : /reload si seuls des fichiers existants ont changé, relancer
 //     le jeu si des fichiers sont ajoutés ou si le .toc change (le jeu ne voit les nouveaux fichiers
 //     qu'au démarrage), prochain lancement si le jeu est fermé.
@@ -80,9 +83,8 @@ namespace GuildUpSMB
 		const string BASE_MARQUE = ".miseajour-smb";	// date du dernier coup d'œil, dans le dossier de ForeverDB
 		const int BASE_JOURS = 7;				// on ne regarde pas plus souvent que ça
 		const string PROG_EXE = "GuildUpSMB-MiseAJour.exe";
-		// Release à étiquette fixe « miseajour » : l'adresse ne change jamais, pas besoin de l'API.
-		const string PROG_URL = "https://github.com/" + DEPOT + "/releases/download/miseajour/" + PROG_EXE;
-		const int PROG_JOURS = 1;				// le programme, on le regarde une fois par jour
+		// Ce programme dans le dépôt : il voyage dans l'archive déjà téléchargée, comme celui de Linux.
+		const string SOI = "outils/MiseAJour/" + PROG_EXE;
 		const string CLE_DEMARRAGE = @"Software\Microsoft\Windows\CurrentVersion\Run";
 		const string NOM_DEMARRAGE = "GuildUpSMB-MiseAJour";
 		public const string NOM_INSTANCE = @"Local\GuildUpSMB-MiseAJour";
@@ -181,7 +183,6 @@ namespace GuildUpSMB
 				bilan.Version = LireVersion(dossierAddon);
 				noter("Déjà à jour (version " + bilan.Version + ", commit " + commit.Substring(0, 7) + ").");
 				MettreAJourBase(jeu, bilan, noter);
-				MettreAJourProgramme(bilan, noter);
 				return bilan;
 			}
 
@@ -194,7 +195,8 @@ namespace GuildUpSMB
 				TelechargerFichier("https://api.github.com/repos/" + DEPOT + "/zipball/" + commit, archive);
 
 				string source = Path.Combine(temp, ADDON);
-				Extraire(archive, source);
+				string nouveau = Path.Combine(temp, PROG_EXE);
+				Extraire(archive, source, nouveau);
 				if (!File.Exists(Path.Combine(source, ADDON + ".toc")))
 					throw new Exception("l'archive ne contient pas " + ADDON + "/" + ADDON + ".toc.");
 				bilan.Version = LireVersion(source);
@@ -203,6 +205,7 @@ namespace GuildUpSMB
 				Directory.CreateDirectory(dossierAddon);
 				Synchroniser(source, dossierAddon, bilan, noter);
 				File.WriteAllText(fichierMarque, commit);
+				MettreAJourProgramme(nouveau, bilan, noter);
 			}
 			finally
 			{
@@ -212,7 +215,6 @@ namespace GuildUpSMB
 			noter(string.Format("Terminé : {0} ajouté(s), {1} modifié(s), {2} supprimé(s).",
 				bilan.Ajoutes, bilan.Modifies, bilan.Supprimes));
 			MettreAJourBase(jeu, bilan, noter);
-			MettreAJourProgramme(bilan, noter);
 			return bilan;
 		}
 
@@ -246,8 +248,9 @@ namespace GuildUpSMB
 			return commit;
 		}
 
-		// Garde uniquement le dossier GuildUpSMB/ de l'archive (dont la racine est « depot-commit/ »).
-		static void Extraire(string archive, string destination)
+		// Garde uniquement le dossier GuildUpSMB/ de l'archive (dont la racine est « depot-commit/ »),
+		// et ce programme dans « programme » si on le demande.
+		static void Extraire(string archive, string destination, string programme)
 		{
 			string racine = Path.GetFullPath(destination) + Path.DirectorySeparatorChar;
 			using (ZipArchive zip = ZipFile.OpenRead(archive))
@@ -258,6 +261,11 @@ namespace GuildUpSMB
 					int barre = chemin.IndexOf('/');
 					if (barre < 0) continue;
 					chemin = chemin.Substring(barre + 1);
+					if (programme != null && chemin == SOI)
+					{
+						entree.ExtractToFile(programme, true);
+						continue;
+					}
 					if (!chemin.StartsWith(ADDON + "/")) continue;
 					chemin = chemin.Substring(ADDON.Length + 1);
 					if (chemin.Length == 0 || chemin.EndsWith("/") || Ignore(chemin)) continue;
@@ -456,45 +464,33 @@ namespace GuildUpSMB
 
 		// ------------------------------------------------------- Le programme se remplace lui-même
 
-		// La version Linux se remplace déjà par celle du dépôt, qui contient son fichier .py. Ici le programme
-		// est compilé et n'est pas dans le dépôt : on prend l'exécutable de la release à étiquette fixe
-		// « miseajour », dont l'adresse ne bouge jamais. Comparaison par empreinte, comme sous Linux.
-		// Windows interdit d'écraser un programme en cours, mais autorise à le renommer : l'ancien devient
-		// « .vieux » (effacé au prochain démarrage) et le neuf prend sa place. Pas de redémarrage automatique :
-		// relancer un programme qui tient encore son mutex est une course perdue d'avance, la nouvelle version
-		// prend donc la main au prochain lancement.
-		static void MettreAJourProgramme(Bilan bilan, Action<string> noter)
+		// Comme la version Linux : le programme installé suit celui du dépôt. Il voyage dans l'archive que l'on
+		// vient de télécharger pour l'addon, donc rien de plus à demander à GitHub, et l'exécutable et l'addon
+		// avancent toujours ensemble. Windows interdit d'écraser un programme en cours, mais autorise à le
+		// renommer : l'ancien devient « .vieux » (effacé au démarrage suivant) et le neuf prend sa place. Pas de
+		// redémarrage automatique : relancer un programme qui tient encore son mutex d'instance unique est une
+		// course perdue d'avance, la nouvelle version prend donc la main au prochain lancement.
+		static void MettreAJourProgramme(string nouveau, Bilan bilan, Action<string> noter)
 		{
 			if (LireReglage("autoprogramme") == "0") return;
 			string moi = Application.ExecutablePath;
 			if (string.IsNullOrEmpty(moi) || !File.Exists(moi)) return;
+			if (!File.Exists(nouveau) || Identiques(nouveau, moi)) return;
 
-			DateTime vu;
-			string date = LireReglage("programmevu");
-			if (date != null
-				&& DateTime.TryParse(date, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out vu)
-				&& (DateTime.UtcNow - vu).TotalDays < PROG_JOURS)
-				return;
-
-			string neuf = moi + ".neuf";
 			try
 			{
-				TelechargerFichier(PROG_URL, neuf, false);
-				EcrireReglage("programmevu", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
-
-				// Jamais une page d'erreur ou un fichier tronqué à la place du programme.
+				// Jamais un fichier tronqué ou illisible à la place du programme.
 				var entete = new byte[2];
-				using (var f = File.OpenRead(neuf)) f.Read(entete, 0, 2);
-				if (new FileInfo(neuf).Length < 16384 || entete[0] != (byte)'M' || entete[1] != (byte)'Z')
-					throw new Exception("le fichier reçu n'est pas un programme Windows.");
-				if (Identiques(neuf, moi)) { File.Delete(neuf); return; }
+				using (var f = File.OpenRead(nouveau)) f.Read(entete, 0, 2);
+				if (new FileInfo(nouveau).Length < 16384 || entete[0] != (byte)'M' || entete[1] != (byte)'Z')
+					throw new Exception("le fichier du dépôt n'est pas un programme Windows.");
 
 				string vieux = moi + ".vieux";
 				try { File.Delete(vieux); } catch { }
 				File.Move(moi, vieux);
 				try
 				{
-					File.Move(neuf, moi);
+					File.Copy(nouveau, moi, true);
 				}
 				catch
 				{
@@ -502,11 +498,10 @@ namespace GuildUpSMB
 					throw;
 				}
 				bilan.ProgrammeRemplace = true;
-				noter("Programme de mise à jour remplacé par celui de la release.");
+				noter("Programme de mise à jour remplacé par celui du dépôt.");
 			}
 			catch (Exception e)
 			{
-				try { File.Delete(neuf); } catch { }
 				noter("Programme de mise à jour non remplacé (" + Message(e) + ").");
 			}
 		}
@@ -907,10 +902,7 @@ namespace GuildUpSMB
 			if (bilan.DejaAJour)
 			{
 				Infobulle(bilan.Version + " à jour (vérifié à " + heure + ")");
-				if (bilan.ProgrammeRemplace)
-				Bulle("Programme de mise à jour renouvelé",
-					"La nouvelle version prendra la main au prochain lancement.", ToolTipIcon.Info, null);
-			else if (bilan.BaseMaj)
+				if (bilan.BaseMaj)
 					Bulle("Base des taux de butin " + (bilan.BasePosee ? "installée" : "mise à jour"),
 						bilan.BasePosee
 							? "ForeverDB " + bilan.BaseVersion + " : relancez le jeu pour que le WoWdex s'en serve."
@@ -930,6 +922,9 @@ namespace GuildUpSMB
 			else
 				texte = "Tapez /reload en jeu pour la charger.";
 			if (bilan.BasePosee) texte += " La base des taux de butin a été installée au passage.";
+			if (bilan.ProgrammeRemplace)
+				texte += " Le programme de mise à jour s'est renouvelé : sa nouvelle version prendra la main au"
+					+ " prochain lancement.";
 			fenetre.Noter(heure + "  " + texte);
 			Bulle("SMB Forever " + bilan.Version + " installé", texte, ToolTipIcon.Info, null);
 		}
