@@ -145,7 +145,8 @@ end
 -- Le programme de mise à jour installe ForeverDB tout seul, mais un membre resté à l'ancien programme ne la
 -- recevra jamais sans rien faire : lui, le programme ne se met pas à jour. L'addon, lui, arrive bien jusqu'à
 -- lui, puisqu'il vient d'être mis à jour : c'est donc à l'addon de le prévenir.
-local LIEN = "https://github.com/MalkaiBZH/SMB-Forever/releases/tag/miseajour"
+-- Le programme est versionné dans le dépôt : on pointe le fichier, pas une release.
+local LIEN = "https://github.com/MalkaiBZH/SMB-Forever/raw/main/outils/MiseAJour/GuildUpSMB-MiseAJour.exe"
 local DELAI_AVERTIR = 20 -- secondes après la connexion, le temps que l'écran se calme
 
 local function Avertir()
@@ -153,12 +154,17 @@ local function Avertir()
 	if not db or db.baseAvertie then return end
 	if ns.BaseButinPresente() then return end
 	db.baseAvertie = true -- une fois suffit : on ne harcèle personne
+	local function Montrer()
+		if ns.AfficherCopie then ns.AfficherCopie(LIEN, "SMB Forever — programme de mise à jour") end
+	end
 	if ns.Notifier then
 		ns.Notifier("version", "Taux de butin",
-			"Le WoWdex sait afficher les taux de butin, mais il lui manque la base. Voir la discussion.")
+			"Il manque la base des taux de butin. Clique ici pour le lien du programme à installer.",
+			nil, Montrer)
 	end
-	print("|cffffd100SMB Forever|r : pour voir les taux de butin dans le WoWdex, prends la dernière version du "
-		.. "programme de mise à jour, il installera la base tout seul. " .. LIEN)
+	print("|cffffd100SMB Forever|r : pour voir les taux de butin dans le WoWdex, remplace ton programme de mise "
+		.. "à jour par celui-ci, une seule fois — ensuite il se renouvellera tout seul, et il installera la base.")
+	print(LIEN)
 end
 
 local cadre = CreateFrame("Frame")

@@ -106,6 +106,10 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   avec un cache plutôt que de construire l'index inverse (179 000 entrées). Expose `ns.ButinBase(pnj)`,
   `ns.TauxBase(pnj, objet)`, `ns.SourcesBase(objet)`, `ns.BaseButin()`, `ns.MetaBase()`,
   `ns.BaseButinPresente()`. **Le taux mesuré par la guilde passe toujours avant celui de la base.**
+  Quand la base manque, une bulle unique (`db.baseAvertie`, 20 s après la connexion) propose le lien du
+  programme de mise à jour ; un clic ouvre `ns.AfficherCopie` (`GuildUp_Options.lua` : la fenêtre « Ctrl+C
+  pour copier » du diag, avec un en-tête au choix — le texte de la discussion n'est pas sélectionnable sur
+  ce client).
 - `GuildUp_Config.lua` : **réglages propres à la guilde** (`ns.Config` : nom public, cri de guilde, emote animée,
   membre vedette). Chargé en premier, sans dépendance ; les autres modules le lisent via `ns.Config`.
 - `GuildUp_Commandes.lua` : page « Aide », la liste de toutes les commandes de `/smb`. Elles y sont déclarées à la
