@@ -98,18 +98,13 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   la guilde. Cinq onglets : Avis de recherche et Bestiaire (même grille, à lignes entières car un modèle 3D ne se
   découpe pas dans une zone qui défile, et même fiche), Zones, Carnet de chasse, Guilde. Monstres pistés
   (`GuildUpDB.wowdex.pistes`), losange sur les barres de nom (`ns.MajPlaquesWowdex`).
-- `GuildUp_Butin.lua` : **pont vers la base ForeverDB** (addon à part, GPL-3.0, <https://github.com/foreverfraddons/forever-db>,
-  qui réunit QuestieDB, VMaNGOS, cMaNGOS classic-db, pfQuest et des relevés en jeu). **Dépendance optionnelle**
-  (`## OptionalDeps: ForeverDB` du `.toc`) : sans elle tout marche, il manque seulement les taux. Elle est
-  « LoadOnDemand », donc chargée à la première fiche ouverte, pas au démarrage. Sa table `drop` est rangée par objet
-  (`drop[objet] = { pnj, chance, … }`, chance en dix-millièmes, `0` = taux inconnu) : on cherche monstre par monstre
-  avec un cache plutôt que de construire l'index inverse (179 000 entrées). Expose `ns.ButinBase(pnj)`,
-  `ns.TauxBase(pnj, objet)`, `ns.SourcesBase(objet)`, `ns.BaseButin()`, `ns.MetaBase()`,
-  `ns.BaseButinPresente()`. **Le taux mesuré par la guilde passe toujours avant celui de la base.**
-  Quand la base manque, une bulle unique (`db.baseAvertie`, 20 s après la connexion) propose le lien du
-  programme de mise à jour ; un clic ouvre `ns.AfficherCopie` (`GuildUp_Options.lua` : la fenêtre « Ctrl+C
-  pour copier » du diag, avec un en-tête au choix — le texte de la discussion n'est pas sélectionnable sur
-  ce client).
+- `GuildUp_Butin.lua` : **taux de butin** des monstres, lus dans `GuildUp_Taux.lua` (généré) et montrés dans la
+  fiche du WoWdex. Aucune dépendance ni réseau : les taux arrivent avec l'addon, comme le bestiaire. La ligne
+  est en base 36 (`pnj|objet:chance,…`, chance en dix-millièmes, `0` = lâché mais taux inconnu, 20 objets au
+  plus) ; elle est repérée à la première demande, puis le texte brut est libéré (`ns.TAUX_BUTIN = nil`).
+  Expose `ns.ButinBase(pnj)` et `ns.TauxBase(pnj, objet)`. **Le taux mesuré par la guilde passe toujours
+  avant celui de la base** : celle-ci ne sert qu'aux objets que personne n'a encore vu tomber, et à ceux que
+  le bestiaire écarte (butin commun).
 - `GuildUp_Config.lua` : **réglages propres à la guilde** (`ns.Config` : nom public, cri de guilde, emote animée,
   membre vedette). Chargé en premier, sans dépendance ; les autres modules le lisent via `ns.Config`.
 - `GuildUp_Commandes.lua` : page « Aide », la liste de toutes les commandes de `/smb`. Elles y sont déclarées à la
@@ -174,6 +169,13 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   `ns.DONJONS_QUETES` (quêtes de chaque donjon, par numéro de zone) et `ns.SUITES_QUETES` (suites de quêtes :
   première quête, étape, nombre d'étapes), qui ne sont plus lus depuis le retrait de « Jouer ensemble » (3.7.0) :
   à retirer de `generer_objectifs.py` à la prochaine régénération.
+- `GuildUp_Taux.lua` (`ns.TAUX_BUTIN` : taux de butin des monstres du bestiaire) : généré par
+  `python outils/generer_butin.py` depuis la base **ForeverDB** (GPL-3.0,
+  <https://github.com/foreverfraddons/forever-db>), qui réunit et recoupe elle-même QuestieDB (GPL-3.0),
+  VMaNGOS (GPL-2.0-or-later), cMaNGOS classic-db (GPL) et pfQuest (MIT), plus des relevés en jeu. Sa table
+  `drop` est rangée par objet : le script l'inverse et ne garde que les monstres du bestiaire. Refaire cette
+  fusion nous-mêmes n'aurait aucun intérêt : on prend son résultat. `--verifier` compare sans rien écrire.
+  À relancer après une régénération du bestiaire.
 - `GuildUp_Bestiaire.lua` (`ns.BESTIAIRE` : monstres hostiles, ou neutres avec du butin, placés dans le monde ;
   numéro du WoWdex = ordre du fichier, du plus faible au plus fort ; niveau, rang, deux zones et 8 apparitions au plus,
   butin particulier ; `ns.BESTIAIRE_ZONES`) : généré par `python outils/generer_bestiaire.py` depuis QuestieDB
@@ -238,23 +240,14 @@ dans un fichier. `python outils/annoncer_version.py --depuis 3.3.0 --essai` mont
 
 - Windows : `MiseAJour.cs` → `GuildUpSMB-MiseAJour.exe` (`construire.bat`), publié dans une release `miseajour-<version>`.
 - Linux : `GuildUpSMB-MiseAJour.py` (Python 3.6+, bibliothèque standard seulement, minuteur systemd de l'utilisateur).
-- Les deux installent aussi **ForeverDB**, la base des taux de butin lue par `GuildUp_Butin.lua` : archive
-  `forever.zip` de la release `latest` de son dépôt (2,7 Mo, dossier `ForeverDB/` tout prêt), posée à côté de
-  l'addon. Absente, elle est installée ; présente, on ne regarde qu'une fois par semaine et on ne réécrit les
-  fichiers que si le `## Version:` de son `.toc` a changé. Un échec n'interrompt jamais la mise à jour de
-  l'addon. Réglages : `basedonnees=0` pour ne pas l'installer, `basejours=<n>` pour l'intervalle (0 = à chaque
-  passage). Marque `ForeverDB/.miseajour-smb` : date UTC du dernier coup d'œil.
-- **L'exécutable Windows se remplace lui-même** depuis la 7.6.0, exactement comme la version Linux : il est
-  **versionné dans le dépôt** (`outils/MiseAJour/GuildUpSMB-MiseAJour.exe`) et voyage dans l'archive déjà
-  téléchargée pour l'addon, donc rien de plus à demander à GitHub et les deux avancent toujours ensemble.
-  **Après `construire.bat`, commiter l'`.exe`** : sans ça les membres gardent l'ancien. Comparaison par
-  empreinte, vérification de l'en-tête `MZ` et de la taille, `autoprogramme=0` pour couper. Windows interdit
-  d'écraser un programme en cours mais autorise à le renommer : l'ancien devient `.exe.vieux`, effacé au
-  démarrage suivant. Pas de redémarrage automatique (le mutex d'instance unique rendrait la course perdue
-  d'avance) : la nouvelle version prend la main au prochain lancement.
-- Un membre resté à un ancien `.exe` n'aura jamais rien de tout ça : c'est l'addon qui le rattrape.
-  `GuildUp_Butin.lua` affiche une bulle unique 20 s après la connexion quand la base manque
-  (`db.baseAvertie`), avec un message en discussion qui pointe la release.
+- **L'exécutable Windows se remplace lui-même** depuis la 7.6.1, exactement comme la version Linux : il est
+  **versionné dans le dépôt** (`outils/MiseAJour/GuildUpSMB-MiseAJour.exe`, retiré du `.gitignore`) et voyage
+  dans l'archive déjà téléchargée pour l'addon, donc rien de plus à demander à GitHub et les deux avancent
+  toujours ensemble. **Après `construire.bat`, commiter l'`.exe`** : sans ça les membres gardent l'ancien.
+  Comparaison par empreinte, vérification de l'en-tête `MZ` et de la taille, `autoprogramme=0` pour couper.
+  Windows interdit d'écraser un programme en cours mais autorise à le renommer : l'ancien devient
+  `.exe.vieux`, effacé au démarrage suivant. Pas de redémarrage automatique (le mutex d'instance unique
+  rendrait la course perdue d'avance) : la nouvelle version prend la main au prochain lancement.
   Les joueurs l'ont tiré de `main` et il se remplace lui-même quand ce fichier change : **tout commit sur `main`
   qui le touche part chez eux**, le garder exécutable (`compile` vérifié avant remplacement) et en fins de ligne LF.
 - Les deux suivent la même logique (empreinte du commit de `main` dans `GuildUpSMB/.miseajour`, synchronisation,

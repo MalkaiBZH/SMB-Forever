@@ -16,12 +16,7 @@
 //   * notification Windows ensuite : /reload si seuls des fichiers existants ont changé, relancer
 //     le jeu si des fichiers sont ajoutés ou si le .toc change (le jeu ne voit les nouveaux fichiers
 //     qu'au démarrage), prochain lancement si le jeu est fermé.
-//   * installe aussi l'addon ForeverDB (base de taux de butin du WoWdex, dépendance optionnelle de
-//     GuildUpSMB). Il n'est pas sur notre dépôt : on prend l'archive « forever.zip » de sa release
-//     « latest » (2,7 Mo), qui contient le dossier ForeverDB/ tout prêt. Absent, il est installé ;
-//     présent, on ne regarde qu'une fois par semaine (il est reconstruit deux fois par jour, mais sa
-//     fraîcheur n'a rien de critique). Réglages « basedonnees » (0 pour ne pas l'installer) et
-//     « basejours » (0 = à chaque passage).// Fermer la fenêtre la range dans la zone de notification ; « Quitter » (menu de l'icône) arrête tout.
+// Fermer la fenêtre la range dans la zone de notification ; « Quitter » (menu de l'icône) arrête tout.
 //
 // Arguments :
 //   /auto           démarrage de Windows : directement dans la zone de notification, sans fenêtre.
@@ -37,7 +32,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
 using System.Drawing;
 using System.IO;
 using System.IO.Compression;
@@ -63,9 +57,6 @@ namespace GuildUpSMB
 		public string Commit = "";
 		public int Ajoutes, Modifies, Supprimes;
 		public bool TocModifie;
-		// ForeverDB : la base des taux de butin, installée à côté (voir MettreAJourBase).
-		public string BaseVersion = "";
-		public bool BasePosee, BaseMaj;
 		// Le programme s'est remplacé lui-même : la nouvelle version prendra la main au prochain lancement.
 		public bool ProgrammeRemplace;
 		// Le jeu ne voit les nouveaux fichiers (et un .toc changé) qu'à son démarrage.
@@ -78,10 +69,6 @@ namespace GuildUpSMB
 		const string BRANCHE = "main";
 		const string ADDON = "GuildUpSMB";
 		const string MARQUE = ".miseajour";		// empreinte du commit installé, dans le dossier de l'addon
-		const string BASE_ADDON = "ForeverDB";	// base des taux de butin, addon à part (dépendance optionnelle)
-		const string BASE_URL = "https://github.com/foreverfraddons/forever-db/releases/download/latest/forever.zip";
-		const string BASE_MARQUE = ".miseajour-smb";	// date du dernier coup d'œil, dans le dossier de ForeverDB
-		const int BASE_JOURS = 7;				// on ne regarde pas plus souvent que ça
 		const string PROG_EXE = "GuildUpSMB-MiseAJour.exe";
 		// Ce programme dans le dépôt : il voyage dans l'archive déjà téléchargée, comme celui de Linux.
 		const string SOI = "outils/MiseAJour/" + PROG_EXE;
@@ -182,7 +169,6 @@ namespace GuildUpSMB
 				bilan.DejaAJour = true;
 				bilan.Version = LireVersion(dossierAddon);
 				noter("Déjà à jour (version " + bilan.Version + ", commit " + commit.Substring(0, 7) + ").");
-				MettreAJourBase(jeu, bilan, noter);
 				return bilan;
 			}
 
@@ -214,7 +200,6 @@ namespace GuildUpSMB
 
 			noter(string.Format("Terminé : {0} ajouté(s), {1} modifié(s), {2} supprimé(s).",
 				bilan.Ajoutes, bilan.Modifies, bilan.Supprimes));
-			MettreAJourBase(jeu, bilan, noter);
 			return bilan;
 		}
 
@@ -342,11 +327,9 @@ namespace GuildUpSMB
 		}
 
 		// « ## Version: 1.6.0 » dans le .toc.
-		static string LireVersion(string dossierAddon) { return LireVersion(dossierAddon, ADDON); }
-
-		static string LireVersion(string dossierAddon, string nom)
+		static string LireVersion(string dossierAddon)
 		{
-			string toc = Path.Combine(dossierAddon, nom + ".toc");
+			string toc = Path.Combine(dossierAddon, ADDON + ".toc");
 			if (!File.Exists(toc)) return "?";
 			foreach (string ligne in File.ReadAllLines(toc))
 			{
@@ -371,95 +354,6 @@ namespace GuildUpSMB
 				finally { p.Dispose(); }
 			}
 			return false;
-		}
-
-		// ------------------------------------------------------- Base des taux de butin (ForeverDB)
-
-		// ForeverDB (https://github.com/foreverfraddons/forever-db, GPL-3.0) donne au WoWdex les taux de butin
-		// des monstres. C'est un addon à part, déclaré « ## OptionalDeps » par GuildUpSMB : sans lui tout marche,
-		// il manque seulement ces taux. Comme personne ici ne passe par l'application CurseForge, on l'installe
-		// nous-mêmes. Rien n'est supprimé : on écrase les fichiers, et son .toc décide de ce que le jeu charge.
-		static void MettreAJourBase(string jeu, Bilan bilan, Action<string> noter)
-		{
-			if (LireReglage("basedonnees") == "0") return;
-			string dossier = Path.Combine(jeu, "Interface", "AddOns", BASE_ADDON);
-			string marque = Path.Combine(dossier, BASE_MARQUE);
-			bool present = File.Exists(Path.Combine(dossier, BASE_ADDON + ".toc"));
-			bilan.BaseVersion = present ? LireVersion(dossier, BASE_ADDON) : "";
-
-			// Déjà là : on ne regarde pas plus d'une fois tous les « basejours » jours.
-			if (present)
-			{
-				int jours;
-				if (!int.TryParse(LireReglage("basejours"), out jours) || jours < 0) jours = BASE_JOURS;
-				DateTime vu;
-				if (File.Exists(marque)
-					&& DateTime.TryParse(File.ReadAllText(marque).Trim(), CultureInfo.InvariantCulture,
-						DateTimeStyles.RoundtripKind, out vu)
-					&& (DateTime.UtcNow - vu).TotalDays < jours)
-					return;
-			}
-
-			string temp = Path.Combine(Path.GetTempPath(), "GuildUpSMB-Base-" + Guid.NewGuid().ToString("N"));
-			try
-			{
-				Directory.CreateDirectory(temp);
-				noter(present ? "Vérification de la base des taux de butin (" + BASE_ADDON + ")…"
-					: "Installation de la base des taux de butin (" + BASE_ADDON + ", 2,7 Mo)…");
-				string archive = Path.Combine(temp, "base.zip");
-				TelechargerFichier(BASE_URL, archive, false);
-				string source = Path.Combine(temp, BASE_ADDON);
-				ExtraireBase(archive, source);
-				if (!File.Exists(Path.Combine(source, BASE_ADDON + ".toc")))
-					throw new Exception("l'archive ne contient pas " + BASE_ADDON + "/" + BASE_ADDON + ".toc.");
-
-				string neuve = LireVersion(source, BASE_ADDON);
-				if (present && neuve == bilan.BaseVersion)
-				{
-					noter("Base des taux de butin : déjà à jour (version " + neuve + ").");
-				}
-				else
-				{
-					Directory.CreateDirectory(dossier);
-					foreach (string f in Directory.GetFiles(source))
-						File.Copy(f, Path.Combine(dossier, Path.GetFileName(f)), true);
-					bilan.BaseVersion = neuve;
-					bilan.BasePosee = !present;
-					bilan.BaseMaj = true;
-					noter("Base des taux de butin " + neuve + (present ? " : mise à jour." : " installée dans " + dossier));
-				}
-				File.WriteAllText(marque, DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
-			}
-			catch (Exception e)
-			{
-				// La base n'est qu'un bonus : son échec ne doit jamais faire échouer la mise à jour de l'addon.
-				noter("Base des taux de butin : " + Message(e) + " (sans gravité, l'addon marche sans elle).");
-			}
-			finally
-			{
-				try { Directory.Delete(temp, true); } catch { }
-			}
-		}
-
-		// L'archive de ForeverDB a déjà « ForeverDB/ » pour racine : rien à retirer devant.
-		static void ExtraireBase(string archive, string destination)
-		{
-			string racine = Path.GetFullPath(destination) + Path.DirectorySeparatorChar;
-			using (ZipArchive zip = ZipFile.OpenRead(archive))
-			{
-				foreach (ZipArchiveEntry entree in zip.Entries)
-				{
-					string chemin = entree.FullName.Replace('\\', '/');
-					if (!chemin.StartsWith(BASE_ADDON + "/")) continue;
-					chemin = chemin.Substring(BASE_ADDON.Length + 1);
-					if (chemin.Length == 0 || chemin.EndsWith("/") || chemin.Contains("/")) continue;
-
-					string cible = Path.GetFullPath(Path.Combine(destination, chemin));
-					if (!cible.StartsWith(racine, StringComparison.OrdinalIgnoreCase)) continue;
-					Directory.CreateDirectory(Path.GetDirectoryName(cible));
-					entree.ExtractToFile(cible, true);
-				}
-			}
 		}
 
 		// ------------------------------------------------------- Le programme se remplace lui-même
@@ -508,25 +402,19 @@ namespace GuildUpSMB
 
 		// ---------------------------------------------------------------- Réseau
 
-		static void Preparer(HttpWebRequest requete, string accept) { Preparer(requete, accept, true); }
-
-		static void Preparer(HttpWebRequest requete, string accept, bool avecJeton)
+		static void Preparer(HttpWebRequest requete, string accept)
 		{
 			requete.UserAgent = "GuildUpSMB-MiseAJour";
 			requete.Accept = accept;
 			requete.Timeout = 30000;
-			string jeton = avecJeton ? Environment.GetEnvironmentVariable("GUILDUPSMB_JETON") : null;
+			string jeton = Environment.GetEnvironmentVariable("GUILDUPSMB_JETON");
 			if (!string.IsNullOrEmpty(jeton)) requete.Headers[HttpRequestHeader.Authorization] = "Bearer " + jeton.Trim();
 		}
 
-		// avecJeton : seulement pour notre dépôt. Une release GitHub redirige vers un autre domaine, qui
-		// refuse un en-tête d'autorisation qui ne le concerne pas.
-		static void TelechargerFichier(string url, string fichier) { TelechargerFichier(url, fichier, true); }
-
-		static void TelechargerFichier(string url, string fichier, bool avecJeton)
+		static void TelechargerFichier(string url, string fichier)
 		{
 			var requete = (HttpWebRequest)WebRequest.Create(url);
-			Preparer(requete, "application/vnd.github+json", avecJeton);
+			Preparer(requete, "application/vnd.github+json");
 			requete.Timeout = 120000;
 			using (var reponse = requete.GetResponse())
 			using (var flux = reponse.GetResponseStream())
@@ -902,12 +790,7 @@ namespace GuildUpSMB
 			if (bilan.DejaAJour)
 			{
 				Infobulle(bilan.Version + " à jour (vérifié à " + heure + ")");
-				if (bilan.BaseMaj)
-					Bulle("Base des taux de butin " + (bilan.BasePosee ? "installée" : "mise à jour"),
-						bilan.BasePosee
-							? "ForeverDB " + bilan.BaseVersion + " : relancez le jeu pour que le WoWdex s'en serve."
-							: "ForeverDB " + bilan.BaseVersion + ".", ToolTipIcon.Info, null);
-				else if (manuel && !fenetre.Visible)
+				if (manuel && !fenetre.Visible)
 					Bulle("SMB Forever est à jour", "Version " + bilan.Version + ".", ToolTipIcon.Info, null);
 				return;
 			}
@@ -921,7 +804,6 @@ namespace GuildUpSMB
 				texte = "Relancez le jeu : de nouveaux fichiers ont été ajoutés, /reload ne suffit pas.";
 			else
 				texte = "Tapez /reload en jeu pour la charger.";
-			if (bilan.BasePosee) texte += " La base des taux de butin a été installée au passage.";
 			if (bilan.ProgrammeRemplace)
 				texte += " Le programme de mise à jour s'est renouvelé : sa nouvelle version prendra la main au"
 					+ " prochain lancement.";

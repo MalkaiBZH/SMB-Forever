@@ -264,10 +264,10 @@ local function DiagCollecte(L)
 		tostring(GetSpecialization ~= nil and GetSpecializationRole ~= nil)))
 end
 
--- Fenêtre avec un texte déjà sélectionné : Ctrl+C pour copier (le diagnostic, un lien…)
+-- Fenêtre avec le texte du diagnostic, déjà sélectionné : Ctrl+C pour copier
 local fenetreCopie
 
-local function AfficherCopie(texte, entete)
+local function AfficherCopie(texte)
 	if not fenetreCopie then
 		-- cadre plat aux couleurs du kit, déplaçable, fermé par Échap
 		local UI = ns.UI
@@ -285,7 +285,7 @@ local function AfficherCopie(texte, entete)
 		tinsert(UISpecialFrames, "GuildUpCopie")
 		local titre = UI.Texte(f, "GameFontNormal", UI.C.ors)
 		titre:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -12)
-		f.titre = titre
+		titre:SetText("SMB Forever — diag (Ctrl+C pour copier)")
 		local fermer = UI.Fermer(f, function() f:Hide() end, 24)
 		fermer:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -6)
 		local fond = UI.Cadre(f, UI.C.champ, UI.C.bord)
@@ -311,16 +311,12 @@ local function AfficherCopie(texte, entete)
 		f.edit = edit
 		fenetreCopie = f
 	end
-	fenetreCopie.titre:SetText((entete or "SMB Forever — diag") .. " (Ctrl+C pour copier)")
 	fenetreCopie.texte = texte
 	fenetreCopie:Show()
 	fenetreCopie.edit:SetText(texte)
 	fenetreCopie.edit:SetFocus()
 	fenetreCopie.edit:HighlightText()
 end
-
--- réutilisable par les autres modules (GuildUp_Butin.lua : le lien du programme de mise à jour)
-ns.AfficherCopie = AfficherCopie
 
 -- Test pour la future carte de la guilde : la position du joueur est-elle lisible par un addon ?
 local function DiagPosition(L)

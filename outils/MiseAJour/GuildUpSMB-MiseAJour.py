@@ -34,7 +34,6 @@
 # (reglages.ini, journal.txt).
 
 import argparse
-import datetime
 import errno
 import glob
 import hashlib
@@ -55,10 +54,6 @@ BRANCHE = "main"
 ADDON = "GuildUpSMB"
 SOI = "outils/MiseAJour/GuildUpSMB-MiseAJour.py"	# ce programme dans le dépôt (mise à jour de lui-même)
 MARQUE = ".miseajour"		# empreinte du commit installé, dans le dossier de l'addon
-BASE_ADDON = "ForeverDB"	# base des taux de butin, addon à part (dépendance optionnelle de GuildUpSMB)
-BASE_URL = "https://github.com/foreverfraddons/forever-db/releases/download/latest/forever.zip"
-BASE_MARQUE = ".miseajour-smb"	# date du dernier coup d'œil, dans le dossier de ForeverDB
-BASE_JOURS = 7				# on ne regarde pas plus souvent que ça
 NOM = "smb-forever-maj"		# programme installé et unités systemd
 TITRE = "SMB Forever Updater"
 INTERVALLES = (5, 15, 30, 60)	# minutes
@@ -86,9 +81,6 @@ class Bilan(object):
 		self.commit = ""
 		self.ajoutes = self.modifies = self.supprimes = 0
 		self.toc_modifie = False
-		# ForeverDB : la base des taux de butin, installée à côté (voir mettre_a_jour_base).
-		self.base_version = ""
-		self.base_posee = self.base_maj = False
 
 	@property
 	def change(self):
@@ -321,10 +313,10 @@ def dossier_addon(jeu):
 	return os.path.join(addons, ADDON)
 
 
-def lire_version(dossier, nom=ADDON):
+def lire_version(dossier):
 	"""« ## Version: 1.6.0 » dans le .toc."""
 	try:
-		with open(os.path.join(dossier, nom + ".toc"), encoding="utf-8-sig", errors="replace") as f:
+		with open(os.path.join(dossier, ADDON + ".toc"), encoding="utf-8-sig", errors="replace") as f:
 			for ligne in f:
 				l = ligne.strip()
 				if l.lower().startswith("## version:"):
@@ -352,13 +344,13 @@ def jeu_lance(jeu):
 
 # ---------------------------------------------------------------- Réseau
 
-def requete(url, accept, etag=None, jeton=True):
+def requete(url, accept, etag=None):
 	r = urllib.request.Request(url)
 	r.add_header("User-Agent", "GuildUpSMB-MiseAJour")
 	r.add_header("Accept", accept)
 	if etag:
 		r.add_header("If-None-Match", etag)
-	jeton = (os.environ.get("GUILDUPSMB_JETON") or "").strip() if jeton else ""
+	jeton = (os.environ.get("GUILDUPSMB_JETON") or "").strip()
 	if jeton:
 		r.add_header("Authorization", "Bearer " + jeton)
 	return r
@@ -394,11 +386,9 @@ def dernier_commit():
 		raise Erreur(message_reseau(e))
 
 
-# jeton : seulement pour notre dépôt. Une release GitHub redirige vers un autre domaine, qui refuse
-# un en-tête d'autorisation qui ne le concerne pas.
-def telecharger(url, fichier, jeton=True):
+def telecharger(url, fichier):
 	try:
-		with urllib.request.urlopen(requete(url, "application/vnd.github+json", jeton=jeton), timeout=120) as r, \
+		with urllib.request.urlopen(requete(url, "application/vnd.github+json"), timeout=120) as r, \
 				open(fichier, "wb") as sortie:
 			shutil.copyfileobj(r, sortie)
 	except urllib.error.HTTPError as e:
@@ -512,7 +502,6 @@ def executer(jeu, noter):
 		bilan.deja_a_jour = True
 		bilan.version = lire_version(addon)
 		noter("Déjà à jour (version {0}, commit {1}).".format(bilan.version, commit[:7]))
-		mettre_a_jour_base(jeu, bilan, noter)
 		return bilan
 
 	temp = tempfile.mkdtemp(prefix="GuildUpSMB-MiseAJour-")
@@ -544,92 +533,8 @@ def executer(jeu, noter):
 
 	noter("Terminé : {0} ajouté(s), {1} modifié(s), {2} supprimé(s).".format(
 		bilan.ajoutes, bilan.modifies, bilan.supprimes))
-	mettre_a_jour_base(jeu, bilan, noter)
 	return bilan
 
-
-def mettre_a_jour_base(jeu, bilan, noter):
-	"""ForeverDB (https://github.com/foreverfraddons/forever-db, GPL-3.0) donne au WoWdex les taux de butin.
-
-	C'est un addon à part, déclaré « ## OptionalDeps » par GuildUpSMB : sans lui tout marche, il manque
-	seulement ces taux. Comme personne ici ne passe par l'application CurseForge, on l'installe nous-mêmes,
-	depuis l'archive « forever.zip » de sa release « latest » (2,7 Mo), qui contient le dossier tout prêt.
-	Absent, il est installé ; présent, on ne regarde qu'une fois tous les BASE_JOURS jours (il est reconstruit
-	deux fois par jour, mais sa fraîcheur n'a rien de critique). Rien n'est supprimé : on écrase les fichiers,
-	et son .toc décide de ce que le jeu charge. Un échec ici ne doit jamais faire échouer la mise à jour.
-	"""
-	if lire_reglage("basedonnees") == "0":
-		return
-	dossier = os.path.join(jeu, "Interface", "AddOns", BASE_ADDON)
-	marque = os.path.join(dossier, BASE_MARQUE)
-	present = os.path.isfile(os.path.join(dossier, BASE_ADDON + ".toc"))
-	bilan.base_version = lire_version(dossier, BASE_ADDON) if present else ""
-
-	if present:
-		try:
-			jours = int(lire_reglage("basejours"))
-			if jours < 0:
-				raise ValueError
-		except (TypeError, ValueError):
-			jours = BASE_JOURS
-		try:
-			with open(marque, encoding="utf-8") as f:
-				vu = datetime.datetime.strptime(f.read().strip()[:19], "%Y-%m-%dT%H:%M:%S")
-			if (datetime.datetime.utcnow() - vu).total_seconds() < jours * 86400:
-				return
-		except (OSError, ValueError):
-			pass
-
-	temp = tempfile.mkdtemp(prefix="GuildUpSMB-Base-")
-	try:
-		noter("Vérification de la base des taux de butin ({0})…".format(BASE_ADDON) if present
-			else "Installation de la base des taux de butin ({0}, 2,7 Mo)…".format(BASE_ADDON))
-		archive = os.path.join(temp, "base.zip")
-		telecharger(BASE_URL, archive, jeton=False)
-		source = os.path.join(temp, BASE_ADDON)
-		extraire_base(archive, source)
-		if not os.path.isfile(os.path.join(source, BASE_ADDON + ".toc")):
-			raise Erreur("l'archive ne contient pas {0}/{0}.toc.".format(BASE_ADDON))
-
-		neuve = lire_version(source, BASE_ADDON)
-		if present and neuve == bilan.base_version:
-			noter("Base des taux de butin : déjà à jour (version {0}).".format(neuve))
-		else:
-			os.makedirs(dossier, exist_ok=True)
-			for nom in sorted(os.listdir(source)):
-				chemin = os.path.join(source, nom)
-				if os.path.isfile(chemin):
-					shutil.copy2(chemin, os.path.join(dossier, nom))
-			bilan.base_version = neuve
-			bilan.base_posee = not present
-			bilan.base_maj = True
-			noter("Base des taux de butin {0}{1}".format(
-				neuve, " : mise à jour." if present else " installée dans " + dossier))
-		with open(marque, "w", encoding="utf-8") as f:
-			f.write(datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"))
-	except (Erreur, OSError, zipfile.BadZipFile) as e:
-		noter("Base des taux de butin : {0} (sans gravité, l'addon marche sans elle).".format(e))
-	finally:
-		shutil.rmtree(temp, ignore_errors=True)
-
-
-def extraire_base(archive, destination):
-	"""L'archive de ForeverDB a déjà « ForeverDB/ » pour racine : rien à retirer devant."""
-	os.makedirs(destination, exist_ok=True)
-	racine = os.path.realpath(destination) + os.sep
-	with zipfile.ZipFile(archive) as zip:
-		for entree in zip.namelist():
-			chemin = entree.replace("\\", "/")
-			if not chemin.startswith(BASE_ADDON + "/"):
-				continue
-			chemin = chemin[len(BASE_ADDON) + 1:]
-			if not chemin or chemin.endswith("/") or "/" in chemin:
-				continue
-			cible = os.path.realpath(os.path.join(destination, chemin))
-			if not cible.startswith(racine):
-				continue
-			with zip.open(entree) as src, open(cible, "wb") as sortie:
-				shutil.copyfileobj(src, sortie)
 
 def mettre_a_jour_programme(nouveau, noter):
 	"""Le programme installé (~/.local/bin) suit celui du dépôt : remplacé s'il a changé."""
