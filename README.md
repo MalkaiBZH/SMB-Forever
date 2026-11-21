@@ -138,7 +138,9 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 - **WoWdex** (`/smb wowdex`) : le bestiaire de Forever à compléter, comme un carnet de collection. Plus de
   3 300 monstres hostiles, numérotés du plus faible au plus fort, chacun avec trois paliers : *vu* (sa barre de nom,
   ta cible ou ton survol : son nom et son modèle apparaissent, sinon « ??? »), *capturé* (vaincu par toi ou ton
-  groupe) et *dépouillé* (son corps fouillé). **Les rares sont l'objectif** : le compteur de l'entête compte les
+  groupe) et *dépouillé* (son corps fouillé). En donjon, où le jeu cache aux addons qui sont les
+  monstres, un monstre est capturé quand il te donne de l'expérience, à la fin d'un combat de boss, ou quand tu
+  fouilles son corps. **Les rares sont l'objectif** : le compteur de l'entête compte les
   rares, rares élites et boss capturés (400), et ils donnent ton titre de chasseur, de Novice à Légende de Forever.
   Cinq onglets :
   - *Avis de recherche* : les rares et boss en grandes cartes, avec leur modèle 3D, leur zone, et « repéré il y a

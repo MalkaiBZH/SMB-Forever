@@ -135,8 +135,13 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "7.7.1", "7.7.0", "7.6.3", "7.6.2", "7.6.1", "7.6.0", "7.5.1", "7.5.0", "7.4.0", "7.3.0", "7.2.0", "7.1.1", "7.1.0", "7.0.0", "6.0.0", "5.5.0", "5.4.0", "5.3.1", "5.3.0", "5.2.0", "5.1.1", "5.1.0", "5.0.0", "4.3.2", "4.3.1", "4.3.0", "4.2.0", "4.1.0", "4.0.6", "4.0.5", "4.0.4", "4.0.3", "4.0.2", "4.0.1", "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "7.7.2", "7.7.1", "7.7.0", "7.6.3", "7.6.2", "7.6.1", "7.6.0", "7.5.1", "7.5.0", "7.4.0", "7.3.0", "7.2.0", "7.1.1", "7.1.0", "7.0.0", "6.0.0", "5.5.0", "5.4.0", "5.3.1", "5.3.0", "5.2.0", "5.1.1", "5.1.0", "5.0.0", "4.3.2", "4.3.1", "4.3.0", "4.2.0", "4.1.0", "4.0.6", "4.0.5", "4.0.4", "4.0.3", "4.0.2", "4.0.1", "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["7.7.2"] = {
+		"Le |cffffd100WoWdex|r compte enfin le butin quand tu ramasses vite : avec le ramassage automatique, la fenêtre de butin était déjà vide quand l'addon la lisait, et presque aucun corps fouillé n'était compté. Tes monstres passent maintenant bien à « dépouillé », et les taux de butin de la guilde vont pouvoir se remplir.",
+		"En |cffffd100donjon|r, le jeu cache aux addons qui sont les monstres : aucun n'était capturé, par personne. Les |cffffd100boss|r le sont maintenant à la fin du combat, et les autres monstres quand ils te donnent de l'expérience ou que tu fouilles leur corps.",
+		"Plus de message d'erreur « secret » en haut de l'écran quand tu ouvres un butin en donjon.",
+	},
 	["7.7.1"] = {
 		"Le |cffffd100« ! »|r des objectifs de quête ne s'affiche plus sur tous les monstres : il ne marque à nouveau que ceux dont tu as vraiment besoin. L'infobulle du client range la ligne de niveau sous le même numéro que les objectifs de quête, et l'addon la prenait pour une quête à faire.",
 	},

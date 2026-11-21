@@ -14,6 +14,7 @@ local carte = ns.BESTIAIRE_ZONES:match("\n?12|[^|\n]*|(%d*)")
 CARTE_ELWYNN = tonumber(carte)
 client.Carte(CARTE_ELWYNN)
 local rare, normal, rare2, boss
+local donjon, nomsDonjon = {}, {} -- deux monstres d'instance (zone sans position), le premier de chaque nom
 for ligne in ns.BESTIAIRE:gmatch("[^\n]+") do
 	local id, fr, en, mi, ma, rang, zones = ligne:match("^(%d+)|([^|]*)|([^|]*)|(%d+)|(%d+)|(%d+)|([^|]*)|")
 	if id and zones:match("^12:") then
@@ -22,6 +23,10 @@ for ligne in ns.BESTIAIRE:gmatch("[^\n]+") do
 		elseif rang == "0" and not normal then normal = { id = tonumber(id), nom = fr } end
 	end
 	if id and rang == "3" and not boss then boss = { id = tonumber(id), nom = fr } end
+	if id and zones:match("^%d+:$") and not nomsDonjon[fr] then
+		nomsDonjon[fr] = true
+		if #donjon < 2 then donjon[#donjon + 1] = { id = tonumber(id), nom = fr } end
+	end
 end
 print("repères", CARTE_ELWYNN, rare.id, rare.nom, rare2 and rare2.id, normal.id, normal.nom, boss.id)
 Charger("GuildUp_Wowdex.lua")
@@ -56,6 +61,53 @@ Etape("monstre normal vu puis vaincu et fouillé", function()
 	OnEvent(ev, "LOOT_OPENED")
 	local e = db.wowdex.m[normal.id]
 	assert(e and e.k == 1 and e.d == 1 and e.b[2589] == 1, "capture ou dépouille manquante")
+end)
+Etape("butin lu dès LOOT_READY, une seule fois par corps", function()
+	local e = db.wowdex.m[normal.id]
+	unites.target = { id = normal.id, nom = normal.nom, mort = true, n = "C" }
+	OnEvent(ev, "LOOT_READY")
+	OnEvent(ev, "LOOT_OPENED")
+	OnEvent(ev, "LOOT_READY")
+	assert(e.k == 2 and e.d == 2 and e.b[2589] == 2, ("corps compté %d fois, dépouillé %d fois"):format(e.k, e.d))
+	assert(db.wowdex.diag.corpsPrets == 1 and db.wowdex.diag.butinsOuverts == 2, "relevé du butin")
+end)
+Etape("en instance : GUID cachés, boss par la fin du combat, monstre par la ligne d'expérience, butin", function()
+	assert(#donjon == 2, "pas de monstre d'instance dans le bestiaire")
+	local A, B = donjon[1], donjon[2]
+	IsInInstance = function() return true end
+	COMBATLOG_XPGAIN_FIRSTPERSON = "%s meurt, vous gagnez %d points d'expérience."
+	-- la cible : un monstre dont le jeu cache le GUID
+	unites.target = { id = A.id, nom = A.nom, mort = true, n = "S" }
+	client.secrets[UnitGUID("target")] = true
+	OnEvent(ev, "PLAYER_TARGET_CHANGED")
+	assert(not db.wowdex.m[A.id] and db.wowdex.diag.guidsCaches == 1, "un GUID caché ne doit rien donner")
+	-- boss : deux évènements et la ligne d'expérience, une seule mort
+	OnEvent(ev, "ENCOUNTER_END", 2741, A.nom, 1, 5, 0)
+	assert(not db.wowdex.m[A.id], "combat de boss perdu compté")
+	OnEvent(ev, "ENCOUNTER_END", 2741, A.nom, 1, 5, 1)
+	OnEvent(ev, "BOSS_KILL", 2741, A.nom)
+	OnEvent(ev, "CHAT_MSG_COMBAT_XP_GAIN", A.nom .. " meurt, vous gagnez 350 points d'expérience.")
+	assert(db.wowdex.m[A.id] and db.wowdex.m[A.id].k == 1, "boss compté " .. tostring(db.wowdex.m[A.id] and db.wowdex.m[A.id].k))
+	print("      " .. messages[#messages])
+	-- deux monstres du même nom, deux lignes d'expérience (la seconde avec un bonus)
+	OnEvent(ev, "CHAT_MSG_COMBAT_XP_GAIN", B.nom .. " meurt, vous gagnez 120 points d'expérience.")
+	OnEvent(ev, "CHAT_MSG_COMBAT_XP_GAIN", B.nom .. " meurt, vous gagnez 120 points d'expérience. (+60 exp bonus Reposé)")
+	OnEvent(ev, "CHAT_MSG_COMBAT_XP_GAIN", "Vous gagnez 500 points d'expérience.")
+	OnEvent(ev, "CHAT_MSG_COMBAT_XP_GAIN", "Monstre de nulle part meurt, vous gagnez 5 points d'expérience.")
+	assert(db.wowdex.m[B.id].k == 2, "lignes d'expérience : " .. db.wowdex.m[B.id].k)
+	assert(db.wowdex.diag.nomsInconnusTexte == "Monstre de nulle part", "nom inconnu pas relevé")
+	-- le corps du premier, fouillé : son GUID arrive en clair par le butin alors que la cible reste cachée ;
+	-- cette mort était déjà comptée par la ligne d'expérience
+	local vraieSource = GetLootSourceInfo
+	GetLootSourceInfo = function() return ("Creature-0-1-2-3-%d-00001Z"):format(B.id), 1 end
+	OnEvent(ev, "LOOT_READY")
+	GetLootSourceInfo = vraieSource
+	assert(db.wowdex.m[B.id].k == 2 and db.wowdex.m[B.id].d == 1, "corps fouillé en instance")
+	-- hors instance, les lignes d'expérience ne comptent pas (le GUID fait foi)
+	IsInInstance = function() return false end
+	OnEvent(ev, "CHAT_MSG_COMBAT_XP_GAIN", B.nom .. " meurt, vous gagnez 120 points d'expérience.")
+	assert(db.wowdex.m[B.id].k == 2, "ligne d'expérience comptée hors instance")
+	unites.target = nil
 end)
 Etape("capture du rare : bulle, fil d'activité, losange retiré", function()
 	local avant = #bulles

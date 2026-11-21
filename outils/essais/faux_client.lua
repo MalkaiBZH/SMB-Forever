@@ -126,7 +126,8 @@ GetLootSourceInfo = function() return UnitGUID("target"), 1 end
 local inconnues = {}
 setmetatable(_G, { __index = function(_, k) inconnues[k] = (inconnues[k] or 0) + 1 return nil end })
 
--- ns
+-- ns ; secrets[valeur] = true : une valeur que le jeu cache (ns.Secrete la reconnaît)
+local secrets = {}
 local db = { notifs = {}, partagePosition = true }
 local envoyes, bulles, activite, messages = {}, {}, {}, {}
 local ecouteur, creerPage
@@ -141,7 +142,7 @@ local ns = {
 	Simplifier = function(s) return s:lower() end,
 	NomJoueur = function(c) return (c:gsub("%-.*", "")) end,
 	NomCourt = function(c) return c end,
-	Secrete = function() return false end,
+	Secrete = function(v) return secrets[v] == true end,
 	Coeur = { Message = function(t) messages[#messages + 1] = t end },
 	InfoObjet = function(o) return "Objet " .. o, "[Objet " .. o .. "]", 1, "icone" end,
 	Precharger = function() end,
@@ -193,6 +194,7 @@ end
 return {
 	ns = ns, db = db, cadres = cadres, unites = unites, plaque = plaque, Factice = Factice, Charger = Charger,
 	Etape = Etape, Bilan = Bilan, envoyes = envoyes, bulles = bulles, activite = activite, messages = messages,
+	secrets = secrets,
 	Avancer = function(s) horloge = horloge + s end,
 	Carte = function(c) CARTE_ELWYNN = c end,
 	Ecouteur = function() return ecouteur end,
