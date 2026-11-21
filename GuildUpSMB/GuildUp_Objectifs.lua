@@ -193,17 +193,22 @@ local function LireInfobulle(unit)
 	if type(data) ~= "table" or type(data.lines) ~= "table" then return false, {}, false end
 	local moi, autres = false, {}
 	local qui = nil      -- nil = moi (lignes sous le titre), sinon le nom du coéquipier
+	-- Un objectif ne vient jamais seul : il est toujours sous le titre de sa quête. Sans cette condition,
+	-- toute ligne du haut de l'infobulle comptait comme un objectif à moi — et sur ce client le type
+	-- « objectif de quête » tombe sur un numéro que porte aussi la ligne de niveau, donc tous les monstres
+	-- se retrouvaient marqués.
+	local dansQuete = false
 	local monNom = MonNom()
 	for _, ligne in ipairs(data.lines) do
 		if ligne.args and TooltipUtil and TooltipUtil.SurfaceArgs then pcall(TooltipUtil.SurfaceArgs, ligne) end
 		local t = ligne.type
 		if t == T_TITRE then
-			qui = nil
+			qui, dansQuete = nil, true
 		elseif t == T_JOUEUR then
 			local nom = ligne.leftText
 			nom = nom and (ns.NomCourt and ns.NomCourt(nom) or nom)
 			qui = (nom and nom ~= monNom) and nom or nil
-		elseif t == T_OBJECTIF and ObjectifAFaire(ligne) then
+		elseif t == T_OBJECTIF and dansQuete and ObjectifAFaire(ligne) then
 			if qui then autres[qui] = true else moi = true end
 		end
 	end
@@ -454,6 +459,30 @@ ns.DiagObjectifs = function(L)
 		Actif() and "affichés" or "coupés", DONNEES and "chargées" or "absentes",
 		tostring(C_TooltipInfo ~= nil and C_TooltipInfo.GetUnit ~= nil),
 		tostring(T_TITRE), tostring(T_OBJECTIF), tostring(T_JOUEUR), n, g, exemple or "pas de cible"))
+
+	-- Le détail de l'infobulle de la cible : c'est la seule façon de voir quelles lignes le client
+	-- renvoie vraiment, et laquelle l'addon prend pour un objectif de quête.
+	if unit and C_TooltipInfo and C_TooltipInfo.GetUnit then
+		local ok, data = pcall(C_TooltipInfo.GetUnit, unit)
+		if ok and type(data) == "table" and type(data.lines) == "table" then
+			L(("infobulle de la cible : %d ligne(s)"):format(#data.lines))
+			for i, ligne in ipairs(data.lines) do
+				if ligne.args and TooltipUtil and TooltipUtil.SurfaceArgs then
+					pcall(TooltipUtil.SurfaceArgs, ligne)
+				end
+				local marque = ""
+				if ligne.type == T_TITRE then marque = "  <- titre de quête"
+				elseif ligne.type == T_JOUEUR then marque = "  <- joueur"
+				elseif ligne.type == T_OBJECTIF then
+					marque = ObjectifAFaire(ligne) and "  <- OBJECTIF À FAIRE (marque le monstre)" or "  <- objectif fini"
+				end
+				L(("  %d. type=%s completed=%s « %s »%s"):format(i, tostring(ligne.type),
+					tostring(ligne.completed), tostring(ligne.leftText or ""):sub(1, 40), marque))
+			end
+		else
+			L("infobulle de la cible : illisible")
+		end
+	end
 end
 
 --------------------------------------------------------------------------------
