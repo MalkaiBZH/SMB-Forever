@@ -98,6 +98,13 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   la guilde. Cinq onglets : Avis de recherche et Bestiaire (même grille, à lignes entières car un modèle 3D ne se
   découpe pas dans une zone qui défile, et même fiche), Zones, Carnet de chasse, Guilde. Monstres pistés
   (`GuildUpDB.wowdex.pistes`), losange sur les barres de nom (`ns.MajPlaquesWowdex`).
+- `GuildUp_Objectifs.lua` (le « ! » sur les ennemis de quête) : un objectif « butin » dont l'objet est lâché
+  par plus de `MAX_SOURCES_BUTIN` espèces (25) est **ignoré**. Ce sont les butins génériques — herbe, étoffe,
+  cuir — et les marquer mettait un « ! » sur presque tout l'écran : la médiane des objectifs est à 4 espèces,
+  mais 10 % dépassent 40 et le record est à 1491. Deux autres pièges du même fichier : le marquage a trois
+  sources (données, infobulle, secours par le nom), et sur ce client `Enum.TooltipDataLineType.QuestObjective`
+  vaut 8, numéro que porte aussi la ligne de niveau — d'où l'obligation d'avoir vu un titre de quête avant
+  d'accepter une ligne d'objectif.
 - `GuildUp_Quetes.lua` lit aussi `ns.SUITES_QUETES` (`GuildUp_ObjectifsQuetes.lua`, chargé **après** lui :
   la lecture est donc différée au premier besoin, puis le texte brut est libéré). Elle sert à apparier deux
   membres sur la **même suite de quêtes à des étapes différentes**, et pas seulement sur une quête identique.

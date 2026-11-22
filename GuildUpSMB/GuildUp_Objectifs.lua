@@ -130,6 +130,12 @@ local function GroupeCompte(q, genre, k, total)
 	return total == 0
 end
 
+-- Au-delà de ce nombre d'espèces, un objet est un butin générique (herbe, étoffe, cuir, viande…) et non
+-- le butin d'un monstre précis : le marquer partout mettrait un « ! » sur presque tout l'écran sans rien
+-- apprendre. La quête 6123 demande de la Terrestrine, listée sur 94 monstres ; le record du fichier est à
+-- 1491. La médiane est à 4 : les objectifs utiles sont petits, la coupure ne les touche pas.
+local MAX_SOURCES_BUTIN = 25
+
 local mesPnj = {}        -- [numéro de PNJ] = true : monstres dont j'ai besoin (données + journal)
 local textesATuer = {}   -- secours : textes de mes objectifs « à tuer » pas terminés
 
@@ -152,7 +158,7 @@ local function CalculerMesBesoins()
 				end
 			end
 			for k, b in ipairs(d.butin) do
-				if GroupeCompte(q, "item", k, nButin) then
+				if #b.pnj <= MAX_SOURCES_BUTIN and GroupeCompte(q, "item", k, nButin) then
 					for _, id in ipairs(b.pnj) do pnj[id] = true end
 				end
 			end
