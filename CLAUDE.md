@@ -89,7 +89,10 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   l'infobulle du jeu (`C_TooltipInfo.GetUnit`) ; listes des coéquipiers reçues sur `PARTY` / `RAID` (`GuildUpObj`).
 - `GuildUp_Wowdex.lua` : page **WoWdex** (`ns.AjouterPage("wowdex")`, `/smb wowdex`) : le bestiaire de
   `GuildUp_Bestiaire.lua` à compléter (vu, capturé = vaincu, dépouillé), détection sur les barres de nom, la cible, le
-  survol et `LOOT_OPENED` (`GetLootSourceInfo`) ; pas de journal de combat (`COMBAT_LOG_EVENT_UNFILTERED` est interdit
+  survol, `LOOT_READY` puis `LOOT_OPENED` (`GetLootSourceInfo` ; avec le ramassage automatique, la fenêtre est déjà vide à
+  `LOOT_OPENED`) ; en instance, où le jeu cache GUID et noms des monstres (valeurs secrètes), par le nom lu dans la ligne
+  d'expérience et dans `ENCOUNTER_END` / `BOSS_KILL` ; relevé `GuildUpDB.wowdex.diag` (ce que le jeu a caché, dernière
+  erreur avalée par `pcall`) montré par `/smb diag` ; pas de journal de combat (`COMBAT_LOG_EVENT_UNFILTERED` est interdit
   aux addons sur ce client : l'enregistrer, même sous `pcall`, affiche une erreur) ; monstres hors bestiaire appris
   sur l'unité ; butin des récoltes (dépeçage, vol à la tire…) ignoré ; recherche par monstre, zone ou objet ; ligne dans
   l'infobulle des monstres ; `ns.NomWowdex(pnj)` (fil d'activité, genres `W` et `R`), `ns.SourcesWowdex(objet)` (Encyclopédie).

@@ -8,7 +8,15 @@
 --             COMBAT_LOG_EVENT_UNFILTERED ; le demander, même sous pcall, affiche une erreur d'addon.)
 --   dépouillé fouillé : ce qu'il a lâché est compté, pour donner les taux de butin. Pas le butin d'une récolte
 --             (dépeçage, vol à la tire, minage, herboristerie : sort lancé moins de 2 s avant l'ouverture du
---             butin, reconnu à son numéro ou à son nom), ni celui d'un monstre ciblé encore vivant
+--             butin, reconnu à son numéro ou à son nom), ni celui d'un monstre ciblé encore vivant. Le butin est
+--             lu dès LOOT_READY : avec le ramassage automatique, la fenêtre est vide (ou ne s'ouvre pas) à
+--             LOOT_OPENED, où il ne restait que les objets soumis à un jet de dés.
+-- En instance, Forever cache aux addons le GUID et le nom des monstres (valeurs secrètes) : barres de nom, cible et
+-- survol ne disent plus qui ils sont. Un monstre y est capturé par son nom, cherché dans le bestiaire : celui de
+-- la ligne d'expérience (« X meurt, vous gagnez… » : une par monstre, aucune pour un monstre gris) ou de la fin
+-- d'un combat de boss (ENCOUNTER_END, BOSS_KILL) ; ou par son corps fouillé, quand le butin donne son GUID.
+-- GuildUpDB.wowdex.diag : petit relevé de ce que le jeu a caché et de ce que chaque voie a donné, avec la
+-- dernière erreur avalée par pcall (/smb diag) : la seule trace, après coup, d'un souci en jeu.
 -- Les rares sont le cœur du WoWdex (7.3.0) : rares, rares élites et boss (RARES) font le compteur de l'entête, le
 -- titre de chasseur (TITRES : seuils en rares et boss capturés), le classement de la guilde et l'onglet « Avis de
 -- recherche ». Un rare du monde (TRAQUES : rare, rare élite) vu vivant déclenche une alerte si je ne l'ai pas
@@ -198,6 +206,116 @@ local function Entree(id, creer)
 		w.m[id] = e
 	end
 	return e
+end
+
+-- En instance, le jeu cache l'identité des monstres : voir l'en-tête. sansGuid[pnj] = { t = GetTime(), n = morts
+-- comptées par le nom et pas encore revues par un GUID, boss }, parGuid[pnj] = GetTime() de la dernière mort
+-- comptée par un GUID : une même mort n'est pas comptée par les deux voies.
+local Instance = { sansGuid = {}, parGuid = {} }
+
+-- relevé : compteur, et le dernier texte qui va avec (nom inconnu, erreur)
+function Instance.Noter(cle, texte)
+	local w = Moi()
+	if not w then return end
+	if type(w.diag) ~= "table" then w.diag = { depuis = Maintenant() } end
+	w.diag[cle] = (tonumber(w.diag[cle]) or 0) + 1
+	if texte ~= nil then
+		texte = tostring(texte)
+		w.diag[cle .. "Texte"] = ns.CouperUTF8 and ns.CouperUTF8(texte, 200) or texte:sub(1, 200)
+	end
+end
+
+-- appel protégé, comme pcall, mais l'erreur est gardée dans le relevé
+function Instance.Essayer(f, ...)
+	local ok, err = pcall(f, ...)
+	if not ok then Instance.Noter("erreurs", err) end
+	return ok, err
+end
+
+function Instance.Dedans()
+	if not IsInInstance then return false end
+	local ok, dedans = pcall(IsInInstance)
+	return ok and not Secrete(dedans) and dedans and true or false
+end
+
+-- la fiche du bestiaire qui porte ce nom : de préférence un monstre de l'instance où je suis (zone du même nom),
+-- sinon un monstre d'instance (zone sans position), sinon le premier de ce nom
+function Instance.Chercher(nom)
+	if not Instance.parNom then
+		Instance.parNom = {}
+		for _, f in ipairs(Bestiaire().liste) do
+			local c = Simplifier(f.nom)
+			local l = Instance.parNom[c]
+			if not l then l = {}; Instance.parNom[c] = l end
+			l[#l + 1] = f
+		end
+	end
+	local ici = GetRealZoneText and GetRealZoneText()
+	ici = type(ici) == "string" and not Secrete(ici) and Simplifier(ici) or nil
+	local trouve, note = nil, 0
+	for _, f in ipairs(Instance.parNom[Simplifier(nom)] or {}) do
+		local n = 1
+		if ("#" .. (f.zonesTexte or "") .. "#"):find(":#", 1, true) then n = 2 end
+		if ici then
+			for z in pairs(ZonesDe(f)) do
+				local nz = NomZone(z)
+				if nz and Simplifier(nz) == ici then n = 3 end
+			end
+		end
+		if n > note then trouve, note = f, n end
+	end
+	return trouve
+end
+
+-- Un monstre vaincu en instance, connu par son nom seul (boss : fin d'un combat de boss, sinon ligne
+-- d'expérience). Un boss donne sa fin de combat, par un ou deux évènements, et sa ligne d'expérience : une mort.
+function Instance.Vaincu(nom, boss)
+	if not Instance.Dedans() then return end
+	if type(nom) ~= "string" or Secrete(nom) or nom == "" then
+		Instance.Noter("nomsCaches")
+		return
+	end
+	local f = Instance.Chercher(nom)
+	if not f then
+		Instance.Noter(boss and "bossInconnus" or "nomsInconnus", nom)
+		return
+	end
+	local t = GetTime()
+	local g = Instance.parGuid[f.id]
+	if g and t - g < 5 then -- (son corps vient d'être compté par son GUID)
+		Instance.parGuid[f.id] = nil
+		return
+	end
+	local c = Instance.sansGuid[f.id]
+	if c and t - c.t < 10 and (boss or c.boss) then
+		c.boss = true
+		return
+	end
+	Instance.sansGuid[f.id] = { t = t, n = (c and t - c.t < 900 and c.n or 0) + 1, boss = boss or false }
+	Instance.Noter(boss and "boss" or "nomsLus")
+	Instance.Vaincre(f.id)
+end
+
+-- « X meurt, vous gagnez N points d'expérience » : le nom du monstre. Le motif vient du texte du jeu, dans sa
+-- langue, coupé au nombre (la suite change avec les bonus de repos ou de groupe).
+function Instance.Experience(texte)
+	if type(texte) ~= "string" then return end
+	if Secrete(texte) then
+		Instance.Noter("xpCachees")
+		return
+	end
+	if not Instance.motif then
+		local f = type(COMBATLOG_XPGAIN_FIRSTPERSON) == "string" and COMBATLOG_XPGAIN_FIRSTPERSON
+			or "%s dies, you gain %d experience."
+		f = f:gsub("%%%d+%$", "%%") -- (« %1$s » : « %s »)
+		f = f:match("^(.-%%d)") or f
+		f = f:gsub("[%^%$%(%)%.%[%]%*%+%-%?]", "%%%0")
+		f = f:gsub("%%s", "(.+)")
+		f = f:gsub("%%d", "%%d+")
+		Instance.motif = "^" .. f
+	end
+	local nom = texte:match(Instance.motif)
+	if type(nom) == "string" then Instance.Vaincu(nom, false) end
 end
 
 local function Palier(e)
@@ -450,7 +568,7 @@ end
 --------------------------------------------------------------------------------
 
 local vaincus = {}     -- [GUID] = true : corps déjà comptés (session)
-local fouilles = {}    -- [GUID] = true : corps déjà fouillés (session)
+local fouilles = {}    -- [GUID] = { t = GetTime(), [objet] = true } : corps déjà fouillés (session)
 local nVaincus, nFouilles = 0, 0
 
 local function PnjDuGuid(guid)
@@ -464,6 +582,10 @@ local function Lire(unite)
 	if not unite or not UnitExists(unite) or UnitIsPlayer(unite) then return nil end
 	if UnitPlayerControlled and UnitPlayerControlled(unite) then return nil end -- (familiers, invocations)
 	local guid = UnitGUID(unite)
+	if Secrete(guid) then -- (en instance)
+		Instance.Noter("guidsCaches")
+		return nil
+	end
 	local id = PnjDuGuid(guid)
 	if not id then return nil end
 	if UnitIsFriend and UnitIsFriend("player", unite) then return nil end
@@ -589,6 +711,13 @@ local function Vaincre(id, guid, unite)
 		vaincus[guid] = true
 		nVaincus = nVaincus + 1
 		if nVaincus > 3000 then wipe(vaincus); nVaincus = 0 end
+		-- (en instance, cette mort a pu être déjà comptée par le nom du monstre)
+		local c = Instance.sansGuid[id]
+		if c and c.n > 0 and GetTime() - c.t < 900 then
+			c.n = c.n - 1
+			return
+		end
+		Instance.parGuid[id] = GetTime()
 	end
 	local e = unite and Apprendre(unite, id) or Entree(id)
 	if not e then
@@ -670,6 +799,7 @@ local function Vaincre(id, guid, unite)
 		Notif("wowdex", "WoWdex", ("%d monstres capturés !"):format(s.k))
 	end
 end
+Instance.Vaincre = Vaincre
 
 -- Récoltes : leur butin n'est pas celui du monstre (le cuir d'un loup dépecé, l'objet volé à un monstre vivant).
 -- Rangs 1 à 4 du dépeçage, vol à la tire, minage, herboristerie ; les noms en plus, si Forever a ses propres numéros.
@@ -701,17 +831,23 @@ local function SortLance(sort)
 	if recolte then finRecolte = GetTime() end
 end
 
--- un monstre ciblé encore vivant (vol à la tire) n'a rien lâché
+-- un monstre ciblé encore vivant (vol à la tire) n'a rien lâché. En instance, le GUID de la cible est caché : le
+-- comparer lève une erreur (« attempt to compare a secret value » à l'ouverture d'un butin, jusqu'à la 7.7.1).
 local function Vivant(guid)
-	if not (UnitExists("target") and UnitGUID("target") == guid) then return false end
+	local cible = UnitExists("target") and UnitGUID("target")
+	if not cible or Secrete(cible) or cible ~= guid then return false end
 	return not UnitIsDead("target")
 end
 
--- corps fouillés : chaque corps (GUID) compte une fois, avec les objets qu'il a lâchés
-local function Fouiller()
+-- corps fouillés : chaque corps (GUID) compte une fois, avec les objets qu'il a lâchés. Appelé à LOOT_READY
+-- (pret) puis à LOOT_OPENED : un corps déjà compté ne gagne alors que les objets pas encore lus, et seulement
+-- pendant 2 s (plus tard, un second butin sur le même corps est une récolte).
+local function Fouiller(pret)
+	Instance.Noter(pret and "butinsPrets" or "butinsOuverts")
 	if IsFishingLoot and IsFishingLoot() then return end
 	if GetTime() - finRecolte < DELAI_RECOLTE then return end
 	local n = GetNumLootItems and GetNumLootItems() or 0
+	if type(n) ~= "number" or Secrete(n) then return end
 	local corps = {} -- [GUID] = { id, objets = { [objet] = true } }
 	local avecSources = GetLootSourceInfo ~= nil
 	for slot = 1, n do
@@ -721,6 +857,7 @@ local function Fouiller()
 			local sources = { GetLootSourceInfo(slot) }
 			for i = 1, #sources, 2 do
 				local guid = sources[i]
+				if Secrete(guid) then Instance.Noter("sourcesCachees") end
 				local id = PnjDuGuid(guid)
 				if id then
 					corps[guid] = corps[guid] or { id = id, objets = {} }
@@ -737,26 +874,47 @@ local function Fouiller()
 			corps[guid] = { id = id, objets = {} }
 			for slot = 1, n do
 				local lien = GetLootSlotLink and GetLootSlotLink(slot)
-				local objet = type(lien) == "string" and tonumber(lien:match("item:(%d+)")) or nil
+				local objet = type(lien) == "string" and not Secrete(lien) and tonumber(lien:match("item:(%d+)")) or nil
 				if objet then corps[guid].objets[objet] = true end
 			end
 		end
 	end
+	local t = GetTime()
 	for guid, c in pairs(corps) do
-		if not fouilles[guid] and not Vivant(guid) and (Bestiaire().par[c.id] or Entree(c.id)) then
-			fouilles[guid] = true
-			nFouilles = nFouilles + 1
-			if nFouilles > 3000 then wipe(fouilles); nFouilles = 0 end
-			Vaincre(c.id, guid)
+		local lus = fouilles[guid]
+		if lus and t - lus.t >= DELAI_RECOLTE then
+			-- (corps déjà fouillé)
+		elseif not Vivant(guid) and (Bestiaire().par[c.id] or Entree(c.id)) then
+			local nouveau = false
+			if not lus then
+				lus = { t = t }
+				nFouilles = nFouilles + 1
+				if nFouilles > 3000 then wipe(fouilles); nFouilles = 1 end
+				fouilles[guid] = lus
+				Vaincre(c.id, guid)
+				local e = Entree(c.id)
+				if e then
+					e.d = (e.d or 0) + 1
+					if e.d == 1 then ScorePlusTard() end
+					nouveau = true
+					Instance.Noter(pret and "corpsPrets" or "corpsOuverts")
+				end
+			end
 			local e = Entree(c.id)
 			if e then
-				e.d = (e.d or 0) + 1
 				if type(e.b) ~= "table" then e.b = {} end
-				for o in pairs(c.objets) do e.b[o] = (e.b[o] or 0) + 1 end
-				e.tb = Maintenant()
-				AnnoncerButin(c.id)
-				if e.d == 1 then ScorePlusTard() end
-				MajBientot()
+				for o in pairs(c.objets) do
+					if not lus[o] then
+						lus[o] = true
+						e.b[o] = (e.b[o] or 0) + 1
+						nouveau = true
+					end
+				end
+				if nouveau then
+					e.tb = Maintenant()
+					AnnoncerButin(c.id)
+					MajBientot()
+				end
 			end
 		end
 	end
@@ -1130,7 +1288,7 @@ end
 -- ce que veut dire chaque ligne de la fiche (infobulle au survol)
 local AIDES = {
 	Vu = "Tu l'as croisé : sa barre de nom est apparue, tu l'as ciblé ou survolé. Son nom et son modèle se dévoilent.",
-	["Capturé"] = "Toi ou ton groupe l'avez vaincu. C'est le palier qui compte pour le WoWdex, et pour un rare, ton titre et le classement. Il est noté quand tu cibles, survoles ou fouilles son corps.",
+	["Capturé"] = "Toi ou ton groupe l'avez vaincu. C'est le palier qui compte pour le WoWdex, et pour un rare, ton titre et le classement. Il est noté quand tu cibles, survoles ou fouilles son corps. En donjon, le jeu cache aux addons qui sont les monstres : ils sont notés quand ils te donnent de l'expérience, à la fin d'un combat de boss, ou quand tu fouilles leur corps.",
 	["Dépouillé"] = "Tu as fouillé son corps. Chaque corps fouillé alimente les taux de butin de la guilde. Le dépeçage et le vol à la tire ne comptent pas.",
 	Guilde = "Le premier membre de la guilde à l'avoir capturé.",
 	["Repéré"] = "La dernière fois qu'un membre l'a vu vivant. Le bouton « Y aller » pose un repère à cet endroit.",
@@ -2864,6 +3022,14 @@ ns.DiagWowdex = function(L)
 	L(("wowdex : %d monstres au bestiaire dont %d rares et boss, moi %d vus / %d capturés / %d dépouillés (%d hors liste), %d rares et boss (%s), %d pistés, guilde %d capturés, %d scores, %d rares repérés, %d rares tués, sources du butin %s"):format(
 		Bestiaire().nombre, Bestiaire().rares, s.v, s.k, s.d, s.hors, s.r, titre, nPistes, nGuilde, nScores, nReperes, nMorts,
 		GetLootSourceInfo and "oui" or "non"))
+	local d = w and type(w.diag) == "table" and w.diag or {}
+	local function N(cle) return tonumber(d[cle]) or 0 end
+	local function T(cle) return d[cle .. "Texte"] and (" (dernier : « " .. tostring(d[cle .. "Texte"]) .. " »)") or "" end
+	L(("wowdex, relevé depuis le %s : butins lus à LOOT_READY %d (corps comptés %d), à LOOT_OPENED %d (corps comptés %d), sources de butin cachées %d ; GUID cachés %d ; en instance : monstres reconnus par leur nom %d, noms hors bestiaire %d%s, noms cachés %d, lignes d'expérience cachées %d, boss %d, boss hors bestiaire %d%s ; erreurs %d%s"):format(
+		type(d.depuis) == "number" and date("%d/%m %H:%M", d.depuis) or "?", N("butinsPrets"), N("corpsPrets"),
+		N("butinsOuverts"), N("corpsOuverts"), N("sourcesCachees"), N("guidsCaches"), N("nomsLus"), N("nomsInconnus"),
+		T("nomsInconnus"), N("nomsCaches"), N("xpCachees"), N("boss"), N("bossInconnus"), T("bossInconnus"),
+		N("erreurs"), T("erreurs")))
 end
 
 --------------------------------------------------------------------------------
@@ -2872,7 +3038,8 @@ end
 
 local ev = CreateFrame("Frame")
 for _, nom in ipairs({ "PLAYER_ENTERING_WORLD", "UPDATE_MOUSEOVER_UNIT", "PLAYER_TARGET_CHANGED",
-	"NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "LOOT_OPENED" }) do
+	"NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "LOOT_READY", "LOOT_OPENED",
+	"CHAT_MSG_COMBAT_XP_GAIN", "ENCOUNTER_END", "BOSS_KILL" }) do
 	pcall(ev.RegisterEvent, ev, nom)
 end
 -- (mort de la cible pendant qu'elle est ciblée : aucun changement de cible)
@@ -2882,23 +3049,30 @@ if not pcall(ev.RegisterUnitEvent, ev, "UNIT_HEALTH", "target") then
 	pcall(ev.RegisterUnitEvent, ev, "UNIT_HEALTH_FREQUENT", "target")
 end
 local premiere = true
-ev:SetScript("OnEvent", function(_, evenement, unite, _, sort)
+-- (a1… : unité ; ou unité, _, sort ; ou texte ; ou numéro du combat de boss, nom, difficulté, taille, réussi)
+ev:SetScript("OnEvent", function(_, evenement, a1, a2, a3, _, a5)
 	if evenement == "UPDATE_MOUSEOVER_UNIT" then
-		pcall(Observer, "mouseover")
+		Instance.Essayer(Observer, "mouseover")
 	elseif evenement == "PLAYER_TARGET_CHANGED" then
-		pcall(Observer, "target")
+		Instance.Essayer(Observer, "target")
 	elseif evenement == "NAME_PLATE_UNIT_ADDED" then
-		pcall(Vu, unite)
-		pcall(MajPlaque, unite)
+		Instance.Essayer(Vu, a1)
+		Instance.Essayer(MajPlaque, a1)
 	elseif evenement == "NAME_PLATE_UNIT_REMOVED" then
-		pcall(RetirerPlaque, unite)
+		Instance.Essayer(RetirerPlaque, a1)
 	elseif evenement == "UNIT_HEALTH" or evenement == "UNIT_HEALTH_FREQUENT" then
-		if UnitIsDead("target") then pcall(Observer, "target") end
+		if UnitIsDead("target") then Instance.Essayer(Observer, "target") end
 	elseif evenement == "UNIT_SPELLCAST_SUCCEEDED" then
-		pcall(SortLance, sort)
-	elseif evenement == "LOOT_OPENED" then
-		local ok, err = pcall(Fouiller)
-		if not ok and ns.Erreur then ns.Erreur("WoWdex : " .. tostring(err)) end
+		Instance.Essayer(SortLance, a3)
+	elseif evenement == "LOOT_READY" or evenement == "LOOT_OPENED" then
+		-- (une erreur va au relevé de /smb diag, plus en haut de l'écran)
+		Instance.Essayer(Fouiller, evenement == "LOOT_READY")
+	elseif evenement == "CHAT_MSG_COMBAT_XP_GAIN" then
+		Instance.Essayer(Instance.Experience, a1)
+	elseif evenement == "ENCOUNTER_END" or evenement == "BOSS_KILL" then
+		if evenement == "BOSS_KILL" or (not Secrete(a5) and (a5 == 1 or a5 == true)) then
+			Instance.Essayer(Instance.Vaincu, a2, true)
+		end
 	elseif evenement == "PLAYER_ENTERING_WORLD" and premiere then
 		premiere = false
 		-- (la guilde et la liste de ses membres ne sont pas connues tout de suite)
