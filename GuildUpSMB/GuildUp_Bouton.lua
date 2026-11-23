@@ -5,7 +5,8 @@
 -- le pseudo, les personnages et le choix des notifications par la fenêtre d'options.
 -- Le médaillon : emblème de la guilde dans un anneau à la couleur de mon rôle ; pastille = nouveautés
 -- (ns.NouveautesGuilde, GuildUp_Interface.lua : appels à l'aide, demandes que je peux honorer, tirage au
--- sort) ; halo doré qui pulse = un tirage au sort attend mon lancer de dés. Aucun message réseau.
+-- sort, appel au Bizkit) ; halo doré qui pulse = un tirage au sort attend mon lancer de dés, ou une partie de
+-- Bizkit cherche des joueurs. Aucun message réseau.
 
 local NOM_ADDON, ns = ...
 local MEDIA = "Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\" -- le dossier de l'addon, quel que soit son nom
@@ -93,7 +94,8 @@ local function Infobulle(self)
 	if n then
 		if n.aide > 0 then GameTooltip:AddLine(n.aide .. " appel" .. (n.aide > 1 and "s" or "") .. " à l'aide", 1, 0.6, 0.5) end
 		if n.demandes > 0 then GameTooltip:AddLine(n.demandes .. " demande" .. (n.demandes > 1 and "s" or "") .. " que tu peux honorer", 1, 0.82, 0) end
-		if n.jeux > 0 then GameTooltip:AddLine("Un tirage au sort t'attend", 1, 0.82, 0) end
+		if (n.bizkit or 0) > 0 then GameTooltip:AddLine("Une partie de Bizkit cherche des joueurs", 1, 0.82, 0) end
+		if n.jeux - (n.bizkit or 0) > 0 then GameTooltip:AddLine("Un tirage au sort t'attend", 1, 0.82, 0) end
 		if n.aide + n.demandes + n.jeux == 0 then GameTooltip:AddLine("Rien de nouveau", 0.7, 0.7, 0.7) end
 	end
 	GameTooltip:AddLine(" ")
@@ -254,7 +256,7 @@ MajBouton = function()
 	bouton.compteur:SetText(n > 9 and "9+" or tostring(n))
 	bouton.compteur:SetShown(n > 0)
 	bouton.pastille:SetShown(n > 0)
-	-- halo doré qui pulse : un tirage au sort attend mon lancer
+	-- halo doré qui pulse : un tirage au sort attend mon lancer, ou un appel au Bizkit m'attend
 	if nv and nv.jeux > 0 then
 		bouton.halo:Show()
 		if not bouton.pulse:IsPlaying() then bouton.pulse:Play() end

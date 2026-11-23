@@ -225,8 +225,11 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
     peut la lancer (s'il a quitté la table, tous les joueurs assis le peuvent), et il devient le créateur. Un joueur qui tarde (40 s) peut être sauté par le suivant ;
     les membres déconnectés libèrent leur place, et on reprend sa place et ses coups après un `/reload`.
     Pas assez de monde ? Un joueur assis clique sur « Appeler la guilde » : les membres qui ne sont pas à table
-    reçoivent une bulle (combien de joueurs, combien de places libres), et un clic dessus leur ouvre la table. Un
-    appel toutes les 2 minutes au plus ; la bulle se coupe avec la case « Jeux » des notifications.
+    reçoivent une bulle sonore (combien de joueurs, combien de places libres), et un clic dessus leur ouvre la table.
+    L'appel reste 5 minutes en pastille sur le médaillon et le menu Jeux ; en combat, la bulle attend la fin du
+    combat. « J'arrive ! », sur la table, prévient celui qui a appelé, et la table affiche qui est en route. Un
+    appel toutes les 2 minutes au plus ; la bulle se coupe avec la case « Jeux » des notifications. Son de l'appel :
+    `media/TheHordeFlagIsTaken.mp3` (sans ce fichier, le son discret des bulles).
 - **Sondage** (`/smb sondage`, ou « Sondage » dans le menu rapide du médaillon) : une question, 2 à 5 choix, 1 à
   10 minutes pour voter. Les membres connectés qui ont l'addon reçoivent une bulle et votent d'un clic ; résultats en
   direct, changement d'avis possible jusqu'à la fin, votes publics (le survol d'un choix montre qui l'a choisi),

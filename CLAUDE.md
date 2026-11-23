@@ -142,7 +142,8 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   guilde), le dernier perd un point ; sur un 3, prison de 3 (chaque 3 sorti
   coûte au prisonnier le numéro de son cran, de 1 à 5, table `PRISONS`), sur un 5, prison de 5 ; sur un double, attaques à
   distribuer (`R` relance du double 6, `T` attaques) ; 9, 10, 11 : un point pour le joueur d'avant, le lanceur, celui d'après ;
-  sinon (4, 6, 8 sans double), le vecteur : `Vecteur(l)`, calculé par chacun sur les positions des dés reçues ; tout est appliqué à la réception, mes messages compris),
+  sinon (4, 6, 8 sans double), le vecteur : `Vecteur(l)`, calculé par chacun sur les positions des dés reçues ; tout est appliqué à la réception, mes messages compris ;
+  appel à la guilde `J` (bulle sonore, pastilles via `ns.BizkitEnAttente` pendant 5 min) et réponse « J'arrive ! » `I`),
   `GuildUpJrn` (fil d'activité et podium, `GuildUp_Journal.lua` : les autres modules y notent leurs nouvelles avec
   `ns.NoterActivite(genre, clé, valeur)`), `GuildUpNpd` (mode calme « ne pas déranger », `GuildUp_Calme.lua` : `ns.NePasDeranger()` coupe les bulles dans
   `ns.Notifier`, `ns.CalmeDe` / `ns.IconeCalme` pour l'afficher sur les autres membres),

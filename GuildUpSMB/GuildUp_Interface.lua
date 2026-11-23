@@ -47,7 +47,8 @@ ns.NouveautesGuilde = function()
 	return {
 		aide = ns.AppelsAide and #ns.AppelsAide() or 0,
 		demandes = ns.NombreDemandesAider and ns.NombreDemandesAider() or 0,
-		jeux = ns.TirageEnAttente and ns.TirageEnAttente() or 0,
+		jeux = (ns.TirageEnAttente and ns.TirageEnAttente() or 0) + (ns.BizkitEnAttente and ns.BizkitEnAttente() or 0),
+		bizkit = ns.BizkitEnAttente and ns.BizkitEnAttente() or 0, -- (compris dans jeux : appel au Bizkit)
 	}
 end
 
@@ -70,7 +71,7 @@ local SECTIONS = {
 	{ id = "wowdex", nom = "WoWdex", icone = "Interface\\Icons\\Ability_Hunter_BeastTaming" },
 	{ id = "guilde", nom = "Guilde", icone = "Interface\\Icons\\INV_Shirt_GuildTabard_01" },
 	{ id = "jeux", nom = "Jeux", icone = "Interface\\Icons\\INV_Misc_Dice_01",
-		badge = function() return ns.TirageEnAttente and ns.TirageEnAttente() or 0 end },
+		badge = function() return (ns.TirageEnAttente and ns.TirageEnAttente() or 0) + (ns.BizkitEnAttente and ns.BizkitEnAttente() or 0) end },
 	{ id = "evenements", nom = "Événements", icone = "Interface\\Icons\\INV_Misc_PocketWatch_01" },
 	{ id = "activite", nom = "Activité", icone = "Interface\\Icons\\INV_Misc_Note_01", neutre = true,
 		badge = function() return ns.NouveautesActivite and ns.NouveautesActivite() or 0 end },

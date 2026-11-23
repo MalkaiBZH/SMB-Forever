@@ -91,8 +91,13 @@
 --   "N"                         nouvelle partie : tous les joueurs repartent à 0 coup, prisons vides ; seul le
 --                               créateur de la partie l'envoie, sauf s'il n'est plus assis ; je deviens le créateur
 --   "J~n"                       j'appelle la guilde à la table (bouton « Appeler la guilde », assis, une place libre,
---                               un appel toutes les DELAI_APPEL secondes) ; n = joueurs assis ; bulle « tirages »
---                               chez qui n'est pas assis, un clic ouvre la table (les versions d'avant l'ignorent)
+--                               un appel toutes les DELAI_APPEL secondes) ; n = joueurs assis ; chez qui n'est pas
+--                               assis : bulle « tirages » avec SON_APPEL (après le combat s'il est en combat), un
+--                               clic ouvre la table ; pastilles du médaillon et du menu Jeux (ns.BizkitEnAttente) et
+--                               bouton « J'arrive ! » pendant DUREE_APPEL, tant qu'il reste une place et que
+--                               l'appelant n'a pas quitté la table (les versions d'avant l'ignorent)
+--   "I~clé"                     « J'arrive ! » en réponse à l'appel de clé : bulle chez lui, « 3 / 8 · Nom arrive »
+--                               sur la table de tous jusqu'à ce que j'y sois assis (au plus DUREE_APPEL)
 --   "Q"                         j'ouvre la table : les membres assis renvoient « A~place~derniere~points » et
 --                               « C~coups », et
 --                               l'auteur du dernier lancer le renvoie en rappel (même id : déjà vu, ignoré)
@@ -136,6 +141,8 @@ local TOUCHE = 40            -- vecteur : un joueur est touché seul si la ligne
 local MAX_PAR_JOUEUR = 7     -- doubles : au plus 7 attaques sur un même joueur
 local VISEE = 0.4            -- doubles : au plus un « V » (où vont mes attaques) toutes les VISEE secondes
 local DELAI_APPEL = 120      -- secondes entre deux appels à la guilde d'un même joueur (« J »)
+local DUREE_APPEL = 300      -- secondes pendant lesquelles un appel reçu reste affiché (pastilles, « J'arrive ! »)
+local SON_APPEL = "Interface\\AddOns\\" .. NOM_ADDON .. "\\media\\TheHordeFlagIsTaken.mp3" -- (absent : son discret)
 
 local Normaliser = ns.Normaliser
 local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
@@ -168,6 +175,8 @@ local pertes = {}            -- [clé] = coups pris depuis le dernier lancer (af
 local cris = {}              -- [clé] = GetTime() de son dernier cri « Bizkit ! » (bulle au-dessus de sa place)
 local finRoule = 0           -- GetTime() où les dés qui roulent à l'écran se posent
 local avant                  -- l'état d'avant ce lancer, affiché tant que les dés roulent (voir Animer)
+local appel                  -- le dernier appel reçu : { qui, n = joueurs assis, debut = GetTime(), repondu, bulle }
+local arrivent = {}          -- [clé] = GetTime() : membres qui ont répondu « J'arrive ! » (affichés sur la table)
 local Maj = function() end
 local Animer = function() end
 local Toucher = function() end -- (animation des coups pris sur la place du joueur)
@@ -625,6 +634,45 @@ local function Appeler()
 	Maj()
 end
 
+local function EnCombat()
+	return (InCombatLockdown and InCombatLockdown()) or (UnitAffectingCombat and UnitAffectingCombat("player"))
+end
+
+-- l'appel reçu vaut encore : récent, une place libre, et moi pas à table (ni parti de la partie en cours)
+local function AppelValide()
+	local a = appel
+	if not a or GetTime() - a.debut > DUREE_APPEL then return nil end
+	local moi = MaCle()
+	if PlaceDe(moi) or partis[moi] or Assis() >= PLACES then return nil end
+	return a
+end
+
+-- pastilles du médaillon et du menu Jeux
+local function MajAppel()
+	if ns.MajBouton then ns.MajBouton() end
+	if ns.MajInterface then ns.MajInterface() end
+end
+
+local function BulleAppel(a)
+	if not ns.Notifier then return end
+	local libres = PLACES - a.n
+	ns.Notifier("tirages", "Bizkit", ("%s cherche des joueurs pour le |cffffd100Bizkit|r · %d à table, %d place%s libre%s")
+		:format(NomJoueur(a.qui), a.n, libres, libres > 1 and "s" or "", libres > 1 and "s" or ""), SON_APPEL,
+		function() if ns.OuvrirInterface then ns.OuvrirInterface("jeux", "bizkit") end end)
+end
+
+-- « J'arrive ! » : je préviens celui qui a appelé (et la table) que je viens
+local function Arriver()
+	local a = AppelValide()
+	if not a or a.repondu then return end
+	a.repondu = true
+	Envoyer("I~" .. a.qui)
+	Maj()
+end
+
+-- pour le médaillon et le menu (GuildUp_Interface.lua) : 1 si un appel m'attend
+ns.BizkitEnAttente = function() return AppelValide() and 1 or 0 end
+
 local function Lancer()
 	if not PeutLancer() then return end
 	if not RandomRoll then Erreur("Ce client ne permet pas de lancer les dés depuis l'addon"); return end
@@ -714,6 +762,12 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		end
 		if avant and avant ~= place then places[avant] = nil end
 		places[place] = qui
+		arrivent[qui] = nil
+		-- (assis, ou table pleine : l'appel ne m'attend plus, les pastilles s'éteignent)
+		if appel then
+			if qui == moi then appel = nil end
+			MajAppel()
+		end
 		pts = tonumber(pts)
 		if not coups[qui] then
 			-- (une version d'avant les coups n'envoie que ses points ; une récente envoie aussi « C »)
@@ -734,6 +788,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		local p = PlaceDe(qui)
 		if p and RefusDepart(qui) then return end -- (un prisonnier reste à table)
 		if qui == moi then NoterMaPlace(nil) end
+		if appel and appel.qui == qui then appel = nil; MajAppel() end -- (celui qui appelait est parti)
 		if p then
 			places[p] = nil
 			if enCours then partis[qui] = true end
@@ -970,13 +1025,25 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		if PlaceDe(moi) then NoterMaPlace(PlaceDe(moi)) end
 		Maj()
 	elseif genre == "J" then
-		-- un appel : bulle pour qui n'est pas à table (et peut encore s'y asseoir) ; un clic ouvre la table
-		if qui == moi or PlaceDe(moi) or partis[moi] then return end
+		-- un appel : bulle pour qui n'est pas à table (et peut encore s'y asseoir), après le combat s'il le faut ;
+		-- pastilles tant qu'il vaut (DUREE_APPEL)
+		if qui == moi then return end
 		local n = tonumber(suite) or Assis()
-		if n >= PLACES or not ns.Notifier then return end
-		ns.Notifier("tirages", "Bizkit", ("%s cherche des joueurs pour le |cffffd100Bizkit|r · %d à table, %d place%s libre%s")
-			:format(NomJoueur(qui), n, PLACES - n, PLACES - n > 1 and "s" or "", PLACES - n > 1 and "s" or ""), "READY_CHECK",
-			function() if ns.OuvrirInterface then ns.OuvrirInterface("jeux", "bizkit") end end)
+		if n >= PLACES then return end
+		appel = { qui = qui, n = n, debut = GetTime() }
+		if not AppelValide() then appel = nil; return end
+		if EnCombat() then appel.bulle = true else BulleAppel(appel) end
+		if C_Timer then C_Timer.After(DUREE_APPEL + 1, function() MajAppel(); Maj() end) end
+		MajAppel()
+		Maj()
+	elseif genre == "I" then
+		-- « J'arrive ! » (suite = qui a appelé) : affiché sur la table, bulle chez celui qui a appelé
+		if suite == "" or PlaceDe(qui) then return end
+		arrivent[qui] = GetTime()
+		if suite == moi and qui ~= moi and ns.Notifier then
+			ns.Notifier("tirages", "Bizkit", ("%s arrive à la table !"):format(NomJoueur(qui)))
+		end
+		Maj()
 	elseif genre == "Q" then
 		if qui == moi then return end
 		local mienne = PlaceDe(moi)
@@ -1461,11 +1528,13 @@ local function CreerTable(parent)
 			Lancer()
 		end
 	end)
-	-- à sa gauche, pendant mes attaques : « 6 attaques » (double 6) ou « Effacer »
+	-- à sa gauche, pendant mes attaques : « 6 attaques » (double 6) ou « Effacer » ; pas assis, pendant un
+	-- appel : « J'arrive ! »
 	f.secondaire = UI.Bouton(f, "", "fantome", 120, 32)
 	f.secondaire:SetPoint("RIGHT", f.lancer, "LEFT", -8, 0)
 	f.secondaire:SetScript("OnClick", function()
-		if ChoixEnAttente() then ChoisirSix() else EffacerAttaques() end
+		if not PlaceDe(MaCle()) then Arriver()
+		elseif ChoixEnAttente() then ChoisirSix() else EffacerAttaques() end
 	end)
 	f.secondaire:Hide()
 	-- à sa droite, toujours là et toujours pareil (rien ne doit trahir un 7) : « Bizkit ! »
@@ -1928,13 +1997,33 @@ Maj = function()
 			t.secondaire:Hide()
 		end
 	else
-		t.secondaire:Hide()
+		-- pas assis, pendant un appel : « J'arrive ! »
+		local ap = not mienne and AppelValide()
+		if ap then
+			t.secondaire:Ecrire(ap.repondu and "Tu arrives" or "J'arrive !")
+			t.secondaire:Activer(not ap.repondu)
+			t.secondaire:Show()
+		else
+			t.secondaire:Hide()
+		end
 		-- (pendant un Bizkit où je n'ai pas crié, le bouton reste comme avant le 7 ; un clic est sans effet)
 		local b = bizkit
 		t.lancer:Activer(PeutLancer() or (b ~= nil and not b.rang[moi] and PeutLancer(true)))
 		t.lancer:Ecrire(attente and "Les dés roulent…" or "Lancer les dés")
 	end
-	t.compte:SetText(("%d / %d"):format(Assis(), PLACES))
+	-- le compte des joueurs, et ceux qui ont répondu « J'arrive ! » (oubliés après DUREE_APPEL)
+	local nA, unSeul = 0, nil
+	for cle, quand in pairs(arrivent) do
+		if GetTime() - quand <= DUREE_APPEL and not PlaceDe(cle) then
+			nA, unSeul = nA + 1, cle
+		else
+			arrivent[cle] = nil
+		end
+	end
+	local enRoute = ""
+	if nA == 1 then enRoute = " · " .. (NomCourt and NomCourt(unSeul) or unSeul) .. " arrive"
+	elseif nA > 1 then enRoute = (" · %d arrivent"):format(nA) end
+	t.compte:SetText(("%d / %d%s"):format(Assis(), PLACES, enRoute))
 
 	-- les cachots
 	t.cachot3:Poser(prisonVue, prisonVue and cranVu, nil)
@@ -2079,9 +2168,17 @@ end
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("CHAT_MSG_SYSTEM")
 ev:RegisterEvent("PLAYER_ENTERING_WORLD")
+ev:RegisterEvent("PLAYER_REGEN_ENABLED")
 ev:SetScript("OnEvent", function(_, event, texte)
 	if event == "CHAT_MSG_SYSTEM" then
 		LireJet(texte)
+	elseif event == "PLAYER_REGEN_ENABLED" then
+		-- fin du combat : la bulle d'un appel reçu pendant le combat, s'il vaut encore
+		local a = appel
+		if a and a.bulle then
+			a.bulle = nil
+			if AppelValide() then BulleAppel(a) end
+		end
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		ev:UnregisterEvent("PLAYER_ENTERING_WORLD")
 		-- après un /reload ou une courte déconnexion, je reprends ma place et mes coups
