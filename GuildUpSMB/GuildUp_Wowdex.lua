@@ -31,7 +31,8 @@
 -- La guilde (GuildUpDB.wowdexGuilde[guilde]) : d[pnj] = { c = premier membre à l'avoir vaincu, j = jour },
 -- s[clé] = { v, k, d, t, r } (score de chaque membre ; r = rares et boss capturés, absent pour une version d'avant
 -- la 7.3.0), butin[pnj][clé] = { k = corps fouillés, o = { [objet] = n }, t = date } (le relevé de chaque autre
--- membre ; le mien est lu dans mon WoWdex), curseurButin (rattrapage), r[pnj] = { c = membre, t = date, carte, x,
+-- membre ; le mien est lu dans mon WoWdex ; ceux d'un membre dont rien n'est arrivé depuis un an, ni relevé ni
+-- score, sont oubliés à la connexion), curseurButin (rattrapage), r[pnj] = { c = membre, t = date, carte, x,
 -- y } (dernier repérage d'un rare du monde), morts[pnj] = { c = membre, t = date } (dernière fois qu'un membre a
 -- vaincu ce rare : un repérage plus ancien que cette mort n'est plus montré).
 -- Taux de drop de la guilde = somme des relevés de chaque membre. Chaque relevé appartient à son membre et ses
@@ -93,6 +94,7 @@ local OCTETS = 240
 local DELAI_ALERTE = 300          -- secondes entre deux alertes « en vue » pour le même monstre
 local DELAI_REPERAGE = 600        -- secondes entre deux repérages du même rare annoncés à la guilde
 local MAX_PISTES = 10             -- monstres pistés au plus
+local OUBLI_BUTIN = 365 * 86400   -- relevés de butin d'un membre dont on n'a rien reçu depuis un an : oubliés
 
 local Normaliser = ns.Normaliser
 local MaCle = ns.MaCle
@@ -542,6 +544,35 @@ local function RecevoirReleve(cle, id, k, objets, t)
 		if n > (r.o[o] or 0) then r.o[o] = n end
 	end
 	if t and t > (r.t or 0) then r.t = t end
+end
+
+-- Oubli des relevés d'un membre disparu : rien reçu de lui depuis OUBLI_BUTIN (ni relevé, ni score). Ses comptes
+-- restent justes, mais ils grossiraient la sauvegarde pour toujours (monstres x membres passés par la guilde).
+-- Un membre actif ne perd rien : son score part à chaque connexion. Le relais ne les renvoie pas (date trop
+-- ancienne pour le curseur) ; s'il revient, ses nouveaux relevés repartent normalement.
+local function OublierButin()
+	local g = Guilde()
+	if not g then return 0 end
+	local dernier = {}
+	for _, parPnj in pairs(g.butin) do
+		for cle, r in pairs(parPnj) do
+			if (r.t or 0) > (dernier[cle] or 0) then dernier[cle] = r.t or 0 end
+		end
+	end
+	for cle, s in pairs(g.s) do
+		if dernier[cle] and (s.t or 0) > dernier[cle] then dernier[cle] = s.t end
+	end
+	local limite, oublies = Maintenant() - OUBLI_BUTIN, 0
+	for cle, t in pairs(dernier) do
+		if t < limite then
+			oublies = oublies + 1
+			for id, parPnj in pairs(g.butin) do
+				parPnj[cle] = nil
+				if next(parPnj) == nil then g.butin[id] = nil end
+			end
+		end
+	end
+	return oublies
 end
 
 -- taux de la guilde pour un monstre : corps fouillés, { [objet] = corps qui l'ont lâché }, membres qui l'ont
@@ -3079,6 +3110,7 @@ ev:SetScript("OnEvent", function(_, evenement, a1, a2, a3, _, a5)
 		C_Timer.After(30, function()
 			local g = Guilde()
 			if g then
+				OublierButin()
 				local depuis = 0
 				for _, d in pairs(g.d) do if d.j > depuis then depuis = d.j end end
 				Envoyer("Q~" .. Base36(depuis))

@@ -1,6 +1,7 @@
 -- GuildUpSMB : essai du WoWdex dans le faux client (outils/essais/faux_client.lua).
 -- Charge le kit d'interface, le bestiaire et GuildUp_Wowdex.lua, puis déroule un scénario : page et onglets,
--- rare en vue, capture, dépouille, messages de la guilde, filtres, recherche, fiche, zones, carnet, classement.
+-- oubli des relevés de butin d'un membre disparu, rare en vue, capture, dépouille, messages de la guilde, filtres,
+-- recherche, fiche, zones, carnet, classement.
 -- Usage, depuis la racine du dépôt :  lua outils/essais/wowdex.lua GuildUpSMB   (code de sortie 1 si un essai rate)
 local client = dofile((arg[0]:gsub("[^/\\]*$", "")) .. "faux_client.lua")
 local ns, db, cadres, unites, plaque = client.ns, client.db, client.cadres, client.unites, client.plaque
@@ -36,7 +37,27 @@ local OnEvent = ev.__scripts.OnEvent
 
 local ecouteur, creerPage = client.Ecouteur(), client.CreerPage()
 
+-- relevés de butin sauvegardés : un membre parti il y a deux ans (oublié), un autre dont seul le score est récent
+-- (gardé), un actif (gardé)
+local maintenant, an = ns.Maintenant(), 365 * 86400
+db.wowdexGuilde = { ["Donjons et Dindons"] = {
+	s = { ["Discret-Forever"] = { v = 5, k = 5, d = 1, t = maintenant - 86400 } },
+	butin = {
+		[normal.id] = {
+			["Parti-Forever"] = { k = 4, o = { [2589] = 2 }, t = maintenant - 2 * an },
+			["Discret-Forever"] = { k = 3, o = {}, t = maintenant - 2 * an },
+			["Actif-Forever"] = { k = 6, o = { [2589] = 3 }, t = maintenant - 3600 },
+		},
+		[rare.id] = { ["Parti-Forever"] = { k = 1, o = {}, t = maintenant - 2 * an } },
+	},
+} }
 OnEvent(ev, "PLAYER_ENTERING_WORLD")
+Etape("oubli des relevés de butin d'un membre disparu depuis un an", function()
+	local b = db.wowdexGuilde["Donjons et Dindons"].butin
+	assert(b[normal.id]["Parti-Forever"] == nil, "le membre parti n'est pas oublié")
+	assert(b[rare.id] == nil, "un monstre sans plus aucun relevé reste dans la sauvegarde")
+	assert(b[normal.id]["Discret-Forever"] and b[normal.id]["Actif-Forever"], "un membre actif a perdu ses relevés")
+end)
 local page
 Etape("création de la page", function() page = creerPage(Factice("Parent")) end)
 local function Onglet(i) page.onglets.boutons[i].__scripts.OnClick(page.onglets.boutons[i]) end

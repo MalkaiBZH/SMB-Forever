@@ -113,7 +113,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   membres sur la **même suite de quêtes à des étapes différentes**, et pas seulement sur une quête identique.
   **Attention** : 104 des 689 racines portent un éventail de quêtes sœurs et non une chaîne (jusqu'à 73 quêtes
   pour 2 étapes) ; leur numéro d'étape ne veut rien dire, donc seules les suites linéaires (autant de quêtes
-  que d'étapes, ou moins) sont gardées — 1 979 quêtes sur 2 959. `ns.DONJONS_QUETES` n'est lue par personne.
+  que d'étapes, ou moins) sont gardées — 1 979 quêtes sur 2 959.
 - `GuildUp_Butin.lua` : **taux de butin** des monstres, lus dans `GuildUp_Taux.lua` (généré) et montrés dans la
   fiche du WoWdex. Aucune dépendance ni réseau : les taux arrivent avec l'addon, comme le bestiaire. La ligne
   est en base 36 (`pnj|objet:chance,…`, chance en dix-millièmes, `0` = lâché mais taux inconnu, 20 objets au
@@ -192,9 +192,8 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   lâchent les objets demandés, dans l'ordre des objectifs du jeu) : généré par `python outils/generer_objectifs.py`
   depuis QuestieDB (`data/Forever` du dépôt Questie/QuestieDB, GPL-3.0 ; `--ref` pour une version précise,
   cache dans `outils/cache/questiedb/`, même `--verifier`). Lu par `GuildUp_Objectifs.lua`. Le même fichier contient
-  `ns.DONJONS_QUETES` (quêtes de chaque donjon, par numéro de zone) et `ns.SUITES_QUETES` (suites de quêtes :
-  première quête, étape, nombre d'étapes), qui ne sont plus lus depuis le retrait de « Jouer ensemble » (3.7.0) :
-  à retirer de `generer_objectifs.py` à la prochaine régénération.
+  `ns.SUITES_QUETES` (suites de quêtes : première quête, étape, nombre d'étapes), lue par `GuildUp_Quetes.lua`
+  depuis la 7.6.3. `ns.DONJONS_QUETES` (quêtes de chaque donjon), lue par personne, a été retirée en 7.7.4.
 - `GuildUp_Taux.lua` (`ns.TAUX_BUTIN` : taux de butin des monstres du bestiaire) : généré par
   `python outils/generer_butin.py` depuis la base **ForeverDB** (GPL-3.0,
   <https://github.com/foreverfraddons/forever-db>), qui réunit et recoupe elle-même QuestieDB (GPL-3.0),

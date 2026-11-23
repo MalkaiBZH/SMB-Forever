@@ -22,10 +22,8 @@ Format d'une ligne (voir GuildUp_Objectifs.lua) :
          « : » si aucun monstre ne le lâche : coffre, marchand, autre quête)
 Seules les quêtes qui ont au moins un monstre à tuer ou à dépouiller sont gardées.
 
-Deux autres listes dans le même fichier (SUITES_QUETES est lue par GuildUp_Quetes.lua ;
-DONJONS_QUETES n'est encore lue par personne) :
-  ns.DONJONS_QUETES  aire|quête,quête,…  les quêtes dont la zone (zoneOrSort = 17) est ce donjon (numéro
-                     de zone AreaTable, voir DONJONS)
+Une autre liste dans le même fichier, lue par GuildUp_Quetes.lua (la liste des quêtes de chaque donjon,
+DONJONS_QUETES, lue par personne, a été retirée en 7.7.4) :
   ns.SUITES_QUETES   quête|racine|étape|longueur  les quêtes qui font partie d'une suite d'au moins deux
                      quêtes : première quête de la suite, rang de celle-ci (1 = la première) et nombre
                      d'étapes du plus long chemin ; la suite se lit par preQuestSingle (13, une seule quête
@@ -40,10 +38,6 @@ RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SORTIE = os.path.join(RACINE, "GuildUpSMB", "GuildUp_ObjectifsQuetes.lua")
 URL = "https://raw.githubusercontent.com/Questie/QuestieDB/{ref}/data/Forever/{fichier}"
 FICHIERS = ("foreverQuestDB.lua", "foreverItemDB.lua")
-
-# Donjons à cinq (numéro de zone AreaTable utilisé par QuestieDB pour les quêtes qui s'y passent)
-DONJONS = (2437, 718, 1581, 209, 719, 717, 133, 1717, 796, 722, 1517, 978, 2100, 1417, 1584, 1583, 2557,
-           2057, 2017)
 
 
 # --- Lecture des tables Lua de QuestieDB (sous-ensemble : tables, nombres, chaînes, nil, booléens) ---
@@ -206,17 +200,7 @@ def construire(ref):
         if not tuer and monstres_butin == 0:
             continue
         lignes.append("%d|%s|%s" % (qid, ";".join(tuer), ";".join(butin)))
-    return lignes, donjons(quetes), suites(quetes)
-
-
-def donjons(quetes):
-    par_aire = {a: [] for a in DONJONS}
-    for qid in sorted(k for k in quetes if isinstance(k, int)):
-        q = liste(quetes[qid])
-        zone = q[16] if len(q) > 16 else None
-        if zone in par_aire:
-            par_aire[zone].append(str(qid))
-    return ["%d|%s" % (a, ",".join(par_aire[a])) for a in DONJONS if par_aire[a]]
+    return lignes, suites(quetes)
 
 
 def suites(quetes):
@@ -253,26 +237,23 @@ def suites(quetes):
     return lignes
 
 
-def contenu(ref, lignes, lignes_donjons, lignes_suites):
-    return ("-- GuildUpSMB : objectifs des quêtes (monstres à tuer, monstres qui lâchent les objets demandés),\n"
-            "-- quêtes de chaque donjon et suites de quêtes.\n"
+def contenu(ref, lignes, lignes_suites):
+    return ("-- GuildUpSMB : objectifs des quêtes (monstres à tuer, monstres qui lâchent les objets demandés)\n"
+            "-- et suites de quêtes.\n"
             "-- FICHIER GÉNÉRÉ par outils/generer_objectifs.py : ne pas modifier à la main.\n"
             "-- Données tirées de la base QuestieDB, version Forever (GPL-3.0, merci à ses auteurs) :\n"
             "-- https://github.com/Questie/QuestieDB (data/Forever, réf. %s, le %s).\n"
             "-- Ligne : quête|tuer|butin ; tuer = objectifs « à tuer » dans l'ordre du jeu (« ; »), monstres de\n"
             "-- chacun (« , ») ; butin = objectifs « objet » dans l'ordre du jeu (« ; ») : objet:monstre,monstre.\n"
             "-- Lu par GuildUp_Objectifs.lua.\n"
-            "-- DONJONS_QUETES : aire du donjon|quêtes qui s'y passent ; SUITES_QUETES : quête|première quête de la\n"
-            "-- suite|étape|nombre d'étapes. SUITES_QUETES est lue par GuildUp_Quetes.lua.\n"
+            "-- SUITES_QUETES : quête|première quête de la suite|étape|nombre d'étapes, lue par GuildUp_Quetes.lua.\n"
             "\n"
             "local NOM_ADDON, ns = ...\n"
             "\n"
             "ns.OBJECTIFS_QUETES = [==[\n%s\n]==]\n"
             "\n"
-            "ns.DONJONS_QUETES = [==[\n%s\n]==]\n"
-            "\n"
             "ns.SUITES_QUETES = [==[\n%s\n]==]\n") % (ref, date.today().isoformat(), "\n".join(lignes),
-                                                      "\n".join(lignes_donjons), "\n".join(lignes_suites))
+                                                      "\n".join(lignes_suites))
 
 
 def main():
@@ -282,15 +263,15 @@ def main():
     ref = "HEAD"
     if "--ref" in args:
         ref = args[args.index("--ref") + 1]
-    lignes, lignes_donjons, lignes_suites = construire(ref)
-    print("%d quêtes avec des monstres à tuer ou à dépouiller, %d donjons, %d quêtes dans une suite"
-          % (len(lignes), len(lignes_donjons), len(lignes_suites)))
+    lignes, lignes_suites = construire(ref)
+    print("%d quêtes avec des monstres à tuer ou à dépouiller, %d quêtes dans une suite"
+          % (len(lignes), len(lignes_suites)))
     if verifier:
         if not os.path.exists(SORTIE):
             print("pas de fichier actuel")
             return
         actuelles = [l for l in open(SORTIE, encoding="utf-8").read().split("\n") if l[:1].isdigit()]
-        lignes = lignes + lignes_donjons + lignes_suites
+        lignes = lignes + lignes_suites
         ajoutees = set(lignes) - set(actuelles)
         retirees = set(actuelles) - set(lignes)
         print("%d ligne(s) ajoutée(s), %d retirée(s)" % (len(ajoutees), len(retirees)))
@@ -300,7 +281,7 @@ def main():
             print("-", l)
         return
     with open(SORTIE, "w", encoding="utf-8", newline="\n") as f:
-        f.write(contenu(ref, lignes, lignes_donjons, lignes_suites))
+        f.write(contenu(ref, lignes, lignes_suites))
     print("écrit :", SORTIE, "(%d octets)" % os.path.getsize(SORTIE))
 
 
