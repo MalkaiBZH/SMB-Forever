@@ -736,6 +736,59 @@ end
 -- Réception
 --------------------------------------------------------------------------------
 
+-- Tout ce qui touche à l'appel, regroupé ici : Recevoir a déjà presque 60 upvalues, la limite de Lua 5.1 (au-delà,
+-- le fichier entier ne se charge plus). « J » un appel, « I » un « J'arrive ! », « A » quelqu'un s'assoit,
+-- « D » quelqu'un se lève.
+local function NoterAppel(genre, qui, suite)
+	local moi = MaCle()
+	if genre == "J" then
+		-- bulle pour qui n'est pas à table (et peut encore s'y asseoir), après le combat s'il le faut ;
+		-- pastilles tant qu'il vaut (DUREE_APPEL)
+		if qui == moi then return end
+		local n = tonumber(suite) or Assis()
+		if n >= PLACES then return end
+		appel = { qui = qui, n = n, debut = GetTime() }
+		if not AppelValide() then appel = nil; return end
+		if EnCombat() then appel.bulle = true else BulleAppel(appel) end
+		if C_Timer then C_Timer.After(DUREE_APPEL + 1, function() MajAppel(); Maj() end) end
+		MajAppel()
+		Maj()
+	elseif genre == "I" then
+		-- suite = qui a appelé : affiché sur la table, bulle chez celui qui a appelé
+		if not suite or suite == "" or PlaceDe(qui) then return end
+		arrivent[qui] = GetTime()
+		if suite == moi and qui ~= moi and ns.Notifier then
+			ns.Notifier("tirages", "Bizkit", ("%s arrive à la table !"):format(NomJoueur(qui)))
+		end
+		Maj()
+	elseif genre == "A" then
+		-- assis : plus en route ; moi assis, ou table pleine : l'appel ne m'attend plus, les pastilles s'éteignent
+		arrivent[qui] = nil
+		if appel then
+			if qui == moi then appel = nil end
+			MajAppel()
+		end
+	elseif genre == "D" then
+		-- celui qui appelait est parti : l'appel tombe
+		if appel and appel.qui == qui then appel = nil; MajAppel() end
+	end
+end
+
+-- « 3 / 8 · Nom arrive » : ceux qui ont répondu « J'arrive ! » sans être encore assis (oubliés après DUREE_APPEL)
+local function EnRoute()
+	local n, unSeul = 0, nil
+	for cle, quand in pairs(arrivent) do
+		if GetTime() - quand <= DUREE_APPEL and not PlaceDe(cle) then
+			n, unSeul = n + 1, cle
+		else
+			arrivent[cle] = nil
+		end
+	end
+	if n == 1 then return " · " .. (NomCourt and NomCourt(unSeul) or unSeul) .. " arrive" end
+	if n > 1 then return (" · %d arrivent"):format(n) end
+	return ""
+end
+
 local function Recevoir(prefixe, msg, canal, expediteur)
 	if prefixe ~= PREFIXE or canal ~= "GUILD" or not msg or not expediteur then return end
 	local qui = Normaliser(expediteur)
@@ -762,12 +815,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		end
 		if avant and avant ~= place then places[avant] = nil end
 		places[place] = qui
-		arrivent[qui] = nil
-		-- (assis, ou table pleine : l'appel ne m'attend plus, les pastilles s'éteignent)
-		if appel then
-			if qui == moi then appel = nil end
-			MajAppel()
-		end
+		NoterAppel("A", qui)
 		pts = tonumber(pts)
 		if not coups[qui] then
 			-- (une version d'avant les coups n'envoie que ses points ; une récente envoie aussi « C »)
@@ -788,7 +836,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		local p = PlaceDe(qui)
 		if p and RefusDepart(qui) then return end -- (un prisonnier reste à table)
 		if qui == moi then NoterMaPlace(nil) end
-		if appel and appel.qui == qui then appel = nil; MajAppel() end -- (celui qui appelait est parti)
+		NoterAppel("D", qui)
 		if p then
 			places[p] = nil
 			if enCours then partis[qui] = true end
@@ -1024,26 +1072,8 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		Effet("info", qui, nil, "nouvelle partie : tout le monde repart à 0 coup")
 		if PlaceDe(moi) then NoterMaPlace(PlaceDe(moi)) end
 		Maj()
-	elseif genre == "J" then
-		-- un appel : bulle pour qui n'est pas à table (et peut encore s'y asseoir), après le combat s'il le faut ;
-		-- pastilles tant qu'il vaut (DUREE_APPEL)
-		if qui == moi then return end
-		local n = tonumber(suite) or Assis()
-		if n >= PLACES then return end
-		appel = { qui = qui, n = n, debut = GetTime() }
-		if not AppelValide() then appel = nil; return end
-		if EnCombat() then appel.bulle = true else BulleAppel(appel) end
-		if C_Timer then C_Timer.After(DUREE_APPEL + 1, function() MajAppel(); Maj() end) end
-		MajAppel()
-		Maj()
-	elseif genre == "I" then
-		-- « J'arrive ! » (suite = qui a appelé) : affiché sur la table, bulle chez celui qui a appelé
-		if suite == "" or PlaceDe(qui) then return end
-		arrivent[qui] = GetTime()
-		if suite == moi and qui ~= moi and ns.Notifier then
-			ns.Notifier("tirages", "Bizkit", ("%s arrive à la table !"):format(NomJoueur(qui)))
-		end
-		Maj()
+	elseif genre == "J" or genre == "I" then
+		NoterAppel(genre, qui, suite)
 	elseif genre == "Q" then
 		if qui == moi then return end
 		local mienne = PlaceDe(moi)
@@ -2011,19 +2041,8 @@ Maj = function()
 		t.lancer:Activer(PeutLancer() or (b ~= nil and not b.rang[moi] and PeutLancer(true)))
 		t.lancer:Ecrire(attente and "Les dés roulent…" or "Lancer les dés")
 	end
-	-- le compte des joueurs, et ceux qui ont répondu « J'arrive ! » (oubliés après DUREE_APPEL)
-	local nA, unSeul = 0, nil
-	for cle, quand in pairs(arrivent) do
-		if GetTime() - quand <= DUREE_APPEL and not PlaceDe(cle) then
-			nA, unSeul = nA + 1, cle
-		else
-			arrivent[cle] = nil
-		end
-	end
-	local enRoute = ""
-	if nA == 1 then enRoute = " · " .. (NomCourt and NomCourt(unSeul) or unSeul) .. " arrive"
-	elseif nA > 1 then enRoute = (" · %d arrivent"):format(nA) end
-	t.compte:SetText(("%d / %d%s"):format(Assis(), PLACES, enRoute))
+	-- le compte des joueurs, et ceux qui sont en route
+	t.compte:SetText(("%d / %d%s"):format(Assis(), PLACES, EnRoute()))
 
 	-- les cachots
 	t.cachot3:Poser(prisonVue, prisonVue and cranVu, nil)
