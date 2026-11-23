@@ -90,6 +90,9 @@
 --                               connaît que par le champ « points » de « A » ; les versions d'avant l'ignorent)
 --   "N"                         nouvelle partie : tous les joueurs repartent à 0 coup, prisons vides ; seul le
 --                               créateur de la partie l'envoie, sauf s'il n'est plus assis ; je deviens le créateur
+--   "J~n"                       j'appelle la guilde à la table (bouton « Appeler la guilde », assis, une place libre,
+--                               un appel toutes les DELAI_APPEL secondes) ; n = joueurs assis ; bulle « tirages »
+--                               chez qui n'est pas assis, un clic ouvre la table (les versions d'avant l'ignorent)
 --   "Q"                         j'ouvre la table : les membres assis renvoient « A~place~derniere~points » et
 --                               « C~coups », et
 --                               l'auteur du dernier lancer le renvoie en rappel (même id : déjà vu, ignoré)
@@ -132,6 +135,7 @@ local TOUCHE = 40            -- vecteur : un joueur est touché seul si la ligne
                              -- plus loin de tout le monde, dégâts de zone sur les deux plus proches
 local MAX_PAR_JOUEUR = 7     -- doubles : au plus 7 attaques sur un même joueur
 local VISEE = 0.4            -- doubles : au plus un « V » (où vont mes attaques) toutes les VISEE secondes
+local DELAI_APPEL = 120      -- secondes entre deux appels à la guilde d'un même joueur (« J »)
 
 local Normaliser = ns.Normaliser
 local NomJoueur = ns.NomJoueur -- (affichage : « Pseudo (Prénom) »)
@@ -607,6 +611,20 @@ local function NouvellePartie()
 	Envoyer("N")
 end
 
+-- l'appel à la guilde : assis, avec une place libre, un au plus toutes les DELAI_APPEL secondes
+local dernierAppel = -DELAI_APPEL
+local function PeutAppeler()
+	return PlaceDe(MaCle()) ~= nil and Assis() < PLACES and GetTime() - dernierAppel >= DELAI_APPEL
+end
+
+local function Appeler()
+	if not PeutAppeler() then return end
+	dernierAppel = GetTime()
+	Envoyer("J~" .. Assis())
+	if C_Timer then C_Timer.After(DELAI_APPEL, function() Maj() end) end
+	Maj()
+end
+
 local function Lancer()
 	if not PeutLancer() then return end
 	if not RandomRoll then Erreur("Ce client ne permet pas de lancer les dés depuis l'addon"); return end
@@ -951,6 +969,14 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 		Effet("info", qui, nil, "nouvelle partie : tout le monde repart à 0 coup")
 		if PlaceDe(moi) then NoterMaPlace(PlaceDe(moi)) end
 		Maj()
+	elseif genre == "J" then
+		-- un appel : bulle pour qui n'est pas à table (et peut encore s'y asseoir) ; un clic ouvre la table
+		if qui == moi or PlaceDe(moi) or partis[moi] then return end
+		local n = tonumber(suite) or Assis()
+		if n >= PLACES or not ns.Notifier then return end
+		ns.Notifier("tirages", "Bizkit", ("%s cherche des joueurs pour le |cffffd100Bizkit|r · %d à table, %d place%s libre%s")
+			:format(NomJoueur(qui), n, PLACES - n, PLACES - n > 1 and "s" or "", PLACES - n > 1 and "s" or ""), "READY_CHECK",
+			function() if ns.OuvrirInterface then ns.OuvrirInterface("jeux", "bizkit") end end)
 	elseif genre == "Q" then
 		if qui == moi then return end
 		local mienne = PlaceDe(moi)
@@ -1589,16 +1615,16 @@ local function CreerCote(parent)
 	f.vide:SetText("Aucun lancer pour l'instant.")
 	f.liste = UI.Liste(f)
 	f.liste:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -40)
-	f.liste:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 104)
+	f.liste:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 136)
 	f.lignes = {}             -- un lancer : son lanceur, ses dés, leur somme
 	f.sous = {}               -- sous chaque lancer : ses effets
 	-- le lancer en cours, encadré (voir Maj)
 	f.actuel = CreateFrame("Frame", nil, f.liste.contenu, "BackdropTemplate")
 	UI.Habiller(f.actuel, { 0.133, 0.11, 0.078, 1 }, { 0.29, 0.235, 0.145, 1 })
 	f.actuel:SetFrameLevel(f.liste.contenu:GetFrameLevel())
-	-- en bas, de haut en bas : les règles (au survol), nouvelle partie, quitter la table
+	-- en bas, de haut en bas : les règles (au survol), appeler la guilde, nouvelle partie, quitter la table
 	f.regles = CreateFrame("Button", nil, f)
-	f.regles:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 78)
+	f.regles:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 110)
 	f.regles:SetPoint("RIGHT", f, "RIGHT", -14, 0)
 	f.regles:SetHeight(20)
 	f.regles.texte = UI.Texte(f.regles, "GameFontHighlightSmall", C.gris)
@@ -1631,8 +1657,13 @@ local function CreerCote(parent)
 	f.nouvelle:SetScript("OnClick", NouvellePartie)
 	UI.Infobulle(f.nouvelle, "Nouvelle partie", "Tous les joueurs repartent à 0 coup. Seul le joueur qui a créé la partie peut en lancer une nouvelle ; s'il a quitté la table, tous les joueurs assis le peuvent. Deux clics pour confirmer.")
 	UI.Infobulle(f.lever, "Quitter la table", "Pendant une partie, qui quitte la table ne peut plus la rejoindre avant la partie suivante (deux clics pour confirmer). Un prisonnier ne peut pas quitter la table.")
+	f.appel = UI.Bouton(f, "Appeler la guilde", "fantome", 100, 26)
+	f.appel:SetPoint("BOTTOMLEFT", f.nouvelle, "TOPLEFT", 0, 6)
+	f.appel:SetPoint("RIGHT", f, "RIGHT", -14, 0)
+	f.appel:SetScript("OnClick", Appeler)
+	UI.Infobulle(f.appel, "Appeler la guilde", "Une bulle prévient les membres qui ne sont pas à table que tu cherches des joueurs ; un clic dessus leur ouvre la table. Il faut être assis et qu'il reste une place. Un appel toutes les 2 minutes au plus.")
 	-- (infobulles aussi sur les boutons grisés)
-	for _, b in ipairs({ f.nouvelle, f.lever }) do
+	for _, b in ipairs({ f.appel, f.nouvelle, f.lever }) do
 		if b.SetMotionScriptsWhileDisabled then b:SetMotionScriptsWhileDisabled(true) end
 	end
 	return f
@@ -2002,6 +2033,9 @@ Maj = function()
 	local refusDepart = mienne and RefusDepart(moi)
 	cote.lever:Activer(mienne ~= nil and not refusDepart)
 	cote.lever:Ecrire(refusDepart or (GetTime() - confirmeDepart <= 3 and "Confirmer ? (sans retour)") or "Quitter la table")
+	cote.appel:Activer(PeutAppeler())
+	cote.appel:Ecrire((GetTime() - dernierAppel < DELAI_APPEL and "Appel envoyé")
+		or (mienne and Assis() >= PLACES and "Table complète") or "Appeler la guilde")
 	local relance = PeutRelancerPartie(moi)
 	cote.nouvelle:Activer(relance)
 	cote.nouvelle:Ecrire(GetTime() - confirmeNouvelle <= 3 and "Confirmer ?"

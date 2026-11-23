@@ -29,7 +29,7 @@ local pret = false
 local suitDnd         -- dernier état du /dnd du jeu, pour ne réagir qu'aux changements
 
 local NOMS = {         -- catégories des bulles, pour le compte rendu (GuildUp_Options.lua)
-	demandes = "demande", quetes = "quête", tirages = "tirage", sondages = "sondage",
+	demandes = "demande", quetes = "quête", tirages = "jeu", sondages = "sondage",
 	aide = "appel à l'aide", annonces = "annonce", evenements = "événement", version = "version",
 	metiers = "métier", membres = "membre", groupes = "groupe", layers = "layer",
 }

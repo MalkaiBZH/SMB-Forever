@@ -375,7 +375,7 @@ local HAUT_CARTE, HAUT_NOTIFS, HAUT_ECRAN = 186, 126, 86
 -- types de bulles du médaillon (db.notifs[cat] == false : coupées), cinq par ligne
 local NOTIFS = {
 	{ "demandes", "Demandes" }, { "aide", "Aide" }, { "niveaux", "Niveaux" }, { "metiers", "Métiers" },
-	{ "evenements", "Événements" }, { "quetes", "Quêtes" }, { "tirages", "Tirages" }, { "sondages", "Sondages" },
+	{ "evenements", "Événements" }, { "quetes", "Quêtes" }, { "tirages", "Jeux" }, { "sondages", "Sondages" },
 	{ "version", "Version" }, { "wowdex", "WoWdex" }, { "cena", "Surprise" }, -- (explosion des montées de niveau, GuildUp_Cena.lua : surprise)
 	{ "gu", (ns.Config and ns.Config.cri) and (tostring(ns.Config.cri):upper() .. "!") or "Cri" },
 }

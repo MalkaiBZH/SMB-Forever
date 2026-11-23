@@ -224,6 +224,9 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
     joueur s'assoit quand il veut. « Nouvelle partie » remet tout le monde à 0 coup : seul le créateur de la partie
     peut la lancer (s'il a quitté la table, tous les joueurs assis le peuvent), et il devient le créateur. Un joueur qui tarde (40 s) peut être sauté par le suivant ;
     les membres déconnectés libèrent leur place, et on reprend sa place et ses coups après un `/reload`.
+    Pas assez de monde ? Un joueur assis clique sur « Appeler la guilde » : les membres qui ne sont pas à table
+    reçoivent une bulle (combien de joueurs, combien de places libres), et un clic dessus leur ouvre la table. Un
+    appel toutes les 2 minutes au plus ; la bulle se coupe avec la case « Jeux » des notifications.
 - **Sondage** (`/smb sondage`, ou « Sondage » dans le menu rapide du médaillon) : une question, 2 à 5 choix, 1 à
   10 minutes pour voter. Les membres connectés qui ont l'addon reçoivent une bulle et votent d'un clic ; résultats en
   direct, changement d'avis possible jusqu'à la fin, votes publics (le survol d'un choix montre qui l'a choisi),
