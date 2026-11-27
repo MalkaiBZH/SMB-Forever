@@ -9,21 +9,31 @@
 -- N'importe quelle suite de lettres est acceptée comme proposition : l'addon ne connaît que 1 300 mots et
 -- refuser tout le reste rendrait le jeu pénible.
 --
--- On ne joue qu'en vol, sur un griffon ou un hippogriffe : au sol la grille est fermée. Le vol est lu par
--- UnitOnTaxi (appel protégé : rien ne dit que le client Forever l'ait) avec un repli sur
--- PLAYER_CONTROL_LOST / PLAYER_CONTROL_GAINED. Le chrono ne tourne que pendant le vol, l'onglet ouvert :
--- à l'atterrissage la grille se fige et reprend au vol suivant du même jour, sinon un vol court
--- condamnerait la partie. Une bulle (catégorie « motus ») propose le mot du jour au décollage, une fois
--- par vol, et seulement s'il reste à trouver.
+-- On ne joue qu'en vol, sur un griffon ou un hippogriffe : au sol la grille est fermée. Tout passe par
+-- SurLeVol(), et une seule ligne du fichier ajoute une proposition à la partie (dans Valider) : elle est
+-- derrière ce test, comme la frappe des lettres. Le vol est lu par UnitOnTaxi (appel protégé : rien ne dit
+-- que le client Forever l'ait) ; à défaut, PLAYER_CONTROL_LOST ne suffit pas — il part aussi sur un charme,
+-- une cinématique ou certains étourdissements — et le repli exige en plus qu'une carte des vols ait été
+-- ouverte ou fermée dans les DELAI_TAXI secondes d'avant, donc qu'on vienne de payer un trajet.
+-- Le chrono ne tourne que pendant le vol, l'onglet ouvert : à l'atterrissage la grille se fige et reprend
+-- au vol suivant du même jour, sinon un vol court condamnerait la partie. Une bulle (catégorie « motus »)
+-- propose le mot du jour au décollage, une fois par vol, et seulement s'il reste à trouver.
 --
 -- Les points du jour : 100 de base, plus une seconde gagnée = un point (180 au plus), plus 25 par ligne
--- laissée, plus 20 par lettre au-delà de cinq. Rien du tout si le mot n'est pas trouvé.
+-- laissée, plus 20 par lettre au-delà de cinq. Rien du tout si le mot n'est pas trouvé. Deux classements :
+-- celui du jour, et celui de la semaine, qui additionne les points de chaque jour joué depuis lundi et
+-- repart à zéro le lundi suivant (le jour 0, 1er janvier 1970, était un jeudi : d'où le décalage de 3 dans
+-- Lundi()).
 --
 -- Réseau (canal GUILD, préfixe "GuildUpMot") :
 --   S~jour~points~secondes~lignes   mon score du jour (nombres en base 36)
---   Q                               « renvoyez-moi vos scores du jour », à la connexion
--- Ma partie : GuildUpDB.motus.partie, commune aux personnages du compte (comme le WoWdex) ; les scores
--- de la guilde : GuildUpDB.motus.guilde, oubliés dès que le jour change.
+--   H~lundi~points…                 mes points de la semaine, un nombre par jour depuis lundi (0 = pas
+--                                   joué) : le classement de la semaine se remplit même chez ceux qui
+--                                   n'étaient pas connectés les jours d'avant
+--   Q                               « renvoyez-moi vos scores », à la connexion ; on répond S puis H
+-- Ma partie : GuildUpDB.motus.partie, commune aux personnages du compte (comme le WoWdex). Les scores du
+-- jour : GuildUpDB.motus.guilde, oubliés dès que le jour change. Les points jour par jour de chacun :
+-- GuildUpDB.motus.histo[clé][jour], oubliés au bout de JOURS_GARDES jours.
 
 local NOM_ADDON, ns = ...
 
@@ -37,6 +47,9 @@ local BONUS_LETTRE = 20        -- par lettre au-delà de MINI
 local CASE, ECART = 42, 6      -- taille d'une case de la grille et espace entre deux
 local TOUCHE = 26              -- taille d'une touche du clavier de l'écran
 local CLASSEMENT_MAX = 12
+local PAS_RANG = 35            -- hauteur d'une ligne du classement
+local JOURS_GARDES = 14        -- au-delà, les scores passés sont oubliés
+local DELAI_TAXI = 20          -- secondes entre la carte des vols fermée et le décollage (repli sans UnitOnTaxi)
 
 local Maintenant = ns.Maintenant
 local Normaliser = ns.Normaliser
@@ -50,6 +63,7 @@ local JUSTE, AILLEURS, ABSENT, VIDE = 1, 2, 3, 4
 local vue           -- le cadre de l'onglet, créé à la première ouverture de la page Jeux
 local partie        -- ma partie du jour (table rangée dans GuildUpDB)
 local controlePerdu = false
+local dernierTaxi = 0   -- quand la carte des vols a été fermée pour la dernière fois
 local bulleFaite = false
 local MajFenetre
 
@@ -143,6 +157,56 @@ local function Scores()
 	return coffre.guilde
 end
 
+-- Le lundi de la semaine d'un jour. Le jour 0 (1er janvier 1970) était un jeudi, d'où le décalage de 3.
+local function Lundi(jour)
+	return jour - ((jour + 3) % 7)
+end
+
+-- Les points de chacun, jour par jour : GuildUpDB.motus.histo[clé][jour] = points. C'est ce qui permet le
+-- classement de la semaine ; au-delà de JOURS_GARDES, tout est oublié pour que la table ne grossisse pas.
+local function Histo()
+	local coffre = Coffre()
+	if not coffre then return {} end
+	if type(coffre.histo) ~= "table" then coffre.histo = {} end
+	local limite = Jour() - JOURS_GARDES
+	for cle, jours in pairs(coffre.histo) do
+		if type(jours) ~= "table" then
+			coffre.histo[cle] = nil
+		else
+			local reste = false
+			for j in pairs(jours) do
+				if type(j) ~= "number" or j < limite then jours[j] = nil else reste = true end
+			end
+			if not reste then coffre.histo[cle] = nil end
+		end
+	end
+	return coffre.histo
+end
+
+local function Noter(cle, jour, points)
+	if not (cle and jour and points) or points <= 0 then return end
+	local h = Histo()
+	h[cle] = h[cle] or {}
+	if not h[cle][jour] or points > h[cle][jour] then h[cle][jour] = points end
+end
+
+-- Total de la semaine en cours (lundi → aujourd'hui) pour chaque membre, avec le nombre de jours joués
+local function TotauxSemaine()
+	local h, lundi, jour = Histo(), Lundi(Jour()), Jour()
+	local liste = {}
+	for cle, jours in pairs(h) do
+		local total, joues = 0, 0
+		for j, p in pairs(jours) do
+			if j >= lundi and j <= jour then
+				total = total + p
+				joues = joues + 1
+			end
+		end
+		if joues > 0 then liste[#liste + 1] = { cle = cle, p = total, n = joues } end
+	end
+	return liste
+end
+
 --------------------------------------------------------------------------------
 -- Les règles du jeu
 --------------------------------------------------------------------------------
@@ -199,12 +263,16 @@ end
 -- Le vol : la seule porte d'entrée du jeu
 --------------------------------------------------------------------------------
 
+-- Vrai seulement pendant un vol en griffon. UnitOnTaxi est la bonne réponse quand le client l'a ; sinon, le
+-- repli ne se contente pas de PLAYER_CONTROL_LOST, qui part aussi sur un charme, une cinématique ou certains
+-- étourdissements : il exige qu'une carte des vols ait été fermée juste avant, c'est-à-dire qu'on vienne de
+-- payer un trajet. Hors de ces deux cas, le jeu reste fermé.
 local function SurLeVol()
 	if UnitOnTaxi then
 		local ok, dessus = pcall(UnitOnTaxi, "player")
 		if ok then return dessus == true or dessus == 1 end
 	end
-	return controlePerdu -- repli : le client n'a pas UnitOnTaxi
+	return controlePerdu and (Maintenant() - dernierTaxi) <= DELAI_TAXI
 end
 
 local function AJouer()
@@ -229,6 +297,23 @@ local function AnnoncerMonScore()
 		Base36(math.floor(p.secondes or 0)), Base36(#p.lignes)), "GUILD")
 end
 
+-- Ma semaine : un nombre par jour depuis lundi (0 = pas joué), pour que le classement de la semaine se
+-- remplisse même chez ceux qui n'étaient pas connectés les jours d'avant. Une quarantaine d'octets.
+local function AnnoncerMaSemaine()
+	if not ns.EnvoyerAddon then return end
+	local mien = Histo()[MaCle()]
+	if not mien then return end
+	local lundi, jour = Lundi(Jour()), Jour()
+	local bouts, rien = { "H", Base36(lundi) }, true
+	for j = lundi, jour do
+		local p = mien[j] or 0
+		if p > 0 then rien = false end
+		bouts[#bouts + 1] = Base36(p)
+	end
+	if rien then return end
+	ns.EnvoyerAddon(PREFIXE, table.concat(bouts, "~"), "GUILD")
+end
+
 local function Recevoir(prefixe, msg, canal, expediteur)
 	if prefixe ~= PREFIXE or canal ~= "GUILD" or not msg or not expediteur then return end
 	local qui = Normaliser(expediteur)
@@ -236,7 +321,22 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	local moi = MaCle()
 	local solo = ns.TestSolo and ns.TestSolo()
 	if msg == "Q" then
-		if qui ~= moi or solo then AnnoncerMonScore() end
+		if qui ~= moi or solo then
+			AnnoncerMonScore()
+			AnnoncerMaSemaine()
+		end
+		return
+	end
+	if msg:find("^H~") then
+		if qui == moi and not solo then return end
+		local nombres = {}
+		for n in msg:gmatch("~(%w+)") do nombres[#nombres + 1] = tonumber(n, 36) end
+		local lundi = table.remove(nombres, 1)
+		if lundi ~= Lundi(Jour()) then return end -- une autre semaine : plus rien à en faire
+		for i, p in ipairs(nombres) do
+			if p and p > 0 then Noter(qui, lundi + i - 1, p) end
+		end
+		if MajFenetre then MajFenetre() end
 		return
 	end
 	local jour, points, secondes, lignes = msg:match("^S~(%w+)~(%w+)~(%w+)~(%w+)$")
@@ -245,6 +345,7 @@ local function Recevoir(prefixe, msg, canal, expediteur)
 	secondes, lignes = tonumber(secondes, 36), tonumber(lignes, 36)
 	if not points or jour ~= Jour() then return end
 	if qui == moi and not solo then return end -- mon propre score, déjà noté
+	Noter(qui, jour, points)
 	local s = Scores()
 	s[qui] = { p = points, s = secondes or 0, l = lignes or ESSAIS }
 	if MajFenetre then MajFenetre() end
@@ -373,7 +474,9 @@ local function Valider()
 		p.points = Points(#p.mot, p.secondes, #p.lignes)
 		local s = Scores()
 		s[MaCle()] = { p = p.points, s = math.floor(p.secondes or 0), l = #p.lignes }
+		Noter(MaCle(), p.jour, p.points)
 		AnnoncerMonScore()
+		AnnoncerMaSemaine()
 		if ns.Notifier then
 			ns.Notifier("motus", "Motus", ("Trouvé : |cffffd100%s|r · %d points"):format(p.mot, p.points), nil,
 				function() if ns.MontrerMotus then ns.MontrerMotus() end end)
@@ -471,29 +574,50 @@ MajFenetre = function()
 	end
 	vue.aide:SetShown(jouable and not vue.champ:HasFocus())
 
-	-- le classement du jour
-	local scores, liste = Scores(), {}
-	for cle, s in pairs(scores) do
-		if cle ~= "jour" and type(s) == "table" and s.p then
-			liste[#liste + 1] = { cle = cle, p = s.p, s = s.s, l = s.l }
+	-- le classement, du jour ou de la semaine
+	local cl, semaine = vue.carteClassement, vue.mode == "semaine"
+	local liste = {}
+	if semaine then
+		liste = TotauxSemaine()
+		table.sort(liste, function(a, b)
+			if a.p ~= b.p then return a.p > b.p end
+			return (a.n or 0) > (b.n or 0)
+		end)
+	else
+		for cle, s in pairs(Scores()) do
+			if cle ~= "jour" and type(s) == "table" and s.p then
+				liste[#liste + 1] = { cle = cle, p = s.p, s = s.s, l = s.l }
+			end
 		end
+		table.sort(liste, function(a, b)
+			if a.p ~= b.p then return a.p > b.p end
+			return (a.s or 0) < (b.s or 0)
+		end)
 	end
-	table.sort(liste, function(a, b)
-		if a.p ~= b.p then return a.p > b.p end
-		return (a.s or 0) < (b.s or 0)
-	end)
+	cl.titre:SetText(semaine and "Classement de la semaine" or "Classement du jour")
+	for _, b in ipairs({ cl.ongletJour, cl.ongletSemaine }) do
+		local actif = (b == (semaine and cl.ongletSemaine or cl.ongletJour))
+		b.texte:SetTextColor(actif and c.ors[1] or c.gris[1], actif and c.ors[2] or c.gris[2],
+			actif and c.ors[3] or c.gris[3])
+		b:SetAlpha(actif and 1 or 0.65)
+	end
 	local moi = MaCle()
 	for i = 1, CLASSEMENT_MAX do
 		local r, e = vue.rangs[i], liste[i]
 		r:SetShown(e ~= nil)
 		if e then
 			r.nom:SetText(("%d. %s"):format(i, NomJoueur(e.cle)))
-			r.detail:SetText(("%d pts · %s · %d l."):format(e.p, Secondes(e.s), e.l or ESSAIS))
+			if semaine then
+				r.detail:SetText(("%d pts · %d jour%s"):format(e.p, e.n, e.n > 1 and "s" or ""))
+			else
+				r.detail:SetText(("%d pts · %s · %d l."):format(e.p, Secondes(e.s), e.l or ESSAIS))
+			end
 			r:Fort(e.cle == moi)
 		end
 	end
-	vue.carteClassement.vide:SetText(#liste == 0 and "Personne n'a encore trouvé le mot du jour." or "")
-	vue.carteClassement.compte:SetText(#liste > 0 and ("%d"):format(#liste) or "")
+	cl.aucun:SetText(#liste > 0 and "" or
+		(semaine and "Aucun point marqué cette semaine." or "Personne n'a encore trouvé le mot du jour."))
+	cl.compte:SetText(#liste > 0 and ("%d"):format(#liste) or "")
 end
 
 local function CreerOnglet(parent)
@@ -510,7 +634,12 @@ local function CreerOnglet(parent)
 	carte:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
 	carte:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
 	carte:SetWidth(math.max(430, math.floor((largeur - 12) * 0.62)))
-	UI.Infobulle(carte.titre, "Motus de la guilde",
+	-- L'infobulle des règles se pose sur un cadre invisible calé sur le titre : carte.titre est un FontString,
+	-- et UI.Infobulle accroche un OnEnter, ce qu'un FontString ne sait pas faire.
+	local survolTitre = CreateFrame("Frame", nil, carte)
+	survolTitre:SetSize(170, 20)
+	survolTitre:SetPoint("TOPLEFT", carte, "TOPLEFT", 12, -10)
+	UI.Infobulle(survolTitre, "Motus de la guilde",
 		"Un mot par jour, le même pour toute la guilde, et seulement en vol. Or : bonne lettre bien placée. "
 		.. "Bronze : bonne lettre, mauvaise place. Les points montent quand tu trouves vite et en peu de lignes.")
 
@@ -552,15 +681,29 @@ local function CreerOnglet(parent)
 	f.clavier = CreerClavier(carte, Taper, Effacer, Valider)
 	f.clavier:SetPoint("BOTTOM", carte, "BOTTOM", 0, 16)
 
-	-- le classement du jour, à droite
+	-- le classement, à droite : deux onglets, le jour et la semaine
 	local cl = UI.Carte(f, "Classement du jour")
 	cl:SetPoint("TOPLEFT", carte, "TOPRIGHT", 12, 0)
 	cl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
 	f.carteClassement = cl
+	f.mode = "jour"
+	cl.ongletJour = UI.Bouton(cl, "Jour", nil, 74, 20)
+	cl.ongletJour:SetPoint("TOPLEFT", cl, "TOPLEFT", 10, -32)
+	cl.ongletJour:SetScript("OnClick", function() f.mode = "jour" ; MajFenetre() end)
+	UI.Infobulle(cl.ongletJour, "Les points du mot du jour")
+	cl.ongletSemaine = UI.Bouton(cl, "Semaine", nil, 82, 20)
+	cl.ongletSemaine:SetPoint("TOPLEFT", cl.ongletJour, "TOPRIGHT", 4, 0)
+	cl.ongletSemaine:SetScript("OnClick", function() f.mode = "semaine" ; MajFenetre() end)
+	UI.Infobulle(cl.ongletSemaine, "Le total depuis lundi",
+		"Les points de chaque jour joué depuis lundi, additionnés. La semaine repart à zéro le lundi.")
+	cl.aucun = UI.Texte(cl, "GameFontHighlight", UI.C.gris)
+	cl.aucun:SetPoint("TOPLEFT", cl, "TOPLEFT", 14, -62)
+	cl.aucun:SetPoint("RIGHT", cl, "RIGHT", -14, 0)
+	cl.aucun:SetWordWrap(true)
 	f.rangs = {}
 	for i = 1, CLASSEMENT_MAX do
-		local r = UI.Rangee(cl, 34)
-		r:SetPoint("TOPLEFT", cl, "TOPLEFT", 10, -34 - (i - 1) * 37)
+		local r = UI.Rangee(cl, 32)
+		r:SetPoint("TOPLEFT", cl, "TOPLEFT", 10, -58 - (i - 1) * PAS_RANG)
 		r:SetPoint("RIGHT", cl, "RIGHT", -10, 0)
 		r.nom = UI.Texte(r, "GameFontNormal", UI.C.texte)
 		r.nom:SetPoint("LEFT", r, "LEFT", 10, 0)
@@ -630,7 +773,8 @@ ev:SetScript("OnUpdate", function(_, ecoule)
 	end
 end)
 
-for _, nom in ipairs({ "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_CONTROL_LOST", "PLAYER_CONTROL_GAINED" }) do
+for _, nom in ipairs({ "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_CONTROL_LOST", "PLAYER_CONTROL_GAINED",
+	"TAXIMAP_OPENED", "TAXIMAP_CLOSED" }) do
 	pcall(ev.RegisterEvent, ev, nom)
 end
 
@@ -639,6 +783,8 @@ ev:SetScript("OnEvent", function(_, evenement)
 		controlePerdu = true
 	elseif evenement == "PLAYER_CONTROL_GAINED" then
 		controlePerdu = false
+	elseif evenement == "TAXIMAP_OPENED" or evenement == "TAXIMAP_CLOSED" then
+		dernierTaxi = Maintenant() -- un trajet vient d'être payé : le repli sans UnitOnTaxi s'appuie là-dessus
 	end
 	Charger()
 	if evenement == "PLAYER_LOGIN" and ns.EnvoyerAddon then
@@ -666,4 +812,11 @@ ns.DiagMotus = function(L)
 			p.fini and (p.gagne and "trouvé" or "perdu") or "en cours",
 			p.points and (", %d points"):format(p.points) or ""))
 	end
+	local mienne, membres = 0, 0
+	for _, e in ipairs(TotauxSemaine()) do
+		membres = membres + 1
+		if e.cle == MaCle() then mienne = e.p end
+	end
+	L(("motus, semaine du lundi %d : %d membre(s) classé(s), %d points pour moi"):format(Lundi(Jour()),
+		membres, mienne))
 end

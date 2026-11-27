@@ -51,8 +51,15 @@ local function Factice(genre, parent)
 	return setmetatable(o, { __index = function(t, k)
 		if type(k) ~= "string" then return nil end
 		local f
-		if k == "SetScript" then f = function(self, nom, fn) self.__scripts[nom] = fn end
-		elseif k == "HookScript" then f = function(self, nom, fn) local a = self.__scripts[nom]; self.__scripts[nom] = function(...) if a then a(...) end; fn(...) end end
+		-- Un FontString ou une Texture n'a pas de scripts : le jeu lèverait une erreur. Le faux client la
+		-- lève aussi, sinon une infobulle accrochée sur le titre d'une carte au lieu d'un cadre passe ici et
+		-- casse en jeu, avalée par un pcall.
+		local function SansScript(self, k)
+			assert(self.__genre ~= "CreateFontString" and self.__genre ~= "CreateTexture",
+				k .. " sur un " .. tostring(self.__genre) .. " : le jeu refuserait")
+		end
+		if k == "SetScript" then f = function(self, nom, fn) SansScript(self, k); self.__scripts[nom] = fn end
+		elseif k == "HookScript" then f = function(self, nom, fn) SansScript(self, k); local a = self.__scripts[nom]; self.__scripts[nom] = function(...) if a then a(...) end; fn(...) end end
 		elseif k == "GetScript" then f = function(self, nom) return self.__scripts[nom] end
 		elseif k == "SetText" then f = function(self, x) assert(x == nil or type(x) == "string" or type(x) == "number", "SetText : " .. type(x)); self.__texte = x and tostring(x) or "" end
 		elseif k == "GetText" then f = function(self) return self.__texte end

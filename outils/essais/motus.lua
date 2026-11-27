@@ -18,6 +18,18 @@ local CreerOnglet, idJeu
 ns.AjouterJeu = function(nom, creer, id) CreerOnglet, idJeu = creer, id end
 
 Charger("GuildUp_Style.lua")
+
+-- Le faux client accepte n'importe quelle méthode sur ses cadres factices, y compris SetScript sur un
+-- FontString, que le jeu refuserait. On le lui interdit ici : une infobulle accrochée sur le titre d'une
+-- carte au lieu d'un cadre levait une erreur en jeu, avalée par le pcall de GuildUp_Tirage.lua, et laissait
+-- l'onglet vide sans rien dire.
+local VraiTexte = ns.UI.Texte
+ns.UI.Texte = function(...)
+	local t = VraiTexte(...)
+	t.SetScript = function() error("SetScript sur un FontString : le jeu refuserait", 2) end
+	return t
+end
+
 Charger("GuildUp_Mots.lua")
 local MOTS_BRUTS = ns.MOTS_MOTUS
 Charger("GuildUp_Motus.lua")
@@ -145,9 +157,14 @@ Etape("trouvé : points, score noté et annoncé à la guilde", function()
 	-- 100 de base + (180 - secondes) + 25 par ligne laissée + 20 par lettre au-delà de 5
 	local attendu = 100 + math.max(0, 180 - math.floor(p.secondes)) + 25 * (6 - #p.lignes) + 20 * (#MOT - 5)
 	assert(p.points == attendu, ("points %d, attendu %d"):format(p.points, attendu))
-	local msg = envoyes[#envoyes]
-	assert(#envoyes > avant and msg:find("^S~"), "rien d'annoncé : " .. tostring(msg))
-	assert(#msg <= 255, "message trop long")
+	local msg, semaine
+	for i = avant + 1, #envoyes do
+		if envoyes[i]:find("^S~") then msg = envoyes[i] end
+		if envoyes[i]:find("^H~") then semaine = envoyes[i] end
+	end
+	assert(msg, "score du jour non annoncé parmi " .. #envoyes - avant .. " message(s)")
+	assert(semaine, "semaine non annoncée")
+	assert(#msg <= 255 and #semaine <= 255, "message trop long")
 	local j, pts, s, l = msg:match("^S~(%w+)~(%w+)~(%w+)~(%w+)$")
 	assert(j and tonumber(j, 36) == JOUR, "jour mal encodé")
 	assert(tonumber(pts, 36) == p.points, "points mal encodés")
@@ -183,7 +200,9 @@ end)
 Etape("un « Q » reçu fait renvoyer mon score", function()
 	local avant = #envoyes
 	ecouteur("GuildUpMot", "Q", "GUILD", "Ronan-Forever")
-	assert(#envoyes == avant + 1 and envoyes[#envoyes]:find("^S~"), "score non renvoyé")
+	local vuS = false
+	for i = avant + 1, #envoyes do if envoyes[i]:find("^S~") then vuS = true end end
+	assert(vuS, "score du jour non renvoyé")
 end)
 
 Etape("atterrissage : la grille garde le résultat, le clavier disparaît", function()
@@ -218,10 +237,95 @@ Etape("perdu après six lignes : aucun point", function()
 	assert(onglet.consigne.__texte:find("était"), "le mot n'est pas révélé : " .. onglet.consigne.__texte)
 end)
 
+Etape("sans UnitOnTaxi, perdre le contrôle ne suffit pas à ouvrir le jeu", function()
+	client.Avancer(86400) -- un jour neuf : sinon la partie est finie et le clavier resterait caché de toute façon
+	local vrai = UnitOnTaxi
+	UnitOnTaxi = nil      -- on fait comme si le client ne connaissait pas l'API
+	surLeVol = false
+	OnEvent(ev, "PLAYER_CONTROL_GAINED")
+	OnUpdate(ev, 1)
+	onglet.Maj()
+	assert(onglet.clavier.__montre == false, "le clavier s'affiche au sol")
+	OnEvent(ev, "PLAYER_CONTROL_LOST") -- charme, cinématique, étourdissement : pas un vol
+	OnUpdate(ev, 1)
+	assert(onglet.clavier.__montre == false, "une simple perte de contrôle ouvre le jeu")
+	OnEvent(ev, "PLAYER_CONTROL_GAINED")
+	OnEvent(ev, "TAXIMAP_CLOSED")      -- là, on paie un trajet
+	OnEvent(ev, "PLAYER_CONTROL_LOST") -- puis on décolle
+	OnUpdate(ev, 1)
+	assert(onglet.clavier.__montre == true, "le repli ne reconnaît pas un vrai vol")
+	UnitOnTaxi = vrai
+	OnEvent(ev, "PLAYER_CONTROL_GAINED")
+	surLeVol = true
+	OnUpdate(ev, 1)
+end)
+
+Etape("classement de la semaine : les jours s'additionnent", function()
+	local Base36 = ns.Base36
+	local jour = math.floor(ns.Maintenant() / 86400)
+	local lundi = jour - ((jour + 3) % 7)
+	local bouts = { "H", Base36(lundi) }
+	for j = lundi, jour do
+		bouts[#bouts + 1] = Base36((j == lundi) and 120 or 60)
+	end
+	local msg = table.concat(bouts, "~")
+	assert(#msg <= 255, "message de semaine trop long : " .. #msg)
+	ecouteur("GuildUpMot", msg, "GUILD", "Ronan-Forever")
+	-- le total attendu se lit dans l'historique rangé par l'addon : le camarade avait déjà un score du jour
+	local total, joues = 0, 0
+	for j, p in pairs(db.motus.histo["Ronan-Forever"] or {}) do
+		if j >= lundi and j <= jour then total = total + p ; joues = joues + 1 end
+	end
+	assert(joues > 0, "l'historique du camarade est vide")
+	local bJour, bSemaine = onglet.carteClassement.ongletJour, onglet.carteClassement.ongletSemaine
+	bSemaine.__scripts.OnClick(bSemaine)
+	assert(onglet.carteClassement.titre.__texte:find("semaine"), "le titre ne passe pas à la semaine")
+	local detail
+	for i = 1, 12 do
+		local r = onglet.rangs[i]
+		if r.__montre and r.nom.__texte:find("Ronan") then detail = r.detail.__texte end
+	end
+	assert(detail, "le camarade n'est pas au classement de la semaine")
+	assert(detail:find(tostring(total)), ("total attendu %d, affiché %s"):format(total, detail))
+	assert(detail:find("jour"), "le nombre de jours joués manque : " .. detail)
+	-- une semaine passée n'entre pas
+	ecouteur("GuildUpMot", ("H~%s~%s"):format(Base36(lundi - 7), Base36(9999)), "GUILD", "Vieux-Forever")
+	onglet.Maj()
+	for i = 1, 12 do
+		local r = onglet.rangs[i]
+		if r.__montre then assert(not r.nom.__texte:find("Vieux"), "une semaine passée est entrée au classement") end
+	end
+	bJour.__scripts.OnClick(bJour)
+	assert(onglet.carteClassement.titre.__texte:find("du jour"), "retour au classement du jour raté")
+end)
+
+Etape("un « Q » renvoie le score du jour et la semaine", function()
+	local avant = #envoyes
+	ecouteur("GuildUpMot", "Q", "GUILD", "Ronan-Forever")
+	local vus = {}
+	for i = avant + 1, #envoyes do vus[envoyes[i]:sub(1, 1)] = true end
+	assert(vus.H, "la semaine n'est pas renvoyée")
+end)
+
+Etape("les scores trop vieux sont oubliés dès qu'on touche à l'historique", function()
+	local coffre = db.motus
+	coffre.histo = coffre.histo or {}
+	local jour = math.floor(ns.Maintenant() / 86400)
+	coffre.histo["Ancien-Forever"] = { [jour - 30] = 500 }
+	-- l'oubli se fait à la première lecture de l'historique : ici, l'arrivée d'un score
+	local lundi = jour - ((jour + 3) % 7)
+	ecouteur("GuildUpMot", ("H~%s~%s"):format(ns.Base36(lundi), ns.Base36(30)), "GUILD", "Autre-Forever")
+	assert(coffre.histo["Ancien-Forever"] == nil, "un score de 30 jours traîne encore")
+	assert(coffre.histo["Autre-Forever"], "le score neuf n'a pas été gardé")
+end)
+
 Etape("le diagnostic parle", function()
 	local lignes = {}
 	ns.DiagMotus(function(s) lignes[#lignes + 1] = s end)
 	assert(#lignes >= 1 and lignes[1]:find("motus"), "diagnostic muet")
+	local semaine
+	for _, l in ipairs(lignes) do if l:find("semaine") then semaine = l end end
+	assert(semaine, "le diagnostic ne dit rien de la semaine")
 end)
 
 os.exit(client.Bilan() and 0 or 1)

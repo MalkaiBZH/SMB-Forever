@@ -144,8 +144,11 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   distribuer (`R` relance du double 6, `T` attaques) ; 9, 10, 11 : un point pour le joueur d'avant, le lanceur, celui d'après ;
   sinon (4, 6, 8 sans double), le vecteur : `Vecteur(l)`, calculé par chacun sur les positions des dés reçues ; tout est appliqué à la réception, mes messages compris ;
   appel à la guilde `J` (bulle sonore, pastilles via `ns.BizkitEnAttente` pendant 5 min) et réponse « J'arrive ! » `I`),
-  `GuildUpMot` (Motus, `/smb motus`, `GuildUp_Motus.lua` : un seul genre de message, `S~jour~points~secondes~lignes`
-  en base 36, plus `Q` à la connexion ; le mot du jour ne circule jamais, chacun le calcule de la date),
+  `GuildUpMot` (Motus, `/smb motus`, `GuildUp_Motus.lua` : `S~jour~points~secondes~lignes` pour le score du jour
+  et `H~lundi~points…` pour la semaine, un nombre par jour depuis lundi, tout en base 36, plus `Q` à la
+  connexion à quoi on répond `S` puis `H` ; le mot du jour ne circule jamais, chacun le calcule de la date.
+  Les points jour par jour de chacun sont gardés dans `GuildUpDB.motus.histo[clé][jour]`, oubliés au bout de
+  `JOURS_GARDES` jours, et c'est de là que sort le classement de la semaine),
   `GuildUpJrn` (fil d'activité et podium, `GuildUp_Journal.lua` : les autres modules y notent leurs nouvelles avec
   `ns.NoterActivite(genre, clé, valeur)`), `GuildUpNpd` (mode calme « ne pas déranger », `GuildUp_Calme.lua` : `ns.NePasDeranger()` coupe les bulles dans
   `ns.Notifier`, `ns.CalmeDe` / `ns.IconeCalme` pour l'afficher sur les autres membres),
@@ -232,7 +235,8 @@ Le vrai test se fait **en jeu**, après `/reload`. Avant de pousser, les essais 
 script (fonction appelée avant d'être définie, nom mal écrit, texte ou nombre absent, « %s » qui reçoit nil), pas
 les défauts d'affichage :
 - `lua outils/essais/wowdex.lua GuildUpSMB` (depuis la racine) : le WoWdex dans un faux client WoW
-  (`outils/essais/faux_client.lua` : cadres factices où toute méthode existe, unités, messages, bulles). Code de
+  (`outils/essais/faux_client.lua` : cadres factices où presque toute méthode existe — mais `SetScript` sur un
+  FontString ou une Texture lève une erreur, comme le jeu —, unités, messages, bulles). Code de
   sortie 1 au moindre échec. Un essai par page : un fichier de plus dans `outils/essais/`, sur le même modèle
   (`outils/essais/registre.lua` : l'onglet Registre de l'Artisanat, avec des fiches de membres reçues par messages).
 - GitHub (`.github/workflows/essais.yml`) relance à chaque push qui touche l'addon la syntaxe de chaque fichier avec
