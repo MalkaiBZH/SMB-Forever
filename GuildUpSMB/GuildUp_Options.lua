@@ -377,6 +377,7 @@ local NOTIFS = {
 	{ "demandes", "Demandes" }, { "aide", "Aide" }, { "niveaux", "Niveaux" }, { "metiers", "Métiers" },
 	{ "evenements", "Événements" }, { "quetes", "Quêtes" }, { "tirages", "Jeux" }, { "sondages", "Sondages" },
 	{ "version", "Version" }, { "wowdex", "WoWdex" }, { "cena", "Surprise" }, -- (explosion des montées de niveau, GuildUp_Cena.lua : surprise)
+	{ "motus", "Motus" }, -- (le mot du jour proposé au décollage, GuildUp_Motus.lua)
 	{ "gu", (ns.Config and ns.Config.cri) and (tostring(ns.Config.cri):upper() .. "!") or "Cri" },
 }
 local MES_ROLES = { "auto", "tank", "heal", "dps" }                  -- puces « Mon rôle »
@@ -702,6 +703,9 @@ SlashCmdList.GUILDUP = function(msg)
 		return
 	elseif cmd == "bizkit" or cmd == "des" or cmd == "dés" then
 		if ns.MontrerBizkit then ns.MontrerBizkit() end
+		return
+	elseif cmd == "motus" or cmd == "mot" then
+		if ns.MontrerMotus then ns.MontrerMotus() end
 		return
 	elseif cmd == "jeux" or cmd == "jeu" then
 		if ns.OuvrirInterface then ns.OuvrirInterface("jeux") end

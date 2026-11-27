@@ -61,7 +61,7 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   (`GuildUp_Carnet.lua` : onglets Registre dans `GuildUp_Metiers.lua` et Crafts dans `GuildUp_Carnet.lua`), Quêtes
   (`GuildUp_Quetes.lua`), WoWdex (`GuildUp_Wowdex.lua`, 7.0.0), Guilde (`GuildUp_Membres.lua`), Jeux (`GuildUp_Tirage.lua` : onglet Tirage au sort ; un jeu de
   plus = un onglet de plus, déclaré avec `ns.AjouterJeu(nom, creer, id)` par un fichier chargé après `GuildUp_Tirage.lua` :
-  Bizkit dans `GuildUp_Bizkit.lua`), Événements (`GuildUp_Evenements.lua`), Activité (`GuildUp_Journal.lua`), Statistiques
+  Bizkit dans `GuildUp_Bizkit.lua`, Motus dans `GuildUp_Motus.lua`), Événements (`GuildUp_Evenements.lua`), Activité (`GuildUp_Journal.lua`), Statistiques
   (`GuildUp_Stats.lua`) ; Options (`GuildUp_Options.lua`) en bas du menu. Les anciennes fonctions `ns.Ouvrir*` /
   `ns.Basculer*` ouvrent ces pages (`ns.OuvrirInterface(page, ...)`). L'encyclopédie et l'aperçu 3D restent des
   fenêtres à part. Ne pas éparpiller : une nouvelle fonction trouve sa place dans une section existante (onglet) avant
@@ -144,6 +144,8 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   distribuer (`R` relance du double 6, `T` attaques) ; 9, 10, 11 : un point pour le joueur d'avant, le lanceur, celui d'après ;
   sinon (4, 6, 8 sans double), le vecteur : `Vecteur(l)`, calculé par chacun sur les positions des dés reçues ; tout est appliqué à la réception, mes messages compris ;
   appel à la guilde `J` (bulle sonore, pastilles via `ns.BizkitEnAttente` pendant 5 min) et réponse « J'arrive ! » `I`),
+  `GuildUpMot` (Motus, `/smb motus`, `GuildUp_Motus.lua` : un seul genre de message, `S~jour~points~secondes~lignes`
+  en base 36, plus `Q` à la connexion ; le mot du jour ne circule jamais, chacun le calcule de la date),
   `GuildUpJrn` (fil d'activité et podium, `GuildUp_Journal.lua` : les autres modules y notent leurs nouvelles avec
   `ns.NoterActivite(genre, clé, valeur)`), `GuildUpNpd` (mode calme « ne pas déranger », `GuildUp_Calme.lua` : `ns.NePasDeranger()` coupe les bulles dans
   `ns.Notifier`, `ns.CalmeDe` / `ns.IconeCalme` pour l'afficher sur les autres membres),
@@ -163,6 +165,14 @@ client 1.60.1, style Vanilla). Tout le code est dans `GuildUpSMB/`. Voir `README
   `SavedVariables` et relayées par les membres connectés ; oubli après 30 jours (`OUBLI`).
 
 ## Données générées (ne pas éditer à la main)
+
+- `GuildUp_Mots.lua` (les mots du Motus) : généré par `python outils/generer_mots.py` depuis les fichiers de
+  données déjà présents (`GuildUp_Objets.lua`, `GuildUp_Bestiaire.lua`, `GuildUp_Sources.lua`), sans aucune
+  liste extérieure. Le tri repose sur une particularité des noms français du client : seul le premier mot porte
+  une majuscule (« Épée longue de fer »), donc **un mot vu en minuscule est un nom commun français**, alors que
+  l'anglais resté dans les données est en Title Case et les noms propres toujours capitalisés. Deux apparitions
+  en minuscule exigées ; le script écarte en plus, à la main, une poignée de noms propres restés en minuscule
+  (`NOMS_PROPRES`) et les mots de grammaire (`MOTS_OUTILS`). `--verifier` compare sans écrire.
 
 - `GuildUp_Craft.lua` (recettes : métier, niveau requis, niveau « jaune », objet, rendement, composants) :
   généré par `python outils/generer_craft.py <build>` depuis les tables du client publiées par wago.tools

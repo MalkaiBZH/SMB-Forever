@@ -135,8 +135,14 @@ end
 
 local NOM_PUBLIC = (ns.Config and ns.Config.nomPublic) or "SMB Forever" -- GuildUp_Config.lua
 -- De la plus récente à la plus ancienne
-local ORDRE = { "7.9.1", "7.9.0", "7.8.0", "7.7.4", "7.7.3", "7.7.2", "7.7.1", "7.7.0", "7.6.3", "7.6.2", "7.6.1", "7.6.0", "7.5.1", "7.5.0", "7.4.0", "7.3.0", "7.2.0", "7.1.1", "7.1.0", "7.0.0", "6.0.0", "5.5.0", "5.4.0", "5.3.1", "5.3.0", "5.2.0", "5.1.1", "5.1.0", "5.0.0", "4.3.2", "4.3.1", "4.3.0", "4.2.0", "4.1.0", "4.0.6", "4.0.5", "4.0.4", "4.0.3", "4.0.2", "4.0.1", "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
+local ORDRE = { "7.10.0", "7.9.1", "7.9.0", "7.8.0", "7.7.4", "7.7.3", "7.7.2", "7.7.1", "7.7.0", "7.6.3", "7.6.2", "7.6.1", "7.6.0", "7.5.1", "7.5.0", "7.4.0", "7.3.0", "7.2.0", "7.1.1", "7.1.0", "7.0.0", "6.0.0", "5.5.0", "5.4.0", "5.3.1", "5.3.0", "5.2.0", "5.1.1", "5.1.0", "5.0.0", "4.3.2", "4.3.1", "4.3.0", "4.2.0", "4.1.0", "4.0.6", "4.0.5", "4.0.4", "4.0.3", "4.0.2", "4.0.1", "4.0.0", "3.14.2", "3.14.1", "3.14.0", "3.13.1", "3.13.0", "3.12.0", "3.11.0", "3.10.0", "3.9.0", "3.8.1", "3.8.0", "3.7.0", "3.6.0","3.5.2", "3.5.1", "3.5.0", "3.4.1", "3.4.0", "3.3.0", "3.2.1", "3.2.0", "3.1.2", "3.1.1", "3.1.0", "3.0.0", "2.15.0", "2.14.2", "2.14.1", "2.14.0", "2.13.1", "2.13.0", "2.12.0", "2.11.0", "2.10.0", "2.9.0", "2.8.0", "2.7.0", "2.6.2", "2.6.1", "2.6.0", "2.5.1", "2.5.0", "2.4.1", "2.4.0", "2.3.1", "2.3.0", "2.2.0", "2.1.1", "2.1.0", "2.0.1", "2.0.0", "1.6.0", "1.5.1", "1.5.0", "1.4.0", "1.3.0" }
 local NOTES = {
+	["7.10.0"] = {
+		"Un |cffffd100Motus|r rejoint la page Jeux : un mot à trouver chaque jour, le même pour toute la guilde. Mais on n'y joue qu'|cffffd100en vol|r, sur un griffon : le mot t'attend pendant le trajet et la grille se ferme à l'atterrissage. Si tu atterris avant d'avoir trouvé, elle reprend où tu l'as laissée au vol suivant, chrono compris.",
+		"La première lettre est donnée, six lignes sont offertes. Or : bonne lettre, bonne place. Bronze : bonne lettre, mauvaise place. Le clavier à l'écran se colore de ce que tu as déjà appris, et tu peux taper au clavier comme cliquer les touches.",
+		"Les |cffffd100points du jour|r récompensent la vitesse : 100 de base, un point par seconde gagnée, 25 par ligne dont tu n'as pas eu besoin et 20 par lettre au-delà de cinq. Le |cffffd100classement du jour|r se remplit tout seul avec les scores de la guilde.",
+		"Les 1 318 mots sortent des noms français du jeu : tu y retrouveras de l'étoffe, des écailles et quelques murlocs.",
+	},
 	["7.9.1"] = {
 		"Le |cffffd100Bizkit|r est de retour dans la page Jeux : la 7.9.0 l'avait fait disparaître. Désolé pour la partie manquée !",
 	},

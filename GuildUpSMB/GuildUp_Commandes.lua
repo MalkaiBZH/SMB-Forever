@@ -41,6 +41,7 @@ local CHAPITRES = {
 		{ "roll", "tirage", "Ouvre un tirage au sort pour la guilde. Maj + clic sur un objet pour le mettre en jeu ; sans rien, rouvre la fenêtre du dernier tirage.",
 			"roll [objet ou mot]" },
 		{ "bizkit", "des, dés", "Le Bizkit : assieds-toi autour de la table et lance deux dés quand vient ton tour. Sur un 7, tout le monde crie « Bizkit ! » : le dernier perd un point. Sur un 3 ou un 5, en prison ! Sur un double, attaque ! Sinon, gare au vecteur. Pas assez de monde ? « Appeler la guilde » prévient les autres membres." },
+		{ "motus", "mot", "Le Motus de la guilde : un mot à trouver chaque jour, le même pour tout le monde, mais on n'y joue qu'en vol sur un griffon. Les points du jour récompensent la vitesse." },
 		{ "sondage", "sondages, vote", "Ouvre le sondage en cours, ou te laisse en poser un (une question, de deux à cinq réponses)." },
 		{ "biere", "gu", "Affiche ou non la chope qui descend de l'écran quand un membre écrit le cri de guilde. Ne lance pas le cri : il part tout seul quand tu écris le cri dans le chat.",
 			nil, function() return Notifs().gu ~= false end },
