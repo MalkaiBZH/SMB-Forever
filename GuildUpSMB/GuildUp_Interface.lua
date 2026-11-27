@@ -48,7 +48,7 @@ ns.NouveautesGuilde = function()
 		aide = ns.AppelsAide and #ns.AppelsAide() or 0,
 		demandes = ns.NombreDemandesAider and ns.NombreDemandesAider() or 0,
 		jeux = (ns.TirageEnAttente and ns.TirageEnAttente() or 0) + (ns.BizkitEnAttente and ns.BizkitEnAttente() or 0)
-			+ (ns.MotusEnAttente and ns.MotusEnAttente() or 0),
+			+ (ns.WowtusEnAttente and ns.WowtusEnAttente() or 0),
 		bizkit = ns.BizkitEnAttente and ns.BizkitEnAttente() or 0, -- (compris dans jeux : appel au Bizkit)
 	}
 end

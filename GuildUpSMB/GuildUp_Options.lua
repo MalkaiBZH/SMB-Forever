@@ -354,7 +354,7 @@ local function Diag()
 		if not ok then L("carte : ERREUR " .. tostring(err)) end
 	end
 	for _, d in ipairs({ { "métiers", ns.DiagMetiers }, { "version", ns.DiagVersion }, { "quêtes", ns.DiagQuetes }, { "objectifs", ns.DiagObjectifs },
-		{ "événements", ns.DiagEvenements }, { "demandes", ns.DiagDemandes }, { "discord", ns.DiagDiscord }, { "carnet", ns.DiagCarnet }, { "carnet2", ns.DiagCarnet2 }, { "identité", ns.DiagIdentite }, { "gu", ns.DiagGU }, { "layers", ns.DiagLayers }, { "wowdex", ns.DiagWowdex } }) do
+		{ "événements", ns.DiagEvenements }, { "demandes", ns.DiagDemandes }, { "discord", ns.DiagDiscord }, { "carnet", ns.DiagCarnet }, { "carnet2", ns.DiagCarnet2 }, { "identité", ns.DiagIdentite }, { "gu", ns.DiagGU }, { "layers", ns.DiagLayers }, { "wowdex", ns.DiagWowdex }, { "wowtus", ns.DiagWowtus } }) do
 		if d[2] then
 			local ok, err = pcall(d[2], L)
 			if not ok then L(d[1] .. " : ERREUR " .. tostring(err)) end
@@ -377,7 +377,7 @@ local NOTIFS = {
 	{ "demandes", "Demandes" }, { "aide", "Aide" }, { "niveaux", "Niveaux" }, { "metiers", "Métiers" },
 	{ "evenements", "Événements" }, { "quetes", "Quêtes" }, { "tirages", "Jeux" }, { "sondages", "Sondages" },
 	{ "version", "Version" }, { "wowdex", "WoWdex" }, { "cena", "Surprise" }, -- (explosion des montées de niveau, GuildUp_Cena.lua : surprise)
-	{ "motus", "Motus" }, -- (le mot du jour proposé au décollage, GuildUp_Motus.lua)
+	{ "motus", "WoWTUS" }, -- (le mot du jour proposé au décollage, GuildUp_Wowtus.lua ; clé restée « motus »)
 	{ "gu", (ns.Config and ns.Config.cri) and (tostring(ns.Config.cri):upper() .. "!") or "Cri" },
 }
 local MES_ROLES = { "auto", "tank", "heal", "dps" }                  -- puces « Mon rôle »
@@ -704,8 +704,8 @@ SlashCmdList.GUILDUP = function(msg)
 	elseif cmd == "bizkit" or cmd == "des" or cmd == "dés" then
 		if ns.MontrerBizkit then ns.MontrerBizkit() end
 		return
-	elseif cmd == "motus" or cmd == "mot" then
-		if ns.MontrerMotus then ns.MontrerMotus() end
+	elseif cmd == "wowtus" or cmd == "motus" or cmd == "mot" then
+		if ns.MontrerWowtus then ns.MontrerWowtus() end
 		return
 	elseif cmd == "jeux" or cmd == "jeu" then
 		if ns.OuvrirInterface then ns.OuvrirInterface("jeux") end

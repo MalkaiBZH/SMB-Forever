@@ -230,7 +230,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
     combat. « J'arrive ! », sur la table, prévient celui qui a appelé, et la table affiche qui est en route. Un
     appel toutes les 2 minutes au plus ; la bulle se coupe avec la case « Jeux » des notifications. Son de l'appel :
     `media/TheHordeFlagIsTaken.mp3` (sans ce fichier, le son discret des bulles).
-  - *Motus* (`/smb motus`) : un mot à trouver chaque jour, le même pour toute la guilde — mais **seulement en
+  - *WoWTUS* (`/smb wowtus`, ou `/smb motus`) : un mot à trouver chaque jour, le même pour toute la guilde — mais **seulement en
     vol**. Prends un griffon et le mot du jour t'attend pendant le trajet ; au sol, la grille est fermée, et
     rien d'autre qu'un vrai vol ne l'ouvre (ni un charme, ni une cinématique). Sa
     longueur tourne de 5 à 8 lettres selon le jour, la première lettre est donnée et six lignes sont offertes.
@@ -244,7 +244,7 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
     et nombre de lignes de chacun) et celui **de la semaine**, qui additionne les points de chaque jour joué
     depuis lundi et repart à zéro le lundi suivant. Les totaux de la semaine circulent dans la guilde, donc le
     classement se remplit même pour les jours où on n'était pas connecté. Les 1 318 mots viennent des noms français du jeu. La bulle du décollage se coupe avec la case
-    « Motus » des notifications.
+    « WoWTUS » des notifications.
 - **Sondage** (`/smb sondage`, ou « Sondage » dans le menu rapide du médaillon) : une question, 2 à 5 choix, 1 à
   10 minutes pour voter. Les membres connectés qui ont l'addon reçoivent une bulle et votent d'un clic ; résultats en
   direct, changement d'avis possible jusqu'à la fin, votes publics (le survol d'un choix montre qui l'a choisi),
@@ -296,9 +296,9 @@ passage : `~/.config/GuildUpSMB-MiseAJour/`.
 | `/smb crafts` | Artisanat : tous les objets fabricables |
 | `/smb quetes` | Quêtes en commun |
 | `/smb wowdex` | WoWdex : les monstres vus, capturés et dépouillés, seul et en guilde (`dex`, `bestiaire`) |
-| `/smb jeux` | Jeux de la guilde (tirage au sort, Bizkit, Motus) |
+| `/smb jeux` | Jeux de la guilde (tirage au sort, Bizkit, WoWTUS) |
 | `/smb bizkit` | Le Bizkit, jeu de dés de la guilde |
-| `/smb motus` | Le Motus de la guilde : le mot du jour, à trouver en vol |
+| `/smb wowtus` | Le WoWTUS de la guilde : le mot du jour, à trouver en vol (aussi `/smb motus`) |
 | `/smb evenements` | Créer un événement de guilde |
 | `/smb encyclo` | Encyclopédie |
 | `/smb sos` | Appeler la guilde à l'aide |

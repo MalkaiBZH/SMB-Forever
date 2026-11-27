@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Génère GuildUpSMB/GuildUp_Mots.lua : les mots français du jeu, pour le Motus (GuildUp_Motus.lua).
+"""Génère GuildUpSMB/GuildUp_Mots.lua : les mots français du jeu, pour le WoWTUS (GuildUp_Wowtus.lua).
 
 Les mots sortent des fichiers de données déjà présents dans l'addon (GuildUp_Objets.lua,
 GuildUp_Bestiaire.lua, GuildUp_Sources.lua) : aucune liste extérieure, aucune licence à traîner.
@@ -81,21 +81,21 @@ def recolter():
 
 
 ENTETE = """\
--- GuildUpSMB : les mots du Motus (GuildUp_Motus.lua, onglet « Motus » de la page Jeux).
+-- GuildUpSMB : les mots du WoWTUS (GuildUp_Wowtus.lua, onglet « WoWTUS » de la page Jeux).
 -- Mots français de 5 à 8 lettres, sans accents, en majuscules, tirés des données du jeu déjà
 -- présentes dans l'addon (objets, bestiaire, sources) par outils/generer_mots.py : dans un nom
 -- français du client, seul le premier mot porte une majuscule (« Épée longue de fer »), donc un mot
 -- vu en minuscule est un nom commun français et non un nom propre ni de l'anglais en Title Case.
 -- Deux apparitions en minuscule exigées ; le script écarte en plus une poignée de noms propres
 -- restés en minuscule et les mots de grammaire.
--- ns.MOTS_MOTUS : un bloc par longueur, « longueur|mots collés » (tous de la même longueur),
--- une ligne par longueur. GuildUp_Motus.lua le découpe puis libère le texte (ns.MOTS_MOTUS = nil).
+-- ns.MOTS_WOWTUS : un bloc par longueur, « longueur|mots collés » (tous de la même longueur),
+-- une ligne par longueur. GuildUp_Wowtus.lua le découpe puis libère le texte (ns.MOTS_WOWTUS = nil).
 -- Ne pas modifier à la main : relancer python outils/generer_mots.py.
 -- %d mots : %s.
 
 local NOM_ADDON, ns = ...
 
-ns.MOTS_MOTUS = [==[
+ns.MOTS_WOWTUS = [==[
 """
 
 
